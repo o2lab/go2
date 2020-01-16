@@ -294,19 +294,15 @@ func (a *analysis) sameAddress(addr1 *ssa.Value, addr2 *ssa.Value) bool {
 
 	// check if they can point to the same obj
 	ptset := a.result.Queries
-	pt1Labels := ptset[*addr1].PointsTo().Labels()
-	pt2Labels := ptset[*addr2].PointsTo().Labels()
-	for _, l1 := range pt1Labels {
-		for _, l2 := range pt2Labels {
-			if l1.Value() == l2.Value() {
-				return true
-			}
-		}
+
+	if ptset[*addr1].MayAlias(ptset[*addr2]) {
+		return true
 	}
 	return false
 }
 
 // check if access1 is po-ordered to some go ins, which is po-ordered to access2
+// TODO: Current approach is naive. We need to consider predecessors and successors of basic blocks.
 func (a *analysis) checkPO(minAcc *accessInfo, maxAcc *accessInfo) bool {
 	sum2 := maxAcc.parent
 	for _, id := range sum2.fromGoroutines {
