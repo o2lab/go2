@@ -11,6 +11,7 @@ import (
 	"golang.org/x/tools/go/ssa"
 	"golang.org/x/tools/go/ssa/ssautil"
 	"sort"
+	"strings"
 
 	aurora "github.com/logrusorgru/aurora"
 	log "github.com/sirupsen/logrus"
@@ -60,7 +61,8 @@ type SyncBlock struct {
 }
 
 var (
-	Analysis *analysis
+	Analysis  *analysis
+	focusPkgs []string
 )
 
 func (a *analysis) getLastSyncBlock(bb *ssa.BasicBlock) *SyncBlock {
@@ -123,8 +125,10 @@ func (a *analysis) visitInstr(bb *ssa.BasicBlock, index int, instruction ssa.Ins
 	}
 	switch instr := instruction.(type) {
 	case *ssa.Alloc:
+	case *ssa.FieldAddr:
+		// get the address of a field
 	case *ssa.UnOp:
-		// read op
+		// read by pointer-dereference
 		if instr.Op == token.MUL {
 			a.addAccessInfo(&instruction, instr.X, false, false, instruction.Parent(), index, bb)
 			// chan recv
@@ -173,13 +177,21 @@ func (a *analysis) addAccessInfo(ins *ssa.Instruction, location ssa.Value, write
 	return info
 }
 
-func fromMainPkg(fn *ssa.Function) bool {
-	return fn.Pkg != nil && fn.Pkg.Pkg != nil && fn.Pkg.Pkg.Path() == "command-line-arguments"
+func fromPkgsOfInterest(fn *ssa.Function) bool {
+	if fn.Pkg == nil || fn.Pkg.Pkg == nil {
+		return false
+	}
+	for _, path := range focusPkgs {
+		if strings.HasPrefix(fn.Pkg.Pkg.Path(), path) {
+			return true
+		}
+	}
+	return false
 }
 
 func (a *analysis) visitInstrs() {
 	for fn := range ssautil.AllFunctions(a.prog) {
-		if !fromMainPkg(fn) || fn.Name() == "init" {
+		if !fromPkgsOfInterest(fn) {
 			continue
 		}
 		if _, ok := a.fn2SummaryMap[fn]; !ok {
@@ -298,7 +310,10 @@ func (a *analysis) sameAddress(addr1 *ssa.Value, addr2 *ssa.Value) bool {
 func (a *analysis) checkPO(minAcc *accessInfo, maxAcc *accessInfo) bool {
 	sum2 := maxAcc.parent
 	for _, id := range sum2.fromGoroutines {
-		goins := a.goID2insMap[id]
+		goins, ok := a.goID2insMap[id]
+		if !ok {
+			continue // FIXME: no instruction found for the goroutineID. bug?
+		}
 		if minAcc.bb == goins.Block() {
 			// check if goins is in minAcc.bb, after minAcc.index
 			for i := minAcc.index + 1; i < len(minAcc.bb.Instrs); i++ {
@@ -389,7 +404,7 @@ func (a *analysis) getConflictingPairs() ([][2]*ssa.Function, [][2]accessInfo) {
 			return nil
 		}
 		caller := edge.Caller
-		if !fromMainPkg(caller.Func) && caller.Func.Name() != "panic" {
+		if !fromPkgsOfInterest(caller.Func) && caller.Func.Name() != "panic" {
 			return nil
 		}
 		callee := edge.Callee
@@ -399,7 +414,7 @@ func (a *analysis) getConflictingPairs() ([][2]*ssa.Function, [][2]accessInfo) {
 			a.addNewGoroutineIDs(caller.Func, 0)
 		}
 
-		if !fromMainPkg(callee.Func) {
+		if !fromPkgsOfInterest(callee.Func) {
 			return nil
 		}
 
@@ -420,6 +435,7 @@ func (a *analysis) getConflictingPairs() ([][2]*ssa.Function, [][2]accessInfo) {
 	if err != nil {
 		log.Fatal(err)
 	}
+	log.Infof("%d goroutineIDs", len(a.goID2insMap))
 
 	for _, sum := range a.fn2SummaryMap {
 		sort.Ints(sum.fromGoroutines)
@@ -448,7 +464,6 @@ func (a *analysis) getConflictingPairs() ([][2]*ssa.Function, [][2]accessInfo) {
 }
 
 func init() {
-	log.SetLevel(log.DebugLevel)
 }
 
 func doAnalysis(args []string) error {
@@ -486,18 +501,23 @@ func doAnalysis(args []string) error {
 	}
 
 	Analysis = &analysis{
-		prog:          prog,
-		pkgs:          pkgs,
-		mains:         mains,
-		ptaConfig:	   config,
-		fn2SummaryMap: make(map[*ssa.Function]*fnSummary),
-		goID2insMap:   make(map[int]*ssa.Go),
-		bb2SyncBlockListMap:make(map[*ssa.BasicBlock][]*SyncBlock),
+		prog:                prog,
+		pkgs:                pkgs,
+		mains:               mains,
+		ptaConfig:           config,
+		fn2SummaryMap:       make(map[*ssa.Function]*fnSummary),
+		goID2insMap:         make(map[int]*ssa.Go),
+		bb2SyncBlockListMap: make(map[*ssa.BasicBlock][]*SyncBlock),
 	}
 
 	Analysis.visitInstrs()
+	log.Infof("%d function summaries, %d basic blocks", len(Analysis.fn2SummaryMap),
+		len(Analysis.bb2SyncBlockListMap))
 	Analysis.printSyncBlocks()
+	log.Info("Running whole-program pointer analysis...")
 	result, err := pointer.Analyze(config)
+	log.Infoln("Done")
+
 	if err != nil {
 		return err // internal error in pointer analysis
 	}
@@ -527,20 +547,30 @@ func (a *analysis) printAccPairs(accPairs [][2]accessInfo) {
 		}
 		return "Read"
 	}
-	for _, pair := range accPairs {
+	for i, pair := range accPairs {
 		ins1, ins2 := *pair[0].instruction, *pair[1].instruction
-		log.Println("Data race:")
+		log.Printf("Data race #%d", i)
+		log.Println("======================")
 		log.Println("  ", rwString(pair[0].write),
 			"of", aurora.Magenta(pair[0].location),
 			"at", pair[0].bb.Parent().Name(), a.prog.Fset.Position(ins1.Pos()))
 		log.Println("  ", rwString(pair[1].write),
 			"of", aurora.Magenta(pair[1].location),
 			"at", pair[1].bb.Parent().Name(), a.prog.Fset.Position(ins2.Pos()))
+		log.Println("======================")
 	}
+	log.Printf("Summary: %d races reported", len(accPairs))
 }
 
 func main() {
+	debug := flag.Bool("debug", false, "Prints debug messages.")
+	focus := flag.String("focus", "", "Specifies a list of packages to check races.")
 	flag.Parse()
+	if *debug {
+		log.SetLevel(log.DebugLevel)
+	}
+	focusPkgs = strings.Split(*focus, ",")
+	focusPkgs = append(focusPkgs, "command-line-arguments")
 
 	err := doAnalysis(flag.Args())
 	if err != nil {
