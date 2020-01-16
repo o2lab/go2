@@ -223,19 +223,19 @@ func (a *analysis) addNewGoroutineIDs(function *ssa.Function, ids ...int) {
 	}
 }
 
-func GraphVisitEdgesPreorder(g *callgraph.Graph, edge func(*callgraph.Edge) error) error {
+func GraphVisitEdgesPreorder(g *callgraph.Graph, edge func(*callgraph.Edge) error) error { // taken from library
 	seen := make(map[*callgraph.Node]bool)
 	var visit func(n *callgraph.Node) error
 	visit = func(n *callgraph.Node) error {
 		if !seen[n] {
 			seen[n] = true
 			for _, e := range n.Out {
-				if err := edge(e); err != nil {
+				if err := edge(e); err != nil { // change of sequence. From postOrder to preOrder
 					return err
 				}
 				if err := visit(e.Callee); err != nil {
 					return err
-				}
+				} // change of sequence
 			}
 		}
 		return nil
@@ -451,7 +451,7 @@ func doAnalysis(args []string) error {
 		mains:         mains,
 		ptaConfig:	   config,
 		fn2SummaryMap: make(map[*ssa.Function]*fnSummary),
-		goID2insMap: make(map[int]*ssa.Go),
+		goID2insMap:   make(map[int]*ssa.Go),
 		bb2SyncBlockListMap:make(map[*ssa.BasicBlock][]*SyncBlock),
 	}
 

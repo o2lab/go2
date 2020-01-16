@@ -86,7 +86,7 @@
 //	fmt.Println(j)
 //}
 
-//Case 6 (HAPPENS-BEFORE: GOOD)
+//Case 6 (NO race; non-deterministic select statement)
 package main
 
 import (
@@ -118,7 +118,7 @@ func main() {
 	fmt.Println(j)
 }
 
-//Case 7
+//Case 7 (from Professor)
 //package main
 //import "fmt"
 //
