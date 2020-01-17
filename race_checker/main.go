@@ -21,7 +21,7 @@ import (
 type chanOp struct {
 	ch  ssa.Value
 	dir types.ChanDir // SendOnly=send, RecvOnly=recv, SendRecv=close
-	pos token.Pos
+	pos token.Pos     // seems not used for now
 }
 
 type analysis struct {
@@ -46,7 +46,7 @@ type accessInfo struct {
 	atomic      bool
 	location    ssa.Value
 	instruction *ssa.Instruction
-	parent      *fnSummary
+	parentSum   *fnSummary
 	bb          *ssa.BasicBlock
 	index       int // index in BasicBlock
 	//lockset []*ssa.Instruction // list of protecting locks
@@ -119,7 +119,7 @@ func (a *analysis) getSyncOpsBeforeAndAfter(acc accessInfo) (bef []ssa.Instructi
 	return
 }
 
-func (a *analysis) visitInstr(bb *ssa.BasicBlock, index int, instruction ssa.Instruction, isLast bool) {
+func (a *analysis) visitOneInstr(bb *ssa.BasicBlock, index int, instruction ssa.Instruction, isLast bool) {
 	if !instruction.Pos().IsValid() {
 		return // Skip NoPos. Can such instruction take part in a race?
 	}
@@ -167,7 +167,7 @@ func (a *analysis) addAccessInfo(ins *ssa.Instruction, location ssa.Value, write
 		atomic:      atomic,
 		location:    location,
 		instruction: ins,
-		parent:      summary,
+		parentSum:   summary,
 		index:       index,
 		bb:          bb,
 	}
@@ -201,11 +201,11 @@ func (a *analysis) visitInstrs() {
 			}
 		}
 		log.Debug(fn)
-		for bi, b := range fn.Blocks {
+		for _, b := range fn.Blocks {
 			log.Debug("  --", b)
 			for index, instr := range b.Instrs {
 				log.Debug("    --", instr)
-				isLast := bi == (len(b.Instrs) - 1)
+				lastInsBB := index == (len(b.Instrs) - 1)
 				if _, ok := a.bb2SyncBlockListMap[b]; !ok {
 					a.bb2SyncBlockListMap[b] = []*SyncBlock{&SyncBlock{
 						bb:    b,
@@ -213,10 +213,7 @@ func (a *analysis) visitInstrs() {
 						end:   -1,
 					}}
 				}
-				a.visitInstr(b, index, instr, isLast)
-				for _, op := range a.chanOps {
-					a.ptaConfig.AddQuery(op.ch)
-				}
+				a.visitOneInstr(b, index, instr, lastInsBB)
 			}
 			sb := a.getLastSyncBlock(b)
 			if sb == nil {
@@ -224,6 +221,9 @@ func (a *analysis) visitInstrs() {
 			}
 			sb.end = len(b.Instrs) - 1
 		}
+	}
+	for _, op := range a.chanOps {
+		a.ptaConfig.AddQuery(op.ch)
 	}
 }
 
@@ -304,7 +304,7 @@ func (a *analysis) sameAddress(addr1 *ssa.Value, addr2 *ssa.Value) bool {
 // check if access1 is po-ordered to some go ins, which is po-ordered to access2
 // TODO: Current approach is naive. We need to consider predecessors and successors of basic blocks.
 func (a *analysis) checkPO(minAcc *accessInfo, maxAcc *accessInfo) bool {
-	sum2 := maxAcc.parent
+	sum2 := maxAcc.parentSum
 	for _, id := range sum2.fromGoroutines {
 		goins, ok := a.goID2insMap[id]
 		if !ok {
@@ -345,6 +345,7 @@ func (a *analysis) checkSOTwoWay(acc1 accessInfo, acc2 accessInfo) bool {
 	return a.hasBlockingSendRecvMatch(bef1, aft2) || a.hasBlockingSendRecvMatch(bef2, aft1)
 }
 
+// returns conflicting access pairs from the two summaries
 func (a *analysis) getConflictingAccesses(sum1 *fnSummary, sum2 *fnSummary) [][2]accessInfo {
 	var res [][2]accessInfo
 	if parallel, _, _ := canRunInParallel(sum1, sum2, nil, nil); !parallel {
@@ -437,6 +438,7 @@ func (a *analysis) getConflictingPairs() ([][2]*ssa.Function, [][2]accessInfo) {
 		sort.Ints(sum.fromGoroutines)
 	}
 
+	// generate a list of functions we have processed
 	functions := make([]*ssa.Function, 0, len(a.fn2SummaryMap))
 	for fn := range a.fn2SummaryMap {
 		functions = append(functions, fn)
