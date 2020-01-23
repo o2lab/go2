@@ -64,7 +64,7 @@
 //	fmt.Println(j)
 //}
 
-//Case 5 (HAPPENS-BEFORE: GOOD)
+//Case 5 (HAPPENS-BEFORE: GOOD) TODO: Check function summary Count!
 //package main
 //import "fmt"
 //func f1(ch chan int) int {
@@ -87,36 +87,36 @@
 //}
 
 //Case 6 (NO race; non-deterministic select statement)
-package main
-
-import (
-	"fmt"
-)
-
-func f2(i int, ch chan int) (int, int) {
-	var j int
-	go func() {
-		j = i
-		ch <- j
-	}()
-	select {
-	case j = <-ch:
-		j++
-	case i = <-ch:
-		i++
-	}
-	return i, j
-}
-
-func main() {
-	i := 1
-	ch := make(chan int)
-	var k int
-	var j int
-	k, j = f2(i, ch)
-	fmt.Println(k)
-	fmt.Println(j)
-}
+//package main
+//
+//import (
+//	"fmt"
+//)
+//
+//func f2(i int, ch chan int) (int, int) {
+//	var j int
+//	go func() {
+//		j = i
+//		ch <- j
+//	}()
+//	select {
+//	case j = <-ch:
+//		j++
+//	case i = <-ch:
+//		i++
+//	}
+//	return i, j
+//}
+//
+//func main() {
+//	i := 1
+//	ch := make(chan int)
+//	var k int
+//	var j int
+//	k, j = f2(i, ch)
+//	fmt.Println(k)
+//	fmt.Println(j)
+//}
 
 //Case 7 (from Professor)
 //package main

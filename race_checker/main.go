@@ -98,7 +98,10 @@ func IsSyncOp(instr *ssa.Instruction) bool {
 		return true
 	case *ssa.UnOp:
 		return ins.Op == token.ARROW
-		// TODO: we consider send and recv only for now. Chan close and Lock/unlock need to be considered!
+	case ssa.CallInstruction:
+		return true
+	case *ssa.Call:
+		return true
 	}
 	return false
 }
@@ -125,8 +128,17 @@ func (a *analysis) visitOneInstr(bb *ssa.BasicBlock, index int, instruction ssa.
 	}
 	switch instr := instruction.(type) {
 	case *ssa.Alloc:
-	case *ssa.FieldAddr:
-		// get the address of a field
+	//case *ssa.FieldAddr:
+	//	// get the address of a field
+	//	refr := *instr.Referrers()
+	//	isW := false
+	//	for i := range refr {
+	//		switch insVal := refr[i].(type) {
+	//		case *ssa.Store:
+	//			isW = insVal.Addr == instr
+	//		}
+	//		a.addAccessInfo(&instruction, instr.X, isW, false, instruction.Parent(), index, bb)
+	//	}
 	case *ssa.UnOp:
 		// read by pointer-dereference
 		if instr.Op == token.MUL {
@@ -140,7 +152,7 @@ func (a *analysis) visitOneInstr(bb *ssa.BasicBlock, index int, instruction ssa.
 		// write op
 		a.addAccessInfo(&instruction, instr.Addr, true, false, instruction.Parent(), index, bb)
 	case *ssa.Go:
-		//a.generateSyncBlock(bb, index, isLast)
+		a.generateSyncBlock(bb, index, isLast)
 	case *ssa.Send:
 		a.generateSyncBlock(bb, index, isLast)
 		a.chanOps = append(a.chanOps, chanOp{instr.Chan, types.SendOnly, instr.Pos()})
@@ -156,7 +168,22 @@ func (a *analysis) visitOneInstr(bb *ssa.BasicBlock, index int, instruction ssa.
 			a.generateSyncBlock(bb, index, isLast)
 			a.chanOps = append(a.chanOps, chanOp{cc.Args[0], types.SendRecv, cc.Pos()})
 		}
-		// TODO: process locks
+	case *ssa.Call:
+		signalStr := instr.Call.Value.String()
+		if strings.HasSuffix(signalStr, ").Lock") && len(instr.Call.Args) == 1 {
+			a.generateSyncBlock(bb, index, isLast)
+		}
+		if strings.HasSuffix(signalStr, ").Unlock") && len(instr.Call.Args) == 1 {
+			a.generateSyncBlock(bb, index, isLast)
+		}
+	case *ssa.Defer:
+		signalStr := instr.Call.Value.String()
+		if strings.HasSuffix(signalStr, ").Lock") && len(instr.Call.Args) == 1 {
+			a.generateSyncBlock(bb, index, isLast)
+		}
+		if strings.HasSuffix(signalStr, ").Unlock") && len(instr.Call.Args) == 1 {
+			a.generateSyncBlock(bb, index, isLast)
+		}
 	}
 }
 
@@ -304,20 +331,26 @@ func (a *analysis) sameAddress(addr1 *ssa.Value, addr2 *ssa.Value) bool {
 // check if access1 is po-ordered to some go ins, which is po-ordered to access2
 // TODO: Current approach is naive. We need to consider predecessors and successors of basic blocks.
 func (a *analysis) checkPO(minAcc *accessInfo, maxAcc *accessInfo) bool {
+	//bbMin := minAcc.bb
+	//bbMax := maxAcc.bb
+	//if bbMin == bbMax.Idom() {
+	//	return true
+	//}
 	sum2 := maxAcc.parentSum
 	for _, id := range sum2.fromGoroutines {
-		goins, ok := a.goID2insMap[id]
+		goinstr, ok := a.goID2insMap[id]
 		if !ok {
-			continue // FIXME: no instruction found for the goroutineID. bug?
+			continue
 		}
-		if minAcc.bb == goins.Block() {
-			// check if goins is in minAcc.bb, after minAcc.index
+		if minAcc.bb == goinstr.Block() {
+			// check if goinstr is in minAcc.bb, after minAcc.index
 			for i := minAcc.index + 1; i < len(minAcc.bb.Instrs); i++ {
-				if minAcc.bb.Instrs[i] == goins {
+				if minAcc.bb.Instrs[i] == goinstr {
 					return true
 				}
 			}
 		}
+		//TODO: check successors of minAcc.bb
 	}
 	return false
 }
@@ -432,7 +465,7 @@ func (a *analysis) getConflictingPairs() ([][2]*ssa.Function, [][2]accessInfo) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Infof("%d goroutineIDs", len(a.goID2insMap))
+	log.Infof("%d goroutines", len(a.goID2insMap)+1)
 
 	for _, sum := range a.fn2SummaryMap {
 		sort.Ints(sum.fromGoroutines)
@@ -547,7 +580,7 @@ func (a *analysis) printAccPairs(accPairs [][2]accessInfo) {
 	}
 	for i, pair := range accPairs {
 		ins1, ins2 := *pair[0].instruction, *pair[1].instruction
-		log.Printf("Data race #%d", i)
+		log.Printf("Data race #%d", i+1)
 		log.Println("======================")
 		log.Println("  ", rwString(pair[0].write),
 			"of", aurora.Magenta(pair[0].location),

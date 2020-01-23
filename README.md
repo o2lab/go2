@@ -13,5 +13,5 @@ TODO:
 
 Channel Operations: used to establish synchronization order between conflicting access pairs. 
 
-Synchronization Order: Sync blocks, seperated by go instructions along with channel operations (send, receive, close) and mutex operations (lock and unlock) and atomic instructions. 
+Synchronization Order: Sync blocks, separated by go instructions along with channel operations (send, receive, close) and mutex operations (lock and unlock) and atomic instructions. 
 
