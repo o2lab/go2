@@ -34,6 +34,11 @@ type analysis struct {
 	fn2SummaryMap       map[*ssa.Function]*fnSummary
 	goID2insMap         map[int]*ssa.Go
 	bb2SyncBlockListMap map[*ssa.BasicBlock][]*SyncBlock
+	analysisStat        stat
+}
+
+type stat struct {
+	nAccess int
 }
 
 type fnSummary struct {
@@ -58,7 +63,6 @@ type SyncBlock struct {
 	bb *ssa.BasicBlock
 	//instruction *ssa.Instruction
 	start, end int // start and end index in bb, excluding the instruction at index end
-	allocated  map[*ssa.Alloc]bool
 }
 
 var (
@@ -83,7 +87,6 @@ func (a *analysis) generateSyncBlock(bb *ssa.BasicBlock, index int, isLast bool)
 		log.Fatal("No last SyncBlock")
 	}
 	sblock.end = index
-	sblock.allocated = nil
 
 	newSBlock := &SyncBlock{
 		bb:    bb,
@@ -124,14 +127,14 @@ func (a *analysis) getSyncOpsBeforeAndAfter(acc accessInfo) (bef []ssa.Instructi
 	return
 }
 
-func (a *analysis) visitOneInstr(bb *ssa.BasicBlock, index int, instruction ssa.Instruction, isLast bool) {
+func (a *analysis) visitOneInstr(bb *ssa.BasicBlock, index int, instruction ssa.Instruction,
+	isLast bool, allocated *map[*ssa.Alloc]bool) {
 	if !instruction.Pos().IsValid() {
 		return // Skip NoPos. Can such instruction take part in a race?
 	}
 	switch instr := instruction.(type) {
 	case *ssa.Alloc:
-		sb := a.getLastSyncBlock(bb)
-		sb.allocated[instr] = true
+		(*allocated)[instr] = true
 	//case *ssa.FieldAddr:
 	//	// get the address of a field
 	//	refr := *instr.Referrers()
@@ -146,7 +149,7 @@ func (a *analysis) visitOneInstr(bb *ssa.BasicBlock, index int, instruction ssa.
 	case *ssa.UnOp:
 		// read by pointer-dereference
 		if instr.Op == token.MUL {
-			a.addAccessInfo(&instruction, instr.X, false, false, instruction.Parent(), index, bb)
+			a.addAccessInfo(&instruction, instr.X, false, false, instruction.Parent(), index, bb, *allocated)
 			// chan recv
 		} else if instr.Op == token.ARROW {
 			a.generateSyncBlock(bb, index, isLast)
@@ -154,8 +157,10 @@ func (a *analysis) visitOneInstr(bb *ssa.BasicBlock, index int, instruction ssa.
 		}
 	case *ssa.Store:
 		// write op
-		a.addAccessInfo(&instruction, instr.Addr, true, false, instruction.Parent(), index, bb)
+		a.addAccessInfo(&instruction, instr.Addr, true, false, instruction.Parent(), index, bb, *allocated)
 	case *ssa.Go:
+		allocated_ := make(map[*ssa.Alloc]bool)
+		allocated = &allocated_
 		a.generateSyncBlock(bb, index, isLast)
 	case *ssa.Send:
 		a.generateSyncBlock(bb, index, isLast)
@@ -191,18 +196,18 @@ func (a *analysis) visitOneInstr(bb *ssa.BasicBlock, index int, instruction ssa.
 	}
 }
 
-func (a *analysis) addAccessInfo(ins *ssa.Instruction, location ssa.Value, write bool, atomic bool, parent *ssa.Function, index int, bb *ssa.BasicBlock) {
+func (a *analysis) addAccessInfo(ins *ssa.Instruction, location ssa.Value, write bool, atomic bool, parent *ssa.Function,
+	index int, bb *ssa.BasicBlock, allocated map[*ssa.Alloc]bool) {
+	a.analysisStat.nAccess += 1
 	switch loc := location.(type) {
 	case *ssa.FieldAddr:
 		if locX, ok := loc.X.(*ssa.Alloc); ok {
-			sb := a.getLastSyncBlock(bb)
-			if _, ok := sb.allocated[locX]; ok {
+			if _, ok := allocated[locX]; ok {
 				return
 			}
 		}
 	case *ssa.Alloc:
-		sb := a.getLastSyncBlock(bb)
-		if _, ok := sb.allocated[loc]; ok {
+		if _, ok := allocated[loc]; ok {
 			return
 		}
 		//case *ssa.Global:
@@ -254,16 +259,16 @@ func (a *analysis) visitInstrs() {
 			log.Debug("  --", b)
 			// create a SyncBlockList with a default SyncBlock for b
 			a.bb2SyncBlockListMap[b] = []*SyncBlock{&SyncBlock{
-				bb:        b,
-				start:     0,
-				end:       -1,
-				allocated: make(map[*ssa.Alloc]bool),
+				bb:    b,
+				start: 0,
+				end:   -1,
 			}}
+			allocated := make(map[*ssa.Alloc]bool)
 			// visit each instruction in b
 			for index, instr := range b.Instrs {
 				log.Debug("    --", instr, a.prog.Fset.Position(instr.Pos()))
 				lastInsBB := index == (len(b.Instrs) - 1)
-				a.visitOneInstr(b, index, instr, lastInsBB)
+				a.visitOneInstr(b, index, instr, lastInsBB, &allocated)
 			}
 			// mark the end of the last SyncBlock
 			sb := a.getLastSyncBlock(b)
@@ -271,7 +276,6 @@ func (a *analysis) visitInstrs() {
 				log.Fatal("SyncBlock list is empty")
 			}
 			sb.end = len(b.Instrs) - 1
-			sb.allocated = nil
 		}
 	}
 	for _, op := range a.chanOps {
@@ -612,7 +616,11 @@ func (a *analysis) printAccPairs(accPairs [][2]accessInfo) {
 			"at", pair[1].bb.Parent().Name(), a.prog.Fset.Position(ins2.Pos()))
 		log.Println("======================")
 	}
-	log.Printf("Summary: %d races reported", len(accPairs))
+	if len(accPairs) == 1 {
+		log.Printf("Summary: 1 race reported, %d accesses checked", a.analysisStat.nAccess)
+	} else {
+		log.Printf("Summary: %d races reported, %d accesses checked", len(accPairs), a.analysisStat.nAccess)
+	}
 }
 
 func main() {
