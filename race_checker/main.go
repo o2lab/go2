@@ -58,6 +58,7 @@ type SyncBlock struct {
 	bb *ssa.BasicBlock
 	//instruction *ssa.Instruction
 	start, end int // start and end index in bb, excluding the instruction at index end
+	allocated  map[*ssa.Alloc]bool
 }
 
 var (
@@ -82,6 +83,7 @@ func (a *analysis) generateSyncBlock(bb *ssa.BasicBlock, index int, isLast bool)
 		log.Fatal("No last SyncBlock")
 	}
 	sblock.end = index
+	sblock.allocated = nil
 
 	newSBlock := &SyncBlock{
 		bb:    bb,
@@ -101,7 +103,7 @@ func IsSyncOp(instr *ssa.Instruction) bool {
 	case ssa.CallInstruction:
 		return true
 	case *ssa.Call:
-		return true
+		return false // TODO: except sync ops
 	}
 	return false
 }
@@ -128,6 +130,8 @@ func (a *analysis) visitOneInstr(bb *ssa.BasicBlock, index int, instruction ssa.
 	}
 	switch instr := instruction.(type) {
 	case *ssa.Alloc:
+		sb := a.getLastSyncBlock(bb)
+		sb.allocated[instr] = true
 	//case *ssa.FieldAddr:
 	//	// get the address of a field
 	//	refr := *instr.Referrers()
@@ -187,7 +191,25 @@ func (a *analysis) visitOneInstr(bb *ssa.BasicBlock, index int, instruction ssa.
 	}
 }
 
-func (a *analysis) addAccessInfo(ins *ssa.Instruction, location ssa.Value, write bool, atomic bool, parent *ssa.Function, index int, bb *ssa.BasicBlock) accessInfo {
+func (a *analysis) addAccessInfo(ins *ssa.Instruction, location ssa.Value, write bool, atomic bool, parent *ssa.Function, index int, bb *ssa.BasicBlock) {
+	switch loc := location.(type) {
+	case *ssa.FieldAddr:
+		if locX, ok := loc.X.(*ssa.Alloc); ok {
+			sb := a.getLastSyncBlock(bb)
+			if _, ok := sb.allocated[locX]; ok {
+				return
+			}
+		}
+	case *ssa.Alloc:
+		sb := a.getLastSyncBlock(bb)
+		if _, ok := sb.allocated[loc]; ok {
+			return
+		}
+		//case *ssa.Global:
+		//	if write {
+		//		log.Debug(loc.Name())
+		//	}
+	}
 	summary := a.fn2SummaryMap[parent]
 	info := accessInfo{
 		write:       write,
@@ -201,7 +223,7 @@ func (a *analysis) addAccessInfo(ins *ssa.Instruction, location ssa.Value, write
 	summary.accesses = append(summary.accesses, info)
 	a.ptaConfig.AddQuery(location)
 
-	return info
+	return
 }
 
 func fromPkgsOfInterest(fn *ssa.Function) bool {
@@ -218,7 +240,7 @@ func fromPkgsOfInterest(fn *ssa.Function) bool {
 
 func (a *analysis) visitInstrs() {
 	for fn := range ssautil.AllFunctions(a.prog) {
-		if !fromPkgsOfInterest(fn) {
+		if !fromPkgsOfInterest(fn) || fn.Name() == "init" || strings.HasPrefix(fn.Name(), "init#") {
 			continue
 		}
 		if _, ok := a.fn2SummaryMap[fn]; !ok {
@@ -230,23 +252,26 @@ func (a *analysis) visitInstrs() {
 		log.Debug(fn)
 		for _, b := range fn.Blocks {
 			log.Debug("  --", b)
+			// create a SyncBlockList with a default SyncBlock for b
+			a.bb2SyncBlockListMap[b] = []*SyncBlock{&SyncBlock{
+				bb:        b,
+				start:     0,
+				end:       -1,
+				allocated: make(map[*ssa.Alloc]bool),
+			}}
+			// visit each instruction in b
 			for index, instr := range b.Instrs {
-				log.Debug("    --", instr)
+				log.Debug("    --", instr, a.prog.Fset.Position(instr.Pos()))
 				lastInsBB := index == (len(b.Instrs) - 1)
-				if _, ok := a.bb2SyncBlockListMap[b]; !ok {
-					a.bb2SyncBlockListMap[b] = []*SyncBlock{&SyncBlock{
-						bb:    b,
-						start: 0,
-						end:   -1,
-					}}
-				}
 				a.visitOneInstr(b, index, instr, lastInsBB)
 			}
+			// mark the end of the last SyncBlock
 			sb := a.getLastSyncBlock(b)
 			if sb == nil {
-				log.Fatal("syncblock list is empty")
+				log.Fatal("SyncBlock list is empty")
 			}
 			sb.end = len(b.Instrs) - 1
+			sb.allocated = nil
 		}
 	}
 	for _, op := range a.chanOps {
@@ -321,14 +346,10 @@ func (a *analysis) sameAddress(addr1 *ssa.Value, addr2 *ssa.Value) bool {
 
 	// check if they can point to the same obj
 	ptset := a.result.Queries
-
-	if ptset[*addr1].MayAlias(ptset[*addr2]) {
-		return true
-	}
-	return false
+	return ptset[*addr1].MayAlias(ptset[*addr2])
 }
 
-// check if access1 is po-ordered to some go ins, which is po-ordered to access2
+// check if minAcc is po-ordered to some go ins, which is po-ordered to maxAcc
 // TODO: Current approach is naive. We need to consider predecessors and successors of basic blocks.
 func (a *analysis) checkPO(minAcc *accessInfo, maxAcc *accessInfo) bool {
 	//bbMin := minAcc.bb
@@ -434,7 +455,7 @@ func (a *analysis) getConflictingPairs() ([][2]*ssa.Function, [][2]accessInfo) {
 			return nil
 		}
 		caller := edge.Caller
-		if !fromPkgsOfInterest(caller.Func) && caller.Func.Name() != "panic" {
+		if !fromPkgsOfInterest(caller.Func) && caller.Func.Name() != "panic" && caller.Func.Name() != "init" {
 			return nil
 		}
 		callee := edge.Callee
@@ -520,6 +541,7 @@ func doAnalysis(args []string) error {
 
 	// Create and build SSA-form program representation.
 	prog, pkgs := ssautil.AllPackages(initial, 0)
+	log.Info("Loading SSA...")
 	prog.Build()
 
 	mains, err := mainPackages(pkgs)
@@ -540,12 +562,12 @@ func doAnalysis(args []string) error {
 		goID2insMap:         make(map[int]*ssa.Go),
 		bb2SyncBlockListMap: make(map[*ssa.BasicBlock][]*SyncBlock),
 	}
-
+	log.Info("Preprocessing...")
 	Analysis.visitInstrs()
 	log.Infof("%d function summaries, %d basic blocks", len(Analysis.fn2SummaryMap),
 		len(Analysis.bb2SyncBlockListMap))
 	Analysis.printSyncBlocks()
-	log.Info("Running whole-program pointer analysis...")
+	log.Info("Running whole-program pointer analysis for ", len(config.Queries), " variables...")
 	result, err := pointer.Analyze(config)
 	log.Infoln("Done")
 
