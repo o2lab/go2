@@ -200,6 +200,7 @@ func (a *analysis) addAccessInfo(ins *ssa.Instruction, location ssa.Value, write
 	index int, bb *ssa.BasicBlock, allocated map[*ssa.Alloc]bool) {
 	a.analysisStat.nAccess += 1
 	switch loc := location.(type) {
+	// Ignore checking access at alloc sites
 	case *ssa.FieldAddr:
 		if locX, ok := loc.X.(*ssa.Alloc); ok {
 			if _, ok := allocated[locX]; ok {
@@ -459,7 +460,7 @@ func (a *analysis) getConflictingPairs() ([][2]*ssa.Function, [][2]accessInfo) {
 			return nil
 		}
 		caller := edge.Caller
-		if !fromPkgsOfInterest(caller.Func) && caller.Func.Name() != "panic" && caller.Func.Name() != "init" {
+		if !fromPkgsOfInterest(caller.Func) || caller.Func.Name() == "panic" || caller.Func.Name() == "init" {
 			return nil
 		}
 		callee := edge.Callee
@@ -469,7 +470,7 @@ func (a *analysis) getConflictingPairs() ([][2]*ssa.Function, [][2]accessInfo) {
 			a.addNewGoroutineIDs(caller.Func, 0)
 		}
 
-		if !fromPkgsOfInterest(callee.Func) {
+		if !fromPkgsOfInterest(callee.Func) || callee.Func.Name() == "init" {
 			return nil
 		}
 
