@@ -128,13 +128,13 @@ func (a *analysis) getSyncOpsBeforeAndAfter(acc accessInfo) (bef []ssa.Instructi
 }
 
 func (a *analysis) visitOneInstr(bb *ssa.BasicBlock, index int, instruction ssa.Instruction,
-	isLast bool, allocated *map[*ssa.Alloc]bool) {
+	isLast bool, allocated map[*ssa.Alloc]bool) {
 	if !instruction.Pos().IsValid() {
 		return // Skip NoPos. Can such instruction take part in a race?
 	}
 	switch instr := instruction.(type) {
 	case *ssa.Alloc:
-		(*allocated)[instr] = true
+		allocated[instr] = true
 	//case *ssa.FieldAddr:
 	//	// get the address of a field
 	//	refr := *instr.Referrers()
@@ -149,18 +149,23 @@ func (a *analysis) visitOneInstr(bb *ssa.BasicBlock, index int, instruction ssa.
 	case *ssa.UnOp:
 		// read by pointer-dereference
 		if instr.Op == token.MUL {
-			a.addAccessInfo(&instruction, instr.X, false, false, instruction.Parent(), index, bb, *allocated)
+			a.addAccessInfo(&instruction, instr.X, false, false, instruction.Parent(), index, bb, allocated)
 			// chan recv
 		} else if instr.Op == token.ARROW {
 			a.generateSyncBlock(bb, index, isLast)
 			a.chanOps = append(a.chanOps, chanOp{instr.X, types.RecvOnly, instr.Pos()})
 		}
+	case *ssa.MapUpdate:
+		if locMap, ok := instr.Map.(*ssa.UnOp); ok {
+			a.addAccessInfo(&instruction, locMap.X, true, false, instruction.Parent(), index, bb, allocated)
+		}
 	case *ssa.Store:
 		// write op
-		a.addAccessInfo(&instruction, instr.Addr, true, false, instruction.Parent(), index, bb, *allocated)
+		a.addAccessInfo(&instruction, instr.Addr, true, false, instruction.Parent(), index, bb, allocated)
 	case *ssa.Go:
-		allocated_ := make(map[*ssa.Alloc]bool)
-		allocated = &allocated_
+		for k := range allocated {
+			delete(allocated, k)
+		}
 		a.generateSyncBlock(bb, index, isLast)
 	case *ssa.Send:
 		a.generateSyncBlock(bb, index, isLast)
@@ -207,15 +212,49 @@ func (a *analysis) addAccessInfo(ins *ssa.Instruction, location ssa.Value, write
 				return
 			}
 		}
+	case *ssa.IndexAddr:
+		if locAlloc, ok := loc.X.(*ssa.Alloc); ok {
+			if _, ok := allocated[locAlloc]; ok {
+				return
+			}
+		} else if locCall, ok := loc.X.(*ssa.Call); ok {
+			// Append call. Check if the slice is in alloc sites.
+			if locCall.Call.Value.Name() == "append" {
+				lastArg := locCall.Call.Args[len(locCall.Call.Args)-1]
+				if locSlice, ok := lastArg.(*ssa.Slice); ok {
+					if locAlloc, ok := locSlice.X.(*ssa.Alloc); ok {
+						if _, ok := allocated[locAlloc]; ok {
+							return
+						}
+					}
+				}
+			}
+		}
+	case *ssa.UnOp:
+		if locUnOp, ok := loc.X.(*ssa.Alloc); ok {
+			if _, ok := allocated[locUnOp]; ok {
+				return
+			}
+		}
+		if locFreeVar, ok := loc.X.(*ssa.FreeVar); ok {
+			if _, ok := locFreeVar.Type().(*types.Pointer); ok {
+				return
+			}
+		}
 	case *ssa.Alloc:
 		if _, ok := allocated[loc]; ok {
 			return
 		}
+		if _, ok := loc.Type().(*types.Pointer); ok && !write {
+			return
+		}
+	case *ssa.FreeVar:
+		if _, ok := loc.Type().(*types.Pointer); ok && !write {
+			return
+		}
 		//case *ssa.Global:
-		//	if write {
-		//		log.Debug(loc.Name())
-		//	}
 	}
+	log.Debug("Added", *ins, a.prog.Fset.Position((*ins).Pos()))
 	summary := a.fn2SummaryMap[parent]
 	info := accessInfo{
 		write:       write,
@@ -269,7 +308,7 @@ func (a *analysis) visitInstrs() {
 			for index, instr := range b.Instrs {
 				log.Debug("    --", instr, a.prog.Fset.Position(instr.Pos()))
 				lastInsBB := index == (len(b.Instrs) - 1)
-				a.visitOneInstr(b, index, instr, lastInsBB, &allocated)
+				a.visitOneInstr(b, index, instr, lastInsBB, allocated)
 			}
 			// mark the end of the last SyncBlock
 			sb := a.getLastSyncBlock(b)
