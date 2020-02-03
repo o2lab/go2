@@ -1,7 +1,5 @@
 package main
 
-import "fmt"
-
 var (
 	i int
 	j int
@@ -9,14 +7,16 @@ var (
 
 func main() {
 	i = 1
-	t := 2
-	fmt.Println(t)
 	go func() {
 		i = 1
-		t1 := 3
-		fmt.Println(t1)
 	}()
-	i = 2
+	foo1(&i)
+}
+
+func foo1(i *int) {
+	go func() {
+		*i = 2
+	}()
 }
 
 //func A() {
