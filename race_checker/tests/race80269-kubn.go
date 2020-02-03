@@ -23,8 +23,8 @@ func mayRace() {
 	select {
 	case <-ch1:
 		fmt.Print("ch1 ")
-	//case <-ch2:
-	//	fmt.Print("ch2 ")
+	case <-ch2:
+		fmt.Print("ch2 ")
 	}
 	fmt.Print(i, "\n") // racy read
 }
@@ -32,6 +32,6 @@ func mayRace() {
 func showBB(j int) int {
 	i := j * 3
 	go mayRace()
-	i = 2 * j + i
+	i = 2*j + i
 	return i
 }

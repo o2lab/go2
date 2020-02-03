@@ -14,25 +14,27 @@
 //}
 
 //Case 2
-//package main
-//type S struct {
-//	i int
-//}
-//func (s *S) read() int { // not anonymous
-//	return s.i // racy read
-//}
-//func (s *S) write(i int) { // not anonymous
-//	s.i = i // racy write
-//}
-//func main() {
-//	s := &S{
-//		i: 1,
-//	}
-//	go func() {
-//		s.write(12)
-//	}()
-//	s.read()
-//}
+package main
+
+type S struct {
+	i int
+}
+
+func (s *S) read() int { // not anonymous
+	return s.i // racy read
+}
+func (s *S) write(i int) { // not anonymous
+	s.i = i // racy write
+}
+func main() {
+	s := &S{
+		i: 1,
+	}
+	go func() {
+		s.write(12)
+	}()
+	s.read()
+}
 
 //Case 3
 //package main
@@ -122,13 +124,21 @@
 //package main
 //import "fmt"
 //
-//func main() {
-//	fmt.Println(getNum())
+//
+//func Y(t *int) {
+//	*t++
 //}
-//func getNum() int {
-//	var i int
-//	go func() {
-//		i = 5
-//	}()
-//	return i
+//
+//func main() {
+//	t := 2
+//	ch := make(chan int, 1)
+//	go Y(&t)
+//	if t == 2 {
+//		fmt.Println("werw")
+//	} else {
+//		ch <- t
+//	}
+//	x := <-ch
+//	fmt.Println(x)
+//	return
 //}

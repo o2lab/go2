@@ -14,7 +14,15 @@ func main() {
 func getNumber() int {
 	var i int
 	go writeI(&i)
-	return i
+	var ch chan int
+	if i == 0 {
+		return 0
+	} else {
+		ch = make(chan int)
+		ch <- i // blocking
+	}
+	k := <-ch
+	return k
 }
 
 // from goroutine 1

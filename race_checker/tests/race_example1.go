@@ -2,7 +2,6 @@ package main
 
 var (
 	i int
-	j int
 )
 
 func main() {

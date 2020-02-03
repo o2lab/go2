@@ -135,17 +135,6 @@ func (a *analysis) visitOneInstr(bb *ssa.BasicBlock, index int, instruction ssa.
 	switch instr := instruction.(type) {
 	case *ssa.Alloc:
 		allocated[instr] = true
-	//case *ssa.FieldAddr:
-	//	// get the address of a field
-	//	refr := *instr.Referrers()
-	//	isW := false
-	//	for i := range refr {
-	//		switch insVal := refr[i].(type) {
-	//		case *ssa.Store:
-	//			isW = insVal.Addr == instr
-	//		}
-	//		a.addAccessInfo(&instruction, instr.X, isW, false, instruction.Parent(), index, bb)
-	//	}
 	case *ssa.UnOp:
 		// read by pointer-dereference
 		if instr.Op == token.MUL {
@@ -245,16 +234,11 @@ func (a *analysis) addAccessInfo(ins *ssa.Instruction, location ssa.Value, write
 		if _, ok := allocated[loc]; ok {
 			return
 		}
-		if _, ok := loc.Type().(*types.Pointer); ok && !write {
-			return
-		}
-	case *ssa.FreeVar:
-		if _, ok := loc.Type().(*types.Pointer); ok && !write {
-			return
-		}
 		//case *ssa.Global:
+		//	if write {
+		//		log.Debug(loc.Name())
+		//	}
 	}
-	log.Debug("Added", *ins, a.prog.Fset.Position((*ins).Pos()))
 	summary := a.fn2SummaryMap[parent]
 	info := accessInfo{
 		write:       write,
@@ -276,7 +260,7 @@ func fromPkgsOfInterest(fn *ssa.Function) bool {
 		return false
 	}
 	for _, path := range focusPkgs {
-		if strings.HasPrefix(fn.Pkg.Pkg.Path(), path) {
+		if path != "" && strings.HasPrefix(fn.Pkg.Pkg.Path(), path) {
 			return true
 		}
 	}
@@ -313,7 +297,7 @@ func (a *analysis) visitInstrs() {
 			// mark the end of the last SyncBlock
 			sb := a.getLastSyncBlock(b)
 			if sb == nil {
-				log.Fatal("SyncBlock list is empty")
+				log.Fatal("syncblock list is empty")
 			}
 			sb.end = len(b.Instrs) - 1
 		}
@@ -339,6 +323,7 @@ func contains(s []int, v int) bool {
 func (a *analysis) addNewGoroutineIDs(function *ssa.Function, ids ...int) {
 	summary, ok := a.fn2SummaryMap[function]
 	if !ok {
+		return
 		log.Fatal("Summary not found:", function)
 	}
 	for _, id := range ids {
@@ -396,11 +381,13 @@ func (a *analysis) sameAddress(addr1 *ssa.Value, addr2 *ssa.Value) bool {
 // check if minAcc is po-ordered to some go ins, which is po-ordered to maxAcc
 // TODO: Current approach is naive. We need to consider predecessors and successors of basic blocks.
 func (a *analysis) checkPO(minAcc *accessInfo, maxAcc *accessInfo) bool {
-	//bbMin := minAcc.bb
-	//bbMax := maxAcc.bb
-	//if bbMin == bbMax.Idom() {
-	//	return true
-	//}
+	bbMin := minAcc.bb
+	bbMax := maxAcc.bb
+	if bbMax.Parent() == bbMin.Parent() && bbMin.Dominates(bbMax) {
+		log.Debug(a.prog.Fset.Position((*minAcc.instruction).Pos()))
+		log.Debug(a.prog.Fset.Position((*maxAcc.instruction).Pos()))
+		return true
+	}
 	sum2 := maxAcc.parentSum
 	for _, id := range sum2.fromGoroutines {
 		goinstr, ok := a.goID2insMap[id]
@@ -415,6 +402,7 @@ func (a *analysis) checkPO(minAcc *accessInfo, maxAcc *accessInfo) bool {
 				}
 			}
 		}
+
 		//TODO: check successors of minAcc.bb
 	}
 	return false
