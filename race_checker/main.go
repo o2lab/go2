@@ -287,7 +287,6 @@ func (a *analysis) checkSyncBlock(sb1 *SyncBlock, sb2 *SyncBlock) {
 				!maySyncByChannelComm(sb1, sb2) {
 				a.reportRace(acc1, acc2)
 			}
-
 		}
 	}
 }
