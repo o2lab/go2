@@ -198,17 +198,28 @@ func (v *InstructionVisitor) visit(instruction ssa.Instruction, bb *ssa.BasicBlo
 				chanOp{ch: st.Chan, dir: st.Dir, pos: st.Pos, syncPred: pred, syncSucc: succ, fromSelect: instrT})
 		}
 		v.parentSummary.selectStmts = append(v.parentSummary.selectStmts, instrT)
-		//case ssa.CallInstruction:
-		//	cc := instrT.Common()
-		//	// chan close
-		//	if b, ok := cc.Value.(*ssa.Builtin); ok {
-		//		if b.Name() == "close" {
-		//			v.makeSyncBlock(bb, index)
-		//			v.parentSummary.chOps = append(v.parentSummary.chOps, chanOp{ch: cc.Args[0], dir: types.SendRecv, pos: cc.Pos()})
-		//		}
-		//	} else if fn, ok := cc.Value.(*ssa.Function); ok && fromPkgsOfInterest(fn) {
-		//		v.sb.fnList = append(v.sb.fnList, fn)
-		//	}
+	case ssa.CallInstruction:
+		cc := instrT.Common()
+		// chan close
+		if b, ok := cc.Value.(*ssa.Builtin); ok {
+			if b.Name() == "close" {
+				//v.makeSyncBlock(bb, index)
+				//v.parentSummary.chOps = append(v.parentSummary.chOps, chanOp{ch: cc.Args[0], dir: types.SendRecv, pos: cc.Pos()})
+			}
+		} else if fn, ok := cc.Value.(*ssa.Function); ok {
+			if fn.Pkg != nil && fn.Pkg.Pkg != nil && fn.Pkg.Pkg.Name() == "sync" {
+				if cc.Value.Name() == "Lock" {
+					v.makeSyncBlock(bb, index)
+					v.sb.snapshot.lockCount++
+				} else if cc.Value.Name() == "Unlock" {
+					v.makeSyncBlock(bb, index)
+					v.sb.snapshot.lockCount--
+				}
+			}
+		}
+		//else if fn, ok := cc.Value.(*ssa.Function); ok && fromPkgsOfInterest(fn) {
+		//	v.sb.fnList = append(v.sb.fnList, fn)
+		//}
 		//case *ssa.Call:
 		//TODO: Handle locks/wg/defer
 		//

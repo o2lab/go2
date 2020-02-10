@@ -283,7 +283,8 @@ func (a *analysis) checkSyncBlock(sb1 *SyncBlock, sb2 *SyncBlock) {
 			if (acc1.write || acc2.write) &&
 				(!acc1.atomic || !acc2.atomic) &&
 				a.sameAddress(acc1.location, acc2.location) &&
-				!maySyncByChannelComm(sb1, sb2) {
+				!maySyncByChannelComm(sb1, sb2) &&
+				(sb1.snapshot.lockCount == 0 || sb2.snapshot.lockCount == 0) {
 				a.reportRace(acc1, acc2)
 			}
 		}
@@ -351,8 +352,8 @@ func (a *analysis) printSyncBlocks() {
 	for fn, sum := range a.fn2SummaryMap {
 		log.Debug(fn)
 		for idx, sb := range sum.syncBlocks {
-			log.Debugf("  %d:%d [%s] %d-%d SEND=%d RECV=%d %s", sb.bb.Index, idx, sb.bb.Comment, sb.start, sb.end,
-				sb.snapshot.mhbChanSend, sb.snapshot.mhaChanRecv, a.prog.Fset.Position(sb.bb.Instrs[sb.start].Pos()))
+			log.Debugf("  %d:%d [%s] %d-%d SEND=%d RECV=%d LOCK=%d %s", sb.bb.Index, idx, sb.bb.Comment, sb.start, sb.end,
+				sb.snapshot.mhbChanSend, sb.snapshot.mhaChanRecv, sb.snapshot.lockCount, a.prog.Fset.Position(sb.bb.Instrs[sb.start].Pos()))
 		}
 	}
 }

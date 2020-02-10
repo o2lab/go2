@@ -10,10 +10,10 @@ func main() {
 	x := 1
 	go func() {
 		m.Lock()
-		defer m.Unlock()
 		x = 2
+		m.Unlock()
 	}()
 	m.Lock()
-	defer m.Unlock()
 	fmt.Println(x)
+	m.Unlock()
 }
