@@ -6,16 +6,20 @@ var (
 
 func main() {
 	i = 1
-	go func() {
-		i = 1
-	}()
-	foo1(&i)
+	//go func() {
+	//	i = 1
+	//}()
+	foo1()
 }
 
-func foo1(i *int) {
+func foo1() {
 	go func() {
-		*i = 2
+		i = 2
 	}()
+}
+
+func aa() {
+	return
 }
 
 //func A() {

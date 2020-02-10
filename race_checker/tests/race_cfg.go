@@ -10,12 +10,20 @@ func main() {
 	ch2 := make(chan bool)
 	go func() {
 		x = 2
-		if choice == 1 {
+		if choice == 0 {
 			ch <- true
 		} else {
-			ch2 <- true
+			x = 3
 		}
+		x = 4
 	}()
-	<-ch
+	select {
+	case <-ch:
+		x = 1
+	case t := <-ch2:
+		if t {
+			x = 2
+		}
+	}
 	fmt.Println(x)
 }
