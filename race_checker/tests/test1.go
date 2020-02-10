@@ -14,37 +14,38 @@
 //}
 
 //Case 2
-package main
-
-type S struct {
-	i int
-}
-
-func (s *S) read() int { // not anonymous
-	return s.i // racy read
-}
-func (s *S) write(i int) { // not anonymous
-	s.i = i // racy write
-}
-func main() {
-	s := &S{
-		i: 1,
-	}
-	go func() {
-		s.write(12)
-	}()
-	s.read()
-}
+//package main
+//
+//type S struct {
+//	i int
+//}
+//
+//func (s *S) read() int { // not anonymous
+//	return s.i // racy read
+//}
+//func (s *S) write(i int) { // not anonymous
+//	s.i = i // racy write
+//}
+//func main() {
+//	s := &S{
+//		i: 1,
+//	}
+//	go func() {
+//		s.write(12)
+//	}()
+//	s.read()
+//}
 
 //Case 3
-//package main
-//var i int // global variable
-//func main() {
-//	go func() {
-//		i = 1 // racy write
-//	}()
-//	i = 2 //racy write
-//}
+package main
+
+var k int // global variable
+func main() {
+	go func() {
+		k = 1 // racy write
+	}()
+	k = 2 //racy write
+}
 
 //Case 4 (HAPPENS-BEFORE: BAD)
 //package main

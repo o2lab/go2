@@ -374,6 +374,7 @@ func (a *analysis) reportRace(a1, a2 accessInfo) {
 	}
 	ins1, ins2 := *a1.instruction, *a2.instruction
 	//alloc1, alloc2 := a.result.Queries[a1.location], a.result.Queries[a2.location]
+	a.analysisStat.raceCount++
 	log.Printf("Data race #%d", a.analysisStat.raceCount)
 	log.Println("======================")
 	log.Println("  ", rwString(a1.write),
@@ -383,7 +384,6 @@ func (a *analysis) reportRace(a1, a2 accessInfo) {
 		"of", aurora.Magenta(a2.comment),
 		"at", ins2.Parent().Name(), a.prog.Fset.Position(ins2.Pos()))
 	log.Println("======================")
-	a.analysisStat.raceCount++
 }
 
 func main() {
