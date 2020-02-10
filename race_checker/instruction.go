@@ -4,6 +4,7 @@ import (
 	"go/token"
 	"go/types"
 	"golang.org/x/tools/go/ssa"
+	"strings"
 )
 
 func IsSyncOp(instr *ssa.Instruction) bool {
@@ -209,20 +210,20 @@ func (v *InstructionVisitor) visit(instruction ssa.Instruction, bb *ssa.BasicBlo
 		//	} else if fn, ok := cc.Value.(*ssa.Function); ok && fromPkgsOfInterest(fn) {
 		//		v.sb.fnList = append(v.sb.fnList, fn)
 		//	}
-		//case *ssa.Call:
-		//TODO: Handle locks/wg/defer
-		//
-		//	signalStr := instrT.Call.Value.String()
-		//	if strings.HasSuffix(signalStr, ").Lock") && len(instrT.Call.Args) == 1 {
-		//		a.generateSyncBlock(bb, index, isLast)
-		//	}
-		//	if strings.HasSuffix(signalStr, ").Unlock") && len(instrT.Call.Args) == 1 {
-		//		a.generateSyncBlock(bb, index, isLast)
-		//	}
+	case *ssa.Call:
+		signalStr := instrT.Call.Value.String()
+		if strings.HasSuffix(signalStr, ").Lock") && len(instrT.Call.Args) == 1 {
+			v.makeSyncBlock(bb, index)
+			v.sb.snapshot.lockCount++
+		}
+		if strings.HasSuffix(signalStr, ").Unlock") && len(instrT.Call.Args) == 1 {
+			v.makeSyncBlock(bb, index)
+			v.sb.snapshot.lockCount--
+		}
 		//case *ssa.Defer:
 		//	signalStr := instrT.Call.Value.String()
 		//	if strings.HasSuffix(signalStr, ").Lock") && len(instrT.Call.Args) == 1 {
-		//		a.generateSyncBlock(bb, index, isLast)
+		//		v.makeSyncBlock(bb, index)
 		//	}
 		//	if strings.HasSuffix(signalStr, ").Unlock") && len(instrT.Call.Args) == 1 {
 		//		a.generateSyncBlock(bb, index, isLast)

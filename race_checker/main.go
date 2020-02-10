@@ -283,9 +283,11 @@ func (a *analysis) checkSyncBlock(sb1 *SyncBlock, sb2 *SyncBlock) {
 			if (acc1.write || acc2.write) &&
 				(!acc1.atomic || !acc2.atomic) &&
 				a.sameAddress(acc1.location, acc2.location) &&
+				(sb1.snapshot.lockCount == 0 || sb2.snapshot.lockCount == 0) &&
 				!maySyncByChannelComm(sb1, sb2) {
 				a.reportRace(acc1, acc2)
 			}
+
 		}
 	}
 }

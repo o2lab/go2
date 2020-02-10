@@ -37,35 +37,37 @@
 //}
 
 //Case 3
-package main
-
-var k int // global variable
-func main() {
-	go func() {
-		k = 1 // racy write
-	}()
-	k = 2 //racy write
-}
+//package main
+//
+//var k int // global variable
+//func main() {
+//	go func() {
+//		k = 1 // racy write
+//	}()
+//	k = 2 //racy write
+//}
 
 //Case 4 (HAPPENS-BEFORE: BAD)
-//package main
-//import "fmt"
-//func f1(i int) int {  // pure function
-//	j := i
-//	j--
-//	return j
-//}
-//
-//func f2(h *int) {
-//	*h++ // racy write
-//}
-//
-//func main() {
-//	i := 1
-//	go f2(&i)
-//	j := f1(i) // racy read
-//	fmt.Println(j)
-//}
+package main
+
+import "fmt"
+
+func f1(i int) int { // pure function
+	j := i
+	j--
+	return j
+}
+
+func f2(h *int) {
+	*h++ // racy write
+}
+
+func main() {
+	i := 1
+	go f2(&i)
+	j := f1(i) // racy read
+	fmt.Println(j)
+}
 
 //Case 5 (HAPPENS-BEFORE: GOOD) TODO: Check function summary Count!
 //package main
