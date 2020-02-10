@@ -144,16 +144,13 @@ func (v *InstructionVisitor) isLocalAddr(location ssa.Value) bool {
 func (v *InstructionVisitor) visit(instruction ssa.Instruction, bb *ssa.BasicBlock, index int) {
 	switch instrT := instruction.(type) {
 	case *ssa.Alloc:
-		if instrT.Comment == "succeeded" {
-			_ = instrT
-		}
 		v.allocated[instrT] = true
 	case *ssa.UnOp:
 		// read by pointer-dereference
 		if instrT.Op == token.MUL && !v.isLocalAddr(instrT.X) {
 			v.sb.addAccessInfo(&instruction, instrT.X, index, instrT.X.Name())
-			// chan recv, mode Acq
 		} else if instrT.Op == token.ARROW {
+			// chan recv, mode Acq
 			succ := v.makeSyncBlock(bb, index)
 			v.parentSummary.chOps = append(v.parentSummary.chOps,
 				chanOp{ch: instrT.X, dir: types.RecvOnly, pos: instrT.Pos(), syncSucc: succ})
@@ -214,7 +211,7 @@ func (v *InstructionVisitor) visit(instruction ssa.Instruction, bb *ssa.BasicBlo
 		//	}
 		//case *ssa.Call:
 		//TODO: Handle locks/wg/defer
-
+		//
 		//	signalStr := instrT.Call.Value.String()
 		//	if strings.HasSuffix(signalStr, ").Lock") && len(instrT.Call.Args) == 1 {
 		//		a.generateSyncBlock(bb, index, isLast)

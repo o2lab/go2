@@ -169,9 +169,6 @@ func GraphVisitPreorder(g *callgraph.Graph, node func(*callgraph.Node, int) erro
 	visit = func(n *callgraph.Node, rank int) error {
 		if !seen[n] {
 			seen[n] = true
-			if err := node(n, rank); err != nil {
-				return err
-			}
 			for _, e := range n.Out {
 				newRank := rank
 				if !isSyntheticEdge(e) {
@@ -185,6 +182,9 @@ func GraphVisitPreorder(g *callgraph.Graph, node func(*callgraph.Node, int) erro
 				if err := visit(e.Callee, newRank); err != nil {
 					return err
 				} // change of sequence
+			}
+			if err := node(n, rank); err != nil {
+				return err
 			}
 		}
 		return nil
@@ -374,6 +374,7 @@ func (a *analysis) reportRace(a1, a2 accessInfo) {
 	}
 	ins1, ins2 := *a1.instruction, *a2.instruction
 	//alloc1, alloc2 := a.result.Queries[a1.location], a.result.Queries[a2.location]
+	a.analysisStat.raceCount++
 	log.Printf("Data race #%d", a.analysisStat.raceCount)
 	log.Println("======================")
 	log.Println("  ", rwString(a1.write),
@@ -383,7 +384,6 @@ func (a *analysis) reportRace(a1, a2 accessInfo) {
 		"of", aurora.Magenta(a2.comment),
 		"at", ins2.Parent().Name(), a.prog.Fset.Position(ins2.Pos()))
 	log.Println("======================")
-	a.analysisStat.raceCount++
 }
 
 func main() {
