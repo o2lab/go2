@@ -5,7 +5,8 @@ import (
 )
 
 type functionSummary struct {
-	chOps           []chanOp
+	chSendOps       []chanOp
+	chRecvOps       []chanOp
 	syncBlocks      []*SyncBlock
 	goroutineRank   int
 	function        *ssa.Function
@@ -15,6 +16,7 @@ type functionSummary struct {
 	snapshot        SyncSnapshot
 	selectDoneBlock []*ssa.BasicBlock
 	selectStmts     []*ssa.Select
+	returnBlocks    []*ssa.BasicBlock
 }
 
 func (s *functionSummary) MakePredAndSuccClosure() {
@@ -46,7 +48,7 @@ func (s *functionSummary) MakePredAndSuccClosure() {
 }
 
 func (s *functionSummary) selectChildBlocks(block *ssa.BasicBlock, nStates int) []*ssa.BasicBlock {
-	var res []*ssa.BasicBlock = make([]*ssa.BasicBlock, 0, nStates)
+	res := make([]*ssa.BasicBlock, 0, nStates)
 	for _, bb := range s.function.Blocks[block.Index+1:] {
 		if bb.Comment == "select.body" {
 			nStates--

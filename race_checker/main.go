@@ -37,11 +37,15 @@ type stat struct {
 var (
 	Analysis  *analysis
 	focusPkgs []string
+	allPkg    bool
 )
 
 func fromPkgsOfInterest(fn *ssa.Function) bool {
 	if fn.Pkg == nil || fn.Pkg.Pkg == nil {
 		return false
+	}
+	if allPkg {
+		return true
 	}
 	for _, path := range focusPkgs {
 		if path != "" && strings.HasPrefix(fn.Pkg.Pkg.Path(), path) {
@@ -74,7 +78,10 @@ func (a *analysis) visitOneFunction(fn *ssa.Function, rank int) {
 		if b.Idom() != nil {
 			idom = b.Idom().Index
 		}
-		log.Debugf("  -- %s %s Dominees: %s, Idom: %d", b, b.Comment, b.Dominees(), idom)
+		log.Debugf("  -- %s %s Succ: %s, Dominees: %s, Idom: %d, IsReturn: %t", b, b.Comment, b.Succs, b.Dominees(), idom, IsReturnBlock(b))
+		if IsReturnBlock(b) {
+			fnSummary.returnBlocks = append(fnSummary.returnBlocks, b)
+		}
 		visitor.sb = &SyncBlock{
 			start:         0,
 			bb:            b,
@@ -93,13 +100,14 @@ func (a *analysis) visitOneFunction(fn *ssa.Function, rank int) {
 			visitor.visit(instr, b, index)
 		}
 		// mark the end of the last SyncBlock
-		if visitor.sb.accesses != nil {
+		if visitor.sb.hasAccessOrSyncOp() {
 			visitor.sb.end = len(b.Instrs) - 1
 			visitor.parentSummary.syncBlocks = append(visitor.parentSummary.syncBlocks, visitor.sb)
 			visitor.parentSummary.bb2sbList[b.Index] = append(visitor.parentSummary.bb2sbList[b.Index], visitor.sb)
 		}
 	}
 	fnSummary.MakePredAndSuccClosure()
+	// syncblocks after blocking select stmt are NondetRecv|NondetSend
 	for _, doneBlock := range fnSummary.selectDoneBlock {
 		// traverse the dominator tree
 		worklist := []*ssa.BasicBlock{doneBlock}
@@ -113,32 +121,74 @@ func (a *analysis) visitOneFunction(fn *ssa.Function, rank int) {
 			}
 		}
 	}
-	for _, op := range fnSummary.chOps {
+	// A successor of a SingleSend SyncBlock is SingleSend
+	// A predecessor of a SingleRecv SyncBlock is SingleRecv
+	for _, op := range fnSummary.chSendOps {
 		if op.fromSelect != nil {
 			continue
 		}
-		if op.Mode().IsRel() {
-			op.syncPred.snapshot.mhbChanSend = SingleSend
-			for _, predSB := range op.syncPred.preds {
-				predSB.snapshot.mhbChanSend = SingleSend
-			}
-		} else if op.Mode().IsAcq() {
-			op.syncSucc.snapshot.mhaChanRecv = SingleRecv
-			for _, succSB := range op.syncSucc.succs {
-				succSB.snapshot.mhaChanRecv = SingleRecv
-			}
+		op.syncPred.snapshot.mhbChanSend = SingleSend
+		for _, predSB := range op.syncPred.preds {
+			predSB.snapshot.mhbChanSend = SingleSend
+		}
+	}
+	for _, op := range fnSummary.chRecvOps {
+		if op.fromSelect != nil {
+			continue
+		}
+		op.syncSucc.snapshot.mhaChanRecv = SingleRecv
+		for _, succSB := range op.syncSucc.succs {
+			succSB.snapshot.mhaChanRecv = SingleRecv
 		}
 	}
 	// update snapshots for blocks under select cases
 	for _, selectInstr := range fnSummary.selectStmts {
 		childBlocks := fnSummary.selectChildBlocks(selectInstr.Block(), len(selectInstr.States))
 		for idx, st := range selectInstr.States {
+			if idx >= len(childBlocks) {
+				break // Not enough childblocks. Some select cases have empty body.
+			}
 			if st.Dir == types.RecvOnly {
 				for _, sb := range fnSummary.bb2sbList[childBlocks[idx].Index] {
 					sb.snapshot.mhaChanRecv = SingleRecv
 				}
 			}
 		}
+	}
+	// summarize fn
+	fnSingleRecv, fnSingleSend := false, false
+	for _, op := range fnSummary.chRecvOps {
+		if op.fromSelect != nil {
+			continue
+		}
+		b := op.syncSucc.bb
+		dominateAllReturnBlocks := true
+		for _, returnB := range fnSummary.returnBlocks {
+			if !b.Dominates(returnB) {
+				dominateAllReturnBlocks = false
+				break
+			}
+		}
+		if dominateAllReturnBlocks {
+			fnSingleRecv = true
+			break
+		}
+	}
+	for _, op := range fnSummary.chSendOps {
+		if op.fromSelect != nil {
+			continue
+		}
+		b := op.syncPred.bb
+		if fnSummary.function.Blocks[0].Dominates(b) {
+			fnSingleSend = true
+			break
+		}
+	}
+	if fnSingleRecv {
+		fnSummary.snapshot.mhaChanRecv = SingleRecv
+	}
+	if fnSingleSend {
+		fnSummary.snapshot.mhbChanSend = SingleSend
 	}
 }
 
@@ -300,7 +350,7 @@ func doAnalysis(args []string) error {
 		Dir:   "",
 		Tests: false,
 	}
-
+	log.Info("Loading input packages...")
 	initial, err := packages.Load(cfg, args...)
 	if err != nil {
 		return err
@@ -317,7 +367,7 @@ func doAnalysis(args []string) error {
 
 	// Create and build SSA-form program representation.
 	prog, pkgs := ssautil.AllPackages(initial, 0)
-	log.Info("Loading SSA...")
+	log.Info("Building SSA program...")
 	prog.Build()
 
 	mains, err := mainPackages(pkgs)
@@ -352,8 +402,8 @@ func (a *analysis) printSyncBlocks() {
 	for fn, sum := range a.fn2SummaryMap {
 		log.Debug(fn)
 		for idx, sb := range sum.syncBlocks {
-			log.Debugf("  %d:%d [%s] %d-%d SEND=%d RECV=%d %s", sb.bb.Index, idx, sb.bb.Comment, sb.start, sb.end,
-				sb.snapshot.mhbChanSend, sb.snapshot.mhaChanRecv, a.prog.Fset.Position(sb.bb.Instrs[sb.start].Pos()))
+			log.Debugf("  %d:%d [%s] %d-%d SEND=%d RECV=%d LOCK=%d %s", sb.bb.Index, idx, sb.bb.Comment, sb.start, sb.end,
+				sb.snapshot.mhbChanSend, sb.snapshot.mhaChanRecv, sb.snapshot.lockCount, a.prog.Fset.Position(sb.bb.Instrs[sb.start].Pos()))
 		}
 	}
 }
@@ -390,12 +440,17 @@ func (a *analysis) reportRace(a1, a2 accessInfo) {
 func main() {
 	debug := flag.Bool("debug", false, "Prints debug messages.")
 	focus := flag.String("focus", "", "Specifies a list of packages to check races.")
+	//flag.BoolVar(&allPkg, "all-package", true, "Analyze all packages required by the main package.")
 	flag.Parse()
 	if *debug {
 		log.SetLevel(log.DebugLevel)
 	}
-	focusPkgs = strings.Split(*focus, ",")
-	focusPkgs = append(focusPkgs, "command-line-arguments")
+	if *focus != "" {
+		focusPkgs = strings.Split(*focus, ",")
+		focusPkgs = append(focusPkgs, "command-line-arguments")
+	} else {
+		allPkg = true
+	}
 
 	err := doAnalysis(flag.Args())
 	if err != nil {

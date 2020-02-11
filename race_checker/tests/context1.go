@@ -2,16 +2,24 @@ package main
 
 import "fmt"
 
-var x int = 1
+var x = 1
+var ch = make(chan bool)
 
 func main() {
-	ch := make(chan bool)
 	func() {
 		go func() {
 			x = 1
 			ch <- true
 		}()
-		<-ch
+		foobar()
 	}()
-	fmt.Println(x) // no race
+	fmt.Println(x) // no race, synced through chan recv in foobar()
+}
+
+func bar() {
+	<-ch
+}
+
+func foobar() {
+	bar()
 }

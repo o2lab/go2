@@ -1,10 +1,10 @@
 package main
 
 import (
+	log "github.com/sirupsen/logrus"
 	"go/token"
 	"go/types"
 	"golang.org/x/tools/go/ssa"
-	"strings"
 )
 
 func IsSyncOp(instr *ssa.Instruction) bool {
@@ -92,7 +92,7 @@ func (op chanOp) Mode() SyncMode {
 }
 
 func (v *InstructionVisitor) makeSyncBlock(bb *ssa.BasicBlock, index int) *SyncBlock {
-	if v.sb.accesses != nil {
+	if v.sb.hasAccessOrSyncOp() {
 		v.sb.end = index
 		v.parentSummary.syncBlocks = append(v.parentSummary.syncBlocks, v.sb)
 		v.lastNonEmptySB = v.sb
@@ -153,7 +153,7 @@ func (v *InstructionVisitor) visit(instruction ssa.Instruction, bb *ssa.BasicBlo
 		} else if instrT.Op == token.ARROW {
 			// chan recv, mode Acq
 			succ := v.makeSyncBlock(bb, index)
-			v.parentSummary.chOps = append(v.parentSummary.chOps,
+			v.parentSummary.chRecvOps = append(v.parentSummary.chRecvOps,
 				chanOp{ch: instrT.X, dir: types.RecvOnly, pos: instrT.Pos(), syncSucc: succ})
 		}
 	case *ssa.MapUpdate:
@@ -186,7 +186,7 @@ func (v *InstructionVisitor) visit(instruction ssa.Instruction, bb *ssa.BasicBlo
 	case *ssa.Send:
 		pred := v.sb
 		v.makeSyncBlock(bb, index)
-		v.parentSummary.chOps = append(v.parentSummary.chOps,
+		v.parentSummary.chSendOps = append(v.parentSummary.chSendOps,
 			chanOp{ch: instrT.Chan, dir: types.SendOnly, pos: instrT.Pos(), syncPred: pred})
 	case *ssa.Select:
 		var pred, succ *SyncBlock
@@ -195,8 +195,11 @@ func (v *InstructionVisitor) visit(instruction ssa.Instruction, bb *ssa.BasicBlo
 			succ = v.makeSyncBlock(bb, index)
 		}
 		for _, st := range instrT.States {
-			v.parentSummary.chOps = append(v.parentSummary.chOps,
-				chanOp{ch: st.Chan, dir: st.Dir, pos: st.Pos, syncPred: pred, syncSucc: succ, fromSelect: instrT})
+			if st.Dir == types.SendOnly {
+				v.parentSummary.chSendOps = append(v.parentSummary.chSendOps, chanOp{ch: st.Chan, dir: st.Dir, pos: st.Pos, syncPred: pred, syncSucc: succ, fromSelect: instrT})
+			} else if st.Dir == types.RecvOnly {
+				v.parentSummary.chRecvOps = append(v.parentSummary.chRecvOps, chanOp{ch: st.Chan, dir: st.Dir, pos: st.Pos, syncPred: pred, syncSucc: succ, fromSelect: instrT})
+			}
 		}
 		v.parentSummary.selectStmts = append(v.parentSummary.selectStmts, instrT)
 		//case ssa.CallInstruction:
@@ -211,15 +214,42 @@ func (v *InstructionVisitor) visit(instruction ssa.Instruction, bb *ssa.BasicBlo
 		//		v.sb.fnList = append(v.sb.fnList, fn)
 		//	}
 	case *ssa.Call:
-		signalStr := instrT.Call.Value.String()
-		if strings.HasSuffix(signalStr, ").Lock") && len(instrT.Call.Args) == 1 {
-			v.makeSyncBlock(bb, index)
-			v.sb.snapshot.lockCount++
+		if fn, ok := instrT.Common().Value.(*ssa.Function); ok {
+			if fn.Pkg != nil && fn.Pkg.Pkg != nil && fn.Pkg.Pkg.Name() == "sync" {
+				if fn.Name() == "Lock" {
+					v.makeSyncBlock(bb, index)
+					v.sb.snapshot.lockCount++
+				} else if fn.Name() == "Unlock" {
+					v.makeSyncBlock(bb, index)
+					v.sb.snapshot.lockCount--
+				}
+			} else {
+				if s, ok := Analysis.fn2SummaryMap[fn]; ok {
+					// apply callee's summary
+					if s.snapshot.hasSyncSideEffect() {
+						v.sb.mergePreSnapshot(s.snapshot)
+						v.makeSyncBlock(bb, index)
+						v.sb.mergePostSnapshot(s.snapshot)
+					}
+				} else {
+					log.Warn("Summary not found for ", fn)
+				}
+			}
+		} else if closure, ok := instrT.Common().Value.(*ssa.MakeClosure); ok {
+			if fn, ok := closure.Fn.(*ssa.Function); ok {
+				if s, ok := Analysis.fn2SummaryMap[fn]; ok {
+					// apply callee's summary
+					if s.snapshot.hasSyncSideEffect() {
+						v.sb.mergePreSnapshot(s.snapshot)
+						v.makeSyncBlock(bb, index)
+						v.sb.mergePostSnapshot(s.snapshot)
+					}
+				} else {
+					log.Warn("Summary not found for ", fn)
+				}
+			}
 		}
-		if strings.HasSuffix(signalStr, ").Unlock") && len(instrT.Call.Args) == 1 {
-			v.makeSyncBlock(bb, index)
-			v.sb.snapshot.lockCount--
-		}
+		//case ssa.CallInstruction:
 		//case *ssa.Defer:
 		//	signalStr := instrT.Call.Value.String()
 		//	if strings.HasSuffix(signalStr, ").Lock") && len(instrT.Call.Args) == 1 {
