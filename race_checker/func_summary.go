@@ -13,6 +13,7 @@ type functionSummary struct {
 	sb2GoInsMap     map[*SyncBlock]*ssa.Go
 	chanOpMHBMap    map[*chanOp][]SyncBlock
 	bb2sbList       map[int][]*SyncBlock
+	fast            FastSnapshot
 	snapshot        SyncSnapshot
 	selectDoneBlock []*ssa.BasicBlock
 	selectStmts     []*ssa.Select

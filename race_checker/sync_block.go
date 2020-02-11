@@ -29,11 +29,25 @@ type SyncBlock struct {
 	mhbGoFuncList []*ssa.Function // list of functions that spawned after the syncBlock by Go
 	preds         []*SyncBlock
 	succs         []*SyncBlock
+	fast          FastSnapshot
 	snapshot      SyncSnapshot
 }
 
-// abstract domains
+type MutexOp struct {
+	loc   ssa.Value
+	write bool
+	block *SyncBlock
+}
+
+// precise domains for sync operations
 type SyncSnapshot struct {
+	lockOpList     map[ssa.Value]MutexOp
+	chanSendOpList []chanOp
+	chanRecvOpList []chanOp
+}
+
+// abstract domains (under-approximation)
+type FastSnapshot struct {
 	lockCount   int
 	mhbWGDone   bool
 	mhaWGWait   bool
@@ -41,31 +55,31 @@ type SyncSnapshot struct {
 	mhaChanRecv ChanRecvDomain
 }
 
-func (s SyncSnapshot) hasSyncSideEffect() bool {
+func (s FastSnapshot) hasSyncSideEffect() bool {
 	return s.lockCount > 0 || s.mhaWGWait || s.mhbWGDone || s.mhbChanSend > NoSend || s.mhaChanRecv > NoRecv
 }
 
-func (b *SyncBlock) mergePostSnapshot(snapshot SyncSnapshot) {
-	if snapshot.mhaWGWait {
-		b.snapshot.mhaWGWait = true
+func (b *SyncBlock) mergePostSnapshot(fast FastSnapshot) {
+	if fast.mhaWGWait {
+		b.fast.mhaWGWait = true
 	}
-	if snapshot.mhaChanRecv > b.snapshot.mhaChanRecv {
-		b.snapshot.mhaChanRecv = snapshot.mhaChanRecv
-		if b.snapshot.mhaChanRecv == SingleRecv {
+	if fast.mhaChanRecv > b.fast.mhaChanRecv {
+		b.fast.mhaChanRecv = fast.mhaChanRecv
+		if b.fast.mhaChanRecv == SingleRecv {
 			b.parentSummary.chRecvOps = append(b.parentSummary.chRecvOps,
 				chanOp{dir: types.RecvOnly, pos: token.NoPos, syncSucc: b})
 		}
 	}
-	b.snapshot.lockCount += snapshot.lockCount
+	b.fast.lockCount += fast.lockCount
 }
 
-func (b *SyncBlock) mergePreSnapshot(snapshot SyncSnapshot) {
-	if snapshot.mhbWGDone {
-		b.snapshot.mhbWGDone = true
+func (b *SyncBlock) mergePreSnapshot(fast FastSnapshot) {
+	if fast.mhbWGDone {
+		b.fast.mhbWGDone = true
 	}
-	if snapshot.mhbChanSend > b.snapshot.mhbChanSend {
-		b.snapshot.mhbChanSend = snapshot.mhbChanSend
-		if b.snapshot.mhbChanSend == SingleSend {
+	if fast.mhbChanSend > b.fast.mhbChanSend {
+		b.fast.mhbChanSend = fast.mhbChanSend
+		if b.fast.mhbChanSend == SingleSend {
 			b.parentSummary.chSendOps = append(b.parentSummary.chSendOps,
 				chanOp{dir: types.SendOnly, pos: token.NoPos, syncPred: b})
 		}
@@ -73,7 +87,7 @@ func (b *SyncBlock) mergePreSnapshot(snapshot SyncSnapshot) {
 }
 
 func (b *SyncBlock) hasAccessOrSyncOp() bool {
-	return len(b.accesses) > 0 || b.snapshot.hasSyncSideEffect()
+	return len(b.accesses) > 0 || b.fast.hasSyncSideEffect()
 }
 
 func (b *SyncBlock) addAccessInfo(ins *ssa.Instruction, location ssa.Value, index int, comment string) {

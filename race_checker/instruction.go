@@ -102,7 +102,8 @@ func (v *InstructionVisitor) makeSyncBlock(bb *ssa.BasicBlock, index int) *SyncB
 		start:         index,
 		bb:            bb,
 		parentSummary: v.parentSummary,
-		snapshot:      SyncSnapshot{mhbChanSend: v.sb.snapshot.mhbChanSend, mhaChanRecv: v.sb.snapshot.mhaChanRecv},
+		fast:          FastSnapshot{mhbChanSend: v.sb.fast.mhbChanSend, mhaChanRecv: v.sb.fast.mhaChanRecv},
+		snapshot:      SyncSnapshot{lockOpList: make(map[ssa.Value]MutexOp)},
 	}
 	if v.lastNonEmptySB != nil {
 		v.lastNonEmptySB.succs = []*SyncBlock{v.sb}
@@ -112,8 +113,11 @@ func (v *InstructionVisitor) makeSyncBlock(bb *ssa.BasicBlock, index int) *SyncB
 }
 
 func (v *InstructionVisitor) isLocalAddr(location ssa.Value) bool {
-	if location.Parent() != nil && location.Parent().Name() == "acquire" {
-		_ = location
+	if location.Pos() == token.NoPos {
+		return true
+	}
+	if _, ok := location.(*ssa.Parameter); ok {
+		return true
 	}
 	switch loc := location.(type) {
 	// Ignore checking accesses at alloc sites
@@ -218,34 +222,41 @@ func (v *InstructionVisitor) visit(instruction ssa.Instruction, bb *ssa.BasicBlo
 			if fn.Pkg != nil && fn.Pkg.Pkg != nil && fn.Pkg.Pkg.Name() == "sync" {
 				if fn.Name() == "Lock" {
 					v.makeSyncBlock(bb, index)
-					v.sb.snapshot.lockCount++
+					v.sb.fast.lockCount++
+					// FIXME: handle reader locks. Currently all locks are assumed to be writers.
+					lockAddr := instrT.Call.Args[0]
+					lockOp := MutexOp{loc: lockAddr, write: true, block: v.sb}
+					Analysis.ptaConfig.AddQuery(lockAddr)
+					v.sb.snapshot.lockOpList[lockAddr] = lockOp
 				} else if fn.Name() == "Unlock" {
 					v.makeSyncBlock(bb, index)
-					v.sb.snapshot.lockCount--
+					v.sb.fast.lockCount--
+					lockAddr := instrT.Call.Args[0]
+					delete(v.sb.snapshot.lockOpList, lockAddr)
 				}
 			} else {
 				if s, ok := Analysis.fn2SummaryMap[fn]; ok {
 					// apply callee's summary
-					if s.snapshot.hasSyncSideEffect() {
-						v.sb.mergePreSnapshot(s.snapshot)
+					if s.fast.hasSyncSideEffect() {
+						v.sb.mergePreSnapshot(s.fast)
 						v.makeSyncBlock(bb, index)
-						v.sb.mergePostSnapshot(s.snapshot)
+						v.sb.mergePostSnapshot(s.fast)
 					}
 				} else {
-					log.Warn("Summary not found for ", fn)
+					log.Debug("Summary not found for ", fn)
 				}
 			}
 		} else if closure, ok := instrT.Common().Value.(*ssa.MakeClosure); ok {
 			if fn, ok := closure.Fn.(*ssa.Function); ok {
 				if s, ok := Analysis.fn2SummaryMap[fn]; ok {
 					// apply callee's summary
-					if s.snapshot.hasSyncSideEffect() {
-						v.sb.mergePreSnapshot(s.snapshot)
+					if s.fast.hasSyncSideEffect() {
+						v.sb.mergePreSnapshot(s.fast)
 						v.makeSyncBlock(bb, index)
-						v.sb.mergePostSnapshot(s.snapshot)
+						v.sb.mergePostSnapshot(s.fast)
 					}
 				} else {
-					log.Warn("Summary not found for ", fn)
+					log.Debug("Summary not found for ", fn)
 				}
 			}
 		}

@@ -22,7 +22,6 @@ type analysis struct {
 	mains         []*ssa.Package
 	result        *pointer.Result
 	cg            *callgraph.Graph
-	chanOps       []chanOp
 	ptaConfig     *pointer.Config
 	fn2SummaryMap map[*ssa.Function]*functionSummary
 	analysisStat  stat
@@ -32,27 +31,32 @@ type stat struct {
 	nAccess    int
 	nGoroutine int
 	raceCount  int
+	nFunctions int
+	nPackages  int
 }
 
 var (
-	Analysis  *analysis
-	focusPkgs []string
-	allPkg    bool
+	Analysis     *analysis
+	focusPkgs    []string
+	excludedPkgs []string
+	allPkg       bool
 )
 
 func fromPkgsOfInterest(fn *ssa.Function) bool {
 	if fn.Pkg == nil || fn.Pkg.Pkg == nil {
 		return false
 	}
-	if allPkg {
-		return true
+	for _, excluded := range excludedPkgs {
+		if fn.Pkg.Pkg.Name() == excluded {
+			return false
+		}
 	}
 	for _, path := range focusPkgs {
 		if path != "" && strings.HasPrefix(fn.Pkg.Pkg.Path(), path) {
 			return true
 		}
 	}
-	return false
+	return allPkg
 }
 
 func (a *analysis) visitOneFunction(fn *ssa.Function, rank int) {
@@ -86,11 +90,12 @@ func (a *analysis) visitOneFunction(fn *ssa.Function, rank int) {
 			start:         0,
 			bb:            b,
 			parentSummary: fnSummary,
+			snapshot:      SyncSnapshot{lockOpList: make(map[ssa.Value]MutexOp)},
 		}
 		visitor.parentSummary.bb2sbList[b.Index] = []*SyncBlock{}
 		if b.Comment == "select.done" {
-			visitor.sb.snapshot.mhaChanRecv = NondetRecv
-			visitor.sb.snapshot.mhbChanSend = NondetSend
+			visitor.sb.fast.mhaChanRecv = NondetRecv
+			visitor.sb.fast.mhbChanSend = NondetSend
 			fnSummary.selectDoneBlock = append(fnSummary.selectDoneBlock, b)
 		}
 
@@ -116,8 +121,8 @@ func (a *analysis) visitOneFunction(fn *ssa.Function, rank int) {
 			worklist = worklist[:len(worklist)-1]
 			worklist = append(worklist, bb.Dominees()...)
 			for _, s := range fnSummary.bb2sbList[bb.Index] {
-				s.snapshot.mhaChanRecv = NondetRecv
-				s.snapshot.mhbChanSend = NondetSend
+				s.fast.mhaChanRecv = NondetRecv
+				s.fast.mhbChanSend = NondetSend
 			}
 		}
 	}
@@ -127,18 +132,18 @@ func (a *analysis) visitOneFunction(fn *ssa.Function, rank int) {
 		if op.fromSelect != nil {
 			continue
 		}
-		op.syncPred.snapshot.mhbChanSend = SingleSend
+		op.syncPred.fast.mhbChanSend = SingleSend
 		for _, predSB := range op.syncPred.preds {
-			predSB.snapshot.mhbChanSend = SingleSend
+			predSB.fast.mhbChanSend = SingleSend
 		}
 	}
 	for _, op := range fnSummary.chRecvOps {
 		if op.fromSelect != nil {
 			continue
 		}
-		op.syncSucc.snapshot.mhaChanRecv = SingleRecv
+		op.syncSucc.fast.mhaChanRecv = SingleRecv
 		for _, succSB := range op.syncSucc.succs {
-			succSB.snapshot.mhaChanRecv = SingleRecv
+			succSB.fast.mhaChanRecv = SingleRecv
 		}
 	}
 	// update snapshots for blocks under select cases
@@ -150,7 +155,7 @@ func (a *analysis) visitOneFunction(fn *ssa.Function, rank int) {
 			}
 			if st.Dir == types.RecvOnly {
 				for _, sb := range fnSummary.bb2sbList[childBlocks[idx].Index] {
-					sb.snapshot.mhaChanRecv = SingleRecv
+					sb.fast.mhaChanRecv = SingleRecv
 				}
 			}
 		}
@@ -185,10 +190,10 @@ func (a *analysis) visitOneFunction(fn *ssa.Function, rank int) {
 		}
 	}
 	if fnSingleRecv {
-		fnSummary.snapshot.mhaChanRecv = SingleRecv
+		fnSummary.fast.mhaChanRecv = SingleRecv
 	}
 	if fnSingleSend {
-		fnSummary.snapshot.mhbChanSend = SingleSend
+		fnSummary.fast.mhbChanSend = SingleSend
 	}
 }
 
@@ -278,6 +283,7 @@ func (a *analysis) preprocess() error {
 			return nil
 		}
 		a.visitOneFunction(node.Func, rank)
+		a.analysisStat.nFunctions += 1
 		return nil
 	}
 
@@ -320,11 +326,22 @@ func (a *analysis) checkRace() {
 }
 
 func hasChannelComm(sb1 *SyncBlock, sb2 *SyncBlock) bool {
-	return sb1.snapshot.mhbChanSend >= NondetSend && sb2.snapshot.mhaChanRecv == SingleRecv
+	return sb1.fast.mhbChanSend >= NondetSend && sb2.fast.mhaChanRecv == SingleRecv
 }
 
 func maySyncByChannelComm(sb1 *SyncBlock, sb2 *SyncBlock) bool {
 	return hasChannelComm(sb1, sb2) || hasChannelComm(sb2, sb1)
+}
+
+func locksetsIntersect(sb1 *SyncBlock, sb2 *SyncBlock) bool {
+	for loc1, _ := range sb1.snapshot.lockOpList {
+		for loc2, _ := range sb2.snapshot.lockOpList {
+			if Analysis.sameAddress(loc1, loc2) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (a *analysis) checkSyncBlock(sb1 *SyncBlock, sb2 *SyncBlock) {
@@ -333,15 +350,13 @@ func (a *analysis) checkSyncBlock(sb1 *SyncBlock, sb2 *SyncBlock) {
 			if (acc1.write || acc2.write) &&
 				(!acc1.atomic || !acc2.atomic) &&
 				a.sameAddress(acc1.location, acc2.location) &&
-				(sb1.snapshot.lockCount == 0 || sb2.snapshot.lockCount == 0) &&
+				//(sb1.fast.lockCount == 0 || sb2.fast.lockCount == 0) && // underapproximation
+				!locksetsIntersect(sb1, sb2) &&
 				!maySyncByChannelComm(sb1, sb2) {
 				a.reportRace(acc1, acc2)
 			}
 		}
 	}
-}
-
-func init() {
 }
 
 func doAnalysis(args []string) error {
@@ -402,8 +417,9 @@ func (a *analysis) printSyncBlocks() {
 	for fn, sum := range a.fn2SummaryMap {
 		log.Debug(fn)
 		for idx, sb := range sum.syncBlocks {
-			log.Debugf("  %d:%d [%s] %d-%d SEND=%d RECV=%d LOCK=%d %s", sb.bb.Index, idx, sb.bb.Comment, sb.start, sb.end,
-				sb.snapshot.mhbChanSend, sb.snapshot.mhaChanRecv, sb.snapshot.lockCount, a.prog.Fset.Position(sb.bb.Instrs[sb.start].Pos()))
+			log.Debugf("  %d:%d [%s] %d-%d [SEND=%d RECV=%d LOCK=%d] %s", sb.bb.Index, idx, sb.bb.Comment, sb.start, sb.end,
+				sb.fast.mhbChanSend, sb.fast.mhaChanRecv, sb.fast.lockCount, a.prog.Fset.Position(sb.bb.Instrs[sb.start].Pos()))
+			log.Debug("  -- Lockset ", sb.snapshot.lockOpList)
 		}
 	}
 }
@@ -471,4 +487,15 @@ func mainPackages(pkgs []*ssa.Package) ([]*ssa.Package, error) {
 		return nil, fmt.Errorf("no main packages")
 	}
 	return mains, nil
+}
+
+func init() {
+	excludedPkgs = []string{
+		"runtime",
+		"fmt",
+		"reflect",
+		"encoding",
+		"errors",
+		"bytes",
+	}
 }
