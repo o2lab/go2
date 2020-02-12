@@ -64,6 +64,14 @@ type chanOp struct {
 	fromSelect *ssa.Select
 }
 
+type wgOp struct {
+	wg       ssa.Value
+	isWait   bool // Negative isWait means "Done" operation
+	pos      token.Pos
+	syncPred *SyncBlock
+	syncSucc *SyncBlock
+}
+
 type accessInfo struct {
 	write       bool
 	atomic      bool
@@ -234,6 +242,17 @@ func (v *InstructionVisitor) visit(instruction ssa.Instruction, bb *ssa.BasicBlo
 					v.sb.fast.lockCount--
 					lockAddr := instrT.Call.Args[0]
 					delete(v.sb.snapshot.lockOpList, lockAddr)
+				} else if fn.Name() == "Wait" {
+					succ := v.makeSyncBlock(bb, index)
+					v.sb.snapshot.wgWaitList = append(v.sb.snapshot.wgWaitList,
+						wgOp{wg: instrT.Call.Args[0], isWait: true, pos: instrT.Pos(), syncSucc: succ})
+					Analysis.ptaConfig.AddQuery(instrT.Call.Args[0])
+				} else if fn.Name() == "Done" {
+					pred := v.sb
+					v.makeSyncBlock(bb, index)
+					pred.snapshot.wgDoneList = append(pred.snapshot.wgDoneList,
+						wgOp{wg: instrT.Call.Args[0], isWait: false, pos: instrT.Pos(), syncPred: pred})
+					Analysis.ptaConfig.AddQuery(instrT.Call.Args[0])
 				}
 			} else {
 				if s, ok := Analysis.fn2SummaryMap[fn]; ok {

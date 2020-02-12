@@ -330,13 +330,28 @@ func hasChannelComm(sb1 *SyncBlock, sb2 *SyncBlock) bool {
 	return sb1.fast.mhbChanSend >= NondetSend && sb2.fast.mhaChanRecv == SingleRecv
 }
 
+func hasWGComm(sb1 *SyncBlock, sb2 *SyncBlock) bool {
+	for _, wgOp := range sb1.snapshot.wgDoneList {
+		for _, wgOp1 := range sb2.snapshot.wgWaitList {
+			if Analysis.sameAddress(wgOp.wg, wgOp1.wg) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func maySyncByChannelComm(sb1 *SyncBlock, sb2 *SyncBlock) bool {
 	return hasChannelComm(sb1, sb2) || hasChannelComm(sb2, sb1)
 }
 
+func maySyncByWGComm(sb1 *SyncBlock, sb2 *SyncBlock) bool {
+	return hasWGComm(sb1, sb2) || hasWGComm(sb2, sb1)
+}
+
 func locksetsIntersect(sb1 *SyncBlock, sb2 *SyncBlock) bool {
-	for loc1, _ := range sb1.snapshot.lockOpList {
-		for loc2, _ := range sb2.snapshot.lockOpList {
+	for loc1 := range sb1.snapshot.lockOpList {
+		for loc2 := range sb2.snapshot.lockOpList {
 			if Analysis.sameAddress(loc1, loc2) {
 				return true
 			}
@@ -353,6 +368,7 @@ func (a *analysis) checkSyncBlock(sb1 *SyncBlock, sb2 *SyncBlock) {
 				a.sameAddress(acc1.location, acc2.location) &&
 				//(sb1.fast.lockCount == 0 || sb2.fast.lockCount == 0) && // underapproximation
 				!locksetsIntersect(sb1, sb2) &&
+				!maySyncByWGComm(sb1, sb2) &&
 				!maySyncByChannelComm(sb1, sb2) {
 				a.reportRace(acc1, acc2)
 			}

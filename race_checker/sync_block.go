@@ -44,6 +44,8 @@ type SyncSnapshot struct {
 	lockOpList     map[ssa.Value]MutexOp
 	chanSendOpList []chanOp
 	chanRecvOpList []chanOp
+	wgWaitList     []wgOp
+	wgDoneList     []wgOp
 }
 
 // abstract domains (under-approximation)
