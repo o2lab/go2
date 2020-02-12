@@ -222,12 +222,13 @@ func GraphVisitPreorder(g *callgraph.Graph, node func(*callgraph.Node, int) erro
 	seen := make(map[*callgraph.Node]bool)
 	var visit func(n *callgraph.Node, rank int) error
 	visit = func(n *callgraph.Node, rank int) error {
-		if !seen[n] {
+		if !seen[n] && fromPkgsOfInterest(n.Func) {
 			seen[n] = true
 			for _, e := range n.Out {
 				newRank := rank
 				if !isSyntheticEdge(e) {
 					if _, ok := e.Site.(*ssa.Go); ok {
+						log.Debugf("%s spawns %s", e.Caller.Func, e.Callee.Func)
 						newRank++
 						if Analysis.analysisStat.nGoroutine < newRank {
 							Analysis.analysisStat.nGoroutine = newRank
@@ -417,7 +418,7 @@ func (a *analysis) printSyncBlocks() {
 	for fn, sum := range a.fn2SummaryMap {
 		log.Debug(fn)
 		for idx, sb := range sum.syncBlocks {
-			log.Debugf("  %d:%d [%s] %d-%d [SEND=%d RECV=%d LOCK=%d] %s", sb.bb.Index, idx, sb.bb.Comment, sb.start, sb.end,
+			log.Debugf("  %d:%d [%s] %d-%d Rank %d [SEND=%d RECV=%d LOCK=%d] %s", sb.bb.Index, idx, sb.bb.Comment, sb.start, sb.end, sb.parentSummary.goroutineRank,
 				sb.fast.mhbChanSend, sb.fast.mhaChanRecv, sb.fast.lockCount, a.prog.Fset.Position(sb.bb.Instrs[sb.start].Pos()))
 			log.Debug("  -- Lockset ", sb.snapshot.lockOpList)
 		}
@@ -497,5 +498,6 @@ func init() {
 		"encoding",
 		"errors",
 		"bytes",
+		"time",
 	}
 }

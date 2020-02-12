@@ -116,8 +116,9 @@ func (v *InstructionVisitor) isLocalAddr(location ssa.Value) bool {
 	if location.Pos() == token.NoPos {
 		return true
 	}
-	if _, ok := location.(*ssa.Parameter); ok {
-		return true
+	if locPara, ok := location.(*ssa.Parameter); ok {
+		_, ok := locPara.Type().(*types.Pointer)
+		return !ok
 	}
 	switch loc := location.(type) {
 	// Ignore checking accesses at alloc sites
