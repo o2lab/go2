@@ -39,35 +39,38 @@
 //Case 3
 //package main
 //
-//var k int // global variable
+//var k int
 //func main() {
+//
+//
 //	go func() {
-//		k = 1 // racy write
+//		//k = 1 // racy write
+//		_ = k
 //	}()
 //	k = 2 //racy write
 //}
 
 //Case 4 (HAPPENS-BEFORE: BAD)
-package main
-
-import "fmt"
-
-func f1(i int) int { // pure function
-	j := i
-	j--
-	return j
-}
-
-func f2(h *int) {
-	*h++ // racy write
-}
-
-func main() {
-	i := 1
-	go f2(&i)
-	j := f1(i) // racy read
-	fmt.Println(j)
-}
+//package main
+//
+//import "fmt"
+//
+//func f1(i int) int { // pure function
+//	j := i
+//	j--
+//	return j
+//}
+//
+//func f2(h *int) {
+//	*h++ // racy write
+//}
+//
+//func main() {
+//	i := 1
+//	go f2(&i)
+//	j := f1(i) // racy read
+//	fmt.Println(j)
+//}
 
 //Case 5 (HAPPENS-BEFORE: GOOD) TODO: Check function summary Count!
 //package main
@@ -145,3 +148,30 @@ func main() {
 //	fmt.Println(x)
 //	return
 //}
+
+//Case 8 (WaitGroup)
+//package main
+//
+//import (
+//	"fmt"
+//	"sync"
+//)
+//
+//var k int
+//
+//func worker(id int, wg *sync.WaitGroup) {
+//	fmt.Printf("Worker number is %d \n", id)
+//	fmt.Printf("K value is %d \n", k)
+//	wg.Done()
+//}
+//
+//func main() {
+//	var wg sync.WaitGroup
+//	for i := 1; i <= 5; i++ {
+//		wg.Add(1)
+//		go worker(i, &wg)
+//	}
+//	wg.Wait()
+//	k = 0
+//}
+

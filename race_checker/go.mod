@@ -11,4 +11,5 @@ require (
 	k8s.io/api v0.17.2
 	k8s.io/apiextensions-apiserver v0.17.2 // indirect
 	k8s.io/client-go v0.17.2
+	k8s.io/sample-apiserver v0.17.2 // indirect
 )

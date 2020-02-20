@@ -7,6 +7,8 @@ import (
 type functionSummary struct {
 	chSendOps       []chanOp
 	chRecvOps       []chanOp
+	wgWaitOps       []wgOp
+	wgDoneOps       []wgOp
 	syncBlocks      []*SyncBlock
 	goroutineRank   int
 	function        *ssa.Function
