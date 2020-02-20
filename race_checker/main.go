@@ -40,6 +40,7 @@ var (
 	focusPkgs    []string
 	excludedPkgs []string
 	allPkg       bool
+	noReport bool
 )
 
 func fromPkgsOfInterest(fn *ssa.Function) bool {

@@ -1,6 +1,11 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"sync"
+)
+
+var m1 sync.Mutex
 
 // from goroutine 0
 func main() {
@@ -13,19 +18,22 @@ func main() {
 
 func getNumber() int {
 	var i int
-	go writeI(&i)
-	var ch chan int
-	if i == 0 {
-		return 0
-	} else {
-		ch = make(chan int)
-		ch <- i // blocking
+	writeI := func() {
+		i = 1
 	}
-	k := <-ch
-	return k
-}
+	go func() {
+		_ = i
+		m1.Lock()
+		writeI()
+		m1.Unlock()
+	}()
+	//var ch chan int
+	//m.Lock()
 
-// from goroutine 1
-func writeI(j *int) {
-	*j = 5
+	//m.Unlock()
+	//k := <-ch
+	m1.Lock()
+	_ = i
+	m1.Unlock()
+	return 0
 }

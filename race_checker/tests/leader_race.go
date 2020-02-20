@@ -54,7 +54,7 @@ func main() {
 			panic(err)
 		}
 		go func() {
-			time.Sleep(10 * time.Microsecond)
+			time.Sleep(20 * time.Microsecond)
 			cancel()
 		}()
 		le.Run(ctx)
