@@ -1,0 +1,94 @@
+diff -ur runtime/race.go /usr/local/Cellar/go/1.13.4/libexec/src/runtime/race.go
+--- runtime/race.go	2020-01-10 15:18:35.000000000 -0600
++++ /usr/local/Cellar/go/1.13.4/libexec/src/runtime/race.go	2020-02-18 21:26:59.000000000 -0600
+@@ -50,6 +50,20 @@
+
+ //go:nosplit
+
++// Used by Neo, replacing RaceAcquire
++func RacePostLock(addr unsafe.Pointer, write bool) {
++	racepostlock(addr, write)
++}
++
++//go:nosplit
++
++// Used by Neo, replacing RaceRelease
++func RaceUnlock(addr unsafe.Pointer, write bool) {
++	raceunlock(addr, write)
++}
++
++//go:nosplit
++
+ // RaceReleaseMerge is like RaceRelease, but also establishes a happens-before
+ // relation with the preceding RaceRelease or RaceReleaseMerge on addr.
+ //
+@@ -232,6 +246,12 @@
+ //go:linkname __tsan_release __tsan_release
+ var __tsan_release byte
+
++//go:linkname __tsan_mutex_after_lock __tsan_mutex_after_lock
++var __tsan_mutex_after_lock byte
++
++//go:linkname __tsan_mutex_before_unlock __tsan_mutex_before_unlock
++var __tsan_mutex_before_unlock byte
++
+ //go:linkname __tsan_release_merge __tsan_release_merge
+ var __tsan_release_merge byte
+
+@@ -257,6 +277,8 @@
+ //go:cgo_import_static __tsan_free
+ //go:cgo_import_static __tsan_acquire
+ //go:cgo_import_static __tsan_release
++//go:cgo_import_static __tsan_mutex_before_unlock
++//go:cgo_import_static __tsan_mutex_after_lock
+ //go:cgo_import_static __tsan_release_merge
+ //go:cgo_import_static __tsan_go_ignore_sync_begin
+ //go:cgo_import_static __tsan_go_ignore_sync_end
+@@ -476,6 +498,16 @@
+ }
+
+ //go:nosplit
++func racepostlock(addr unsafe.Pointer, write bool) {
++	racepostlockg(getg(), addr, write)
++}
++
++//go:nosplit
++func raceunlock(addr unsafe.Pointer, write bool) {
++	raceunlockg(getg(), addr, write)
++}
++
++//go:nosplit
+ func racereleaseg(gp *g, addr unsafe.Pointer) {
+ 	if getg().raceignore != 0 || !isvalidaddr(addr) {
+ 		return
+@@ -484,6 +516,30 @@
+ }
+
+ //go:nosplit
++func racepostlockg(gp *g, addr unsafe.Pointer, write bool)  {
++	if getg().raceignore != 0 || !isvalidaddr(addr) {
++		return
++	}
++	if write {
++		racecall(&__tsan_mutex_after_lock, gp.racectx, uintptr(addr), 1, 0)
++	} else {
++		racecall(&__tsan_mutex_after_lock, gp.racectx, uintptr(addr), 0, 0)
++	}
++}
++
++//go:nosplit
++func raceunlockg(gp *g, addr unsafe.Pointer, write bool)  {
++	if getg().raceignore != 0 || !isvalidaddr(addr) {
++		return
++	}
++	if write {
++		racecall(&__tsan_mutex_before_unlock, gp.racectx, uintptr(addr), 1, 0)
++	} else {
++		racecall(&__tsan_mutex_before_unlock, gp.racectx, uintptr(addr), 0, 0)
++	}
++}
++
++//go:nosplit
+ func racereleasemerge(addr unsafe.Pointer) {
+ 	racereleasemergeg(getg(), addr)
+ }
