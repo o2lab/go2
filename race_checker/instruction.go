@@ -103,6 +103,12 @@ func (v *InstructionVisitor) makeSyncBlock(bb *ssa.BasicBlock, index int) *SyncB
 	if v.sb.hasAccessOrSyncOp() {
 		v.sb.end = index
 		v.parentSummary.syncBlocks = append(v.parentSummary.syncBlocks, v.sb)
+
+		if v.lastNonEmptySB != nil {
+			v.lastNonEmptySB.succs = []*SyncBlock{v.sb}
+			v.sb.preds = []*SyncBlock{v.lastNonEmptySB}
+		}
+
 		v.lastNonEmptySB = v.sb
 		v.parentSummary.bb2sbList[bb.Index] = append(v.parentSummary.bb2sbList[bb.Index], v.sb)
 	}
@@ -110,12 +116,8 @@ func (v *InstructionVisitor) makeSyncBlock(bb *ssa.BasicBlock, index int) *SyncB
 		start:         index,
 		bb:            bb,
 		parentSummary: v.parentSummary,
-		fast:          FastSnapshot{mhbChanSend: v.sb.fast.mhbChanSend, mhaChanRecv: v.sb.fast.mhaChanRecv},
-		snapshot:      SyncSnapshot{lockOpList: make(map[ssa.Value]MutexOp)},
-	}
-	if v.lastNonEmptySB != nil {
-		v.lastNonEmptySB.succs = []*SyncBlock{v.sb}
-		v.sb.preds = []*SyncBlock{v.lastNonEmptySB}
+		//fast:          FastSnapshot{mhbChanSend: v.sb.fast.mhbChanSend, mhaChanRecv: v.sb.fast.mhaChanRecv},
+		snapshot: SyncSnapshot{lockOpList: make(map[ssa.Value]MutexOp)},
 	}
 	return v.sb
 }
@@ -166,7 +168,7 @@ func (v *InstructionVisitor) visit(instruction ssa.Instruction, bb *ssa.BasicBlo
 		} else if instrT.Op == token.ARROW {
 			// chan recv, mode Acq
 			succ := v.makeSyncBlock(bb, index)
-			v.parentSummary.chRecvOps = append(v.parentSummary.chRecvOps,
+			succ.snapshot.chanRecvOpList = append(succ.snapshot.chanRecvOpList,
 				chanOp{ch: instrT.X, dir: types.RecvOnly, pos: instrT.Pos(), syncSucc: succ})
 		}
 	case *ssa.MapUpdate:
@@ -181,8 +183,12 @@ func (v *InstructionVisitor) visit(instruction ssa.Instruction, bb *ssa.BasicBlo
 			v.sb.addAccessInfo(&instruction, instrT.Addr, index, instrT.Addr.Name())
 		}
 	case *ssa.Go:
+		pred := v.sb
 		sb := v.makeSyncBlock(bb, index)
 		v.parentSummary.sb2GoInsMap[sb] = instrT
+		if childSummary, ok := instrT.Call.Value.(*ssa.Function); ok {
+			pred.mhbGoFuncList = append(pred.mhbGoFuncList, Analysis.fn2SummaryMap[childSummary])
+		}
 		for _, arg := range instrT.Call.Args {
 			if locAlloc, ok := arg.(*ssa.Alloc); ok {
 				delete(v.allocated, locAlloc)
@@ -199,7 +205,7 @@ func (v *InstructionVisitor) visit(instruction ssa.Instruction, bb *ssa.BasicBlo
 	case *ssa.Send:
 		pred := v.sb
 		v.makeSyncBlock(bb, index)
-		v.parentSummary.chSendOps = append(v.parentSummary.chSendOps,
+		pred.snapshot.chanSendOpList = append(pred.snapshot.chanSendOpList,
 			chanOp{ch: instrT.Chan, dir: types.SendOnly, pos: instrT.Pos(), syncPred: pred})
 	case *ssa.Select:
 		var pred, succ *SyncBlock
@@ -231,7 +237,7 @@ func (v *InstructionVisitor) visit(instruction ssa.Instruction, bb *ssa.BasicBlo
 			if fn.Pkg != nil && fn.Pkg.Pkg != nil && fn.Pkg.Pkg.Name() == "sync" {
 				if fn.Name() == "Lock" {
 					v.makeSyncBlock(bb, index)
-					v.sb.fast.lockCount++
+					//v.sb.fast.lockCount++
 					// FIXME: handle reader locks. Currently all locks are assumed to be writers.
 					lockAddr := instrT.Call.Args[0]
 					lockOp := MutexOp{loc: lockAddr, write: true, block: v.sb}
@@ -239,7 +245,7 @@ func (v *InstructionVisitor) visit(instruction ssa.Instruction, bb *ssa.BasicBlo
 					v.sb.snapshot.lockOpList[lockAddr] = lockOp
 				} else if fn.Name() == "Unlock" {
 					v.makeSyncBlock(bb, index)
-					v.sb.fast.lockCount--
+					//v.sb.fast.lockCount--
 					lockAddr := instrT.Call.Args[0]
 					delete(v.sb.snapshot.lockOpList, lockAddr)
 				} else if fn.Name() == "Wait" {
@@ -255,31 +261,31 @@ func (v *InstructionVisitor) visit(instruction ssa.Instruction, bb *ssa.BasicBlo
 					Analysis.ptaConfig.AddQuery(instrT.Call.Args[0])
 				}
 			} else {
-				if s, ok := Analysis.fn2SummaryMap[fn]; ok {
-					// apply callee's summary
-					if s.fast.hasSyncSideEffect() {
-						v.sb.mergePreSnapshot(s.fast)
-						v.makeSyncBlock(bb, index)
-						v.sb.mergePostSnapshot(s.fast)
-					}
-				} else {
-					log.Debug("Summary not found for ", fn)
-				}
+				//if s, ok := Analysis.fn2SummaryMap[fn]; ok {
+				//	// apply callee's summary
+				//	//if s.fast.hasSyncSideEffect() {
+				//	//	v.sb.mergePreSnapshot(s.fast)
+				//	//	v.makeSyncBlock(bb, index)
+				//	//	v.sb.mergePostSnapshot(s.fast)
+				//	//}
+				//} else {
+				log.Debug("Summary not found for ", fn)
+				//}
 			}
-		} else if closure, ok := instrT.Common().Value.(*ssa.MakeClosure); ok {
-			if fn, ok := closure.Fn.(*ssa.Function); ok {
-				if s, ok := Analysis.fn2SummaryMap[fn]; ok {
-					// apply callee's summary
-					if s.fast.hasSyncSideEffect() {
-						v.sb.mergePreSnapshot(s.fast)
-						v.makeSyncBlock(bb, index)
-						v.sb.mergePostSnapshot(s.fast)
-					}
-				} else {
-					log.Debug("Summary not found for ", fn)
-				}
-			}
-		}
+		} // else if closure, ok := instrT.Common().Value.(*ssa.MakeClosure); ok {
+		//	if fn, ok := closure.Fn.(*ssa.Function); ok {
+		//		if s, ok := Analysis.fn2SummaryMap[fn]; ok {
+		//			// apply callee's summary
+		//			//if s.fast.hasSyncSideEffect() {
+		//			//	v.sb.mergePreSnapshot(s.fast)
+		//			//	v.makeSyncBlock(bb, index)
+		//			//	v.sb.mergePostSnapshot(s.fast)
+		//			//}
+		//		} else {
+		//			log.Debug("Summary not found for ", fn)
+		//		}
+		//	}
+		//}
 		//case ssa.CallInstruction:
 		//case *ssa.Defer:
 		//	signalStr := instrT.Call.Value.String()

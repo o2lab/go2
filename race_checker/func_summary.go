@@ -5,17 +5,17 @@ import (
 )
 
 type functionSummary struct {
-	chSendOps       []chanOp
-	chRecvOps       []chanOp
-	wgWaitOps       []wgOp
-	wgDoneOps       []wgOp
-	syncBlocks      []*SyncBlock
-	goroutineRank   int
-	function        *ssa.Function
-	sb2GoInsMap     map[*SyncBlock]*ssa.Go
-	chanOpMHBMap    map[*chanOp][]SyncBlock
-	bb2sbList       map[int][]*SyncBlock
-	fast            FastSnapshot
+	chSendOps     []chanOp
+	chRecvOps     []chanOp
+	wgWaitOps     []wgOp
+	wgDoneOps     []wgOp
+	syncBlocks    []*SyncBlock
+	goroutineRank int
+	function      *ssa.Function
+	sb2GoInsMap   map[*SyncBlock]*ssa.Go
+	chanOpMHBMap  map[*chanOp][]SyncBlock
+	bb2sbList     map[int][]*SyncBlock
+	//	fast            FastSnapshot
 	snapshot        SyncSnapshot
 	selectDoneBlock []*ssa.BasicBlock
 	selectStmts     []*ssa.Select

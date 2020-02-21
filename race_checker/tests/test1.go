@@ -1,31 +1,43 @@
-//Case 1
 //package main
-//import "fmt"
-//func main() {
-//	fmt.Println(getNumber())
-//}
+//
+//import (
+//	"fmt"
+//)
+//
+//var k int
+//var xx int
+//
 //func getNumber() int {
 //	var i int
+//	xx = 2
 //	go writeI(&i)
-//	return i // racy read
+//	return i // racy read, race #3
 //}
 //func writeI(j *int) {
-//	*j = 5 // racy write
+//	*j = 5 // racy write, race #3
 //}
-
-//Case 2
-//package main
 //
 //type S struct {
 //	i int
 //}
 //
-//func (s *S) read() int { // not anonymous
-//	return s.i // racy read
+//func (s *S) read() int {
+//	return s.i // racy read, race #1
 //}
-//func (s *S) write(i int) { // not anonymous
-//	s.i = i // racy write
+//func (s *S) write(i int) {
+//	s.i = i // racy write, race #1
 //}
+//
+//func f1(i int) int {
+//	j := i
+//	j--
+//	return j
+//}
+//
+//func f2(h *int) {
+//	*h++ // racy write, race #2
+//}
+//
 //func main() {
 //	s := &S{
 //		i: 1,
@@ -34,64 +46,70 @@
 //		s.write(12)
 //	}()
 //	s.read()
-//}
-
-//Case 3
-//package main
 //
-//var k int
-//func main() {
-//
+//	fmt.Println(getNumber())
 //
 //	go func() {
-//		//k = 1 // racy write
-//		_ = k
+//		_ = k // racy read, race #4
 //	}()
-//	k = 2 //racy write
-//}
-
-//Case 4 (HAPPENS-BEFORE: BAD)
-//package main
+//	k = 2 //racy write, race #4
 //
-//import "fmt"
-//
-//func f1(i int) int { // pure function
-//	j := i
-//	j--
-//	return j
-//}
-//
-//func f2(h *int) {
-//	*h++ // racy write
-//}
-//
-//func main() {
 //	i := 1
 //	go f2(&i)
-//	j := f1(i) // racy read
+//	j := f1(i) // racy read, race #2
 //	fmt.Println(j)
 //}
 
-//Case 5 (HAPPENS-BEFORE: GOOD) TODO: Check function summary Count!
+// ___________________________________________________
+
+//Case 7
+package main
+
+import (
+	"fmt"
+)
+
+var chn = make(chan int, 1)
+
+var t = 2
+
+func Y(t *int) {
+	*t++
+	j := *t
+	chn <- j
+	j = *t
+}
+
+func main() {
+	t = 2
+	go Y(&t)
+	x := <-chn
+	fmt.Println(x)
+}
+
+//Case 8 (WaitGroup)
 //package main
-//import "fmt"
-//func f1(ch chan int) int {
-//	j := <-ch
-//	j--
-//	return j
-//}
 //
-//func f2(i int, ch chan int) {
-//	i++
-//	ch <- i
+//import (
+//	"fmt"
+//	"sync"
+//)
+//
+//var w int
+//var v int
+//
+//func worker(wg *sync.WaitGroup) {
+//	fmt.Printf("K value is %d \n", w) //racy read, race #5
+//	wg.Done()
 //}
 //
 //func main() {
-//	i := 1
-//	ch := make(chan int)
-//	go f2(i, ch)
-//	j := f1(ch)
-//	fmt.Println(j)
+//	v = 4
+//	var wg sync.WaitGroup
+//	wg.Add(1)
+//	go worker(&wg)
+//	wg.Wait()
+//	w = 0  //racy write, race #5
 //}
 
 //Case 6 (NO race; non-deterministic select statement)
@@ -126,52 +144,24 @@
 //	fmt.Println(j)
 //}
 
-//Case 7 (from Professor)
+//Case 5 (HAPPENS-BEFORE: GOOD) TODO: Check function summary Count!
 //package main
 //import "fmt"
+//func f1(ch chan int) int {
+//	j := <-ch
+//	j--
+//	return j
+//}
 //
-//
-//func Y(t *int) {
-//	*t++
+//func f2(i int, ch chan int) {
+//	i++
+//	ch <- i
 //}
 //
 //func main() {
-//	t := 2
-//	ch := make(chan int, 1)
-//	go Y(&t)
-//	if t == 2 {
-//		fmt.Println("werw")
-//	} else {
-//		ch <- t
-//	}
-//	x := <-ch
-//	fmt.Println(x)
-//	return
+//	i := 1
+//	ch := make(chan int)
+//	go f2(i, ch)
+//	j := f1(ch)
+//	fmt.Println(j)
 //}
-
-//Case 8 (WaitGroup)
-//package main
-//
-//import (
-//	"fmt"
-//	"sync"
-//)
-//
-//var k int
-//
-//func worker(id int, wg *sync.WaitGroup) {
-//	fmt.Printf("Worker number is %d \n", id)
-//	fmt.Printf("K value is %d \n", k)
-//	wg.Done()
-//}
-//
-//func main() {
-//	var wg sync.WaitGroup
-//	for i := 1; i <= 5; i++ {
-//		wg.Add(1)
-//		go worker(i, &wg)
-//	}
-//	wg.Wait()
-//	k = 0
-//}
-

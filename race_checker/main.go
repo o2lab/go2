@@ -4,7 +4,8 @@ import (
 	"flag"
 	"fmt"
 	"github.com/logrusorgru/aurora"
-	"go/types"
+	"github.com/twmb/algoimpl/go/graph"
+	//"go/types"
 	"golang.org/x/tools/go/callgraph"
 	"golang.org/x/tools/go/callgraph/cha"
 	"golang.org/x/tools/go/packages"
@@ -25,6 +26,8 @@ type analysis struct {
 	ptaConfig     *pointer.Config
 	fn2SummaryMap map[*ssa.Function]*functionSummary
 	analysisStat  stat
+	HBgraph       *graph.Graph
+	sb2HBnodeMap  map[*SyncBlock]graph.Node
 }
 
 type stat struct {
@@ -93,11 +96,11 @@ func (a *analysis) visitOneFunction(fn *ssa.Function, rank int) {
 			snapshot:      SyncSnapshot{lockOpList: make(map[ssa.Value]MutexOp)},
 		}
 		visitor.parentSummary.bb2sbList[b.Index] = []*SyncBlock{}
-		if b.Comment == "select.done" {
-			visitor.sb.fast.mhaChanRecv = NondetRecv
-			visitor.sb.fast.mhbChanSend = NondetSend
-			fnSummary.selectDoneBlock = append(fnSummary.selectDoneBlock, b)
-		}
+		//if b.Comment == "select.done" {
+		//	visitor.sb.fast.mhaChanRecv = NondetRecv
+		//	visitor.sb.fast.mhbChanSend = NondetSend
+		//	fnSummary.selectDoneBlock = append(fnSummary.selectDoneBlock, b)
+		//}
 
 		// visit each instruction in b
 		for index, instr := range b.Instrs {
@@ -107,6 +110,10 @@ func (a *analysis) visitOneFunction(fn *ssa.Function, rank int) {
 		// mark the end of the last SyncBlock
 		if visitor.sb.hasAccessOrSyncOp() {
 			visitor.sb.end = len(b.Instrs) - 1
+			if visitor.lastNonEmptySB != nil {
+				visitor.lastNonEmptySB.succs = []*SyncBlock{visitor.sb}
+				visitor.sb.preds = []*SyncBlock{visitor.lastNonEmptySB}
+			}
 			visitor.parentSummary.syncBlocks = append(visitor.parentSummary.syncBlocks, visitor.sb)
 			visitor.parentSummary.bb2sbList[b.Index] = append(visitor.parentSummary.bb2sbList[b.Index], visitor.sb)
 		}
@@ -120,81 +127,81 @@ func (a *analysis) visitOneFunction(fn *ssa.Function, rank int) {
 			bb := worklist[len(worklist)-1]
 			worklist = worklist[:len(worklist)-1]
 			worklist = append(worklist, bb.Dominees()...)
-			for _, s := range fnSummary.bb2sbList[bb.Index] {
-				s.fast.mhaChanRecv = NondetRecv
-				s.fast.mhbChanSend = NondetSend
-			}
+			//for _, s := range fnSummary.bb2sbList[bb.Index] {
+			//	s.fast.mhaChanRecv = NondetRecv
+			//	s.fast.mhbChanSend = NondetSend
+			//}
 		}
 	}
 	// A successor of a SingleSend SyncBlock is SingleSend
 	// A predecessor of a SingleRecv SyncBlock is SingleRecv
-	for _, op := range fnSummary.chSendOps {
-		if op.fromSelect != nil {
-			continue
-		}
-		op.syncPred.fast.mhbChanSend = SingleSend
-		for _, predSB := range op.syncPred.preds {
-			predSB.fast.mhbChanSend = SingleSend
-		}
-	}
-	for _, op := range fnSummary.chRecvOps {
-		if op.fromSelect != nil {
-			continue
-		}
-		op.syncSucc.fast.mhaChanRecv = SingleRecv
-		for _, succSB := range op.syncSucc.succs {
-			succSB.fast.mhaChanRecv = SingleRecv
-		}
-	}
+	//for _, op := range fnSummary.chSendOps {
+	//	if op.fromSelect != nil {
+	//		continue
+	//	}
+	//	op.syncPred.fast.mhbChanSend = SingleSend
+	//	for _, predSB := range op.syncPred.preds {
+	//		predSB.fast.mhbChanSend = SingleSend
+	//	}
+	//}
+	//for _, op := range fnSummary.chRecvOps {
+	//	if op.fromSelect != nil {
+	//		continue
+	//	}
+	//	op.syncSucc.fast.mhaChanRecv = SingleRecv
+	//	for _, succSB := range op.syncSucc.succs {
+	//		succSB.fast.mhaChanRecv = SingleRecv
+	//	}
+	//}
 	// update snapshots for blocks under select cases
-	for _, selectInstr := range fnSummary.selectStmts {
-		childBlocks := fnSummary.selectChildBlocks(selectInstr.Block(), len(selectInstr.States))
-		for idx, st := range selectInstr.States {
-			if idx >= len(childBlocks) {
-				break // Not enough childblocks. Some select cases have empty body.
-			}
-			if st.Dir == types.RecvOnly {
-				for _, sb := range fnSummary.bb2sbList[childBlocks[idx].Index] {
-					sb.fast.mhaChanRecv = SingleRecv
-				}
-			}
-		}
-	}
+	//for _, selectInstr := range fnSummary.selectStmts {
+	//	childBlocks := fnSummary.selectChildBlocks(selectInstr.Block(), len(selectInstr.States))
+	//	for idx, st := range selectInstr.States {
+	//		if idx >= len(childBlocks) {
+	//			break // Not enough childblocks. Some select cases have empty body.
+	//		}
+	//		if st.Dir == types.RecvOnly {
+	//			for _, sb := range fnSummary.bb2sbList[childBlocks[idx].Index] {
+	//				sb.fast.mhaChanRecv = SingleRecv
+	//			}
+	//		}
+	//	}
+	//}
 	// summarize fn
-	fnSingleRecv, fnSingleSend := false, false
+	// fnSingleRecv, fnSingleSend := false, false
 	for _, op := range fnSummary.chRecvOps {
 		if op.fromSelect != nil {
 			continue
 		}
-		b := op.syncSucc.bb
-		dominateAllReturnBlocks := true
-		for _, returnB := range fnSummary.returnBlocks {
-			if !b.Dominates(returnB) {
-				dominateAllReturnBlocks = false
-				break
-			}
-		}
-		if dominateAllReturnBlocks {
-			fnSingleRecv = true
-			break
-		}
+		//b := op.syncSucc.bb
+		//dominateAllReturnBlocks := true
+		//for _, returnB := range fnSummary.returnBlocks {
+		//	if !b.Dominates(returnB) {
+		//		dominateAllReturnBlocks = false
+		//		break
+		//	}
+		//}
+		//if dominateAllReturnBlocks {
+		//	fnSingleRecv = true
+		//	break
+		//}
 	}
 	for _, op := range fnSummary.chSendOps {
 		if op.fromSelect != nil {
 			continue
 		}
-		b := op.syncPred.bb
-		if fnSummary.function.Blocks[0].Dominates(b) {
-			fnSingleSend = true
-			break
-		}
+		//b := op.syncPred.bb
+		//if fnSummary.function.Blocks[0].Dominates(b) {
+		//	fnSingleSend = true
+		//	break
+		//}
 	}
-	if fnSingleRecv {
-		fnSummary.fast.mhaChanRecv = SingleRecv
-	}
-	if fnSingleSend {
-		fnSummary.fast.mhbChanSend = SingleSend
-	}
+	//if fnSingleRecv {
+	//	fnSummary.fast.mhaChanRecv = SingleRecv
+	//}
+	//if fnSingleSend {
+	//	fnSummary.fast.mhbChanSend = SingleSend
+	//}
 }
 
 func isSyntheticEdge(edge *callgraph.Edge) bool {
@@ -287,7 +294,6 @@ func (a *analysis) preprocess() error {
 		a.analysisStat.nFunctions += 1
 		return nil
 	}
-
 	err := GraphVisitPreorder(cg, visitNode)
 	if err != nil {
 		log.Fatal(err)
@@ -300,8 +306,77 @@ func (a *analysis) preprocess() error {
 		log.Fatal(err)
 	}
 	Analysis.result = result
+	log.Info("Building HB Graph...")
+	a.HBgraph = graph.New(graph.Directed)
+	Analysis.sb2HBnodeMap = make(map[*SyncBlock]graph.Node)
+	for _, fn := range a.fn2SummaryMap {
+		for _, sb := range fn.syncBlocks {
+			temp := a.HBgraph.MakeNode()
+			*temp.Value = sb
+			Analysis.sb2HBnodeMap[sb] = temp
+		}
+	}
+	// create PO edges
+	for _, fn := range a.fn2SummaryMap {
+		if len(fn.syncBlocks) == 0 {
+			continue
+		}
+		curr := fn.syncBlocks[0]
+		stack := []*SyncBlock{curr}
+		visited := map[*SyncBlock]bool{}
+		for len(stack) > 0 {
+			curr = stack[len(stack)-1]
+			stack = stack[:len(stack)-1]
+			visited[curr] = true
+			for _, nextnode := range curr.succs {
+				err := a.HBgraph.MakeEdge(a.sb2HBnodeMap[curr], a.sb2HBnodeMap[nextnode])
+				if err != nil {
+					return err
+				}
+				if !visited[nextnode] {
+					stack = append(stack, nextnode)
+				}
+			}
+			// to handle go function calls
+			for _, goSumm1 := range curr.mhbGoFuncList {
+				for _, sb1 := range goSumm1.syncBlocks {
+					err := a.HBgraph.MakeEdge(a.sb2HBnodeMap[curr], a.sb2HBnodeMap[sb1])
+					if err != nil {
+						return err
+					}
+				}
+			}
+		}
+	}
 
+	// Sync Order edges created here
+	for _, fn := range a.fn2SummaryMap {
+		if len(fn.syncBlocks) == 0 {
+			continue
+		}
+		for _, sendedges := range fn.snapshot.chanSendOpList {
+			for _, recvedges := range fn.snapshot.chanRecvOpList {
+				if sendedges.ch == recvedges.ch {
+					err := a.HBgraph.MakeEdge(a.sb2HBnodeMap[sendedges.syncPred], a.sb2HBnodeMap[recvedges.syncSucc])
+					if err != nil {
+						return err
+					}
+				}
+			}
+		}
+	}
+	log.Infoln("Done")
 	return nil
+}
+
+func (a *analysis) isNeighbor(from *SyncBlock, to *SyncBlock) bool {
+	fromNode := a.sb2HBnodeMap[from]
+	for _, neighbor := range a.HBgraph.Neighbors(fromNode) {
+		if *neighbor.Value == to {
+			return true
+		}
+	}
+	return false
 }
 
 func (a *analysis) checkRace() {
@@ -326,9 +401,9 @@ func (a *analysis) checkRace() {
 	}
 }
 
-func hasChannelComm(sb1 *SyncBlock, sb2 *SyncBlock) bool {
-	return sb1.fast.mhbChanSend >= NondetSend && sb2.fast.mhaChanRecv == SingleRecv
-}
+//func hasChannelComm(sb1 *SyncBlock, sb2 *SyncBlock) bool {
+//	return sb1.fast.mhbChanSend >= NondetSend && sb2.fast.mhaChanRecv == SingleRecv
+//}
 
 func hasWGComm(sb1 *SyncBlock, sb2 *SyncBlock) bool {
 	for _, wgOp := range sb1.snapshot.wgDoneList {
@@ -341,9 +416,9 @@ func hasWGComm(sb1 *SyncBlock, sb2 *SyncBlock) bool {
 	return false
 }
 
-func maySyncByChannelComm(sb1 *SyncBlock, sb2 *SyncBlock) bool {
-	return hasChannelComm(sb1, sb2) || hasChannelComm(sb2, sb1)
-}
+//func maySyncByChannelComm(sb1 *SyncBlock, sb2 *SyncBlock) bool {
+//	return hasChannelComm(sb1, sb2) || hasChannelComm(sb2, sb1)
+//}
 
 func maySyncByWGComm(sb1 *SyncBlock, sb2 *SyncBlock) bool {
 	return hasWGComm(sb1, sb2) || hasWGComm(sb2, sb1)
@@ -368,8 +443,8 @@ func (a *analysis) checkSyncBlock(sb1 *SyncBlock, sb2 *SyncBlock) {
 				a.sameAddress(acc1.location, acc2.location) &&
 				//(sb1.fast.lockCount == 0 || sb2.fast.lockCount == 0) && // underapproximation
 				!locksetsIntersect(sb1, sb2) &&
-				!maySyncByWGComm(sb1, sb2) &&
-				!maySyncByChannelComm(sb1, sb2) {
+				// !maySyncByChannelComm(sb1, sb2) &&
+				!maySyncByWGComm(sb1, sb2) {
 				a.reportRace(acc1, acc2)
 			}
 		}
@@ -435,7 +510,7 @@ func (a *analysis) printSyncBlocks() {
 		log.Debug(fn)
 		for idx, sb := range sum.syncBlocks {
 			log.Debugf("  %d:%d [%s] %d-%d Rank %d [SEND=%d RECV=%d LOCK=%d] %s", sb.bb.Index, idx, sb.bb.Comment, sb.start, sb.end, sb.parentSummary.goroutineRank,
-				sb.fast.mhbChanSend, sb.fast.mhaChanRecv, sb.fast.lockCount, a.prog.Fset.Position(sb.bb.Instrs[sb.start].Pos()))
+				/* sb.fast.mhbChanSend, sb.fast.mhaChanRecv, sb.fast.lockCount, */ a.prog.Fset.Position(sb.bb.Instrs[sb.start].Pos()))
 			log.Debug("  -- Lockset ", sb.snapshot.lockOpList)
 		}
 	}
