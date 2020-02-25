@@ -99,16 +99,28 @@ func (op chanOp) Mode() SyncMode {
 	return AcqRel
 }
 
+func areSendRecvPair(op1, op2 chanOp) bool {
+	if op1.dir == types.SendOnly && op2.dir == types.RecvOnly {
+		return Analysis.sameAddress(op1.ch, op2.ch)
+	}
+	return false
+}
+
+func areDoneWaitPair(op1, op2 wgOp) bool {
+	if !op1.isWait && op2.isWait {
+		return Analysis.sameAddress(op1.wg, op2.wg)
+	}
+	return false
+}
+
 func (v *InstructionVisitor) makeSyncBlock(bb *ssa.BasicBlock, index int) *SyncBlock {
 	if v.sb.hasAccessOrSyncOp() {
 		v.sb.end = index
 		v.parentSummary.syncBlocks = append(v.parentSummary.syncBlocks, v.sb)
-
 		if v.lastNonEmptySB != nil {
 			v.lastNonEmptySB.succs = []*SyncBlock{v.sb}
 			v.sb.preds = []*SyncBlock{v.lastNonEmptySB}
 		}
-
 		v.lastNonEmptySB = v.sb
 		v.parentSummary.bb2sbList[bb.Index] = append(v.parentSummary.bb2sbList[bb.Index], v.sb)
 	}
@@ -170,6 +182,7 @@ func (v *InstructionVisitor) visit(instruction ssa.Instruction, bb *ssa.BasicBlo
 			succ := v.makeSyncBlock(bb, index)
 			succ.snapshot.chanRecvOpList = append(succ.snapshot.chanRecvOpList,
 				chanOp{ch: instrT.X, dir: types.RecvOnly, pos: instrT.Pos(), syncSucc: succ})
+			Analysis.ptaConfig.AddQuery(instrT.X)
 		}
 	case *ssa.MapUpdate:
 		if locMap, ok := instrT.Map.(*ssa.UnOp); ok {
@@ -207,6 +220,7 @@ func (v *InstructionVisitor) visit(instruction ssa.Instruction, bb *ssa.BasicBlo
 		v.makeSyncBlock(bb, index)
 		pred.snapshot.chanSendOpList = append(pred.snapshot.chanSendOpList,
 			chanOp{ch: instrT.Chan, dir: types.SendOnly, pos: instrT.Pos(), syncPred: pred})
+		Analysis.ptaConfig.AddQuery(instrT.Chan)
 	case *ssa.Select:
 		var pred, succ *SyncBlock
 		if instrT.Blocking {

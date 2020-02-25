@@ -43,7 +43,7 @@ var (
 	focusPkgs    []string
 	excludedPkgs []string
 	allPkg       bool
-	noReport bool
+	noReport     bool
 )
 
 func fromPkgsOfInterest(fn *ssa.Function) bool {
@@ -278,7 +278,7 @@ func (a *analysis) sameAddress(addr1 ssa.Value, addr2 ssa.Value) bool {
 
 // two functions can run in parallel iff their fromGoroutines slices do not equal
 // return the summary with the min goroutine ID as 2nd return val
-func canRunInParallel(summary1 *functionSummary, summary2 *functionSummary) bool {
+func inDifferentGoroutines(summary1 *functionSummary, summary2 *functionSummary) bool {
 	return summary1.goroutineRank != summary2.goroutineRank
 }
 
@@ -307,13 +307,22 @@ func (a *analysis) preprocess() error {
 		log.Fatal(err)
 	}
 	Analysis.result = result
+
+	for _, fn := range a.fn2SummaryMap {
+		for _, sb := range fn.syncBlocks {
+			if !sb.snapshot.hasSyncSideEffect() {
+
+			}
+		}
+	}
+
 	log.Info("Building HB Graph...")
 	a.HBgraph = graph.New(graph.Directed)
 	Analysis.sb2HBnodeMap = make(map[*SyncBlock]graph.Node)
 	for _, fn := range a.fn2SummaryMap {
 		for _, sb := range fn.syncBlocks {
 			temp := a.HBgraph.MakeNode()
-			*temp.Value = sb
+			*temp.Value = sb // label
 			Analysis.sb2HBnodeMap[sb] = temp
 		}
 	}
@@ -329,13 +338,13 @@ func (a *analysis) preprocess() error {
 			curr = stack[len(stack)-1]
 			stack = stack[:len(stack)-1]
 			visited[curr] = true
-			for _, nextnode := range curr.succs {
-				err := a.HBgraph.MakeEdge(a.sb2HBnodeMap[curr], a.sb2HBnodeMap[nextnode])
+			for _, nextNode := range curr.succs {
+				err := a.HBgraph.MakeEdge(a.sb2HBnodeMap[curr], a.sb2HBnodeMap[nextNode])
 				if err != nil {
 					return err
 				}
-				if !visited[nextnode] {
-					stack = append(stack, nextnode)
+				if !visited[nextNode] {
+					stack = append(stack, nextNode)
 				}
 			}
 			// to handle go function calls
@@ -351,16 +360,41 @@ func (a *analysis) preprocess() error {
 	}
 
 	// Sync Order edges created here
-	for _, fn := range a.fn2SummaryMap {
-		if len(fn.syncBlocks) == 0 {
+	for _, fn1 := range a.fn2SummaryMap {
+		if len(fn1.syncBlocks) == 0 {
 			continue
 		}
-		for _, sendedges := range fn.snapshot.chanSendOpList {
-			for _, recvedges := range fn.snapshot.chanRecvOpList {
-				if sendedges.ch == recvedges.ch {
-					err := a.HBgraph.MakeEdge(a.sb2HBnodeMap[sendedges.syncPred], a.sb2HBnodeMap[recvedges.syncSucc])
-					if err != nil {
-						return err
+		for _, fn2 := range a.fn2SummaryMap {
+			if !(inDifferentGoroutines(fn1, fn2)) || len(fn2.syncBlocks) == 0 {
+				continue
+			}
+			for _, sb1 := range fn1.syncBlocks {
+				if !sb1.hasAccessOrSyncOp() {
+					continue
+				}
+				for _, sb2 := range fn2.syncBlocks {
+					if !sb2.hasAccessOrSyncOp() {
+						continue
+					}
+					for _, send := range sb1.snapshot.chanSendOpList {
+						for _, recv := range sb2.snapshot.chanRecvOpList {
+							if areSendRecvPair(send, recv) {
+								err := a.HBgraph.MakeEdge(a.sb2HBnodeMap[sb1], a.sb2HBnodeMap[sb2])
+								if err != nil {
+									return err
+								}
+							}
+						}
+					}
+					for _, done := range sb1.snapshot.wgDoneList {
+						for _, wait := range sb2.snapshot.wgWaitList {
+							if areDoneWaitPair(done, wait) {
+								err := a.HBgraph.MakeEdge(a.sb2HBnodeMap[sb1], a.sb2HBnodeMap[sb2])
+								if err != nil {
+									return err
+								}
+							}
+						}
 					}
 				}
 			}
@@ -370,12 +404,37 @@ func (a *analysis) preprocess() error {
 	return nil
 }
 
-func (a *analysis) isNeighbor(from *SyncBlock, to *SyncBlock) bool {
-	fromNode := a.sb2HBnodeMap[from]
-	for _, neighbor := range a.HBgraph.Neighbors(fromNode) {
-		if *neighbor.Value == to {
-			return true
+// incorporate transitivity
+func (a *analysis) reachable(sb1 *SyncBlock, sb2 *SyncBlock) bool {
+	//goal := a.sb2HBnodeMap[sb2]
+	curr := a.sb2HBnodeMap[sb1]
+	stack := []graph.Node{curr}
+	visited := map[graph.Node]bool{}
+	for len(stack) > 0 {
+		curr = stack[len(stack)-1]
+		stack = stack[:len(stack)-1]
+		if curSb, ok := (*curr.Value).(*SyncBlock); ok {
+			log.Debugf("%s %s", curSb.parentSummary.function.Name(), curSb.bb)
+			if curSb == sb2 {
+				return true
+			}
 		}
+		//if curr == goal {
+		//	return true
+		//}
+		visited[curr] = true
+		for _, reachableNode := range a.HBgraph.Neighbors(curr) {
+			if !visited[reachableNode] {
+				stack = append(stack, reachableNode)
+			}
+		}
+	}
+	return false
+}
+
+func (a *analysis) reachableBothWays(sb1 *SyncBlock, sb2 *SyncBlock) bool {
+	if a.reachable(sb1, sb2) || a.reachable(sb2, sb1) {
+		return true
 	}
 	return false
 }
@@ -391,7 +450,7 @@ func (a *analysis) checkRace() {
 		for j := 0; j <= i; j++ {
 			fn1, fn2 := functions[i], functions[j]
 			fs1, fs2 := a.fn2SummaryMap[fn1], a.fn2SummaryMap[fn2]
-			if canRunInParallel(fs1, fs2) {
+			if inDifferentGoroutines(fs1, fs2) {
 				for _, sb1 := range fs1.syncBlocks {
 					for _, sb2 := range fs2.syncBlocks {
 						a.checkSyncBlock(sb1, sb2)
@@ -400,29 +459,6 @@ func (a *analysis) checkRace() {
 			}
 		}
 	}
-}
-
-//func hasChannelComm(sb1 *SyncBlock, sb2 *SyncBlock) bool {
-//	return sb1.fast.mhbChanSend >= NondetSend && sb2.fast.mhaChanRecv == SingleRecv
-//}
-
-func hasWGComm(sb1 *SyncBlock, sb2 *SyncBlock) bool {
-	for _, wgOp := range sb1.snapshot.wgDoneList {
-		for _, wgOp1 := range sb2.snapshot.wgWaitList {
-			if Analysis.sameAddress(wgOp.wg, wgOp1.wg) {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-//func maySyncByChannelComm(sb1 *SyncBlock, sb2 *SyncBlock) bool {
-//	return hasChannelComm(sb1, sb2) || hasChannelComm(sb2, sb1)
-//}
-
-func maySyncByWGComm(sb1 *SyncBlock, sb2 *SyncBlock) bool {
-	return hasWGComm(sb1, sb2) || hasWGComm(sb2, sb1)
 }
 
 func locksetsIntersect(sb1 *SyncBlock, sb2 *SyncBlock) bool {
@@ -444,8 +480,7 @@ func (a *analysis) checkSyncBlock(sb1 *SyncBlock, sb2 *SyncBlock) {
 				a.sameAddress(acc1.location, acc2.location) &&
 				//(sb1.fast.lockCount == 0 || sb2.fast.lockCount == 0) && // underapproximation
 				!locksetsIntersect(sb1, sb2) &&
-				// !maySyncByChannelComm(sb1, sb2) &&
-				!maySyncByWGComm(sb1, sb2) {
+				!a.reachableBothWays(sb1, sb2) {
 				a.reportRace(acc1, acc2)
 			}
 		}
@@ -510,9 +545,11 @@ func (a *analysis) printSyncBlocks() {
 	for fn, sum := range a.fn2SummaryMap {
 		log.Debug(fn)
 		for idx, sb := range sum.syncBlocks {
-			log.Debugf("  %d:%d [%s] %d-%d Rank %d [SEND=%d RECV=%d LOCK=%d] %s", sb.bb.Index, idx, sb.bb.Comment, sb.start, sb.end, sb.parentSummary.goroutineRank,
+			log.Debugf("  %d:%d [%s] %d-%d Rank %d %s", sb.bb.Index, idx, sb.bb.Comment, sb.start, sb.end, sb.parentSummary.goroutineRank,
 				/* sb.fast.mhbChanSend, sb.fast.mhaChanRecv, sb.fast.lockCount, */ a.prog.Fset.Position(sb.bb.Instrs[sb.start].Pos()))
 			log.Debug("  -- Lockset ", sb.snapshot.lockOpList)
+			log.Debug("  -- chan ", sb.snapshot.chanSendOpList, " recv ", sb.snapshot.chanRecvOpList)
+			log.Debug("  -- Lockset ", sb.snapshot.wgDoneList, " wait ", sb.snapshot.wgWaitList)
 		}
 	}
 }

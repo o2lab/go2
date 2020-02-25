@@ -86,8 +86,11 @@ type SyncSnapshot struct {
 //	}
 //}
 
+func (s *SyncSnapshot) hasSyncSideEffect() bool {
+	return len(s.lockOpList) > 0 || len(s.chanRecvOpList) > 0 || len(s.chanSendOpList) > 0 || len(s.wgDoneList) > 0 || len(s.wgWaitList) > 0
+}
 func (b *SyncBlock) hasAccessOrSyncOp() bool {
-	return len(b.accesses) > 0 // || b.fast.hasSyncSideEffect()
+	return len(b.accesses) > 0 || b.snapshot.hasSyncSideEffect()
 }
 
 func (b *SyncBlock) addAccessInfo(ins *ssa.Instruction, location ssa.Value, index int, comment string) {
