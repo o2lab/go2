@@ -274,17 +274,14 @@ func (v *InstructionVisitor) visit(instruction ssa.Instruction, bb *ssa.BasicBlo
 						wgOp{wg: instrT.Call.Args[0], isWait: false, pos: instrT.Pos(), syncPred: pred})
 					Analysis.ptaConfig.AddQuery(instrT.Call.Args[0])
 				}
-			} else {
-				//if s, ok := Analysis.fn2SummaryMap[fn]; ok {
-				//	// apply callee's summary
-				//	//if s.fast.hasSyncSideEffect() {
-				//	//	v.sb.mergePreSnapshot(s.fast)
-				//	//	v.makeSyncBlock(bb, index)
-				//	//	v.sb.mergePostSnapshot(s.fast)
-				//	//}
-				//} else {
-				log.Debug("Summary not found for ", fn)
-				//}
+			} else if fn.Pkg.Pkg.Name() == "main" {
+				if summary, ok := Analysis.fn2SummaryMap[fn]; ok {
+					v.sb.mergePreSnapshot(summary.snapshot)
+					v.makeSyncBlock(bb, index)
+					v.sb.mergePostSnapshot(summary.snapshot)
+				} else {
+					log.Debug("Summary not found for ", fn)
+				}
 			}
 		} // else if closure, ok := instrT.Common().Value.(*ssa.MakeClosure); ok {
 		//	if fn, ok := closure.Fn.(*ssa.Function); ok {

@@ -4,6 +4,7 @@ import "fmt"
 
 var x = 1
 var ch = make(chan bool)
+var y = false
 
 func main() {
 	func() {
@@ -11,15 +12,15 @@ func main() {
 			x = 1
 			ch <- true
 		}()
-		foobar()
+		funcOne()
 	}()
-	fmt.Println(x) // no race, synced through chan recv in foobar()
+	fmt.Println(y) // no race, synced through chan recv in funcTwo()
 }
 
-func bar() {
-	<-ch
+func funcTwo() {
+	y = <-ch
 }
 
-func foobar() {
-	bar()
+func funcOne() {
+	funcTwo()
 }

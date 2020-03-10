@@ -217,15 +217,6 @@ func isInit(fn *ssa.Function) bool {
 	return fn.Pkg != nil && fn.Pkg.Func("init") == fn
 }
 
-func contains(s []int, v int) bool {
-	for _, a := range s {
-		if a == v {
-			return true
-		}
-	}
-	return false
-}
-
 func GraphVisitPreorder(g *callgraph.Graph, node func(*callgraph.Node, int) error) error {
 	seen := make(map[*callgraph.Node]bool)
 	var visit func(n *callgraph.Node, rank int) error
@@ -307,14 +298,6 @@ func (a *analysis) preprocess() error {
 		log.Fatal(err)
 	}
 	Analysis.result = result
-
-	for _, fn := range a.fn2SummaryMap {
-		for _, sb := range fn.syncBlocks {
-			if !sb.snapshot.hasSyncSideEffect() {
-
-			}
-		}
-	}
 
 	log.Info("Building HB Graph...")
 	a.HBgraph = graph.New(graph.Directed)

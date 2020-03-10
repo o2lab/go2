@@ -52,7 +52,7 @@
 //	go func() {
 //		_ = k // racy read, race #4
 //	}()
-//	k = 2 //racy write, race #4
+//	k = 2 // racy write, race #4
 //
 //	i := 1
 //	go f2(&i)
@@ -62,30 +62,37 @@
 
 // ___________________________________________________
 
-//Case 7
-package main
-
-import (
-	"fmt"
-)
-
-var chn = make(chan int, 1)
-
-var t = 2
-
-func Y(t *int) {
-	*t++
-	j := *t
-	chn <- j
-	j = *t
-}
-
-func main() {
-	t = 2
-	go Y(&t)
-	x := <-chn
-	fmt.Println(x)
-}
+//Case 7 (channels)
+//package main
+//
+//import (
+//	"fmt"
+//	"sync"
+//)
+//
+//var chn = make(chan int, 1)
+//var wg = sync.WaitGroup{}
+//
+////var t = 2
+//
+//func Y(t *int) {
+//	*t = 1
+//	//j := *t
+//	chn <- 1
+//	//j = *t
+//	go func() {
+//		<-chn
+//		//*t = 1
+//		wg.Done()
+//	}()
+//}
+//
+//func main() {
+//	t := 2
+//	go Y(&t)
+//	wg.Wait()
+//	fmt.Println(t)
+//}
 
 //Case 8 (WaitGroup)
 //package main
@@ -144,7 +151,7 @@ func main() {
 //	fmt.Println(j)
 //}
 
-//Case 5 (HAPPENS-BEFORE: GOOD) TODO: Check function summary Count!
+//Case 5 (HAPPENS-BEFORE: GOOD)
 //package main
 //import "fmt"
 //func f1(ch chan int) int {
@@ -165,3 +172,33 @@ func main() {
 //	j := f1(ch)
 //	fmt.Println(j)
 //}
+
+// Testing method calls
+package main
+
+type someData struct {
+	someInt int
+}
+
+var xtoy = make(chan int)
+
+func (someNum someData) forPrint() {
+	someNum.someInt = <-xtoy
+}
+
+func (someNum someData) double() {
+	xtoy <- someNum.someInt
+}
+
+func main() {
+	x := someData{someInt: 5}
+	go func() {
+		x.someInt = 2 * x.someInt
+		x.double()
+		//xtoy <- x.someInt
+	}()
+	go func() {
+		x.forPrint()
+		//x.someInt = <-xtoy
+	}()
+}

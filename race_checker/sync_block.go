@@ -2,6 +2,8 @@ package main
 
 import (
 	log "github.com/sirupsen/logrus"
+	"go/token"
+	"go/types"
 	"golang.org/x/tools/go/ssa"
 )
 
@@ -58,39 +60,36 @@ type SyncSnapshot struct {
 //func (s FastSnapshot) hasSyncSideEffect() bool {
 //	return s.lockCount > 0 || s.mhaWGWait || s.mhbWGDone || s.mhbChanSend > NoSend || s.mhaChanRecv > NoRecv
 //}
-//
-//func (b *SyncBlock) mergePostSnapshot(fast FastSnapshot) {
-//	if fast.mhaWGWait {
-//		b.fast.mhaWGWait = true
-//	}
-//	if fast.mhaChanRecv > b.fast.mhaChanRecv {
-//		b.fast.mhaChanRecv = fast.mhaChanRecv
-//		if b.fast.mhaChanRecv == SingleRecv {
-//			b.parentSummary.chRecvOps = append(b.parentSummary.chRecvOps,
-//				chanOp{dir: types.RecvOnly, pos: token.NoPos, syncSucc: b})
-//		}
-//	}
-//	b.fast.lockCount += fast.lockCount
-//}
-//
-//func (b *SyncBlock) mergePreSnapshot(fast FastSnapshot) {
-//	if fast.mhbWGDone {
-//		b.fast.mhbWGDone = true
-//	}
-//	if fast.mhbChanSend > b.fast.mhbChanSend {
-//		b.fast.mhbChanSend = fast.mhbChanSend
-//		if b.fast.mhbChanSend == SingleSend {
-//			b.parentSummary.chSendOps = append(b.parentSummary.chSendOps,
-//				chanOp{dir: types.SendOnly, pos: token.NoPos, syncPred: b})
-//		}
-//	}
-//}
 
-func (s *SyncSnapshot) hasSyncSideEffect() bool {
+// if callee contains incoming sync edges, merge with instructions after method call
+func (b *SyncBlock) mergePostSnapshot(calleeSnapshot SyncSnapshot) {
+	if len(calleeSnapshot.wgWaitList) > 0 {
+		b.snapshot.wgWaitList = calleeSnapshot.wgWaitList
+	}
+	if len(calleeSnapshot.chanRecvOpList) > 0 {
+		b.snapshot.chanRecvOpList = append(b.snapshot.chanRecvOpList, calleeSnapshot.chanRecvOpList...)
+		b.parentSummary.chRecvOps = append(b.parentSummary.chRecvOps, chanOp{dir: types.RecvOnly, pos: token.NoPos, syncSucc: b})
+	}
+}
+
+// if callee contains outgoing sync edges, merge with instructions before method call
+func (b *SyncBlock) mergePreSnapshot(calleeSnapshot SyncSnapshot) {
+	if len(calleeSnapshot.wgDoneList) > 0 {
+		b.snapshot.wgDoneList = calleeSnapshot.wgDoneList
+	}
+	if len(calleeSnapshot.chanSendOpList) > 0 {
+		b.snapshot.chanSendOpList = append(b.snapshot.chanSendOpList, calleeSnapshot.chanSendOpList...)
+		b.parentSummary.chSendOps = append(b.parentSummary.chSendOps, chanOp{dir: types.SendOnly, pos: token.NoPos, syncPred: b})
+	}
+}
+
+// whether or not the sync block has synchronization primitives
+func (s *SyncSnapshot) hasSyncOp() bool {
 	return len(s.lockOpList) > 0 || len(s.chanRecvOpList) > 0 || len(s.chanSendOpList) > 0 || len(s.wgDoneList) > 0 || len(s.wgWaitList) > 0
 }
+
 func (b *SyncBlock) hasAccessOrSyncOp() bool {
-	return len(b.accesses) > 0 || b.snapshot.hasSyncSideEffect()
+	return len(b.accesses) > 0 || b.snapshot.hasSyncOp()
 }
 
 func (b *SyncBlock) addAccessInfo(ins *ssa.Instruction, location ssa.Value, index int, comment string) {
