@@ -7,6 +7,7 @@ import (
 type functionSummary struct {
 	chSendOps     []chanOp
 	chRecvOps     []chanOp
+	chCloseOps    []chanOp
 	wgWaitOps     []wgOp
 	wgDoneOps     []wgOp
 	syncBlocks    []*SyncBlock

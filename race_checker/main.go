@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"github.com/logrusorgru/aurora"
 	"github.com/twmb/algoimpl/go/graph"
+	"golang.org/x/tools/go/callgraph/cha"
 	//"go/types"
 	"golang.org/x/tools/go/callgraph"
-	"golang.org/x/tools/go/callgraph/cha"
 	"golang.org/x/tools/go/packages"
 	"golang.org/x/tools/go/pointer"
 	"golang.org/x/tools/go/ssa"
@@ -44,6 +44,7 @@ var (
 	excludedPkgs []string
 	allPkg       bool
 	noReport     bool
+	fnReported   map[string]string
 )
 
 func fromPkgsOfInterest(fn *ssa.Function) bool {
@@ -86,6 +87,34 @@ func (a *analysis) visitOneFunction(fn *ssa.Function, rank int) {
 		if b.Idom() != nil {
 			idom = b.Idom().Index
 		}
+
+		if b.Comment == "rangeindex.body" || b.Comment == "rangeindex.loop" {
+			if IsReturnBlock(b) {
+				fnSummary.returnBlocks = append(fnSummary.returnBlocks, b)
+			}
+			visitor.sb = &SyncBlock{
+				start:         0,
+				bb:            b,
+				parentSummary: fnSummary,
+				snapshot:      SyncSnapshot{lockOpList: make(map[ssa.Value]MutexOp)},
+			}
+			visitor.parentSummary.bb2sbList[b.Index] = []*SyncBlock{}
+
+			for index, instr := range b.Instrs {
+				log.Debugf("    -- %s: %s", instr, a.prog.Fset.Position(instr.Pos()))
+				visitor.visit(instr, b, index)
+			}
+
+			if visitor.sb.hasAccessOrSyncOp() {
+				visitor.sb.end = len(b.Instrs) - 1
+				if visitor.lastNonEmptySB != nil {
+					visitor.lastNonEmptySB.succs = []*SyncBlock{visitor.sb}
+					visitor.sb.preds = []*SyncBlock{visitor.lastNonEmptySB}
+				}
+				visitor.parentSummary.syncBlocks = append(visitor.parentSummary.syncBlocks, visitor.sb)
+				visitor.parentSummary.bb2sbList[b.Index] = append(visitor.parentSummary.bb2sbList[b.Index], visitor.sb)
+			}
+		}
 		log.Debugf("  -- %s %s Succ: %s, Dominees: %s, Idom: %d, IsReturn: %t", b, b.Comment, b.Succs, b.Dominees(), idom, IsReturnBlock(b))
 		if IsReturnBlock(b) {
 			fnSummary.returnBlocks = append(fnSummary.returnBlocks, b)
@@ -97,11 +126,6 @@ func (a *analysis) visitOneFunction(fn *ssa.Function, rank int) {
 			snapshot:      SyncSnapshot{lockOpList: make(map[ssa.Value]MutexOp)},
 		}
 		visitor.parentSummary.bb2sbList[b.Index] = []*SyncBlock{}
-		//if b.Comment == "select.done" {
-		//	visitor.sb.fast.mhaChanRecv = NondetRecv
-		//	visitor.sb.fast.mhbChanSend = NondetSend
-		//	fnSummary.selectDoneBlock = append(fnSummary.selectDoneBlock, b)
-		//}
 
 		// visit each instruction in b
 		for index, instr := range b.Instrs {
@@ -120,7 +144,7 @@ func (a *analysis) visitOneFunction(fn *ssa.Function, rank int) {
 		}
 	}
 	fnSummary.MakePredAndSuccClosure()
-	// syncblocks after blocking select stmt are NondetRecv|NondetSend
+
 	for _, doneBlock := range fnSummary.selectDoneBlock {
 		// traverse the dominator tree
 		worklist := []*ssa.BasicBlock{doneBlock}
@@ -128,81 +152,18 @@ func (a *analysis) visitOneFunction(fn *ssa.Function, rank int) {
 			bb := worklist[len(worklist)-1]
 			worklist = worklist[:len(worklist)-1]
 			worklist = append(worklist, bb.Dominees()...)
-			//for _, s := range fnSummary.bb2sbList[bb.Index] {
-			//	s.fast.mhaChanRecv = NondetRecv
-			//	s.fast.mhbChanSend = NondetSend
-			//}
 		}
 	}
-	// A successor of a SingleSend SyncBlock is SingleSend
-	// A predecessor of a SingleRecv SyncBlock is SingleRecv
-	//for _, op := range fnSummary.chSendOps {
-	//	if op.fromSelect != nil {
-	//		continue
-	//	}
-	//	op.syncPred.fast.mhbChanSend = SingleSend
-	//	for _, predSB := range op.syncPred.preds {
-	//		predSB.fast.mhbChanSend = SingleSend
-	//	}
-	//}
-	//for _, op := range fnSummary.chRecvOps {
-	//	if op.fromSelect != nil {
-	//		continue
-	//	}
-	//	op.syncSucc.fast.mhaChanRecv = SingleRecv
-	//	for _, succSB := range op.syncSucc.succs {
-	//		succSB.fast.mhaChanRecv = SingleRecv
-	//	}
-	//}
-	// update snapshots for blocks under select cases
-	//for _, selectInstr := range fnSummary.selectStmts {
-	//	childBlocks := fnSummary.selectChildBlocks(selectInstr.Block(), len(selectInstr.States))
-	//	for idx, st := range selectInstr.States {
-	//		if idx >= len(childBlocks) {
-	//			break // Not enough childblocks. Some select cases have empty body.
-	//		}
-	//		if st.Dir == types.RecvOnly {
-	//			for _, sb := range fnSummary.bb2sbList[childBlocks[idx].Index] {
-	//				sb.fast.mhaChanRecv = SingleRecv
-	//			}
-	//		}
-	//	}
-	//}
-	// summarize fn
-	// fnSingleRecv, fnSingleSend := false, false
 	for _, op := range fnSummary.chRecvOps {
 		if op.fromSelect != nil {
 			continue
 		}
-		//b := op.syncSucc.bb
-		//dominateAllReturnBlocks := true
-		//for _, returnB := range fnSummary.returnBlocks {
-		//	if !b.Dominates(returnB) {
-		//		dominateAllReturnBlocks = false
-		//		break
-		//	}
-		//}
-		//if dominateAllReturnBlocks {
-		//	fnSingleRecv = true
-		//	break
-		//}
 	}
 	for _, op := range fnSummary.chSendOps {
 		if op.fromSelect != nil {
 			continue
 		}
-		//b := op.syncPred.bb
-		//if fnSummary.function.Blocks[0].Dominates(b) {
-		//	fnSingleSend = true
-		//	break
-		//}
 	}
-	//if fnSingleRecv {
-	//	fnSummary.fast.mhaChanRecv = SingleRecv
-	//}
-	//if fnSingleSend {
-	//	fnSummary.fast.mhbChanSend = SingleSend
-	//}
 }
 
 func isSyntheticEdge(edge *callgraph.Edge) bool {
@@ -223,15 +184,22 @@ func GraphVisitPreorder(g *callgraph.Graph, node func(*callgraph.Node, int) erro
 	visit = func(n *callgraph.Node, rank int) error {
 		if !seen[n] && fromPkgsOfInterest(n.Func) {
 			seen[n] = true
+			for _, outEdge := range n.Out {
+				if outEdge.Site.Block().Comment == "rangeindex.body" {
+					n.Out = append(n.Out, outEdge)
+				}
+			}
 			for _, e := range n.Out {
 				newRank := rank
 				if !isSyntheticEdge(e) {
 					if _, ok := e.Site.(*ssa.Go); ok {
 						log.Debugf("%s spawns %s", e.Caller.Func, e.Callee.Func)
-						newRank++
-						if Analysis.analysisStat.nGoroutine < newRank {
-							Analysis.analysisStat.nGoroutine = newRank
+						if rank == 0 {
+							newRank = rank + Analysis.analysisStat.nGoroutine + 1
+						} else {
+							newRank = rank + Analysis.analysisStat.nGoroutine
 						}
+						Analysis.analysisStat.nGoroutine++
 					}
 				}
 				if err := visit(e.Callee, newRank); err != nil {
@@ -262,13 +230,12 @@ func (a *analysis) sameAddress(addr1 ssa.Value, addr2 ssa.Value) bool {
 		}
 	}
 
-	// check if they can point to the same obj
+	// check points-to set to see if they can point to the same object
 	ptset := a.result.Queries
-	return ptset[addr1].MayAlias(ptset[addr2])
+	return ptset[addr1].PointsTo().Intersects(ptset[addr2].PointsTo())
 }
 
-// two functions can run in parallel iff their fromGoroutines slices do not equal
-// return the summary with the min goroutine ID as 2nd return val
+// two functions can run in parallel iff they are located in
 func inDifferentGoroutines(summary1 *functionSummary, summary2 *functionSummary) bool {
 	return summary1.goroutineRank != summary2.goroutineRank
 }
@@ -428,6 +395,9 @@ func (a *analysis) checkRace() {
 	for fn := range a.fn2SummaryMap {
 		functions = append(functions, fn)
 	}
+	//generate map for storing reported racy function pairs
+	fnReported = make(map[string]string)
+
 	// for each distinct unordered pair
 	for i := 0; i < len(functions); i++ {
 		for j := 0; j <= i; j++ {
@@ -461,10 +431,19 @@ func (a *analysis) checkSyncBlock(sb1 *SyncBlock, sb2 *SyncBlock) {
 			if (acc1.write || acc2.write) &&
 				(!acc1.atomic || !acc2.atomic) &&
 				a.sameAddress(acc1.location, acc2.location) &&
-				//(sb1.fast.lockCount == 0 || sb2.fast.lockCount == 0) && // underapproximation
 				!locksetsIntersect(sb1, sb2) &&
 				!a.reachableBothWays(sb1, sb2) {
-				a.reportRace(acc1, acc2)
+				if acc1.write {
+					tempSb := sb2
+					sb2 = sb1
+					sb1 = tempSb
+				}
+				if fn, ok := fnReported[sb1.bb.Parent().Name()]; ok && (fn == strings.Split(sb2.bb.Parent().Name(), "$")[0]) {
+					// omit access pairs that have already been reported
+				} else {
+					fnReported[sb1.bb.Parent().Name()] = strings.Split(sb2.bb.Parent().Name(), "$")[0]
+					a.reportRace(acc1, acc2)
+				}
 			}
 		}
 	}
@@ -487,9 +466,9 @@ func doAnalysis(args []string) error {
 
 	// Print the names of the source files
 	// for each package listed on the command line.
-	//for _, pkg := range initial {
-	//	fmt.Println(pkg.ID, pkg.GoFiles)
-	//}
+	for _, pkg := range initial {
+		fmt.Println(pkg.ID, pkg.GoFiles)
+	}
 
 	// Create and build SSA-form program representation.
 	prog, pkgs := ssautil.AllPackages(initial, 0)
@@ -504,7 +483,6 @@ func doAnalysis(args []string) error {
 		Mains:          mains,
 		BuildCallGraph: true,
 	}
-
 	Analysis = &analysis{
 		prog:          prog,
 		pkgs:          pkgs,
@@ -554,6 +532,7 @@ func (a *analysis) reportRace(a1, a2 accessInfo) {
 	}
 	ins1, ins2 := *a1.instruction, *a2.instruction
 	//alloc1, alloc2 := a.result.Queries[a1.location], a.result.Queries[a2.location]
+
 	a.analysisStat.raceCount++
 	log.Printf("Data race #%d", a.analysisStat.raceCount)
 	log.Println("======================")

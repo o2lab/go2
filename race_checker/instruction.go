@@ -7,27 +7,15 @@ import (
 	"golang.org/x/tools/go/ssa"
 )
 
-func IsSyncOp(instr *ssa.Instruction) bool {
-	switch ins := (*instr).(type) {
-	case *ssa.Send:
-		return true
-	case *ssa.UnOp:
-		return ins.Op == token.ARROW
-	case ssa.CallInstruction:
-		return true
-	case *ssa.Call:
-		return false // TODO: except sync ops
-	}
-	return false
-}
-
 func IsWrite(instr *ssa.Instruction) bool {
 	_, write := (*instr).(*ssa.Store)
 	return write
 }
 
+// SyncMode indicates read/write to shared memory.
 type SyncMode int
 
+// Read/write to shared memory is indicated via one of the following acquire/release constants.
 const (
 	AcqOnly SyncMode = iota
 	RelOnly
@@ -66,7 +54,7 @@ type chanOp struct {
 
 type wgOp struct {
 	wg       ssa.Value
-	isWait   bool // Negative isWait means "Done" operation
+	isWait   bool // Negative isWait indicates "Done" operation
 	pos      token.Pos
 	syncPred *SyncBlock
 	syncSucc *SyncBlock
@@ -235,17 +223,17 @@ func (v *InstructionVisitor) visit(instruction ssa.Instruction, bb *ssa.BasicBlo
 			}
 		}
 		v.parentSummary.selectStmts = append(v.parentSummary.selectStmts, instrT)
-		//case ssa.CallInstruction:
-		//	cc := instrT.Common()
-		//	// chan close
-		//	if b, ok := cc.Value.(*ssa.Builtin); ok {
-		//		if b.Name() == "close" {
-		//			v.makeSyncBlock(bb, index)
-		//			v.parentSummary.chOps = append(v.parentSummary.chOps, chanOp{ch: cc.Args[0], dir: types.SendRecv, pos: cc.Pos()})
-		//		}
-		//	} else if fn, ok := cc.Value.(*ssa.Function); ok && fromPkgsOfInterest(fn) {
-		//		v.sb.fnList = append(v.sb.fnList, fn)
-		//	}
+	case ssa.CallInstruction:
+		cc := instrT.Common()
+		// chan close
+		if b, ok := cc.Value.(*ssa.Builtin); ok {
+			if b.Name() == "close" {
+				v.makeSyncBlock(bb, index)
+				v.parentSummary.chCloseOps = append(v.parentSummary.chCloseOps, chanOp{ch: cc.Args[0], dir: types.SendRecv, pos: cc.Pos()})
+			}
+		} else if fn, ok := cc.Value.(*ssa.Function); ok && fromPkgsOfInterest(fn) {
+			v.sb.fnList = append(v.sb.fnList, fn)
+		}
 	case *ssa.Call:
 		if fn, ok := instrT.Common().Value.(*ssa.Function); ok {
 			if fn.Pkg != nil && fn.Pkg.Pkg != nil && fn.Pkg.Pkg.Name() == "sync" {
@@ -275,36 +263,38 @@ func (v *InstructionVisitor) visit(instruction ssa.Instruction, bb *ssa.BasicBlo
 					Analysis.ptaConfig.AddQuery(instrT.Call.Args[0])
 				}
 			} else if fn.Pkg.Pkg.Name() == "main" {
-				if summary, ok := Analysis.fn2SummaryMap[fn]; ok {
-					v.sb.mergePreSnapshot(summary.snapshot)
-					v.makeSyncBlock(bb, index)
-					v.sb.mergePostSnapshot(summary.snapshot)
-				} else {
-					log.Debug("Summary not found for ", fn)
+				recverType := fn.Signature.Recv().Type()
+				switch recverType.(type) {
+				case *types.Pointer:
+					// for method calls with pointer receiver
+					if summary, ok := Analysis.fn2SummaryMap[fn]; ok {
+						v.sb.mergePreSnapshot(summary.snapshot)
+						v.makeSyncBlock(bb, index)
+						v.sb.mergePostSnapshot(summary.snapshot)
+					} else {
+						log.Debug("Summary not found for ", fn)
+					}
+				}
+			} else if closure, ok := instrT.Common().Value.(*ssa.MakeClosure); ok {
+				if fn, ok := closure.Fn.(*ssa.Function); ok {
+					if summary, ok := Analysis.fn2SummaryMap[fn]; ok {
+						//apply callee's summary
+						v.sb.mergePreSnapshot(summary.snapshot)
+						v.makeSyncBlock(bb, index)
+						v.sb.mergePostSnapshot(summary.snapshot)
+					} else {
+						log.Debug("Summary not found for ", fn)
+					}
 				}
 			}
-		} // else if closure, ok := instrT.Common().Value.(*ssa.MakeClosure); ok {
-		//	if fn, ok := closure.Fn.(*ssa.Function); ok {
-		//		if s, ok := Analysis.fn2SummaryMap[fn]; ok {
-		//			// apply callee's summary
-		//			//if s.fast.hasSyncSideEffect() {
-		//			//	v.sb.mergePreSnapshot(s.fast)
-		//			//	v.makeSyncBlock(bb, index)
-		//			//	v.sb.mergePostSnapshot(s.fast)
-		//			//}
-		//		} else {
-		//			log.Debug("Summary not found for ", fn)
-		//		}
-		//	}
-		//}
-		//case ssa.CallInstruction:
+		}
 		//case *ssa.Defer:
 		//	signalStr := instrT.Call.Value.String()
 		//	if strings.HasSuffix(signalStr, ").Lock") && len(instrT.Call.Args) == 1 {
 		//		v.makeSyncBlock(bb, index)
 		//	}
 		//	if strings.HasSuffix(signalStr, ").Unlock") && len(instrT.Call.Args) == 1 {
-		//		a.generateSyncBlock(bb, index, isLast)
+		//		v.makeSyncBlock(bb, index)
 		//	}
 	}
 }

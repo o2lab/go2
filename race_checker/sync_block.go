@@ -7,30 +7,16 @@ import (
 	"golang.org/x/tools/go/ssa"
 )
 
-type ChanSendDomain int
-type ChanRecvDomain int
-
-//const (
-//	NoSend ChanSendDomain = iota
-//	NondetSend
-//	SingleSend
-//	NoRecv ChanRecvDomain = iota
-//	NondetRecv
-//	SingleRecv
-//)
-
 type SyncBlock struct {
 	bb            *ssa.BasicBlock
 	parentSummary *functionSummary
-	//instruction *ssa.Instruction
 	start, end    int // start and end index in bb, excluding the instruction at index end
 	fnList        []*ssa.Function
 	accesses      []accessInfo
 	mhbGoFuncList []*functionSummary // list of functions that spawned after the syncBlock by Go
 	preds         []*SyncBlock
 	succs         []*SyncBlock
-	//	fast          FastSnapshot
-	snapshot SyncSnapshot
+	snapshot      SyncSnapshot
 }
 
 type MutexOp struct {
@@ -47,19 +33,6 @@ type SyncSnapshot struct {
 	wgWaitList     []wgOp
 	wgDoneList     []wgOp
 }
-
-// abstract domains (under-approximation)
-//type FastSnapshot struct {
-//	lockCount   int
-//	mhbWGDone   bool
-//	mhaWGWait   bool
-//	mhbChanSend ChanSendDomain
-//	mhaChanRecv ChanRecvDomain
-//}
-
-//func (s FastSnapshot) hasSyncSideEffect() bool {
-//	return s.lockCount > 0 || s.mhaWGWait || s.mhbWGDone || s.mhbChanSend > NoSend || s.mhaChanRecv > NoRecv
-//}
 
 // if callee contains incoming sync edges, merge with instructions after method call
 func (b *SyncBlock) mergePostSnapshot(calleeSnapshot SyncSnapshot) {
