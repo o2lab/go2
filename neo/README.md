@@ -35,7 +35,7 @@ Neo implements the weakly-doesn't-commute partial order (WDC, see [Roemer el. al
 The fastest way to try Neo is to use the docker image provided as [Dockerfile](./Dockerfile) in the current folder.
 To build and run the image in one command,
 ```
-docker run -it --entry-point bash $(docker build -q .)
+docker run -it --entrypoint bash $(docker build -q .)
 ```
 
 ### Source code
