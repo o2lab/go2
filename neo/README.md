@@ -12,7 +12,7 @@ Neo can predict general order violation bugs such as:
 The fastest way to try Neo is to use the docker image provided as [Dockerfile](./Dockerfile) in the current folder.
 To build and run the image in one command,
 ```
-docker run -it --entry-point bash $(docker build -q .)
+docker run -it --entrypoint bash $(docker build -q .)
 ```
 
 The container has several built-in commands:
