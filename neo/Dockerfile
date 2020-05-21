@@ -7,6 +7,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 		libc6-dev \
 		make \
 		pkg-config \
+		vim \
 	&& rm -rf /var/lib/apt/lists/*
 
 RUN set -eux; \
@@ -20,9 +21,25 @@ RUN set -eux; \
 	go version
 
 ENV GOPATH /go
+ENV GOROOT /usr/local/go
 ENV CC gcc
 ENV CXX g++
 ENV PATH $GOPATH/bin:/usr/local/go/bin:$PATH
 
 RUN mkdir -p "$GOPATH/src" "$GOPATH/bin" && chmod -R 777 "$GOPATH"
 WORKDIR $GOPATH
+
+#RUN git clone --depth 1 https://github.com/kubernetes/kubernetes.git
+#RUN git clone --depth 1 https://github.com/etcd-io/etcd.git
+#RUN git clone --depth 1 https://github.com/grpc/grpc-go.git
+#RUN git clone --depth 1 https://github.com/cockroachdb/cockroach.git
+#RUN git clone --depth 1 https://github.com/caddyserver/caddy.git
+#RUN git clone --depth 1 https://github.com/astaxie/beego.git
+#RUN git clone --depth 1 https://github.com/prometheus/prometheus.git
+#RUN git clone --depth 1 https://github.com/pingcap/tidb.git
+#RUN git clone --depth 1 https://github.com/syncthing/syncthing.git
+#RUN git clone --depth 1 https://github.com/gogs/gogs.git
+#RUN git clone --depth 1 https://github.com/moby/moby.git
+
+COPY test_one.sh /go
+RUN /bin/bash -c "mkdir /go/log && source test_one.sh && golist"
