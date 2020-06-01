@@ -5,9 +5,8 @@ import (
 	"fmt"
 	"github.com/logrusorgru/aurora"
 	"github.com/twmb/algoimpl/go/graph"
-	"golang.org/x/tools/go/callgraph/cha"
-	//"go/types"
 	"golang.org/x/tools/go/callgraph"
+	"golang.org/x/tools/go/callgraph/cha"
 	"golang.org/x/tools/go/packages"
 	"golang.org/x/tools/go/pointer"
 	"golang.org/x/tools/go/ssa"
@@ -43,7 +42,6 @@ var (
 	focusPkgs    []string
 	excludedPkgs []string
 	allPkg       bool
-	noReport     bool
 	fnReported   map[string]string
 )
 
@@ -127,11 +125,13 @@ func (a *analysis) visitOneFunction(fn *ssa.Function, rank int) {
 		}
 		visitor.parentSummary.bb2sbList[b.Index] = []*SyncBlock{}
 
-		// visit each instruction in b
 		for index, instr := range b.Instrs {
 			log.Debugf("    -- %s: %s", instr, a.prog.Fset.Position(instr.Pos()))
 			visitor.visit(instr, b, index)
 		}
+
+		// visit each instruction in b
+
 		// mark the end of the last SyncBlock
 		if visitor.sb.hasAccessOrSyncOp() {
 			visitor.sb.end = len(b.Instrs) - 1
@@ -164,6 +164,7 @@ func (a *analysis) visitOneFunction(fn *ssa.Function, rank int) {
 			continue
 		}
 	}
+
 }
 
 func isSyntheticEdge(edge *callgraph.Edge) bool {
@@ -379,6 +380,9 @@ func (a *analysis) reachable(sb1 *SyncBlock, sb2 *SyncBlock) bool {
 			}
 		}
 	}
+	//if sb1.bb.Idom() == sb2.bb || sb2.bb.Idom() == sb1.bb {
+	//	return true
+	//}
 	return false
 }
 
@@ -415,34 +419,37 @@ func (a *analysis) checkRace() {
 }
 
 func locksetsIntersect(sb1 *SyncBlock, sb2 *SyncBlock) bool {
+	res := false
 	for loc1 := range sb1.snapshot.lockOpList {
 		for loc2 := range sb2.snapshot.lockOpList {
 			if Analysis.sameAddress(loc1, loc2) {
-				return true
+				res = true
 			}
 		}
 	}
-	return false
+	return res
 }
 
 func (a *analysis) checkSyncBlock(sb1 *SyncBlock, sb2 *SyncBlock) {
 	for _, acc1 := range sb1.accesses {
 		for _, acc2 := range sb2.accesses {
-			if (acc1.write || acc2.write) &&
-				(!acc1.atomic || !acc2.atomic) &&
+			if (acc1.write || acc2.write) && (!acc1.atomic || !acc2.atomic) &&
 				a.sameAddress(acc1.location, acc2.location) &&
-				!locksetsIntersect(sb1, sb2) &&
-				!a.reachableBothWays(sb1, sb2) {
+				!locksetsIntersect(sb1, sb2) && !a.reachableBothWays(sb1, sb2) {
 				if acc1.write {
-					tempSb := sb2
-					sb2 = sb1
-					sb1 = tempSb
-				}
-				if fn, ok := fnReported[sb1.bb.Parent().Name()]; ok && (fn == strings.Split(sb2.bb.Parent().Name(), "$")[0]) {
-					// omit access pairs that have already been reported
+					if fn, ok := fnReported[strings.Split(sb1.bb.Parent().Name(), "$")[0]]; ok && (fn == strings.Split(sb2.bb.Parent().Name(), "$")[0]) {
+						// omit access pairs that have already been reported
+					} else {
+						fnReported[strings.Split(sb1.bb.Parent().Name(), "$")[0]] = strings.Split(sb2.bb.Parent().Name(), "$")[0]
+						a.reportRace(acc1, acc2)
+					}
 				} else {
-					fnReported[sb1.bb.Parent().Name()] = strings.Split(sb2.bb.Parent().Name(), "$")[0]
-					a.reportRace(acc1, acc2)
+					if fn, ok := fnReported[strings.Split(sb2.bb.Parent().Name(), "$")[0]]; ok && (fn == strings.Split(sb1.bb.Parent().Name(), "$")[0]) {
+						// omit access pairs that have already been reported
+					} else {
+						fnReported[strings.Split(sb2.bb.Parent().Name(), "$")[0]] = strings.Split(sb1.bb.Parent().Name(), "$")[0]
+						a.reportRace(acc1, acc2)
+					}
 				}
 			}
 		}
@@ -534,6 +541,10 @@ func (a *analysis) reportRace(a1, a2 accessInfo) {
 	//alloc1, alloc2 := a.result.Queries[a1.location], a.result.Queries[a2.location]
 
 	a.analysisStat.raceCount++
+	//acc := a1
+	//if !acc.write {
+	//	acc = a2
+	//} TODO: Report racy struct field instead of token number
 	log.Printf("Data race #%d", a.analysisStat.raceCount)
 	log.Println("======================")
 	log.Println("  ", rwString(a1.write),
@@ -590,5 +601,8 @@ func init() {
 		"errors",
 		"bytes",
 		"time",
+		"testing",
+		"strconv",
+		"atomic",
 	}
 }

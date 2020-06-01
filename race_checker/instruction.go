@@ -8,8 +8,26 @@ import (
 )
 
 func IsWrite(instr *ssa.Instruction) bool {
-	_, write := (*instr).(*ssa.Store)
-	return write
+	if _, write := (*instr).(*ssa.Store); write {
+		return write
+	} else if theIns, write := (*instr).(*ssa.UnOp); write {
+		allIns := theIns.Block().Instrs
+		for _, indIns := range allIns {
+			switch checkDelete := indIns.(type) {
+			case ssa.CallInstruction:
+				if fn, ok := checkDelete.Common().Value.(*ssa.Builtin); ok {
+					if fn.Name() == "delete" {
+						return true
+					}
+				}
+			}
+		}
+	}
+
+	//if _, isDelete := (*instr).(ssa.CallInstruction); isDelete {
+	//	return isDelete
+	//}
+	return false
 }
 
 // SyncMode indicates read/write to shared memory.
@@ -133,7 +151,8 @@ func (v *InstructionVisitor) isLocalAddr(location ssa.Value) bool {
 	switch loc := location.(type) {
 	// Ignore checking accesses at alloc sites
 	case *ssa.FieldAddr:
-		return v.isLocalAddr(loc.X)
+		return false
+		//return v.isLocalAddr(loc.X)
 	case *ssa.IndexAddr:
 		return v.isLocalAddr(loc.X)
 	case *ssa.Call:
@@ -162,6 +181,16 @@ func (v *InstructionVisitor) visit(instruction ssa.Instruction, bb *ssa.BasicBlo
 	case *ssa.Alloc:
 		v.allocated[instrT] = true
 	case *ssa.UnOp:
+		allIns := instrT.Block().Instrs
+		for _, indIns := range allIns {
+			switch checkDelete := indIns.(type) {
+			case ssa.CallInstruction:
+				if _, isDelete := checkDelete.Common().Value.(*ssa.Builtin); isDelete {
+					v.sb.addAccessInfo(&instruction, instrT.X, index, instrT.X.Name())
+				}
+			}
+		}
+
 		// read by pointer-dereference
 		if instrT.Op == token.MUL && !v.isLocalAddr(instrT.X) {
 			v.sb.addAccessInfo(&instruction, instrT.X, index, instrT.X.Name())
@@ -202,6 +231,8 @@ func (v *InstructionVisitor) visit(instruction ssa.Instruction, bb *ssa.BasicBlo
 					delete(v.allocated, locAlloc)
 				}
 			}
+			childGo := closure.Fn.(*ssa.Function)
+			pred.mhbGoFuncList = append(pred.mhbGoFuncList, Analysis.fn2SummaryMap[childGo])
 		}
 	case *ssa.Send:
 		pred := v.sb
@@ -224,6 +255,25 @@ func (v *InstructionVisitor) visit(instruction ssa.Instruction, bb *ssa.BasicBlo
 		}
 		v.parentSummary.selectStmts = append(v.parentSummary.selectStmts, instrT)
 	case ssa.CallInstruction:
+		allIns := instrT.Block().Instrs
+		isDefer := false
+		for _, indIns := range allIns {
+			switch checkDefer := indIns.(type) {
+			case *ssa.Defer:
+				if instrT.Pos() == checkDefer.Pos() {
+					isDefer = true
+				}
+			}
+		}
+		//if fn, isDelete := instrT.Common().Value.(*ssa.Builtin); isDelete {
+		//	if fn.Name() == "delete" {
+		//		switch paramSlice := instrT.Common().Args[0].(type) {
+		//		case *ssa.UnOp:
+		//			v.sb.addAccessInfo(&instruction, paramSlice.X, index, paramSlice.X.Name())
+		//		}
+		//	}
+		//}
+
 		cc := instrT.Common()
 		// chan close
 		if b, ok := cc.Value.(*ssa.Builtin); ok {
@@ -231,15 +281,43 @@ func (v *InstructionVisitor) visit(instruction ssa.Instruction, bb *ssa.BasicBlo
 				v.makeSyncBlock(bb, index)
 				v.parentSummary.chCloseOps = append(v.parentSummary.chCloseOps, chanOp{ch: cc.Args[0], dir: types.SendRecv, pos: cc.Pos()})
 			}
-		} else if fn, ok := cc.Value.(*ssa.Function); ok && fromPkgsOfInterest(fn) {
+		} else if fn, ok := cc.Value.(*ssa.Function); ok && fromPkgsOfInterest(fn) && !isDefer {
+			if fn.Name() == "Run" {
+				v.sb.fnList = append(v.sb.fnList, fn)
+			} else if fn.Name() == "Lock" {
+				v.makeSyncBlock(bb, index)
+				lockAddr := instrT.Common().Args[0]
+				lockOp := MutexOp{loc: lockAddr, write: true, block: v.sb}
+				Analysis.ptaConfig.AddQuery(lockAddr)
+				v.sb.snapshot.lockOpList[lockAddr] = lockOp
+			} else if fn.Name() == "Unlock" {
+				v.makeSyncBlock(bb, index)
+				lockAddr := instrT.Common().Args[0]
+				delete(v.sb.snapshot.lockOpList, lockAddr)
+			} else {
+				v.makeSyncBlock(bb, index)
+				v.sb.fnList = append(v.sb.fnList, fn)
+			}
+		} else {
 			v.sb.fnList = append(v.sb.fnList, fn)
+		}
+	case *ssa.RunDefers:
+		bIns := instrT.Block().Instrs
+		for _, ins := range bIns {
+			switch deferIns := ins.(type) {
+			case *ssa.Defer:
+				if deferIns.Call.Value.Name() == "Unlock" {
+					v.makeSyncBlock(bb, index)
+					lockAddr := deferIns.Common().Args[0]
+					delete(v.sb.snapshot.lockOpList, lockAddr)
+				}
+			}
 		}
 	case *ssa.Call:
 		if fn, ok := instrT.Common().Value.(*ssa.Function); ok {
 			if fn.Pkg != nil && fn.Pkg.Pkg != nil && fn.Pkg.Pkg.Name() == "sync" {
 				if fn.Name() == "Lock" {
 					v.makeSyncBlock(bb, index)
-					//v.sb.fast.lockCount++
 					// FIXME: handle reader locks. Currently all locks are assumed to be writers.
 					lockAddr := instrT.Call.Args[0]
 					lockOp := MutexOp{loc: lockAddr, write: true, block: v.sb}
@@ -247,7 +325,6 @@ func (v *InstructionVisitor) visit(instruction ssa.Instruction, bb *ssa.BasicBlo
 					v.sb.snapshot.lockOpList[lockAddr] = lockOp
 				} else if fn.Name() == "Unlock" {
 					v.makeSyncBlock(bb, index)
-					//v.sb.fast.lockCount--
 					lockAddr := instrT.Call.Args[0]
 					delete(v.sb.snapshot.lockOpList, lockAddr)
 				} else if fn.Name() == "Wait" {
@@ -288,13 +365,5 @@ func (v *InstructionVisitor) visit(instruction ssa.Instruction, bb *ssa.BasicBlo
 				}
 			}
 		}
-		//case *ssa.Defer:
-		//	signalStr := instrT.Call.Value.String()
-		//	if strings.HasSuffix(signalStr, ").Lock") && len(instrT.Call.Args) == 1 {
-		//		v.makeSyncBlock(bb, index)
-		//	}
-		//	if strings.HasSuffix(signalStr, ").Unlock") && len(instrT.Call.Args) == 1 {
-		//		v.makeSyncBlock(bb, index)
-		//	}
 	}
 }

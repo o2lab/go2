@@ -174,31 +174,51 @@
 //}
 
 // Testing method calls
+//package main
+//
+//import (
+//	"fmt"
+//)
+//
+//type someData struct {
+//	someInt int
+//}
+//
+//var xtoy = make(chan int)
+//
+//func (someNum someData) justRecv() int {
+//	k := <-xtoy
+//	close(xtoy)
+//	return k
+//}
+//
+//func (someNum someData) justSend() {
+//	xtoy <- someNum.someInt
+//}
+//
+//func main() {
+//	x := someData{someInt: 5}
+//	var j int
+//	go func() {
+//		x.someInt = 2 * x.someInt
+//		x.justSend()
+//	}()
+//	go func() {
+//		j = x.justRecv()
+//		fmt.Println(j)
+//	}()
+//}
 package main
 
-type someData struct {
-	someInt int
-}
-
-var xtoy = make(chan int)
-
-func (someNum someData) forPrint() {
-	someNum.someInt = <-xtoy
-}
-
-func (someNum someData) double() {
-	xtoy <- someNum.someInt
-}
+import "fmt"
 
 func main() {
-	x := someData{someInt: 5}
-	go func() {
-		x.someInt = 2 * x.someInt
-		x.double()
-		//xtoy <- x.someInt
-	}()
-	go func() {
-		x.forPrint()
-		//x.someInt = <-xtoy
-	}()
+	var m map[int]int
+	m = make(map[int]int)
+	for j := 0; j < 3; j++ {
+		m[j] = j + 1
+	}
+	for _, i := range m {
+		fmt.Println("Let's see ", i)
+	}
 }
