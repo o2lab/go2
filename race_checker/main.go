@@ -164,11 +164,11 @@ func (a *analysis) visitOneFunction(fn *ssa.Function, rank int) {
 			continue
 		}
 	}
-
 }
 
 func isSyntheticEdge(edge *callgraph.Edge) bool {
-	return edge.Caller.Func.Pkg == nil || edge.Callee.Func.Synthetic != ""
+	return edge.Caller.Func.Pkg == nil
+	//|| edge.Callee.Func.Synthetic != ""
 }
 
 func isSyntheticNode(node *callgraph.Node) bool {
@@ -183,7 +183,7 @@ func GraphVisitPreorder(g *callgraph.Graph, node func(*callgraph.Node, int) erro
 	seen := make(map[*callgraph.Node]bool)
 	var visit func(n *callgraph.Node, rank int) error
 	visit = func(n *callgraph.Node, rank int) error {
-		if !seen[n] && fromPkgsOfInterest(n.Func) {
+		if !seen[n] && (fromPkgsOfInterest(n.Func) || strings.HasSuffix(n.Func.Name(), "$bound")) {
 			seen[n] = true
 			for _, outEdge := range n.Out {
 				if outEdge.Site.Block().Comment == "rangeindex.body" {
@@ -192,7 +192,7 @@ func GraphVisitPreorder(g *callgraph.Graph, node func(*callgraph.Node, int) erro
 			}
 			for _, e := range n.Out {
 				newRank := rank
-				if !isSyntheticEdge(e) {
+				if !isSyntheticEdge(e) && e.Caller.Func.Pkg.Pkg.Name() != "sync" {
 					if _, ok := e.Site.(*ssa.Go); ok {
 						log.Debugf("%s spawns %s", e.Caller.Func, e.Callee.Func)
 						if rank == 0 {
@@ -236,7 +236,7 @@ func (a *analysis) sameAddress(addr1 ssa.Value, addr2 ssa.Value) bool {
 	return ptset[addr1].PointsTo().Intersects(ptset[addr2].PointsTo())
 }
 
-// two functions can run in parallel iff they are located in
+// two functions can run in parallel iff they are located in different goroutines
 func inDifferentGoroutines(summary1 *functionSummary, summary2 *functionSummary) bool {
 	return summary1.goroutineRank != summary2.goroutineRank
 }
@@ -309,7 +309,6 @@ func (a *analysis) preprocess() error {
 			}
 		}
 	}
-
 	// Sync Order edges created here
 	for _, fn1 := range a.fn2SummaryMap {
 		if len(fn1.syncBlocks) == 0 {
@@ -370,9 +369,6 @@ func (a *analysis) reachable(sb1 *SyncBlock, sb2 *SyncBlock) bool {
 				return true
 			}
 		}
-		//if curr == goal {
-		//	return true
-		//}
 		visited[curr] = true
 		for _, reachableNode := range a.HBgraph.Neighbors(curr) {
 			if !visited[reachableNode] {
@@ -380,9 +376,6 @@ func (a *analysis) reachable(sb1 *SyncBlock, sb2 *SyncBlock) bool {
 			}
 		}
 	}
-	//if sb1.bb.Idom() == sb2.bb || sb2.bb.Idom() == sb1.bb {
-	//	return true
-	//}
 	return false
 }
 
@@ -401,7 +394,6 @@ func (a *analysis) checkRace() {
 	}
 	//generate map for storing reported racy function pairs
 	fnReported = make(map[string]string)
-
 	// for each distinct unordered pair
 	for i := 0; i < len(functions); i++ {
 		for j := 0; j <= i; j++ {
@@ -431,6 +423,9 @@ func locksetsIntersect(sb1 *SyncBlock, sb2 *SyncBlock) bool {
 }
 
 func (a *analysis) checkSyncBlock(sb1 *SyncBlock, sb2 *SyncBlock) {
+	if sb1.bb.Parent().Pkg.Pkg.Name() == "sync" {
+		return
+	}
 	for _, acc1 := range sb1.accesses {
 		for _, acc2 := range sb2.accesses {
 			if (acc1.write || acc2.write) && (!acc1.atomic || !acc2.atomic) &&

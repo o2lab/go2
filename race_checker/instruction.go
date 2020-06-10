@@ -17,16 +17,12 @@ func IsWrite(instr *ssa.Instruction) bool {
 			case ssa.CallInstruction:
 				if fn, ok := checkDelete.Common().Value.(*ssa.Builtin); ok {
 					if fn.Name() == "delete" {
-						return true
+						return true // is delete instruction
 					}
 				}
 			}
 		}
 	}
-
-	//if _, isDelete := (*instr).(ssa.CallInstruction); isDelete {
-	//	return isDelete
-	//}
 	return false
 }
 
@@ -265,14 +261,6 @@ func (v *InstructionVisitor) visit(instruction ssa.Instruction, bb *ssa.BasicBlo
 				}
 			}
 		}
-		//if fn, isDelete := instrT.Common().Value.(*ssa.Builtin); isDelete {
-		//	if fn.Name() == "delete" {
-		//		switch paramSlice := instrT.Common().Args[0].(type) {
-		//		case *ssa.UnOp:
-		//			v.sb.addAccessInfo(&instruction, paramSlice.X, index, paramSlice.X.Name())
-		//		}
-		//	}
-		//}
 
 		cc := instrT.Common()
 		// chan close
