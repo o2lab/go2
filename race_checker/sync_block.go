@@ -1,7 +1,6 @@
 package main
 
 import (
-	log "github.com/sirupsen/logrus"
 	"go/token"
 	"go/types"
 	"golang.org/x/tools/go/ssa"
@@ -66,7 +65,7 @@ func (b *SyncBlock) hasAccessOrSyncOp() bool {
 }
 
 func (b *SyncBlock) addAccessInfo(ins *ssa.Instruction, location ssa.Value, index int, comment string) {
-	log.Debug("Added", *ins, Analysis.prog.Fset.Position((*ins).Pos()))
+	//log.Debug("Added", *ins, Analysis.prog.Fset.Position((*ins).Pos()))
 	info := accessInfo{
 		write:       IsWrite(ins),
 		atomic:      false,

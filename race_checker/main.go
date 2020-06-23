@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/logrusorgru/aurora"
 	"github.com/twmb/algoimpl/go/graph"
+	"go/token"
 	"golang.org/x/tools/go/callgraph"
 	"golang.org/x/tools/go/callgraph/cha"
 	"golang.org/x/tools/go/packages"
@@ -43,6 +44,11 @@ var (
 	excludedPkgs []string
 	allPkg       bool
 	fnReported   map[string]string
+	levels = make(map[int]int)
+	storeIns 	 []string
+	mthdCall	 token.Pos
+	progFunc	 map[*ssa.Function]bool
+	worklist
 )
 
 func fromPkgsOfInterest(fn *ssa.Function) bool {
@@ -63,7 +69,6 @@ func fromPkgsOfInterest(fn *ssa.Function) bool {
 }
 
 func (a *analysis) visitOneFunction(fn *ssa.Function, rank int) {
-	log.Debug(fn)
 	fnSummary := a.fn2SummaryMap[fn]
 	if fnSummary == nil {
 		fnSummary = &functionSummary{
@@ -81,10 +86,10 @@ func (a *analysis) visitOneFunction(fn *ssa.Function, rank int) {
 	}
 
 	for _, b := range fn.Blocks {
-		idom := -1
-		if b.Idom() != nil {
-			idom = b.Idom().Index
-		}
+		//idom := -1 // for debugging purpose
+		//if b.Idom() != nil {
+		//	idom = b.Idom().Index
+		//}
 
 		if b.Comment == "rangeindex.body" || b.Comment == "rangeindex.loop" {
 			if IsReturnBlock(b) {
@@ -99,7 +104,6 @@ func (a *analysis) visitOneFunction(fn *ssa.Function, rank int) {
 			visitor.parentSummary.bb2sbList[b.Index] = []*SyncBlock{}
 
 			for index, instr := range b.Instrs {
-				log.Debugf("    -- %s: %s", instr, a.prog.Fset.Position(instr.Pos()))
 				visitor.visit(instr, b, index)
 			}
 
@@ -113,7 +117,6 @@ func (a *analysis) visitOneFunction(fn *ssa.Function, rank int) {
 				visitor.parentSummary.bb2sbList[b.Index] = append(visitor.parentSummary.bb2sbList[b.Index], visitor.sb)
 			}
 		}
-		log.Debugf("  -- %s %s Succ: %s, Dominees: %s, Idom: %d, IsReturn: %t", b, b.Comment, b.Succs, b.Dominees(), idom, IsReturnBlock(b))
 		if IsReturnBlock(b) {
 			fnSummary.returnBlocks = append(fnSummary.returnBlocks, b)
 		}
@@ -125,12 +128,10 @@ func (a *analysis) visitOneFunction(fn *ssa.Function, rank int) {
 		}
 		visitor.parentSummary.bb2sbList[b.Index] = []*SyncBlock{}
 
+		// visit each instruction in b
 		for index, instr := range b.Instrs {
-			log.Debugf("    -- %s: %s", instr, a.prog.Fset.Position(instr.Pos()))
 			visitor.visit(instr, b, index)
 		}
-
-		// visit each instruction in b
 
 		// mark the end of the last SyncBlock
 		if visitor.sb.hasAccessOrSyncOp() {
@@ -217,10 +218,91 @@ func GraphVisitPreorder(g *callgraph.Graph, node func(*callgraph.Node, int) erro
 	for f, n := range g.Nodes {
 		if f != nil && f.Pkg != nil && fromPkgsOfInterest(f) && f.Pkg.Func("main") == f {
 			err = visit(n, 0)
+			VisitAllInstructions(n.Func, 0)
 			return err
 		}
 	}
 	return nil
+}
+
+func VisitAllInstructions(fn *ssa.Function, rank int) {
+	for _, excluded := range excludedPkgs {
+		if fn.Pkg.Pkg.Name() == excluded {
+			return
+		}
+	}
+	fnBlocks := fn.Blocks
+	if theLvl, ok := levels[rank]; !ok {
+		theLvl = 0
+		if rank > 0 {
+			theLvl = 1
+		}
+		levels[rank] = theLvl
+	}
+	if fn.Name() == "main" {
+		log.Debug(strings.Repeat(" ", levels[rank]), "PUSH ", fn.Name(), " at lvl ", levels[rank])
+		storeIns = append(storeIns, fn.Name())
+		levels[rank]++
+	}
+	for _, aBlock := range fnBlocks {
+		for _, theIns := range aBlock.Instrs {
+			switch examIns := theIns.(type) {
+			case *ssa.Call: // for function calls and method calls
+				if examIns.Call.Method != nil { // calling a method
+					fnName := examIns.Call.Method.Name()
+					if mthdCall != examIns.Call.Method.Pos() {
+						log.Debug(strings.Repeat(" ", levels[rank]), "PUSH ", examIns.Call.Method.FullName(), " at lvl ", levels[rank])
+						levels[rank]++
+						mthdCall = examIns.Call.Method.Pos()
+						storeIns = append(storeIns, fnName)
+					}
+					for theFunc := range progFunc {
+						if theFunc.Name() == fnName {
+							VisitAllInstructions(theFunc, rank)
+							break
+						}
+					}
+				} else if fromPkgsOfInterest(examIns.Call.StaticCallee()) && examIns.Call.StaticCallee().Pkg.Pkg.Name() != "sync" { // calling a function
+					fnName := examIns.Call.Value.Name()
+					if strings.HasPrefix(fnName, "t") && len(fnName) > 3 {
+						fnName = examIns.Call.Value.Type().String()
+					}
+					log.Debug(strings.Repeat(" ", levels[rank]), "PUSH ", fnName, " at lvl ", levels[rank])
+					storeIns = append(storeIns, fnName)
+					levels[rank]++
+					VisitAllInstructions(examIns.Call.StaticCallee(), rank)
+				}
+			case *ssa.Return: // for endpoints of each function
+				if fromPkgsOfInterest(examIns.Parent()) {
+					fnName := examIns.Parent().Name()
+					if fnName == storeIns[len(storeIns) - 1] {
+						storeIns = storeIns[:len(storeIns) - 1]
+						if levels[rank] == 0 {
+							rank--
+						}
+						levels[rank]--
+						log.Debug(strings.Repeat(" ", levels[rank]), "POP  ", fnName, " at lvl ", levels[rank])
+					}
+				}
+			case *ssa.Go: // for spawning of goroutines
+				rank++
+				var fnName string
+				switch anonFn := examIns.Call.Value.(type) {
+				case *ssa.MakeClosure:
+					fnName = anonFn.Fn.Name()
+				case *ssa.Function:
+					fnName = anonFn.Name()
+				}
+
+			}
+		}
+	}
+}
+
+func newGoroutine(fn *ssa.Function, rank int) {
+	log.Debug(strings.Repeat(" ", levels[rank]), "PUSH GO ", fnName, " at lvl ", levels[rank])
+	storeIns = append(storeIns, fnName)
+	VisitAllInstructions(examIns.Call.StaticCallee(), rank)
 }
 
 func (a *analysis) sameAddress(addr1 ssa.Value, addr2 ssa.Value) bool {
@@ -364,7 +446,6 @@ func (a *analysis) reachable(sb1 *SyncBlock, sb2 *SyncBlock) bool {
 		curr = stack[len(stack)-1]
 		stack = stack[:len(stack)-1]
 		if curSb, ok := (*curr.Value).(*SyncBlock); ok {
-			log.Debugf("%s %s", curSb.parentSummary.function.Name(), curSb.bb)
 			if curSb == sb2 {
 				return true
 			}
@@ -476,6 +557,7 @@ func doAnalysis(args []string) error {
 	prog, pkgs := ssautil.AllPackages(initial, 0)
 	log.Info("Building SSA program...")
 	prog.Build()
+	progFunc = ssautil.AllFunctions(prog)
 
 	mains, err := mainPackages(pkgs)
 	if err != nil {
@@ -496,20 +578,18 @@ func doAnalysis(args []string) error {
 	if err != nil {
 		return err // internal error in pointer analysis
 	}
-	Analysis.printSyncBlocks()
+	// Analysis.printSyncBlocks()
 	log.Infof("%d function summaries", len(Analysis.fn2SummaryMap))
 	Analysis.checkRace()
 	Analysis.printSummary()
 	return nil
 }
 
-// test only
 func (a *analysis) printSyncBlocks() {
 	for fn, sum := range a.fn2SummaryMap {
 		log.Debug(fn)
 		for idx, sb := range sum.syncBlocks {
-			log.Debugf("  %d:%d [%s] %d-%d Rank %d %s", sb.bb.Index, idx, sb.bb.Comment, sb.start, sb.end, sb.parentSummary.goroutineRank,
-				/* sb.fast.mhbChanSend, sb.fast.mhaChanRecv, sb.fast.lockCount, */ a.prog.Fset.Position(sb.bb.Instrs[sb.start].Pos()))
+			log.Debugf("  %d:%d [%s] %d-%d Rank %d %s", sb.bb.Index, idx, sb.bb.Comment, sb.start, sb.end, sb.parentSummary.goroutineRank, a.prog.Fset.Position(sb.bb.Instrs[sb.start].Pos()))
 			log.Debug("  -- Lockset ", sb.snapshot.lockOpList)
 			log.Debug("  -- chan ", sb.snapshot.chanSendOpList, " recv ", sb.snapshot.chanRecvOpList)
 			log.Debug("  -- Lockset ", sb.snapshot.wgDoneList, " wait ", sb.snapshot.wgWaitList)
@@ -599,5 +679,9 @@ func init() {
 		"testing",
 		"strconv",
 		"atomic",
+		"strings",
+		"bytealg",
+		"race",
+		"syscall",
 	}
 }

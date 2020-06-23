@@ -2,8 +2,8 @@
 package main
 
 import (
-	"testing"
 	"sync"
+	"testing"
 	"time"
 )
 
@@ -12,7 +12,7 @@ const unschedulableQTimeInterval = 60 * time.Second
 type Pod string
 
 type PodInfo struct {
-	Pod Pod
+	Pod       Pod
 	Timestamp time.Time
 }
 
@@ -33,13 +33,13 @@ func GetPodFullName(pod Pod) string {
 func newUnschedulablePodsMap() *UnschedulablePodsMap {
 	return &UnschedulablePodsMap{
 		podInfoMap: make(map[string]*PodInfo),
-		keyFunc: GetPodFullName,
+		keyFunc:    GetPodFullName,
 	}
 }
 
 type PriorityQueue struct {
-	stop  <-chan struct{}
-	lock sync.RWMutex
+	stop           <-chan struct{}
+	lock           sync.RWMutex
 	unschedulableQ *UnschedulablePodsMap
 }
 
@@ -48,7 +48,7 @@ func (p *PriorityQueue) flushUnschedulableQLeftover() {
 	defer p.lock.Unlock()
 
 	for _, pInfo := range p.unschedulableQ.podInfoMap {
-		_ = pInfo.Timestamp // racy read
+		_ = pInfo.Timestamp // racy read on Timestamp
 	}
 }
 
@@ -65,8 +65,8 @@ func (p *PriorityQueue) newPodInfo(pod Pod) *PodInfo {
 
 func NewPriorityQueueWithClock(stop <-chan struct{}) *PriorityQueue {
 	pq := &PriorityQueue{
-		stop: stop,
-		unschedulableQ:newUnschedulablePodsMap(),
+		stop:           stop,
+		unschedulableQ: newUnschedulablePodsMap(),
 	}
 	pq.run()
 	return pq
@@ -83,7 +83,6 @@ func BackoffUntil(f func(), stopCh <-chan struct{}) {
 			return
 		default:
 		}
-
 
 		func() {
 			f()
@@ -118,7 +117,7 @@ func TestKubernetes81148(t *testing.T) {
 		q := NewPriorityQueue(nil) // will trigger child goroutine that leads to racy read
 		highPod := Pod("1")
 		addOrUpdateUnschedulablePod(q, highPod)
-		q.unschedulableQ.podInfoMap[GetPodFullName(highPod)].Timestamp = time.Now().Add(-1 * unschedulableQTimeInterval) // racy write
+		q.unschedulableQ.podInfoMap[GetPodFullName(highPod)].Timestamp = time.Now().Add(-1 * unschedulableQTimeInterval) // racy write on Timestamp
 	}()
 	wg.Wait()
 }
