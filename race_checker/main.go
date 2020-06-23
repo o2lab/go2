@@ -1,6 +1,7 @@
 package main
 
 import (
+	"container/list"
 	"flag"
 	"fmt"
 	"github.com/logrusorgru/aurora"
@@ -38,6 +39,12 @@ type stat struct {
 	nPackages  int
 }
 
+type goroutineInfo struct{
+	goIns  *ssa.Go
+	entryMethod string
+	rank int
+}
+
 var (
 	Analysis     *analysis
 	focusPkgs    []string
@@ -48,7 +55,7 @@ var (
 	storeIns 	 []string
 	mthdCall	 token.Pos
 	progFunc	 map[*ssa.Function]bool
-	worklist
+	worklist list.List
 )
 
 func fromPkgsOfInterest(fn *ssa.Function) bool {
@@ -222,6 +229,13 @@ func GraphVisitPreorder(g *callgraph.Graph, node func(*callgraph.Node, int) erro
 			return err
 		}
 	}
+
+	for worklist.Len() > 0 {
+		info := worklist.Front()
+		worklist.Remove(info)
+		newGoroutine(info.Value.(goroutineInfo))
+	}
+
 	return nil
 }
 
@@ -293,16 +307,19 @@ func VisitAllInstructions(fn *ssa.Function, rank int) {
 				case *ssa.Function:
 					fnName = anonFn.Name()
 				}
+				log.Debug(strings.Repeat(" ", levels[rank]), "PUSH GO ", fnName, " at lvl ", levels[rank])
 
+				var info = goroutineInfo {examIns,fnName,rank}
+				worklist.PushBack(info)
 			}
 		}
 	}
 }
 
-func newGoroutine(fn *ssa.Function, rank int) {
-	log.Debug(strings.Repeat(" ", levels[rank]), "PUSH GO ", fnName, " at lvl ", levels[rank])
-	storeIns = append(storeIns, fnName)
-	VisitAllInstructions(examIns.Call.StaticCallee(), rank)
+func newGoroutine(info goroutineInfo) {
+	//examIns *ssa.Go, fnName string, rank int
+	storeIns = append(storeIns, info.entryMethod)
+	VisitAllInstructions(info.goIns.Call.StaticCallee(), info.rank)
 }
 
 func (a *analysis) sameAddress(addr1 ssa.Value, addr2 ssa.Value) bool {
