@@ -1,7 +1,6 @@
 package main
 
 import (
-	"container/list"
 	"flag"
 	"fmt"
 	"github.com/logrusorgru/aurora"
@@ -39,10 +38,10 @@ type stat struct {
 	nPackages  int
 }
 
-type goroutineInfo struct{
-	goIns  *ssa.Go
+type goroutineInfo struct {
+	goIns       *ssa.Go
 	entryMethod string
-	rank int
+	goID        int
 }
 
 var (
@@ -51,11 +50,12 @@ var (
 	excludedPkgs []string
 	allPkg       bool
 	fnReported   map[string]string
-	levels = make(map[int]int)
-	storeIns 	 []string
-	mthdCall	 token.Pos
-	progFunc	 map[*ssa.Function]bool
-	worklist list.List
+	levels       = make(map[int]int)
+	storeIns     []string
+	mthdCall     token.Pos
+	progFunc     map[*ssa.Function]bool
+	//worklist 	 list.List
+	workList []goroutineInfo
 )
 
 func fromPkgsOfInterest(fn *ssa.Function) bool {
@@ -225,81 +225,93 @@ func GraphVisitPreorder(g *callgraph.Graph, node func(*callgraph.Node, int) erro
 	for f, n := range g.Nodes {
 		if f != nil && f.Pkg != nil && fromPkgsOfInterest(f) && f.Pkg.Func("main") == f {
 			err = visit(n, 0)
-			VisitAllInstructions(n.Func, 0)
 			return err
 		}
 	}
 
-	for worklist.Len() > 0 {
-		info := worklist.Front()
-		worklist.Remove(info)
-		newGoroutine(info.Value.(goroutineInfo))
-	}
+	//for worklist.Len() > 0 {
+	//	info := worklist.Front()
+	//	worklist.Remove(info)
+	//	newGoroutine(info.Value.(goroutineInfo))
+	//}
 
 	return nil
 }
 
-func VisitAllInstructions(fn *ssa.Function, rank int) {
+func VisitAllInstructions(fn *ssa.Function, goID int) {
 	for _, excluded := range excludedPkgs {
 		if fn.Pkg.Pkg.Name() == excluded {
 			return
 		}
 	}
-	fnBlocks := fn.Blocks
-	if theLvl, ok := levels[rank]; !ok {
-		theLvl = 0
-		if rank > 0 {
-			theLvl = 1
-		}
-		levels[rank] = theLvl
+	if _, ok := levels[goID]; !ok && goID > 0 { // initialize level counter for new goroutine
+		levels[goID] = 1
 	}
 	if fn.Name() == "main" {
-		log.Debug(strings.Repeat(" ", levels[rank]), "PUSH ", fn.Name(), " at lvl ", levels[rank])
+		levels[goID] = 0 // initialize level count at main entry
+		log.Debug(strings.Repeat(" ", levels[goID]), "PUSH ", fn.Name(), " at lvl ", levels[goID])
 		storeIns = append(storeIns, fn.Name())
-		levels[rank]++
+		levels[goID]++
 	}
-	for _, aBlock := range fnBlocks {
-		for _, theIns := range aBlock.Instrs {
+	fnBlocks := fn.Blocks
+	for j, nBlock := range fn.Blocks {
+		if nBlock.Comment == "for.done" && j != len(fnBlocks)-1 {
+			fnBlocks = append(fnBlocks, nBlock)
+		}
+	}
+	for i, aBlock := range fnBlocks {
+		if aBlock.Comment == "for.done" && i != len(fnBlocks)-1 { // return of a for loop
+			continue
+		} else if aBlock.Comment == "recover" { // ignore built-in recover function
+			continue
+		}
+		for _, theIns := range aBlock.Instrs { // examine each instruction
 			switch examIns := theIns.(type) {
 			case *ssa.Call: // for function calls and method calls
+				if examIns.Call.StaticCallee() == nil {
+					continue
+				}
 				if examIns.Call.Method != nil { // calling a method
 					fnName := examIns.Call.Method.Name()
 					if mthdCall != examIns.Call.Method.Pos() {
-						log.Debug(strings.Repeat(" ", levels[rank]), "PUSH ", examIns.Call.Method.FullName(), " at lvl ", levels[rank])
-						levels[rank]++
+						log.Debug(strings.Repeat(" ", levels[goID]), "PUSH ", examIns.Call.Method.Name(), " at lvl ", levels[goID])
+						levels[goID]++
 						mthdCall = examIns.Call.Method.Pos()
 						storeIns = append(storeIns, fnName)
 					}
 					for theFunc := range progFunc {
-						if theFunc.Name() == fnName {
-							VisitAllInstructions(theFunc, rank)
+						if theFunc.Name() == fnName && fromPkgsOfInterest(theFunc) {
+							VisitAllInstructions(theFunc, goID)
 							break
 						}
 					}
 				} else if fromPkgsOfInterest(examIns.Call.StaticCallee()) && examIns.Call.StaticCallee().Pkg.Pkg.Name() != "sync" { // calling a function
 					fnName := examIns.Call.Value.Name()
-					if strings.HasPrefix(fnName, "t") && len(fnName) > 3 {
+					if strings.HasPrefix(fnName, "t") && len(fnName) <= 3 {
 						fnName = examIns.Call.Value.Type().String()
 					}
-					log.Debug(strings.Repeat(" ", levels[rank]), "PUSH ", fnName, " at lvl ", levels[rank])
+					log.Debug(strings.Repeat(" ", levels[goID]), "PUSH ", fnName, " at lvl ", levels[goID])
 					storeIns = append(storeIns, fnName)
-					levels[rank]++
-					VisitAllInstructions(examIns.Call.StaticCallee(), rank)
+					levels[goID]++
+					VisitAllInstructions(examIns.Call.StaticCallee(), goID)
 				}
 			case *ssa.Return: // for endpoints of each function
-				if fromPkgsOfInterest(examIns.Parent()) {
+				if fromPkgsOfInterest(examIns.Parent()) && len(storeIns) > 0 {
 					fnName := examIns.Parent().Name()
-					if fnName == storeIns[len(storeIns) - 1] {
-						storeIns = storeIns[:len(storeIns) - 1]
-						if levels[rank] == 0 {
-							rank--
-						}
-						levels[rank]--
-						log.Debug(strings.Repeat(" ", levels[rank]), "POP  ", fnName, " at lvl ", levels[rank])
+					if fnName == storeIns[len(storeIns)-1] {
+						storeIns = storeIns[:len(storeIns)-1]
+						levels[goID]--
+						log.Debug(strings.Repeat(" ", levels[goID]), "POP  ", fnName, " at lvl ", levels[goID])
 					}
 				}
+				if len(storeIns) == 0 && len(workList) != 0 { // finished reporting current goroutine and workList isn't empty
+					nextGoInfo := workList[len(workList)-1] // get the goroutine info at end of workList
+					workList = workList[:len(workList)-1]   // pop goroutine info from end of workList
+					newGoroutine(nextGoInfo)
+				} else {
+					return
+				}
 			case *ssa.Go: // for spawning of goroutines
-				rank++
 				var fnName string
 				switch anonFn := examIns.Call.Value.(type) {
 				case *ssa.MakeClosure:
@@ -307,19 +319,21 @@ func VisitAllInstructions(fn *ssa.Function, rank int) {
 				case *ssa.Function:
 					fnName = anonFn.Name()
 				}
-				log.Debug(strings.Repeat(" ", levels[rank]), "PUSH GO ", fnName, " at lvl ", levels[rank])
-
-				var info = goroutineInfo {examIns,fnName,rank}
-				worklist.PushBack(info)
+				newGoID := goID + 1 // increment goID for child goroutine
+				var info = goroutineInfo{examIns, fnName, newGoID}
+				// worklist.PushBack(info)
+				workList = append(workList, info) // store encountered goroutines
 			}
 		}
 	}
 }
 
 func newGoroutine(info goroutineInfo) {
-	//examIns *ssa.Go, fnName string, rank int
 	storeIns = append(storeIns, info.entryMethod)
-	VisitAllInstructions(info.goIns.Call.StaticCallee(), info.rank)
+	log.Debug(strings.Repeat("-", 50))
+	log.Debug(strings.Repeat(" ", levels[info.goID]), "PUSH ", info.entryMethod, " at lvl ", levels[info.goID])
+	levels[info.goID]++
+	VisitAllInstructions(info.goIns.Call.StaticCallee(), info.goID)
 }
 
 func (a *analysis) sameAddress(addr1 ssa.Value, addr2 ssa.Value) bool {
@@ -580,6 +594,7 @@ func doAnalysis(args []string) error {
 	if err != nil {
 		return err
 	}
+	VisitAllInstructions(mains[0].Func("main"), 0)
 	config := &pointer.Config{
 		Mains:          mains,
 		BuildCallGraph: true,
@@ -700,5 +715,6 @@ func init() {
 		"bytealg",
 		"race",
 		"syscall",
+		"poll",
 	}
 }
