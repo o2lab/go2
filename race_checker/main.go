@@ -64,6 +64,9 @@ func fromPkgsOfInterest(fn *ssa.Function) bool {
 	}
 	for _, excluded := range excludedPkgs {
 		if fn.Pkg.Pkg.Name() == excluded {
+			if fn.Name() == "AfterFunc" { // include the Run method for testing purposes
+				return true
+			}
 			return false
 		}
 	}
@@ -238,9 +241,9 @@ func GraphVisitPreorder(g *callgraph.Graph, node func(*callgraph.Node, int) erro
 	return nil
 }
 
-func VisitAllInstructions(fn *ssa.Function, goID int) {
-	for _, excluded := range excludedPkgs {
-		if fn.Pkg.Pkg.Name() == excluded {
+func (a *analysis) VisitAllInstructions(fn *ssa.Function, goID int) {
+	for _, excluded := range excludedPkgs { // TODO: need revision
+		if fn.Pkg.Pkg.Name() == excluded && fn.Name() != "AfterFunc" && fn.Name() != "when" {
 			return
 		}
 	}
@@ -255,23 +258,78 @@ func VisitAllInstructions(fn *ssa.Function, goID int) {
 	}
 	fnBlocks := fn.Blocks
 	for j, nBlock := range fn.Blocks {
-		if nBlock.Comment == "for.done" && j != len(fnBlocks)-1 {
+		if nBlock.Comment == "for.done" && j != len(fnBlocks)-1 { // when return block doesn't have largest index
 			fnBlocks = append(fnBlocks, nBlock)
+		} else if nBlock.Comment == "recover" { // ignore built-in recover function
+			fnBlocks = fnBlocks[:len(fnBlocks)-1]
 		}
 	}
 	for i, aBlock := range fnBlocks {
-		if aBlock.Comment == "for.done" && i != len(fnBlocks)-1 { // return of a for loop
-			continue
-		} else if aBlock.Comment == "recover" { // ignore built-in recover function
+		if aBlock.Comment == "for.done" && i != len(fnBlocks)-1 { // ignore return block if it doesn't have largest index
 			continue
 		}
 		for _, theIns := range aBlock.Instrs { // examine each instruction
+			for _, ex := range excludedPkgs { // TODO: need revision
+				if ex == theIns.Parent().Pkg.Pkg.Name() {
+					if fn.Name() != "AfterFunc" && fn.Name() != "when" {
+						return
+					}
+				}
+			}
 			switch examIns := theIns.(type) {
-			case *ssa.Call: // for function calls and method calls
-				if examIns.Call.StaticCallee() == nil {
+			case *ssa.MakeInterface:
+				if strings.Contains(examIns.X.String(), "complit") {
 					continue
 				}
-				if examIns.Call.Method != nil { // calling a method
+				if _, ok := examIns.X.(*ssa.Call); !ok {
+					continue
+				}
+				a.ptaConfig.AddQuery(examIns.X)
+				result, err := pointer.Analyze(a.ptaConfig) // conduct pointer analysis
+				if err != nil {
+					log.Fatal(err)
+				}
+				Analysis.result = result
+				ptrSet := a.result.Queries            // set of pointers from result of pointer analysis
+				PTSet := ptrSet[examIns.X].PointsTo() // set of labels for locations that the pointer points to
+				locName := string(PTSet.String())
+				if strings.Contains(locName, "complit") {
+					continue
+				}
+				fnName := strings.Split(locName, "command-line-arguments.")[1]
+				fnName = fnName[:len(fnName)-1]
+				for theFunc := range progFunc {
+					if theFunc.Name() == fnName && fromPkgsOfInterest(theFunc) {
+						log.Debug(strings.Repeat(" ", levels[goID]), "PUSH ", fnName, " at lvl ", levels[goID])
+						levels[goID]++
+						storeIns = append(storeIns, fnName)
+						a.VisitAllInstructions(theFunc, goID)
+						break
+					}
+				}
+			case *ssa.Call:
+				if examIns.Call.StaticCallee() == nil && examIns.Call.Method == nil { // calling anonymous function
+					if _, ok := examIns.Call.Value.(*ssa.Builtin); !ok {
+						a.ptaConfig.AddQuery(examIns.Call.Value)
+						result, err := pointer.Analyze(a.ptaConfig) // conduct pointer analysis
+						if err != nil {
+							log.Fatal(err)
+						}
+						Analysis.result = result
+						ptrSet := a.result.Queries                     // set of pointers from result of pointer analysis
+						PTSet := ptrSet[examIns.Call.Value].PointsTo() // set of labels for locations that the pointer points to
+						locName := string(PTSet.String())
+						fnName := strings.Split(locName[1:len(locName)-1], ".")[1]
+						for theFunc := range progFunc {
+							if theFunc.Name() == fnName && fromPkgsOfInterest(theFunc) {
+								a.VisitAllInstructions(theFunc, goID)
+								break
+							}
+						}
+					} else {
+						continue
+					}
+				} else if examIns.Call.Method != nil { // calling a method
 					fnName := examIns.Call.Method.Name()
 					if mthdCall != examIns.Call.Method.Pos() {
 						log.Debug(strings.Repeat(" ", levels[goID]), "PUSH ", examIns.Call.Method.Name(), " at lvl ", levels[goID])
@@ -281,22 +339,34 @@ func VisitAllInstructions(fn *ssa.Function, goID int) {
 					}
 					for theFunc := range progFunc {
 						if theFunc.Name() == fnName && fromPkgsOfInterest(theFunc) {
-							VisitAllInstructions(theFunc, goID)
+							a.VisitAllInstructions(theFunc, goID)
 							break
 						}
 					}
 				} else if fromPkgsOfInterest(examIns.Call.StaticCallee()) && examIns.Call.StaticCallee().Pkg.Pkg.Name() != "sync" { // calling a function
+					if examIns.Call.StaticCallee().Name() == "runtimeNano" || examIns.Call.StaticCallee().Name() == "startTimer" { // this function in the time package returns the current value of the runtime clock in nanoseconds
+						continue
+					}
 					fnName := examIns.Call.Value.Name()
-					if strings.HasPrefix(fnName, "t") && len(fnName) <= 3 {
-						fnName = examIns.Call.Value.Type().String()
+					if strings.HasPrefix(fnName, "t") && len(fnName) <= 3 { // if function name is token number
+						switch callVal := examIns.Call.Value.(type) {
+						case *ssa.MakeClosure:
+							fnName = callVal.Fn.Name()
+						default:
+							fnName = callVal.Type().String()
+						}
 					}
 					log.Debug(strings.Repeat(" ", levels[goID]), "PUSH ", fnName, " at lvl ", levels[goID])
 					storeIns = append(storeIns, fnName)
 					levels[goID]++
-					VisitAllInstructions(examIns.Call.StaticCallee(), goID)
+					a.VisitAllInstructions(examIns.Call.StaticCallee(), goID)
 				}
 			case *ssa.Return: // for endpoints of each function
+				if i != len(fnBlocks)-1 {
+					continue
+				}
 				if fromPkgsOfInterest(examIns.Parent()) && len(storeIns) > 0 {
+
 					fnName := examIns.Parent().Name()
 					if fnName == storeIns[len(storeIns)-1] {
 						storeIns = storeIns[:len(storeIns)-1]
@@ -305,9 +375,9 @@ func VisitAllInstructions(fn *ssa.Function, goID int) {
 					}
 				}
 				if len(storeIns) == 0 && len(workList) != 0 { // finished reporting current goroutine and workList isn't empty
-					nextGoInfo := workList[len(workList)-1] // get the goroutine info at end of workList
-					workList = workList[:len(workList)-1]   // pop goroutine info from end of workList
-					newGoroutine(nextGoInfo)
+					nextGoInfo := workList[0] // get the goroutine info at end of workList
+					workList = workList[1:]   // pop goroutine info from end of workList
+					a.newGoroutine(nextGoInfo)
 				} else {
 					return
 				}
@@ -320,20 +390,24 @@ func VisitAllInstructions(fn *ssa.Function, goID int) {
 					fnName = anonFn.Name()
 				}
 				newGoID := goID + 1 // increment goID for child goroutine
+				if len(workList) > 0 {
+					newGoID = workList[len(workList)-1].goID + 1
+				}
 				var info = goroutineInfo{examIns, fnName, newGoID}
 				// worklist.PushBack(info)
 				workList = append(workList, info) // store encountered goroutines
+				log.Debug(strings.Repeat(" ", levels[goID]), "spawning Goroutine ----->  ", fnName)
 			}
 		}
 	}
 }
 
-func newGoroutine(info goroutineInfo) {
+func (a *analysis) newGoroutine(info goroutineInfo) {
 	storeIns = append(storeIns, info.entryMethod)
-	log.Debug(strings.Repeat("-", 50))
+	log.Debug(strings.Repeat("-", 35), "Goroutine ", info.entryMethod, strings.Repeat("-", 35), "[", info.goID, "]")
 	log.Debug(strings.Repeat(" ", levels[info.goID]), "PUSH ", info.entryMethod, " at lvl ", levels[info.goID])
 	levels[info.goID]++
-	VisitAllInstructions(info.goIns.Call.StaticCallee(), info.goID)
+	a.VisitAllInstructions(info.goIns.Call.StaticCallee(), info.goID)
 }
 
 func (a *analysis) sameAddress(addr1 ssa.Value, addr2 ssa.Value) bool {
@@ -594,7 +668,7 @@ func doAnalysis(args []string) error {
 	if err != nil {
 		return err
 	}
-	VisitAllInstructions(mains[0].Func("main"), 0)
+
 	config := &pointer.Config{
 		Mains:          mains,
 		BuildCallGraph: true,
@@ -606,12 +680,20 @@ func doAnalysis(args []string) error {
 		ptaConfig:     config,
 		fn2SummaryMap: make(map[*ssa.Function]*functionSummary),
 	}
+
+	log.Info("Compiling stack trace for every Goroutine... ")
+	log.Debug(strings.Repeat("-", 35), "Stack trace begins", strings.Repeat("-", 35))
+	Analysis.VisitAllInstructions(mains[0].Func("main"), 0)
+	log.Debug(strings.Repeat("-", 35), "Stack trace ends", strings.Repeat("-", 35))
+
 	err = Analysis.preprocess()
 	if err != nil {
 		return err // internal error in pointer analysis
 	}
 	// Analysis.printSyncBlocks()
 	log.Infof("%d function summaries", len(Analysis.fn2SummaryMap))
+
+	log.Info("Checking for data races... ")
 	Analysis.checkRace()
 	Analysis.printSummary()
 	return nil
@@ -716,5 +798,6 @@ func init() {
 		"race",
 		"syscall",
 		"poll",
+		"trace",
 	}
 }

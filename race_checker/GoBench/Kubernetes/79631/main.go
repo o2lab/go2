@@ -55,7 +55,7 @@ type PriorityQueue struct {
 func (p *PriorityQueue) flushBackoffQCompleted() {
 	p.lock.Lock()
 	defer p.lock.Unlock()
-	p.podBackoffQ.Pop()
+	p.podBackoffQ.Pop() // will trigger racy write
 
 }
 
@@ -73,7 +73,7 @@ func NewPriorityQueueWithClock() *PriorityQueue {
 }
 
 func (p *PriorityQueue) run() {
-	go Until(p.flushBackoffQCompleted, p.stop)
+	go Until(p.flushBackoffQCompleted, p.stop) // will trigger racy write
 }
 
 func BackoffUntil(f func(), stopCh <-chan struct{}) {
@@ -85,7 +85,7 @@ func BackoffUntil(f func(), stopCh <-chan struct{}) {
 		}
 
 		func() {
-			f()
+			f() // will trigger racy write
 		}()
 
 		select {
