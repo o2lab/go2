@@ -64,7 +64,7 @@ func fromPkgsOfInterest(fn *ssa.Function) bool {
 	}
 	for _, excluded := range excludedPkgs {
 		if fn.Pkg.Pkg.Name() == excluded {
-			if fn.Name() == "AfterFunc" { // include the Run method for testing purposes
+			if fn.Name() == "AfterFunc" || fn.Name() == "when" { // TODO: revision needed
 				return true
 			}
 			return false
@@ -205,7 +205,7 @@ func GraphVisitPreorder(g *callgraph.Graph, node func(*callgraph.Node, int) erro
 				newRank := rank
 				if !isSyntheticEdge(e) && e.Caller.Func.Pkg.Pkg.Name() != "sync" {
 					if _, ok := e.Site.(*ssa.Go); ok {
-						log.Debugf("%s spawns %s", e.Caller.Func, e.Callee.Func)
+						//log.Debugf("%s spawns %s", e.Caller.Func, e.Callee.Func)
 						if rank == 0 {
 							newRank = rank + Analysis.analysisStat.nGoroutine + 1
 						} else {
@@ -241,7 +241,8 @@ func GraphVisitPreorder(g *callgraph.Graph, node func(*callgraph.Node, int) erro
 	return nil
 }
 
-func (a *analysis) VisitAllInstructions(fn *ssa.Function, goID int) {
+func (a *analysis) VisitAllInstructions(fn *ssa.Function, goID int) { // called by doAnalysis()
+	a.analysisStat.nGoroutine = goID + 1    // keep count of goroutine quantity
 	for _, excluded := range excludedPkgs { // TODO: need revision
 		if fn.Pkg.Pkg.Name() == excluded && fn.Name() != "AfterFunc" && fn.Name() != "when" {
 			return
@@ -264,9 +265,19 @@ func (a *analysis) VisitAllInstructions(fn *ssa.Function, goID int) {
 			fnBlocks = fnBlocks[:len(fnBlocks)-1]
 		}
 	}
-	for i, aBlock := range fnBlocks {
+	repeatSwitch := false // triggered when encountering basic blocks for body of a forloop
+	for i := 0; i < len(fnBlocks); i++ {
+		aBlock := fnBlocks[i]
 		if aBlock.Comment == "for.done" && i != len(fnBlocks)-1 { // ignore return block if it doesn't have largest index
 			continue
+		}
+		if aBlock.Comment == "for.body" || aBlock.Comment == "rangeindex.body" { // repeat unrolling of forloop
+			if repeatSwitch == false {
+				i--
+				repeatSwitch = true
+			} else {
+				repeatSwitch = false
+			}
 		}
 		for _, theIns := range aBlock.Instrs { // examine each instruction
 			for _, ex := range excludedPkgs { // TODO: need revision
@@ -277,6 +288,25 @@ func (a *analysis) VisitAllInstructions(fn *ssa.Function, goID int) {
 				}
 			}
 			switch examIns := theIns.(type) {
+			case *ssa.Defer:
+				if _, ok := examIns.Call.Value.(*ssa.Builtin); ok {
+					continue
+				}
+				if fromPkgsOfInterest(examIns.Call.StaticCallee()) {
+					fnName := examIns.Call.Value.Name()
+					if strings.HasPrefix(fnName, "t") && len(fnName) <= 3 { // if function name is token number
+						switch callVal := examIns.Call.Value.(type) {
+						case *ssa.MakeClosure:
+							fnName = callVal.Fn.Name()
+						default:
+							fnName = callVal.Type().String()
+						}
+					}
+					log.Debug(strings.Repeat(" ", levels[goID]), "PUSH ", fnName, " at lvl ", levels[goID])
+					storeIns = append(storeIns, fnName)
+					levels[goID]++
+					a.VisitAllInstructions(examIns.Call.StaticCallee(), goID)
+				}
 			case *ssa.MakeInterface:
 				if strings.Contains(examIns.X.String(), "complit") {
 					continue
@@ -284,48 +314,11 @@ func (a *analysis) VisitAllInstructions(fn *ssa.Function, goID int) {
 				if _, ok := examIns.X.(*ssa.Call); !ok {
 					continue
 				}
-				a.ptaConfig.AddQuery(examIns.X)
-				result, err := pointer.Analyze(a.ptaConfig) // conduct pointer analysis
-				if err != nil {
-					log.Fatal(err)
-				}
-				Analysis.result = result
-				ptrSet := a.result.Queries            // set of pointers from result of pointer analysis
-				PTSet := ptrSet[examIns.X].PointsTo() // set of labels for locations that the pointer points to
-				locName := string(PTSet.String())
-				if strings.Contains(locName, "complit") {
-					continue
-				}
-				fnName := strings.Split(locName, "command-line-arguments.")[1]
-				fnName = fnName[:len(fnName)-1]
-				for theFunc := range progFunc {
-					if theFunc.Name() == fnName && fromPkgsOfInterest(theFunc) {
-						log.Debug(strings.Repeat(" ", levels[goID]), "PUSH ", fnName, " at lvl ", levels[goID])
-						levels[goID]++
-						storeIns = append(storeIns, fnName)
-						a.VisitAllInstructions(theFunc, goID)
-						break
-					}
-				}
+				a.pointerAnalysis(examIns.X, goID)
 			case *ssa.Call:
-				if examIns.Call.StaticCallee() == nil && examIns.Call.Method == nil { // calling anonymous function
+				if examIns.Call.StaticCallee() == nil && examIns.Call.Method == nil { // calling a parameter function
 					if _, ok := examIns.Call.Value.(*ssa.Builtin); !ok {
-						a.ptaConfig.AddQuery(examIns.Call.Value)
-						result, err := pointer.Analyze(a.ptaConfig) // conduct pointer analysis
-						if err != nil {
-							log.Fatal(err)
-						}
-						Analysis.result = result
-						ptrSet := a.result.Queries                     // set of pointers from result of pointer analysis
-						PTSet := ptrSet[examIns.Call.Value].PointsTo() // set of labels for locations that the pointer points to
-						locName := string(PTSet.String())
-						fnName := strings.Split(locName[1:len(locName)-1], ".")[1]
-						for theFunc := range progFunc {
-							if theFunc.Name() == fnName && fromPkgsOfInterest(theFunc) {
-								a.VisitAllInstructions(theFunc, goID)
-								break
-							}
-						}
+						a.pointerAnalysis(examIns.Call.Value, goID)
 					} else {
 						continue
 					}
@@ -344,7 +337,7 @@ func (a *analysis) VisitAllInstructions(fn *ssa.Function, goID int) {
 						}
 					}
 				} else if fromPkgsOfInterest(examIns.Call.StaticCallee()) && examIns.Call.StaticCallee().Pkg.Pkg.Name() != "sync" { // calling a function
-					if examIns.Call.StaticCallee().Name() == "runtimeNano" || examIns.Call.StaticCallee().Name() == "startTimer" { // this function in the time package returns the current value of the runtime clock in nanoseconds
+					if examIns.Call.StaticCallee().Name() == "runtimeNano" || examIns.Call.StaticCallee().Name() == "startTimer" { // revision needed
 						continue
 					}
 					fnName := examIns.Call.Value.Name()
@@ -361,12 +354,11 @@ func (a *analysis) VisitAllInstructions(fn *ssa.Function, goID int) {
 					levels[goID]++
 					a.VisitAllInstructions(examIns.Call.StaticCallee(), goID)
 				}
-			case *ssa.Return: // for endpoints of each function
+			case *ssa.Return:
 				if i != len(fnBlocks)-1 {
 					continue
 				}
 				if fromPkgsOfInterest(examIns.Parent()) && len(storeIns) > 0 {
-
 					fnName := examIns.Parent().Name()
 					if fnName == storeIns[len(storeIns)-1] {
 						storeIns = storeIns[:len(storeIns)-1]
@@ -384,7 +376,7 @@ func (a *analysis) VisitAllInstructions(fn *ssa.Function, goID int) {
 			case *ssa.Go: // for spawning of goroutines
 				var fnName string
 				switch anonFn := examIns.Call.Value.(type) {
-				case *ssa.MakeClosure:
+				case *ssa.MakeClosure: // go call for anonymous function
 					fnName = anonFn.Fn.Name()
 				case *ssa.Function:
 					fnName = anonFn.Name()
@@ -408,6 +400,37 @@ func (a *analysis) newGoroutine(info goroutineInfo) {
 	log.Debug(strings.Repeat(" ", levels[info.goID]), "PUSH ", info.entryMethod, " at lvl ", levels[info.goID])
 	levels[info.goID]++
 	a.VisitAllInstructions(info.goIns.Call.StaticCallee(), info.goID)
+}
+
+func (a *analysis) pointerAnalysis(location ssa.Value, goID int) {
+	a.ptaConfig.AddQuery(location)
+	result, err := pointer.Analyze(a.ptaConfig) // conduct pointer analysis
+	if err != nil {
+		log.Fatal(err)
+	}
+	Analysis.result = result
+	ptrSet := a.result.Queries           // set of pointers from result of pointer analysis
+	PTSet := ptrSet[location].PointsTo() // set of labels for locations that the pointer points to
+	locName := string(PTSet.String())
+	if strings.Contains(locName, "complit") {
+		return
+	}
+	fnName := strings.Split(locName[1:len(locName)-1], "command-line-arguments.")[1]
+	if strings.Contains(fnName, "$") {
+		fnName = strings.Split(fnName, "$")[0]
+	}
+	if strings.Contains(fnName, ").") {
+		fnName = strings.Split(fnName, ").")[1]
+	}
+	for theFunc := range progFunc {
+		if theFunc.Name() == fnName && fromPkgsOfInterest(theFunc) {
+			log.Debug(strings.Repeat(" ", levels[goID]), "PUSH ", fnName, " at lvl ", levels[goID])
+			levels[goID]++
+			storeIns = append(storeIns, fnName)
+			a.VisitAllInstructions(theFunc, goID)
+			break
+		}
+	}
 }
 
 func (a *analysis) sameAddress(addr1 ssa.Value, addr2 ssa.Value) bool {
@@ -445,9 +468,9 @@ func (a *analysis) preprocess() error {
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Infof("%d goroutines", a.analysisStat.nGoroutine+1)
+	//log.Infof("%d goroutines", a.analysisStat.nGoroutine+1)
 	a.ptaConfig.BuildCallGraph = false
-	log.Info("Running whole-program pointer analysis for ", len(a.ptaConfig.Queries), " variables...")
+	//log.Info("Running whole-program pointer analysis for ", len(a.ptaConfig.Queries), " variables...")
 	result, err := pointer.Analyze(a.ptaConfig)
 	if err != nil {
 		log.Fatal(err)
@@ -537,7 +560,6 @@ func (a *analysis) preprocess() error {
 			}
 		}
 	}
-	log.Infoln("Done")
 	return nil
 }
 
@@ -654,8 +676,9 @@ func doAnalysis(args []string) error {
 
 	// Print the names of the source files
 	// for each package listed on the command line.
-	for _, pkg := range initial {
-		fmt.Println(pkg.ID, pkg.GoFiles)
+	for nP, pkg := range initial {
+		log.Info(pkg.ID, pkg.GoFiles)
+		log.Infof("Done  -- %d packages loaded", nP+1)
 	}
 
 	// Create and build SSA-form program representation.
@@ -682,16 +705,17 @@ func doAnalysis(args []string) error {
 	}
 
 	log.Info("Compiling stack trace for every Goroutine... ")
-	log.Debug(strings.Repeat("-", 35), "Stack trace begins", strings.Repeat("-", 35))
+	log.Debug(strings.Repeat("-", 35), "Stack trace begins", strings.Repeat("-", 50))
 	Analysis.VisitAllInstructions(mains[0].Func("main"), 0)
-	log.Debug(strings.Repeat("-", 35), "Stack trace ends", strings.Repeat("-", 35))
+	log.Debug(strings.Repeat("-", 35), "Stack trace ends", strings.Repeat("-", 50))
+	log.Info("Done  -- ", Analysis.analysisStat.nGoroutine, " goroutines analyzed!")
 
 	err = Analysis.preprocess()
 	if err != nil {
 		return err // internal error in pointer analysis
 	}
 	// Analysis.printSyncBlocks()
-	log.Infof("%d function summaries", len(Analysis.fn2SummaryMap))
+	log.Infof("Done  -- %d function summaries assembled", len(Analysis.fn2SummaryMap))
 
 	log.Info("Checking for data races... ")
 	Analysis.checkRace()
@@ -713,9 +737,9 @@ func (a *analysis) printSyncBlocks() {
 
 func (a *analysis) printSummary() {
 	if a.analysisStat.raceCount == 1 {
-		log.Printf("Summary: 1 race reported, %d accesses checked", a.analysisStat.nAccess)
+		log.Printf("Done  -- 1 race reported, %d accesses checked", a.analysisStat.nAccess)
 	} else {
-		log.Printf("Summary: %d races reported, %d accesses checked", a.analysisStat.raceCount, a.analysisStat.nAccess)
+		log.Printf("Done  -- %d races reported, %d accesses checked", a.analysisStat.raceCount, a.analysisStat.nAccess)
 	}
 }
 
