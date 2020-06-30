@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/logrusorgru/aurora"
 	"github.com/twmb/algoimpl/go/graph"
-	"go/token"
 	"golang.org/x/tools/go/callgraph"
 	"golang.org/x/tools/go/callgraph/cha"
 	"golang.org/x/tools/go/packages"
@@ -52,7 +51,6 @@ var (
 	fnReported   map[string]string
 	levels       = make(map[int]int)
 	storeIns     []string
-	mthdCall     token.Pos
 	progFunc     map[*ssa.Function]bool
 	//worklist 	 list.List
 	workList []goroutineInfo
@@ -258,17 +256,24 @@ func (a *analysis) VisitAllInstructions(fn *ssa.Function, goID int) { // called 
 		levels[goID]++
 	}
 	fnBlocks := fn.Blocks
+	var toAppend []*ssa.BasicBlock
 	for j, nBlock := range fn.Blocks {
-		if nBlock.Comment == "for.done" && j != len(fnBlocks)-1 { // when return block doesn't have largest index
-			fnBlocks = append(fnBlocks, nBlock)
+		if strings.HasSuffix(nBlock.Comment, ".done") && j != len(fnBlocks)-1 { // when return block doesn't have largest index
+			bLen := len(nBlock.Instrs)
+			if _, ok := nBlock.Instrs[bLen-1].(*ssa.Return); ok {
+				toAppend = append([]*ssa.BasicBlock{nBlock}, toAppend...)
+			}
 		} else if nBlock.Comment == "recover" { // ignore built-in recover function
-			fnBlocks = fnBlocks[:len(fnBlocks)-1]
+			fnBlocks = append(fnBlocks[:j], fnBlocks[j+1:]...)
 		}
+	}
+	if len(toAppend) > 0 {
+		fnBlocks = append(fnBlocks, toAppend...) // move return block to end of slice
 	}
 	repeatSwitch := false // triggered when encountering basic blocks for body of a forloop
 	for i := 0; i < len(fnBlocks); i++ {
 		aBlock := fnBlocks[i]
-		if aBlock.Comment == "for.done" && i != len(fnBlocks)-1 { // ignore return block if it doesn't have largest index
+		if strings.HasSuffix(aBlock.Comment, ".done") && i != len(fnBlocks)-1 { // ignore return block if it doesn't have largest index
 			continue
 		}
 		if aBlock.Comment == "for.body" || aBlock.Comment == "rangeindex.body" { // repeat unrolling of forloop
@@ -288,11 +293,27 @@ func (a *analysis) VisitAllInstructions(fn *ssa.Function, goID int) { // called 
 				}
 			}
 			switch examIns := theIns.(type) {
+			case *ssa.ChangeType:
+				switch mc := examIns.X.(type) {
+				case *ssa.MakeClosure:
+					fnName := mc.Fn.Name()
+					for theFunc := range progFunc {
+						if theFunc.Name() == fnName && fromPkgsOfInterest(theFunc) {
+							log.Debug(strings.Repeat(" ", levels[goID]), "PUSH ", fnName, " at lvl ", levels[goID])
+							levels[goID]++
+							storeIns = append(storeIns, fnName)
+							a.VisitAllInstructions(theFunc, goID)
+							break
+						}
+					}
+				default:
+					continue
+				}
 			case *ssa.Defer:
 				if _, ok := examIns.Call.Value.(*ssa.Builtin); ok {
 					continue
 				}
-				if fromPkgsOfInterest(examIns.Call.StaticCallee()) {
+				if fromPkgsOfInterest(examIns.Call.StaticCallee()) && examIns.Call.StaticCallee().Pkg.Pkg.Name() != "sync" {
 					fnName := examIns.Call.Value.Name()
 					if strings.HasPrefix(fnName, "t") && len(fnName) <= 3 { // if function name is token number
 						switch callVal := examIns.Call.Value.(type) {
@@ -323,18 +344,24 @@ func (a *analysis) VisitAllInstructions(fn *ssa.Function, goID int) { // called 
 						continue
 					}
 				} else if examIns.Call.Method != nil { // calling a method
-					fnName := examIns.Call.Method.Name()
-					if mthdCall != examIns.Call.Method.Pos() {
-						log.Debug(strings.Repeat(" ", levels[goID]), "PUSH ", examIns.Call.Method.Name(), " at lvl ", levels[goID])
-						levels[goID]++
-						mthdCall = examIns.Call.Method.Pos()
-						storeIns = append(storeIns, fnName)
-					}
-					for theFunc := range progFunc {
-						if theFunc.Name() == fnName && fromPkgsOfInterest(theFunc) {
-							a.VisitAllInstructions(theFunc, goID)
-							break
+					if _, ok := examIns.Call.Value.(*ssa.Builtin); !ok {
+						switch isParam := examIns.Call.Value.(type) {
+						case *ssa.Parameter:
+							a.pointerAnalysis(isParam, goID)
+						default:
+							fnName := examIns.Call.Method.Name()
+							for theFunc := range progFunc {
+								if theFunc.Name() == fnName && fromPkgsOfInterest(theFunc) && theFunc.Pkg.Pkg.Name() != "sync" {
+									log.Debug(strings.Repeat(" ", levels[goID]), "PUSH ", fnName, " at lvl ", levels[goID])
+									levels[goID]++
+									storeIns = append(storeIns, fnName)
+									a.VisitAllInstructions(theFunc, goID)
+									break
+								}
+							}
 						}
+					} else {
+						continue
 					}
 				} else if fromPkgsOfInterest(examIns.Call.StaticCallee()) && examIns.Call.StaticCallee().Pkg.Pkg.Name() != "sync" { // calling a function
 					if examIns.Call.StaticCallee().Name() == "runtimeNano" || examIns.Call.StaticCallee().Name() == "startTimer" { // revision needed
@@ -355,6 +382,7 @@ func (a *analysis) VisitAllInstructions(fn *ssa.Function, goID int) { // called 
 					a.VisitAllInstructions(examIns.Call.StaticCallee(), goID)
 				}
 			case *ssa.Return:
+
 				if i != len(fnBlocks)-1 {
 					continue
 				}
@@ -415,15 +443,18 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int) {
 	if strings.Contains(locName, "complit") {
 		return
 	}
-	fnName := strings.Split(locName[1:len(locName)-1], "command-line-arguments.")[1]
-	if strings.Contains(fnName, "$") {
-		fnName = strings.Split(fnName, "$")[0]
+	fnName := locName[1 : len(locName)-1]
+	if strings.Contains(fnName, "command-line-arguments.") {
+		fnName = strings.Split(fnName, "command-line-arguments.")[1]
+	}
+	if strings.Contains(fnName, "$bound") {
+		fnName = strings.Split(fnName, "$bound")[0]
 	}
 	if strings.Contains(fnName, ").") {
 		fnName = strings.Split(fnName, ").")[1]
 	}
 	for theFunc := range progFunc {
-		if theFunc.Name() == fnName && fromPkgsOfInterest(theFunc) {
+		if theFunc.Name() == fnName && fromPkgsOfInterest(theFunc) && theFunc.Pkg.Pkg.Name() != "sync" {
 			log.Debug(strings.Repeat(" ", levels[goID]), "PUSH ", fnName, " at lvl ", levels[goID])
 			levels[goID]++
 			storeIns = append(storeIns, fnName)
@@ -823,5 +854,7 @@ func init() {
 		"syscall",
 		"poll",
 		"trace",
+		"logging",
+		"os",
 	}
 }
