@@ -49,7 +49,6 @@ var (
 	workList     []goroutineInfo
 	reportedAddr []ssa.Value
 	allocMap     = make(map[*ssa.Alloc]bool)
-	insCounter   int
 )
 
 func doAnalysis(args []string) error {
@@ -76,7 +75,6 @@ func doAnalysis(args []string) error {
 
 	// Create and build SSA-form program representation.
 	prog, pkgs := ssautil.AllPackages(initial, 0)
-	//mainPkg := prog.Package(pkgs[0].Pkg)
 
 	log.Info("Building SSA code for entire program...")
 	prog.Build()
@@ -313,13 +311,16 @@ func sliceContains(s []ssa.Value, e ssa.Value) bool {
 	return false
 }
 
-func sliceContainsG(s []graph.Node, e graph.Node) bool {
-	for _, a := range s {
-		if a == e {
-			return true
-		}
+func updateRecords(fnName string, goID int, pushPop string) {
+	if pushPop == "POP  " {
+		storeIns = storeIns[:len(storeIns)-1]
+		levels[goID]--
 	}
-	return false
+	log.Debug(strings.Repeat(" ", levels[goID]), pushPop, fnName, " at lvl ", levels[goID])
+	if pushPop == "PUSH " {
+		storeIns = append(storeIns, fnName)
+		levels[goID]++
+	}
 }
 
 func (a *analysis) checkRacyPairs() {
@@ -427,13 +428,13 @@ func (a *analysis) printRace(counter int, insPair []ssa.Instruction, addrPair []
 func (a *analysis) reachable(fromIns ssa.Instruction, toIns ssa.Instruction) bool {
 	fromNode := a.RWinsMap[fromIns]
 	toNode := a.RWinsMap[toIns]
-	er := a.HBgraph.Neighbors(fromNode)
-	for len(er) > 0 {
-		new := er[len(er)-1]
-		er = er[:len(er)-1]
-		next := a.HBgraph.Neighbors(new)
-		er = append(er, next...)
-		if new == toNode {
+	nexts := a.HBgraph.Neighbors(fromNode)
+	for len(nexts) > 0 {
+		curr := nexts[len(nexts)-1]
+		nexts = nexts[:len(nexts)-1]
+		next := a.HBgraph.Neighbors(curr)
+		nexts = append(nexts, next...)
+		if curr == toNode {
 			return true
 		}
 	}
@@ -453,7 +454,7 @@ func (a *analysis) sameAddress(addr1 ssa.Value, addr2 ssa.Value) bool {
 	return ptset[addr1].PointsTo().Intersects(ptset[addr2].PointsTo())
 }
 
-func (a *analysis) VisitAllInstructions(fn *ssa.Function, goID int) { // called by doAnalysis()
+func (a *analysis) VisitAllInstructions(fn *ssa.Function, goID int) {
 	a.analysisStat.nGoroutine = goID + 1 // keep count of goroutine quantity
 	if !isSynthetic(fn) {                // if function is NOT synthetic
 		for _, excluded := range excludedPkgs { // TODO: need revision
@@ -463,9 +464,7 @@ func (a *analysis) VisitAllInstructions(fn *ssa.Function, goID int) { // called 
 		}
 		if fn.Name() == "main" {
 			levels[goID] = 0 // initialize level count at main entry
-			log.Debug(strings.Repeat(" ", levels[goID]), "PUSH ", fn.Name(), " at lvl ", levels[goID])
-			storeIns = append(storeIns, fn.Name())
-			levels[goID]++
+			updateRecords(fn.Name(), goID, "PUSH ")
 		}
 	}
 	if _, ok := levels[goID]; !ok && goID > 0 { // initialize level counter for new goroutine
@@ -476,6 +475,7 @@ func (a *analysis) VisitAllInstructions(fn *ssa.Function, goID int) { // called 
 	}
 	fnBlocks := fn.Blocks
 	var toAppend []*ssa.BasicBlock
+	var toDefer []ssa.Instruction // stack for deferred calls
 	for j, nBlock := range fn.Blocks {
 		if strings.HasSuffix(nBlock.Comment, ".done") && j != len(fnBlocks)-1 { // when return block doesn't have largest index
 			bLen := len(nBlock.Instrs)
@@ -504,6 +504,28 @@ func (a *analysis) VisitAllInstructions(fn *ssa.Function, goID int) { // called 
 			}
 		}
 		for _, theIns := range aBlock.Instrs { // examine each instruction
+			if theIns.String() == "rundefers" { // execute deferred calls at this index
+				for _, dIns := range toDefer {
+					deferIns := dIns.(*ssa.Defer)
+					if _, ok := deferIns.Call.Value.(*ssa.Builtin); ok {
+						continue
+					}
+					if fromPkgsOfInterest(deferIns.Call.StaticCallee()) && deferIns.Call.StaticCallee().Pkg.Pkg.Name() != "sync" {
+						fnName := deferIns.Call.Value.Name()
+						if strings.HasPrefix(fnName, "t") && len(fnName) <= 3 { // if function name is token number
+							switch callVal := deferIns.Call.Value.(type) {
+							case *ssa.MakeClosure:
+								fnName = callVal.Fn.Name()
+							default:
+								fnName = callVal.Type().String()
+							}
+						}
+						updateRecords(fnName, goID, "PUSH ")
+						RWIns[goID] = append(RWIns[goID], dIns)
+						a.VisitAllInstructions(dIns.(*ssa.Defer).Call.StaticCallee(), goID)
+					}
+				}
+			}
 			for _, ex := range excludedPkgs { // TODO: need revision
 				if !isSynthetic(fn) && ex == theIns.Parent().Pkg.Pkg.Name() {
 					if fn.Name() != "AfterFunc" && fn.Name() != "when" {
@@ -536,9 +558,7 @@ func (a *analysis) VisitAllInstructions(fn *ssa.Function, goID int) { // called 
 					theFn := mc.Fn.(*ssa.Function)
 					if fromPkgsOfInterest(theFn) {
 						fnName := mc.Fn.Name()
-						log.Debug(strings.Repeat(" ", levels[goID]), "PUSH ", fnName, " at lvl ", levels[goID])
-						levels[goID]++
-						storeIns = append(storeIns, fnName)
+						updateRecords(fnName, goID, "PUSH ")
 						RWIns[goID] = append(RWIns[goID], theIns)
 						a.VisitAllInstructions(theFn, goID)
 					}
@@ -546,25 +566,7 @@ func (a *analysis) VisitAllInstructions(fn *ssa.Function, goID int) { // called 
 					continue
 				}
 			case *ssa.Defer:
-				if _, ok := examIns.Call.Value.(*ssa.Builtin); ok {
-					continue
-				}
-				if fromPkgsOfInterest(examIns.Call.StaticCallee()) && examIns.Call.StaticCallee().Pkg.Pkg.Name() != "sync" {
-					fnName := examIns.Call.Value.Name()
-					if strings.HasPrefix(fnName, "t") && len(fnName) <= 3 { // if function name is token number
-						switch callVal := examIns.Call.Value.(type) {
-						case *ssa.MakeClosure:
-							fnName = callVal.Fn.Name()
-						default:
-							fnName = callVal.Type().String()
-						}
-					}
-					log.Debug(strings.Repeat(" ", levels[goID]), "PUSH ", fnName, " at lvl ", levels[goID])
-					storeIns = append(storeIns, fnName)
-					RWIns[goID] = append(RWIns[goID], theIns)
-					levels[goID]++
-					a.VisitAllInstructions(examIns.Call.StaticCallee(), goID)
-				}
+				toDefer = append([]ssa.Instruction{theIns}, toDefer...)
 			case *ssa.MakeInterface: // construct instance of interface type
 				if strings.Contains(examIns.X.String(), "complit") {
 					continue
@@ -606,10 +608,8 @@ func (a *analysis) VisitAllInstructions(fn *ssa.Function, goID int) { // called 
 							fnName = callVal.Type().String()
 						}
 					}
-					log.Debug(strings.Repeat(" ", levels[goID]), "PUSH ", fnName, " at lvl ", levels[goID])
-					storeIns = append(storeIns, fnName)
+					updateRecords(fnName, goID, "PUSH ")
 					RWIns[goID] = append(RWIns[goID], theIns)
-					levels[goID]++
 					a.VisitAllInstructions(examIns.Call.StaticCallee(), goID)
 				}
 			case *ssa.Return:
@@ -619,10 +619,8 @@ func (a *analysis) VisitAllInstructions(fn *ssa.Function, goID int) { // called 
 				if (fromPkgsOfInterest(examIns.Parent()) || isSynthetic(examIns.Parent())) && len(storeIns) > 0 {
 					fnName := examIns.Parent().Name()
 					if fnName == storeIns[len(storeIns)-1] {
-						storeIns = storeIns[:len(storeIns)-1]
+						updateRecords(fnName, goID, "POP  ")
 						RWIns[goID] = append(RWIns[goID], theIns)
-						levels[goID]--
-						log.Debug(strings.Repeat(" ", levels[goID]), "POP  ", fnName, " at lvl ", levels[goID])
 					}
 				}
 				if len(storeIns) == 0 && len(workList) != 0 { // finished reporting current goroutine and workList isn't empty

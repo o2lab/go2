@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-type Dialer struct {}
+type Dialer struct{}
 
 func (d *Dialer) CloseAll() {}
 
@@ -20,7 +20,7 @@ type Authenticator struct {
 
 func (a *Authenticator) UpdateTransportConfig() {
 	d := NewDialer()
-	a.onRotate = d.CloseAll // repeated write
+	a.onRotate = d.CloseAll // repeated write to onRotate
 }
 
 func newAuthenticator() *Authenticator {
