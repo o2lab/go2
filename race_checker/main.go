@@ -107,7 +107,7 @@ func doAnalysis(args []string) error {
 	for g, _ := range RWIns {
 		totalIns += len(RWIns[g])
 	}
-	log.Info("Done  -- ", Analysis.analysisStat.nGoroutine, " goroutines analyzed! ", totalIns, " instructions of interest! ")
+	log.Info("Done  -- ", Analysis.analysisStat.nGoroutine, " goroutines analyzed! ", totalIns, " instructions of interest detected! ")
 
 	log.Info("Building Happened-Before graph... ")
 	Analysis.HBgraph = graph.New(graph.Directed)
@@ -165,9 +165,6 @@ func fromPkgsOfInterest(fn *ssa.Function) bool {
 	}
 	for _, excluded := range excludedPkgs {
 		if fn.Pkg.Pkg.Name() == excluded {
-			if fn.Name() == "AfterFunc" || fn.Name() == "when" { // TODO: revision needed
-				return true
-			}
 			return false
 		}
 	}
@@ -187,7 +184,6 @@ func init() {
 		"encoding",
 		"errors",
 		"bytes",
-		"time",
 		"testing",
 		"strconv",
 		"atomic",
@@ -206,15 +202,14 @@ func isLocalAddr(location ssa.Value) bool {
 	if location.Pos() == token.NoPos {
 		return true
 	}
-	if locPara, ok := location.(*ssa.Parameter); ok {
-		_, ok := locPara.Type().(*types.Pointer)
-		return !ok
-	}
 	switch loc := location.(type) {
+	case *ssa.Parameter:
+		_, ok := loc.Type().(*types.Pointer)
+		return !ok
 	case *ssa.FieldAddr:
-		return false
+		isLocalAddr(loc.X)
 	case *ssa.IndexAddr:
-		return isLocalAddr(loc.X)
+		isLocalAddr(loc.X)
 	//case *ssa.Call:
 	//	if loc.Call.Value.Name() == "append" {
 	//		lastArg := loc.Call.Args[len(loc.Call.Args)-1]
@@ -227,11 +222,11 @@ func isLocalAddr(location ssa.Value) bool {
 	//		}
 	//	}
 	case *ssa.UnOp:
-		return isLocalAddr(loc.X)
+		isLocalAddr(loc.X)
 	case *ssa.Alloc:
-		if _, ok := allocMap[loc]; ok || !loc.Heap || loc.Comment == "complit" {
-			return true
-		} // false heap means local alloc
+		if !loc.Heap {
+			return true // false heap means local alloc
+		}
 	default:
 		return false
 	}
@@ -311,6 +306,15 @@ func sliceContains(s []ssa.Value, e ssa.Value) bool {
 	return false
 }
 
+func sliceContainsStr(s []string, e string) bool {
+	for _, a := range s {
+		if a == e {
+			return true
+		}
+	}
+	return false
+}
+
 func updateRecords(fnName string, goID int, pushPop string) {
 	if pushPop == "POP  " {
 		storeIns = storeIns[:len(storeIns)-1]
@@ -331,7 +335,7 @@ func (a *analysis) checkRacyPairs() {
 				for _, goJ := range RWIns[j] {
 					insSlice := []ssa.Instruction{goI, goJ} // one instruction from each goroutine
 					addressPair := a.insAddress(insSlice)
-					if len(addressPair) > 1 && a.sameAddress(addressPair[0], addressPair[1]) && !sliceContains(reportedAddr, addressPair[0]) && !a.reachable(goI, goJ) {
+					if len(addressPair) > 1 && a.sameAddress(addressPair[0], addressPair[1]) && !sliceContains(reportedAddr, addressPair[0]) && !a.reachable(goI, goJ) && !a.reachable(goI, goJ) {
 						reportedAddr = append(reportedAddr, addressPair[0])
 						counter++
 						a.printRace(counter, insSlice, addressPair)
@@ -390,7 +394,13 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 	ptrSet := a.result.Queries                    // set of pointers from result of pointer analysis
 	PTSet := ptrSet[location].PointsTo().Labels() // set of labels for locations that the pointer points to
 	var fnName string
-	switch theFunc := PTSet[0].Value().(type) {
+	rightLoc := 0 // initialize index in points-to set
+	if len(PTSet) > 1 {
+		for !sliceContainsStr(storeIns, PTSet[rightLoc].Value().Parent().Name()) {
+			rightLoc++ // get the location previously called by an "unpopped" function, TODO: needs refinement
+		}
+	}
+	switch theFunc := PTSet[rightLoc].Value().(type) {
 	case *ssa.Function:
 		fnName = theFunc.Name()
 		log.Debug(strings.Repeat(" ", levels[goID]), "PUSH ", fnName, " at lvl ", levels[goID])
@@ -458,7 +468,7 @@ func (a *analysis) VisitAllInstructions(fn *ssa.Function, goID int) {
 	a.analysisStat.nGoroutine = goID + 1 // keep count of goroutine quantity
 	if !isSynthetic(fn) {                // if function is NOT synthetic
 		for _, excluded := range excludedPkgs { // TODO: need revision
-			if fn.Pkg.Pkg.Name() == excluded && fn.Name() != "AfterFunc" && fn.Name() != "when" {
+			if fn.Pkg.Pkg.Name() == excluded {
 				return
 			}
 		}
@@ -528,9 +538,7 @@ func (a *analysis) VisitAllInstructions(fn *ssa.Function, goID int) {
 			}
 			for _, ex := range excludedPkgs { // TODO: need revision
 				if !isSynthetic(fn) && ex == theIns.Parent().Pkg.Pkg.Name() {
-					if fn.Name() != "AfterFunc" && fn.Name() != "when" {
-						return
-					}
+					return
 				}
 			}
 			switch examIns := theIns.(type) {
@@ -541,18 +549,24 @@ func (a *analysis) VisitAllInstructions(fn *ssa.Function, goID int) {
 					RWIns[goID] = append(RWIns[goID], theIns)
 					a.ptaConfig.AddQuery(examIns.Addr)
 				}
+				if theFunc, storeFn := examIns.Val.(*ssa.Function); storeFn {
+					fnName := theFunc.Name()
+					updateRecords(fnName, goID, "PUSH ")
+					RWIns[goID] = append(RWIns[goID], theIns)
+					a.VisitAllInstructions(theFunc, goID)
+				}
 			case *ssa.UnOp: // read op
 				if examIns.Op == token.MUL && !isLocalAddr(examIns.X) { // pointer dereference
 					RWIns[goID] = append(RWIns[goID], theIns)
 					a.ptaConfig.AddQuery(examIns.X)
 				}
-			case *ssa.Lookup: // look up element index
+			case *ssa.Lookup: // look up element index, read op
 				readIns := examIns.X.(*ssa.UnOp)
 				if readIns.Op == token.MUL && !isLocalAddr(readIns.X) {
 					RWIns[goID] = append(RWIns[goID], theIns)
 					a.ptaConfig.AddQuery(readIns.X)
 				}
-			case *ssa.ChangeType: // a value-preserving type change
+			case *ssa.ChangeType: // a value-preserving type change, write op
 				switch mc := examIns.X.(type) {
 				case *ssa.MakeClosure: // yield closure value for *Function and free variable values supplied by Bindings
 					theFn := mc.Fn.(*ssa.Function)
@@ -595,11 +609,11 @@ func (a *analysis) VisitAllInstructions(fn *ssa.Function, goID int) {
 					} else {
 						continue
 					}
-				} else if fromPkgsOfInterest(examIns.Call.StaticCallee()) && (examIns.Call.StaticCallee().Pkg.Pkg.Name() != "sync" || examIns.Call.StaticCallee().Name() == "Range") { // calling a function
-					fnName := examIns.Call.Value.Name()
-					if fnName == "runtimeNano" || fnName == "startTimer" { // revision needed
+				} else if fromPkgsOfInterest(examIns.Call.StaticCallee()) && examIns.Call.StaticCallee().Pkg.Pkg.Name() != "sync" { // calling a function
+					if examIns.Call.StaticCallee().Blocks == nil { // empty function block, won't have return instruction
 						continue
 					}
+					fnName := examIns.Call.Value.Name()
 					if strings.HasPrefix(fnName, "t") && len(fnName) <= 3 { // if function name is token number
 						switch callVal := examIns.Call.Value.(type) {
 						case *ssa.MakeClosure:
@@ -611,6 +625,16 @@ func (a *analysis) VisitAllInstructions(fn *ssa.Function, goID int) {
 					updateRecords(fnName, goID, "PUSH ")
 					RWIns[goID] = append(RWIns[goID], theIns)
 					a.VisitAllInstructions(examIns.Call.StaticCallee(), goID)
+					//} else if examIns.Call.StaticCallee().Pkg.Pkg.Name() == "sync" {
+					//	syncOp := examIns.Call.StaticCallee().Name()
+					//	switch syncOp {
+					//	case "Lock":
+					//		lockLoc := examIns.Call.Args[0]
+					//		lockedLocs = append(lockedLocs, lockLoc)
+					//	case "Unlock":
+					//		lockLoc := examIns.Call.Args[0]
+					//		deleteFromSlice(lockedLocs, lockLoc)
+					//	}
 				}
 			case *ssa.Return:
 				if i != len(fnBlocks)-1 {
@@ -637,6 +661,8 @@ func (a *analysis) VisitAllInstructions(fn *ssa.Function, goID int) {
 					fnName = anonFn.Fn.Name()
 				case *ssa.Function:
 					fnName = anonFn.Name()
+				case *ssa.TypeAssert:
+					fnName = anonFn.X.Name()
 				}
 				newGoID := goID + 1 // increment goID for child goroutine
 				if len(workList) > 0 {
