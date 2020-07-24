@@ -54,7 +54,8 @@ var (
 	workList     []goroutineInfo
 	reportedAddr []ssa.Value
 	allocMap     = make(map[*ssa.Alloc]bool)
-	lockedLocs   []ssa.Value
+	lockMap      = make(map[ssa.Instruction][]ssa.Value) // map each read/write access to a snapshot of actively maintained lockset
+	lockSet      []ssa.Value                             // active lockset, to be maintained along instruction traversal
 	addrNameMap  = make(map[string][]ssa.Value)
 	addrMap      = make(map[string][]RWInsInd)
 	tryMap       = make(map[*ssa.Function]bool) // for debugging purposes only
@@ -63,9 +64,8 @@ var (
 func deleteFromSlice(s []ssa.Value, e ssa.Value) []ssa.Value {
 	var res []ssa.Value
 	for i, a := range s {
-		if a == e {
+		if a.Name() == e.Name() {
 			res = append(s[:i], s[i+1:]...)
-			return res
 		}
 	}
 	return res
@@ -137,8 +137,8 @@ func doAnalysis(args []string) error {
 	var goCaller []graph.Node
 	for nGo, insSlice := range RWIns {
 		for i, anIns := range insSlice {
-			if nGo == 0 && i == 0 {
-				prevN = Analysis.HBgraph.MakeNode()
+			if nGo == 0 && i == 0 { // main goroutine, first instruction
+				prevN = Analysis.HBgraph.MakeNode() // initiate for future nodes
 				*prevN.Value = anIns
 			} else {
 				currN := Analysis.HBgraph.MakeNode()
@@ -206,7 +206,6 @@ func init() {
 		"encoding",
 		"errors",
 		"bytes",
-		//"testing",
 		"strconv",
 		"strings",
 		"bytealg",
@@ -260,6 +259,10 @@ func isReadIns(ins ssa.Instruction) bool { // is the instruction a read access?
 		return true
 	case *ssa.Lookup:
 		return true
+	case *ssa.Call:
+		if insType.Call.Value.Name() != "delete" && !strings.HasPrefix(insType.Call.Value.Name(), "Add") && len(insType.Call.Args) > 0 {
+			return true
+		}
 	default:
 		_ = insType
 	}
@@ -277,6 +280,21 @@ func isWriteIns(ins ssa.Instruction) bool { // is the instruction a write access
 	case *ssa.Call:
 		if insType.Call.Value.Name() == "delete" {
 			return true
+		} else if strings.HasPrefix(insType.Call.Value.Name(), "Add") {
+			return true
+		}
+	}
+	return false
+}
+
+func locksetsInterset(insA ssa.Instruction, insB ssa.Instruction) bool {
+	setA := lockMap[insA] // lockset of instruction-A
+	setB := lockMap[insB] // lockset of instruction-B
+	for _, addrA := range setA {
+		for _, addrB := range setB {
+			if addrA == addrB {
+				return true
+			}
 		}
 	}
 	return false
@@ -345,6 +363,15 @@ func sliceContainsStr(s []string, e string) bool {
 	return false
 }
 
+func sliceContainsIns(s []ssa.Instruction, e ssa.Instruction) bool {
+	for _, a := range s {
+		if a == e {
+			return true
+		}
+	}
+	return false
+}
+
 func sliceContainsInsAt(s []ssa.Instruction, e ssa.Instruction) int {
 	i := 0
 	for s[i] != e {
@@ -373,7 +400,7 @@ func (a *analysis) checkRacyPairs() {
 				for _, goJ := range RWIns[j] {
 					insSlice := []ssa.Instruction{goI, goJ} // one instruction from each goroutine
 					addressPair := a.insAddress(insSlice)
-					if len(addressPair) > 1 && a.sameAddress(addressPair[0], addressPair[1]) && !sliceContains(reportedAddr, addressPair[0]) && !a.reachable(goI, goJ) && !a.reachable(goI, goJ) {
+					if len(addressPair) > 1 && a.sameAddress(addressPair[0], addressPair[1]) && !sliceContains(reportedAddr, addressPair[0]) && !a.reachable(goI, goJ) && !a.reachable(goI, goJ) && !locksetsInterset(insSlice[0], insSlice[1]) {
 						reportedAddr = append(reportedAddr, addressPair[0])
 						counter++
 						a.printRace(counter, insSlice, addressPair)
@@ -397,6 +424,15 @@ func (a *analysis) insAddress(insSlice []ssa.Instruction) []ssa.Value { // obtai
 			if theIns.Call.Value.Name() == "delete" {
 				minWrite++
 				theAddrs = append(theAddrs, theIns.Call.Args[0].(*ssa.UnOp).X)
+			} else if strings.HasPrefix(theIns.Call.Value.Name(), "Add") {
+				minWrite++
+				theAddrs = append(theAddrs, theIns.Call.Args[0].(*ssa.FieldAddr).X)
+			} else if len(theIns.Call.Args) > 0 {
+				for _, anArg := range theIns.Call.Args {
+					if readAcc, ok := anArg.(*ssa.FieldAddr); ok {
+						theAddrs = append(theAddrs, readAcc.X)
+					}
+				}
 			}
 		case *ssa.UnOp:
 			theAddrs = append(theAddrs, theIns.X)
@@ -422,9 +458,9 @@ func (a *analysis) newGoroutine(info goroutineInfo) {
 	log.Debug(strings.Repeat(" ", levels[info.goID]), "PUSH ", info.entryMethod, " at lvl ", levels[info.goID])
 	levels[info.goID]++
 	switch info.goIns.Call.Value.(type) {
-	case *ssa.TypeAssert:
-		a.visitAllInstructions(info.goIns.Call.StaticCallee(), info.goID)
 	case *ssa.MakeClosure:
+		a.visitAllInstructions(info.goIns.Call.StaticCallee(), info.goID)
+	default:
 		a.visitAllInstructions(info.goIns.Call.StaticCallee(), info.goID)
 	}
 
@@ -576,7 +612,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 					if _, ok := deferIns.Call.Value.(*ssa.Builtin); ok {
 						continue
 					}
-					if fromPkgsOfInterest(deferIns.Call.StaticCallee()) {
+					if fromPkgsOfInterest(deferIns.Call.StaticCallee()) && deferIns.Call.StaticCallee().Pkg.Pkg.Name() != "sync" {
 						fnName := deferIns.Call.Value.Name()
 						if strings.HasPrefix(fnName, "t") && len(fnName) <= 3 { // if function name is token number
 							switch callVal := deferIns.Call.Value.(type) {
@@ -589,6 +625,11 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 						updateRecords(fnName, goID, "PUSH ")
 						RWIns[goID] = append(RWIns[goID], dIns)
 						a.visitAllInstructions(dIns.(*ssa.Defer).Call.StaticCallee(), goID)
+					} else if deferIns.Call.StaticCallee().Name() == "Unlock" {
+						lockLoc := deferIns.Call.Args[0]
+						if sliceContains(lockSet, lockLoc) {
+							lockSet = deleteFromSlice(lockSet, lockLoc)
+						}
 					}
 				}
 			}
@@ -603,6 +644,9 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 			case *ssa.Store: // write op
 				if !isLocalAddr(examIns.Addr) {
 					RWIns[goID] = append(RWIns[goID], theIns)
+					if len(lockSet) > 0 {
+						lockMap[theIns] = lockSet
+					}
 					addrNameMap[examIns.Addr.Name()] = append(addrNameMap[examIns.Addr.Name()], examIns.Addr)                                                 // map address name to address, used for checking points-to labels later
 					addrMap[examIns.Addr.Name()] = append(addrMap[examIns.Addr.Name()], RWInsInd{goID: goID, goInd: sliceContainsInsAt(RWIns[goID], theIns)}) // map address name to slice of instructions accessing the same address name
 					a.ptaConfig.AddQuery(examIns.Addr)
@@ -616,13 +660,9 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 			case *ssa.UnOp: // read op
 				if examIns.Op == token.MUL && !isLocalAddr(examIns.X) {
 					RWIns[goID] = append(RWIns[goID], theIns)
-					addrNameMap[examIns.X.Name()] = append(addrNameMap[examIns.X.Name()], examIns.X)
-					addrMap[examIns.X.Name()] = append(addrMap[examIns.X.Name()], RWInsInd{goID: goID, goInd: sliceContainsInsAt(RWIns[goID], theIns)})
-					a.ptaConfig.AddQuery(examIns.X)
-				}
-			case *ssa.FieldAddr: // read op
-				if !isLocalAddr(examIns.X) {
-					RWIns[goID] = append(RWIns[goID], theIns)
+					if len(lockSet) > 0 {
+						lockMap[theIns] = lockSet
+					}
 					addrNameMap[examIns.X.Name()] = append(addrNameMap[examIns.X.Name()], examIns.X)
 					addrMap[examIns.X.Name()] = append(addrMap[examIns.X.Name()], RWInsInd{goID: goID, goInd: sliceContainsInsAt(RWIns[goID], theIns)})
 					a.ptaConfig.AddQuery(examIns.X)
@@ -631,6 +671,9 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				readIns := examIns.X.(*ssa.UnOp)
 				if readIns.Op == token.MUL && !isLocalAddr(readIns.X) {
 					RWIns[goID] = append(RWIns[goID], theIns)
+					if len(lockSet) > 0 {
+						lockMap[theIns] = lockSet
+					}
 					addrNameMap[readIns.X.Name()] = append(addrNameMap[readIns.X.Name()], readIns.X)
 					addrMap[readIns.X.Name()] = append(addrMap[readIns.X.Name()], RWInsInd{goID: goID, goInd: sliceContainsInsAt(RWIns[goID], theIns)})
 					a.ptaConfig.AddQuery(readIns.X)
@@ -643,6 +686,9 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 						fnName := mc.Fn.Name()
 						updateRecords(fnName, goID, "PUSH ")
 						RWIns[goID] = append(RWIns[goID], theIns)
+						if len(lockSet) > 0 {
+							lockMap[theIns] = lockSet
+						}
 						a.visitAllInstructions(theFn, goID)
 					}
 				default:
@@ -661,13 +707,19 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				}
 				a.pointerAnalysis(examIns.X, goID, theIns)
 			case *ssa.Call:
-				if examIns.Call.StaticCallee() == nil && examIns.Call.Method == nil { // calling a parameter function
+				if _, ok := examIns.Call.Value.(*ssa.Builtin); ok {
+					continue
+				}
+				if examIns.Call.StaticCallee() == nil && examIns.Call.Method == nil && examIns.Call.StaticCallee().Pkg.Pkg.Name() != "sync" { // calling a parameter function
 					if _, ok := examIns.Call.Value.(*ssa.Builtin); !ok {
 						a.pointerAnalysis(examIns.Call.Value, goID, theIns)
 					} else if examIns.Call.Value.Name() == "delete" { // delete op
 						if theVal, ok := examIns.Call.Args[0].(*ssa.UnOp); ok {
 							if theVal.Op == token.MUL && !isLocalAddr(theVal.X) {
 								RWIns[goID] = append(RWIns[goID], theIns)
+								if len(lockSet) > 0 {
+									lockMap[theIns] = lockSet
+								}
 								addrNameMap[theVal.X.Name()] = append(addrNameMap[theVal.X.Name()], theVal)
 								addrMap[theVal.X.Name()] = append(addrMap[theVal.X.Name()], RWInsInd{goID: goID, goInd: sliceContainsInsAt(RWIns[goID], theIns)})
 								a.ptaConfig.AddQuery(theVal.X)
@@ -676,25 +728,35 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 					} else {
 						continue
 					}
-				} else if examIns.Call.Method != nil { // calling an method
+				} else if examIns.Call.Method != nil && examIns.Call.Method.Pkg().Name() != "sync" { // calling an method
 					if _, ok := examIns.Call.Value.(*ssa.Builtin); !ok {
 						a.pointerAnalysis(examIns.Call.Value, goID, theIns)
 					} else {
 						continue
 					}
 				} else if fromPkgsOfInterest(examIns.Call.StaticCallee()) && examIns.Call.StaticCallee().Pkg.Pkg.Name() != "sync" { // calling a function
-					if examIns.Call.StaticCallee().Blocks == nil { // empty function block, won't have return instruction
-						for _, checkArgs := range examIns.Call.Args { // assumed write to function parameter
-							switch access := checkArgs.(type) {
-							case *ssa.FieldAddr:
-								if !isLocalAddr(access.X) {
+					for _, checkArgs := range examIns.Call.Args { // assumed write to function parameter
+						switch access := checkArgs.(type) {
+						case *ssa.FieldAddr:
+							if !isLocalAddr(access.X) {
+								if strings.HasPrefix(examIns.Call.Value.Name(), "Add") {
+									RWIns[goID] = append(RWIns[goID], theIns)
+									if len(lockSet) > 0 {
+										lockMap[theIns] = lockSet
+									}
+									addrNameMap[access.X.Name()] = append(addrNameMap[access.X.Name()], access.X)                                                     // map address name to address, used for checking points-to labels later
+									addrMap[access.X.Name()] = append(addrMap[access.X.Name()], RWInsInd{goID: goID, goInd: sliceContainsInsAt(RWIns[goID], theIns)}) // map address name to slice of instructions accessing the same address name
+									a.ptaConfig.AddQuery(access.X)
+								} else {
 									RWIns[goID] = append(RWIns[goID], theIns)
 									a.ptaConfig.AddQuery(access.X)
 								}
-							default:
-								continue
 							}
+						default:
+							continue
 						}
+					}
+					if examIns.Call.StaticCallee().Blocks == nil {
 						continue
 					}
 					fnName := examIns.Call.Value.Name()
@@ -710,19 +772,22 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 					RWIns[goID] = append(RWIns[goID], theIns)
 					a.visitAllInstructions(examIns.Call.StaticCallee(), goID)
 				} else if examIns.Call.StaticCallee().Pkg.Pkg.Name() == "sync" {
-					syncOp := examIns.Call.StaticCallee().Name()
-					switch syncOp {
+					switch examIns.Call.Value.Name() {
 					case "Range":
 						fnName := examIns.Call.Value.Name()
 						updateRecords(fnName, goID, "PUSH ")
 						RWIns[goID] = append(RWIns[goID], theIns)
 						a.visitAllInstructions(examIns.Call.StaticCallee(), goID)
 					case "Lock":
-						lockLoc := examIns.Call.Args[0]
-						lockedLocs = append(lockedLocs, lockLoc)
+						lockLoc := examIns.Call.Args[0]       // identifier for address of lock
+						if !sliceContains(lockSet, lockLoc) { // if lock is not already in active lockset
+							lockSet = append(lockSet, lockLoc)
+						}
 					case "Unlock":
 						lockLoc := examIns.Call.Args[0]
-						deleteFromSlice(lockedLocs, lockLoc)
+						if sliceContains(lockSet, lockLoc) {
+							lockSet = deleteFromSlice(lockSet, lockLoc)
+						}
 					}
 				}
 			case *ssa.Return:
