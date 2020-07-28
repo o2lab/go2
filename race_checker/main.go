@@ -61,13 +61,9 @@ var (
 	tryMap       = make(map[*ssa.Function]bool) // for debugging purposes only
 )
 
-func deleteFromSlice(s []ssa.Value, e ssa.Value) []ssa.Value {
+func deleteFromLockSet(s []ssa.Value, k int) []ssa.Value {
 	var res []ssa.Value
-	for i, a := range s {
-		if a.Name() == e.Name() {
-			res = append(s[:i], s[i+1:]...)
-		}
-	}
+	res = append(s[:k], s[k+1:]...)
 	return res
 }
 
@@ -145,13 +141,13 @@ func doAnalysis(args []string) error {
 				*currN.Value = anIns
 				if nGo != 0 && i == 0 {
 					prevN = goCaller[0]
-					goCaller = goCaller[1:]
+					goCaller = goCaller[1:] // pop from stack
 					err := Analysis.HBgraph.MakeEdge(prevN, currN)
 					if err != nil {
 						log.Fatal(err)
 					}
 				} else if _, ok := anIns.(*ssa.Go); ok {
-					goCaller = append(goCaller, currN)
+					goCaller = append(goCaller, currN) // sequentially store go calls in the same goroutine
 					err := Analysis.HBgraph.MakeEdge(prevN, currN)
 					if err != nil {
 						log.Fatal(err)
@@ -257,6 +253,8 @@ func isReadIns(ins ssa.Instruction) bool { // is the instruction a read access?
 	switch insType := ins.(type) {
 	case *ssa.UnOp:
 		return true
+	case *ssa.FieldAddr:
+		return true
 	case *ssa.Lookup:
 		return true
 	case *ssa.Call:
@@ -287,17 +285,26 @@ func isWriteIns(ins ssa.Instruction) bool { // is the instruction a write access
 	return false
 }
 
-func locksetsInterset(insA ssa.Instruction, insB ssa.Instruction) bool {
-	setA := lockMap[insA] // lockset of instruction-A
-	setB := lockMap[insB] // lockset of instruction-B
-	for _, addrA := range setA {
-		for _, addrB := range setB {
-			if addrA == addrB {
-				return true
-			}
+func lockSetContainsAt(s []ssa.Value, e ssa.Value) int {
+	var aPos, bPos token.Pos
+	for i, a := range s {
+		switch aType := a.(type) {
+		case *ssa.Global:
+			aPos = aType.Pos()
+		case *ssa.FieldAddr:
+			aPos = aType.X.Pos()
+		}
+		switch eType := e.(type) {
+		case *ssa.Global:
+			bPos = eType.Pos()
+		case *ssa.FieldAddr:
+			bPos = eType.X.Pos()
+		}
+		if aPos == bPos {
+			return i
 		}
 	}
-	return false
+	return -1
 }
 
 func main() {
@@ -363,15 +370,6 @@ func sliceContainsStr(s []string, e string) bool {
 	return false
 }
 
-func sliceContainsIns(s []ssa.Instruction, e ssa.Instruction) bool {
-	for _, a := range s {
-		if a == e {
-			return true
-		}
-	}
-	return false
-}
-
 func sliceContainsInsAt(s []ssa.Instruction, e ssa.Instruction) int {
 	i := 0
 	for s[i] != e {
@@ -400,7 +398,7 @@ func (a *analysis) checkRacyPairs() {
 				for _, goJ := range RWIns[j] {
 					insSlice := []ssa.Instruction{goI, goJ} // one instruction from each goroutine
 					addressPair := a.insAddress(insSlice)
-					if len(addressPair) > 1 && a.sameAddress(addressPair[0], addressPair[1]) && !sliceContains(reportedAddr, addressPair[0]) && !a.reachable(goI, goJ) && !a.reachable(goI, goJ) && !locksetsInterset(insSlice[0], insSlice[1]) {
+					if len(addressPair) > 1 && a.sameAddress(addressPair[0], addressPair[1]) && !sliceContains(reportedAddr, addressPair[0]) && !a.reachable(goI, goJ) && !a.locksetsInterset(insSlice[0], insSlice[1]) {
 						reportedAddr = append(reportedAddr, addressPair[0])
 						counter++
 						a.printRace(counter, insSlice, addressPair)
@@ -424,7 +422,7 @@ func (a *analysis) insAddress(insSlice []ssa.Instruction) []ssa.Value { // obtai
 			if theIns.Call.Value.Name() == "delete" {
 				minWrite++
 				theAddrs = append(theAddrs, theIns.Call.Args[0].(*ssa.UnOp).X)
-			} else if strings.HasPrefix(theIns.Call.Value.Name(), "Add") {
+			} else if strings.HasPrefix(theIns.Call.Value.Name(), "Add") && theIns.Call.StaticCallee().Pkg.Pkg.Name() == "atomic" {
 				minWrite++
 				theAddrs = append(theAddrs, theIns.Call.Args[0].(*ssa.FieldAddr).X)
 			} else if len(theIns.Call.Args) > 0 {
@@ -446,6 +444,19 @@ func (a *analysis) insAddress(insSlice []ssa.Instruction) []ssa.Value { // obtai
 		return theAddrs // write op always before read op
 	}
 	return []ssa.Value{}
+}
+
+func (a *analysis) locksetsInterset(insA ssa.Instruction, insB ssa.Instruction) bool {
+	setA := lockMap[insA] // lockset of instruction-A
+	setB := lockMap[insB] // lockset of instruction-B
+	for _, addrA := range setA {
+		for _, addrB := range setB {
+			if a.sameAddress(addrA, addrB) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (a *analysis) newGoroutine(info goroutineInfo) {
@@ -494,6 +505,9 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 	}
 	switch theFunc := PTSet[rightLoc].Value().(type) {
 	case *ssa.Function:
+		if isSynthetic(theFunc) { // ignore method wrappers
+			break
+		}
 		fnName = theFunc.Name()
 		log.Debug(strings.Repeat(" ", levels[goID]), "PUSH ", fnName, " at lvl ", levels[goID])
 		levels[goID]++
@@ -528,6 +542,12 @@ func (a *analysis) printRace(counter int, insPair []ssa.Instruction, addrPair []
 }
 
 func (a *analysis) reachable(fromIns ssa.Instruction, toIns ssa.Instruction) bool {
+	fromBlock := fromIns.Block().Index
+	if fromIns.Block().Comment == toIns.Parent().Parent().Blocks[fromBlock].Comment {
+		if strings.HasPrefix(fromIns.Block().Comment, "rangeindex") {
+			return false
+		}
+	}
 	fromNode := a.RWinsMap[fromIns]
 	toNode := a.RWinsMap[toIns]
 	nexts := a.HBgraph.Neighbors(fromNode)
@@ -576,8 +596,9 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 		RWIns = append(RWIns, []ssa.Instruction{})
 	}
 	fnBlocks := fn.Blocks
+	var returnIns []ssa.Instruction
 	var toAppend []*ssa.BasicBlock
-	var toDefer []ssa.Instruction // stack for deferred calls
+	var toDefer []ssa.Instruction // stack storing deferred calls
 	for j, nBlock := range fn.Blocks {
 		if strings.HasSuffix(nBlock.Comment, ".done") && j != len(fnBlocks)-1 { // when return block doesn't have largest index
 			bLen := len(nBlock.Instrs)
@@ -627,8 +648,8 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 						a.visitAllInstructions(dIns.(*ssa.Defer).Call.StaticCallee(), goID)
 					} else if deferIns.Call.StaticCallee().Name() == "Unlock" {
 						lockLoc := deferIns.Call.Args[0]
-						if sliceContains(lockSet, lockLoc) {
-							lockSet = deleteFromSlice(lockSet, lockLoc)
+						if k := lockSetContainsAt(lockSet, lockLoc); k >= 0 {
+							lockSet = deleteFromLockSet(lockSet, k)
 						}
 					}
 				}
@@ -667,6 +688,16 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 					addrMap[examIns.X.Name()] = append(addrMap[examIns.X.Name()], RWInsInd{goID: goID, goInd: sliceContainsInsAt(RWIns[goID], theIns)})
 					a.ptaConfig.AddQuery(examIns.X)
 				}
+			case *ssa.FieldAddr:
+				if !isLocalAddr(examIns.X) {
+					RWIns[goID] = append(RWIns[goID], theIns)
+					if len(lockSet) > 0 {
+						lockMap[theIns] = lockSet
+					}
+					addrNameMap[examIns.X.Name()] = append(addrNameMap[examIns.X.Name()], examIns.X)                                                    // map address name to address, used for checking points-to labels later
+					addrMap[examIns.X.Name()] = append(addrMap[examIns.X.Name()], RWInsInd{goID: goID, goInd: sliceContainsInsAt(RWIns[goID], theIns)}) // map address name to slice of instructions accessing the same address name
+					a.ptaConfig.AddQuery(examIns.X)
+				}
 			case *ssa.Lookup: // look up element index, read op
 				readIns := examIns.X.(*ssa.UnOp)
 				if readIns.Op == token.MUL && !isLocalAddr(readIns.X) {
@@ -703,17 +734,18 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				if _, ok := examIns.X.(*ssa.Call); !ok {
 					if _, ok := examIns.X.(*ssa.Parameter); !ok {
 						continue
+					} else {
+						if _, ok1 := examIns.X.(*ssa.Parameter).Type().(*types.Basic); ok1 {
+							continue
+						}
 					}
 				}
 				a.pointerAnalysis(examIns.X, goID, theIns)
 			case *ssa.Call:
-				if _, ok := examIns.Call.Value.(*ssa.Builtin); ok {
-					continue
-				}
-				if examIns.Call.StaticCallee() == nil && examIns.Call.Method == nil && examIns.Call.StaticCallee().Pkg.Pkg.Name() != "sync" { // calling a parameter function
+				if examIns.Call.StaticCallee() == nil && examIns.Call.Method == nil {
 					if _, ok := examIns.Call.Value.(*ssa.Builtin); !ok {
 						a.pointerAnalysis(examIns.Call.Value, goID, theIns)
-					} else if examIns.Call.Value.Name() == "delete" { // delete op
+					} else if examIns.Call.Value.Name() == "delete" { // built-in delete op
 						if theVal, ok := examIns.Call.Args[0].(*ssa.UnOp); ok {
 							if theVal.Op == token.MUL && !isLocalAddr(theVal.X) {
 								RWIns[goID] = append(RWIns[goID], theIns)
@@ -735,22 +767,20 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 						continue
 					}
 				} else if fromPkgsOfInterest(examIns.Call.StaticCallee()) && examIns.Call.StaticCallee().Pkg.Pkg.Name() != "sync" { // calling a function
-					for _, checkArgs := range examIns.Call.Args { // assumed write to function parameter
+					for _, checkArgs := range examIns.Call.Args {
 						switch access := checkArgs.(type) {
 						case *ssa.FieldAddr:
-							if !isLocalAddr(access.X) {
-								if strings.HasPrefix(examIns.Call.Value.Name(), "Add") {
-									RWIns[goID] = append(RWIns[goID], theIns)
-									if len(lockSet) > 0 {
-										lockMap[theIns] = lockSet
-									}
-									addrNameMap[access.X.Name()] = append(addrNameMap[access.X.Name()], access.X)                                                     // map address name to address, used for checking points-to labels later
-									addrMap[access.X.Name()] = append(addrMap[access.X.Name()], RWInsInd{goID: goID, goInd: sliceContainsInsAt(RWIns[goID], theIns)}) // map address name to slice of instructions accessing the same address name
-									a.ptaConfig.AddQuery(access.X)
-								} else {
-									RWIns[goID] = append(RWIns[goID], theIns)
-									a.ptaConfig.AddQuery(access.X)
+							if !isLocalAddr(access.X) && strings.HasPrefix(examIns.Call.Value.Name(), "Add") {
+								RWIns[goID] = append(RWIns[goID], theIns)
+								if len(lockSet) > 0 {
+									lockMap[theIns] = lockSet
 								}
+								addrNameMap[access.X.Name()] = append(addrNameMap[access.X.Name()], access.X)                                                     // map address name to address, used for checking points-to labels later
+								addrMap[access.X.Name()] = append(addrMap[access.X.Name()], RWInsInd{goID: goID, goInd: sliceContainsInsAt(RWIns[goID], theIns)}) // map address name to slice of instructions accessing the same address name
+								a.ptaConfig.AddQuery(access.X)
+							} else {
+								RWIns[goID] = append(RWIns[goID], theIns)
+								a.ptaConfig.AddQuery(access.X)
 							}
 						default:
 							continue
@@ -785,13 +815,14 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 						}
 					case "Unlock":
 						lockLoc := examIns.Call.Args[0]
-						if sliceContains(lockSet, lockLoc) {
-							lockSet = deleteFromSlice(lockSet, lockLoc)
+						if p := lockSetContainsAt(lockSet, lockLoc); p >= 0 {
+							lockSet = deleteFromLockSet(lockSet, p)
 						}
 					}
 				}
 			case *ssa.Return:
 				if i != len(fnBlocks)-1 {
+					returnIns = append([]ssa.Instruction{theIns}, returnIns...) // store return instructions that don't belong to final block
 					continue
 				}
 				if (fromPkgsOfInterest(examIns.Parent()) || isSynthetic(examIns.Parent())) && len(storeIns) > 0 {
@@ -827,6 +858,24 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				var info = goroutineInfo{examIns, fnName, newGoID}
 				workList = append(workList, info) // store encountered goroutines
 				log.Debug(strings.Repeat(" ", levels[goID]), "spawning Goroutine ----->  ", fnName)
+			}
+		}
+		if i == len(fnBlocks)-1 && len(returnIns) > 0 {
+			theIns := returnIns[0]
+			examIns := theIns.(*ssa.Return)
+			if (fromPkgsOfInterest(examIns.Parent()) || isSynthetic(examIns.Parent())) && len(storeIns) > 0 {
+				fnName := examIns.Parent().Name()
+				if fnName == storeIns[len(storeIns)-1] {
+					updateRecords(fnName, goID, "POP  ")
+					RWIns[goID] = append(RWIns[goID], theIns)
+				}
+			}
+			if len(storeIns) == 0 && len(workList) != 0 { // finished reporting current goroutine and workList isn't empty
+				nextGoInfo := workList[0] // get the goroutine info at end of workList
+				workList = workList[1:]   // pop goroutine info from end of workList
+				a.newGoroutine(nextGoInfo)
+			} else {
+				return
 			}
 		}
 	}
