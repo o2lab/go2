@@ -59,6 +59,7 @@ var (
 	addrNameMap  = make(map[string][]ssa.Value)
 	addrMap      = make(map[string][]RWInsInd)
 	tryMap       = make(map[*ssa.Function]bool) // for debugging purposes only
+	paramFunc    ssa.Value
 )
 
 func deleteFromLockSet(s []ssa.Value, k int) []ssa.Value {
@@ -471,10 +472,11 @@ func (a *analysis) newGoroutine(info goroutineInfo) {
 	switch info.goIns.Call.Value.(type) {
 	case *ssa.MakeClosure:
 		a.visitAllInstructions(info.goIns.Call.StaticCallee(), info.goID)
+	case *ssa.TypeAssert:
+		a.visitAllInstructions(paramFunc.(*ssa.MakeClosure).Fn.(*ssa.Function), info.goID)
 	default:
 		a.visitAllInstructions(info.goIns.Call.StaticCallee(), info.goID)
 	}
-
 }
 
 func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Instruction) {
@@ -497,17 +499,14 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 		//PTSetIndir := ptrSetIndir[location].PointsTo().Labels()
 	}
 	var fnName string
-	rightLoc := 0 // initialize index in points-to set
-	if len(PTSet) > 1 {
-		for !sliceContainsStr(storeIns, PTSet[rightLoc].Value().Parent().Name()) {
+	rightLoc := 0       // initialize index in points-to set
+	if len(PTSet) > 1 { // multiple targets returned
+		for !sliceContainsStr(storeIns, PTSet[rightLoc].Value().Parent().Name()) { // Baseline: Explore all targets
 			rightLoc++ // get the location previously called by an "unpopped" function, TODO: needs refinement
 		}
 	}
 	switch theFunc := PTSet[rightLoc].Value().(type) {
 	case *ssa.Function:
-		if isSynthetic(theFunc) { // ignore method wrappers
-			break
-		}
 		fnName = theFunc.Name()
 		log.Debug(strings.Repeat(" ", levels[goID]), "PUSH ", fnName, " at lvl ", levels[goID])
 		levels[goID]++
@@ -543,8 +542,8 @@ func (a *analysis) printRace(counter int, insPair []ssa.Instruction, addrPair []
 
 func (a *analysis) reachable(fromIns ssa.Instruction, toIns ssa.Instruction) bool {
 	fromBlock := fromIns.Block().Index
-	if fromIns.Block().Comment == toIns.Parent().Parent().Blocks[fromBlock].Comment {
-		if strings.HasPrefix(fromIns.Block().Comment, "rangeindex") {
+	if strings.HasPrefix(fromIns.Block().Comment, "rangeindex") { // if checking in a forloop
+		if fromIns.Block().Comment == toIns.Parent().Parent().Blocks[fromBlock].Comment {
 			return false
 		}
 	}
@@ -664,6 +663,11 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				allocMap[examIns] = true // store addresses of reserved space for checking whether an address is local
 			case *ssa.Store: // write op
 				if !isLocalAddr(examIns.Addr) {
+					if len(storeIns) > 1 {
+						if storeIns[len(storeIns)-2] == "AfterFunc" { // ignore this write instruction as AfterFunc is analyzed elsewhere
+							break
+						}
+					}
 					RWIns[goID] = append(RWIns[goID], theIns)
 					if len(lockSet) > 0 {
 						lockMap[theIns] = lockSet
@@ -767,6 +771,9 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 						continue
 					}
 				} else if fromPkgsOfInterest(examIns.Call.StaticCallee()) && examIns.Call.StaticCallee().Pkg.Pkg.Name() != "sync" { // calling a function
+					if examIns.Call.Value.Name() == "AfterFunc" && examIns.Call.StaticCallee().Pkg.Pkg.Name() == "time" { // calling time.AfterFunc()
+						paramFunc = examIns.Call.Args[1]
+					}
 					for _, checkArgs := range examIns.Call.Args {
 						switch access := checkArgs.(type) {
 						case *ssa.FieldAddr:
@@ -847,8 +854,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				case *ssa.Function:
 					fnName = anonFn.Name()
 				case *ssa.TypeAssert:
-					fnName = anonFn.X.Name()
-					a.pointerAnalysis(anonFn.X, goID, theIns)
+					fnName = paramFunc.(*ssa.MakeClosure).Fn.Name()
 				}
 				newGoID := goID + 1 // increment goID for child goroutine
 				if len(workList) > 0 {
