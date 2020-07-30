@@ -58,8 +58,9 @@ var (
 	lockSet      []ssa.Value                             // active lockset, to be maintained along instruction traversal
 	addrNameMap  = make(map[string][]ssa.Value)
 	addrMap      = make(map[string][]RWInsInd)
-	tryMap       = make(map[*ssa.Function]bool) // for debugging purposes only
 	paramFunc    ssa.Value
+	goStack      [][]string
+	goCaller     = make(map[int]int)
 )
 
 func deleteFromLockSet(s []ssa.Value, k int) []ssa.Value {
@@ -96,8 +97,6 @@ func doAnalysis(args []string) error {
 	log.Info("Building SSA code for entire program...")
 	prog.Build()
 	log.Info("Done  -- SSA code built")
-
-	tryMap = ssautil.AllFunctions(prog)
 
 	mains, err := mainPackages(pkgs)
 	if err != nil {
@@ -499,11 +498,19 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 		//PTSetIndir := ptrSetIndir[location].PointsTo().Labels()
 	}
 	var fnName string
-	rightLoc := 0       // initialize index in points-to set
+	rightLoc := 0       // initialize index for the right points-to location
 	if len(PTSet) > 1 { // multiple targets returned
-		for !sliceContainsStr(storeIns, PTSet[rightLoc].Value().Parent().Name()) { // Baseline: Explore all targets
-			rightLoc++ // get the location previously called by an "unpopped" function, TODO: needs refinement
+		for ind, eachTarget := range PTSet { // check each target
+			if sliceContainsStr(storeIns, eachTarget.Value().Parent().Name()) { // calling function is in current goroutine
+				rightLoc = ind
+				continue
+			} else if sliceContainsStr(goStack[goID], eachTarget.Value().Parent().Name()) { // check callstack of current goroutine
+				rightLoc = ind
+				continue
+			}
 		}
+	} else if len(PTSet) == 0 {
+		return
 	}
 	switch theFunc := PTSet[rightLoc].Value().(type) {
 	case *ssa.Function:
@@ -586,6 +593,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 		if fn.Name() == "main" {
 			levels[goID] = 0 // initialize level count at main entry
 			updateRecords(fn.Name(), goID, "PUSH ")
+			goStack = append(goStack, []string{})
 		}
 	}
 	if _, ok := levels[goID]; !ok && goID > 0 { // initialize level counter for new goroutine
@@ -840,8 +848,8 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 					}
 				}
 				if len(storeIns) == 0 && len(workList) != 0 { // finished reporting current goroutine and workList isn't empty
-					nextGoInfo := workList[0] // get the goroutine info at end of workList
-					workList = workList[1:]   // pop goroutine info from end of workList
+					nextGoInfo := workList[0] // get the goroutine info at head of workList
+					workList = workList[1:]   // pop goroutine info from head of workList
 					a.newGoroutine(nextGoInfo)
 				} else {
 					return
@@ -862,6 +870,15 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				}
 				RWIns[goID] = append(RWIns[goID], theIns)
 				var info = goroutineInfo{examIns, fnName, newGoID}
+				goStack = append(goStack, []string{}) // initialize interior slice
+				goCaller[newGoID] = goID              // map caller goroutine
+				goStack[newGoID] = append(goStack[newGoID], storeIns...)
+				iterGo := goID
+				for iterGo > 0 { // include stack from earlier caller goroutines
+					goStack[newGoID] = append(goStack[iterGo], goStack[newGoID]...)
+					temp := goCaller[iterGo]
+					iterGo = temp
+				}
 				workList = append(workList, info) // store encountered goroutines
 				log.Debug(strings.Repeat(" ", levels[goID]), "spawning Goroutine ----->  ", fnName)
 			}
