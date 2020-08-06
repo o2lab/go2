@@ -12,6 +12,7 @@ import (
 	"golang.org/x/tools/go/pointer"
 	"golang.org/x/tools/go/ssa"
 	"golang.org/x/tools/go/ssa/ssautil"
+	"strconv"
 	"strings"
 )
 
@@ -56,12 +57,41 @@ var (
 	allocMap     = make(map[*ssa.Alloc]bool)
 	lockMap      = make(map[ssa.Instruction][]ssa.Value) // map each read/write access to a snapshot of actively maintained lockset
 	lockSet      []ssa.Value                             // active lockset, to be maintained along instruction traversal
-	addrNameMap  = make(map[string][]ssa.Value)
-	addrMap      = make(map[string][]RWInsInd)
+	addrNameMap  = make(map[string][]ssa.Value)          // for potential optimization purposes
+	addrMap      = make(map[string][]RWInsInd)           // for potential optimization purposes
 	paramFunc    ssa.Value
 	goStack      [][]string
 	goCaller     = make(map[int]int)
+	goNames      = make(map[int]string)
 )
+
+func checkTokenName(fnName string, theIns *ssa.Call) string {
+	if strings.HasPrefix(fnName, "t") { // function name begins with letter t
+		if _, err := strconv.Atoi(string([]rune(fnName)[1:])); err == nil { // function name after first character look like an integer
+			switch callVal := theIns.Call.Value.(type) {
+			case *ssa.MakeClosure:
+				fnName = callVal.Fn.Name()
+			default:
+				fnName = callVal.Type().String()
+			}
+		}
+	}
+	return fnName
+}
+
+func checkTokenNameDefer(fnName string, theIns *ssa.Defer) string {
+	if strings.HasPrefix(fnName, "t") { // function name begins with letter t
+		if _, err := strconv.Atoi(string([]rune(fnName)[1:])); err == nil { // function name after first character look like an integer
+			switch callVal := theIns.Call.Value.(type) {
+			case *ssa.MakeClosure:
+				fnName = callVal.Fn.Name()
+			default:
+				fnName = callVal.Type().String()
+			}
+		}
+	}
+	return fnName
+}
 
 func deleteFromLockSet(s []ssa.Value, k int) []ssa.Value {
 	var res []ssa.Value
@@ -394,14 +424,16 @@ func (a *analysis) checkRacyPairs() {
 	counter := 0 // initialize race counter
 	for i := 0; i < len(RWIns); i++ {
 		for j := i + 1; j < len(RWIns); j++ { // must be in different goroutines, j always greater than i
-			for _, goI := range RWIns[i] {
-				for _, goJ := range RWIns[j] {
+			for ii, goI := range RWIns[i] {
+				for jj, goJ := range RWIns[j] {
 					insSlice := []ssa.Instruction{goI, goJ} // one instruction from each goroutine
 					addressPair := a.insAddress(insSlice)
 					if len(addressPair) > 1 && a.sameAddress(addressPair[0], addressPair[1]) && !sliceContains(reportedAddr, addressPair[0]) && !a.reachable(goI, goJ) && !a.locksetsInterset(insSlice[0], insSlice[1]) {
 						reportedAddr = append(reportedAddr, addressPair[0])
 						counter++
-						a.printRace(counter, insSlice, addressPair)
+						goIDs := []int{i, j}    // store goroutine IDs
+						insInd := []int{ii, jj} // store index of instruction within worker goroutine
+						a.printRace(counter, insSlice, addressPair, goIDs, insInd)
 					}
 				}
 			}
@@ -465,6 +497,7 @@ func (a *analysis) newGoroutine(info goroutineInfo) {
 		RWIns = append(RWIns, []ssa.Instruction{})
 	}
 	RWIns[info.goID] = append(RWIns[info.goID], info.goIns)
+	goNames[info.goID] = info.entryMethod
 	log.Debug(strings.Repeat("-", 35), "Goroutine ", info.entryMethod, strings.Repeat("-", 35), "[", info.goID, "]")
 	log.Debug(strings.Repeat(" ", levels[info.goID]), "PUSH ", info.entryMethod, " at lvl ", levels[info.goID])
 	levels[info.goID]++
@@ -534,14 +567,55 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 	}
 }
 
-func (a *analysis) printRace(counter int, insPair []ssa.Instruction, addrPair []ssa.Value) {
+func (a *analysis) printRace(counter int, insPair []ssa.Instruction, addrPair []ssa.Value, goIDs []int, insInd []int) {
 	log.Printf("Data race #%d", counter)
 	log.Println(strings.Repeat("=", 100))
 	for i, anIns := range insPair {
 		if isWriteIns(anIns) {
-			log.Println("\tWrite of ", aurora.Magenta(addrPair[i].Name()), " in function ", aurora.BgBrightGreen(anIns.Parent().Name()), " at ", a.prog.Fset.Position(anIns.Pos()))
+			log.Println("  Write of ", aurora.Magenta(addrPair[i].Name()), " in function ", aurora.BgBrightGreen(anIns.Parent().Name()), " at ", a.prog.Fset.Position(anIns.Pos()))
 		} else {
-			log.Println("\tRead of  ", aurora.Magenta(addrPair[i].Name()), " in function ", aurora.BgBrightGreen(anIns.Parent().Name()), " at ", a.prog.Fset.Position(anIns.Pos()))
+			log.Println("  Read of  ", aurora.Magenta(addrPair[i].Name()), " in function ", aurora.BgBrightGreen(anIns.Parent().Name()), " at ", a.prog.Fset.Position(anIns.Pos()))
+		}
+		var printStack []string
+		var printPos []token.Pos
+		for p, everyIns := range RWIns[goIDs[i]] {
+			if p < insInd[i]-1 {
+				if isFunc, ok := everyIns.(*ssa.Call); ok {
+					printName := isFunc.Call.Value.Name()
+					printName = checkTokenName(printName, everyIns.(*ssa.Call))
+					printStack = append(printStack, printName)
+					printPos = append(printPos, everyIns.Pos())
+				} else if _, ok1 := everyIns.(*ssa.Return); ok1 && len(printStack) > 0 {
+					printStack = printStack[:len(printStack)-1]
+					printPos = printPos[:len(printPos)-1]
+				}
+			} else {
+				continue
+			}
+		}
+		if len(printStack) > 0 {
+			log.Println("\tcalled by function[s]: ")
+		}
+		for p, toPrint := range printStack {
+			log.Println("\t ", strings.Repeat(" ", p), toPrint, a.prog.Fset.Position(printPos[p]))
+		}
+		log.Println("\tin goroutine  ***", goNames[goIDs[i]], "[", goIDs[i], "] *** , with the following stack trace: ")
+		var pathGo []int
+		j := goIDs[i]
+		for j > 0 {
+			pathGo = append([]int{j}, pathGo...)
+			temp := goCaller[j]
+			j = temp
+		}
+		for q, eachGo := range pathGo {
+			eachStack := goStack[eachGo]
+			for k, eachFn := range eachStack {
+				if k == 0 {
+					log.Println("\t ", strings.Repeat(" ", q), "--> Goroutine: ", eachFn, "[", goCaller[eachGo], "]")
+				} else {
+					log.Println("\t   ", strings.Repeat(" ", q), strings.Repeat(" ", k), eachFn)
+				}
+			}
 		}
 	}
 	log.Println(strings.Repeat("=", 100))
@@ -593,7 +667,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 		if fn.Name() == "main" {
 			levels[goID] = 0 // initialize level count at main entry
 			updateRecords(fn.Name(), goID, "PUSH ")
-			goStack = append(goStack, []string{})
+			goStack = append(goStack, []string{}) // initialize first interior slice for main goroutine
 		}
 	}
 	if _, ok := levels[goID]; !ok && goID > 0 { // initialize level counter for new goroutine
@@ -642,14 +716,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 					}
 					if fromPkgsOfInterest(deferIns.Call.StaticCallee()) && deferIns.Call.StaticCallee().Pkg.Pkg.Name() != "sync" {
 						fnName := deferIns.Call.Value.Name()
-						if strings.HasPrefix(fnName, "t") && len(fnName) <= 3 { // if function name is token number
-							switch callVal := deferIns.Call.Value.(type) {
-							case *ssa.MakeClosure:
-								fnName = callVal.Fn.Name()
-							default:
-								fnName = callVal.Type().String()
-							}
-						}
+						fnName = checkTokenNameDefer(fnName, deferIns)
 						updateRecords(fnName, goID, "PUSH ")
 						RWIns[goID] = append(RWIns[goID], dIns)
 						a.visitAllInstructions(dIns.(*ssa.Defer).Call.StaticCallee(), goID)
@@ -793,9 +860,6 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 								addrNameMap[access.X.Name()] = append(addrNameMap[access.X.Name()], access.X)                                                     // map address name to address, used for checking points-to labels later
 								addrMap[access.X.Name()] = append(addrMap[access.X.Name()], RWInsInd{goID: goID, goInd: sliceContainsInsAt(RWIns[goID], theIns)}) // map address name to slice of instructions accessing the same address name
 								a.ptaConfig.AddQuery(access.X)
-							} else {
-								RWIns[goID] = append(RWIns[goID], theIns)
-								a.ptaConfig.AddQuery(access.X)
 							}
 						default:
 							continue
@@ -805,14 +869,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 						continue
 					}
 					fnName := examIns.Call.Value.Name()
-					if strings.HasPrefix(fnName, "t") && len(fnName) <= 3 { // if function name is token number
-						switch callVal := examIns.Call.Value.(type) {
-						case *ssa.MakeClosure:
-							fnName = callVal.Fn.Name()
-						default:
-							fnName = callVal.Type().String()
-						}
-					}
+					fnName = checkTokenName(fnName, examIns)
 					updateRecords(fnName, goID, "PUSH ")
 					RWIns[goID] = append(RWIns[goID], theIns)
 					a.visitAllInstructions(examIns.Call.StaticCallee(), goID)
@@ -873,12 +930,6 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				goStack = append(goStack, []string{}) // initialize interior slice
 				goCaller[newGoID] = goID              // map caller goroutine
 				goStack[newGoID] = append(goStack[newGoID], storeIns...)
-				iterGo := goID
-				for iterGo > 0 { // include stack from earlier caller goroutines
-					goStack[newGoID] = append(goStack[iterGo], goStack[newGoID]...)
-					temp := goCaller[iterGo]
-					iterGo = temp
-				}
 				workList = append(workList, info) // store encountered goroutines
 				log.Debug(strings.Repeat(" ", levels[goID]), "spawning Goroutine ----->  ", fnName)
 			}
