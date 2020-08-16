@@ -3,7 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/logrusorgru/aurora"
+	"github.com/fatih/color"
 	log "github.com/sirupsen/logrus"
 	"github.com/twmb/algoimpl/go/graph"
 	"go/token"
@@ -17,15 +17,14 @@ import (
 )
 
 type analysis struct {
-	prog          *ssa.Program
-	pkgs          []*ssa.Package
-	mains         []*ssa.Package
-	result        *pointer.Result
-	ptaConfig     *pointer.Config
-	fn2SummaryMap map[*ssa.Function]*functionSummary
-	analysisStat  stat
-	HBgraph       *graph.Graph
-	RWinsMap      map[ssa.Instruction]graph.Node
+	prog         *ssa.Program
+	pkgs         []*ssa.Package
+	mains        []*ssa.Package
+	result       *pointer.Result
+	ptaConfig    *pointer.Config
+	analysisStat stat
+	HBgraph      *graph.Graph
+	RWinsMap     map[ssa.Instruction]graph.Node
 }
 
 type goroutineInfo struct {
@@ -54,7 +53,6 @@ var (
 	storeIns     []string
 	workList     []goroutineInfo
 	reportedAddr []ssa.Value
-	allocMap     = make(map[*ssa.Alloc]bool)
 	lockMap      = make(map[ssa.Instruction][]ssa.Value) // map each read/write access to a snapshot of actively maintained lockset
 	lockSet      []ssa.Value                             // active lockset, to be maintained along instruction traversal
 	addrNameMap  = make(map[string][]ssa.Value)          // for potential optimization purposes
@@ -101,9 +99,9 @@ func deleteFromLockSet(s []ssa.Value, k int) []ssa.Value {
 
 func doAnalysis(args []string) error {
 	cfg := &packages.Config{
-		Mode:  packages.LoadAllSyntax,
-		Dir:   "",
-		Tests: false,
+		Mode:  packages.LoadAllSyntax, // the level o information returned for each package
+		Dir:   "",                     // directory in which to run the build system's query tool
+		Tests: false,                  // setting Tests will include related test packages
 	}
 	log.Info("Loading input packages...")
 	initial, err := packages.Load(cfg, args...)
@@ -112,6 +110,8 @@ func doAnalysis(args []string) error {
 	}
 	if packages.PrintErrors(initial) > 0 {
 		return fmt.Errorf("packages contain errors")
+	} else if len(initial) == 0 {
+		return fmt.Errorf("package list empty")
 	}
 
 	// Print the names of the source files
@@ -139,12 +139,11 @@ func doAnalysis(args []string) error {
 		BuildCallGraph: true,
 	}
 	Analysis = &analysis{
-		prog:          prog,
-		pkgs:          pkgs,
-		mains:         mains,
-		ptaConfig:     config,
-		fn2SummaryMap: make(map[*ssa.Function]*functionSummary),
-		RWinsMap:      make(map[ssa.Instruction]graph.Node),
+		prog:      prog,
+		pkgs:      pkgs,
+		mains:     mains,
+		ptaConfig: config,
+		RWinsMap:  make(map[ssa.Instruction]graph.Node),
 	}
 
 	log.Info("Compiling stack trace for every Goroutine... ")
@@ -161,6 +160,7 @@ func doAnalysis(args []string) error {
 	Analysis.HBgraph = graph.New(graph.Directed)
 	var prevN graph.Node
 	var goCaller []graph.Node
+	var waitingN graph.Node
 	for nGo, insSlice := range RWIns {
 		for i, anIns := range insSlice {
 			if nGo == 0 && i == 0 { // main goroutine, first instruction
@@ -192,6 +192,15 @@ func doAnalysis(args []string) error {
 			}
 			if isReadIns(anIns) || isWriteIns(anIns) {
 				Analysis.RWinsMap[anIns] = prevN
+			} else if callIns, ok := anIns.(*ssa.Call); ok {
+				if callIns.Call.Value.Name() == "Wait" {
+					waitingN = prevN
+				}
+			} else if callIns, ok := anIns.(*ssa.Call); ok && callIns.Call.Value.Name() == "Done" {
+				err := Analysis.HBgraph.MakeEdge(prevN, waitingN)
+				if err != nil {
+					log.Fatal(err)
+				}
 			}
 		}
 	}
@@ -241,6 +250,12 @@ func init() {
 		"trace",
 		"logging",
 		"os",
+		"builtin",
+		"pflag",
+		"log",
+		"reflect",
+		"internal",
+		"impl",
 	}
 }
 
@@ -256,17 +271,6 @@ func isLocalAddr(location ssa.Value) bool {
 		isLocalAddr(loc.X)
 	case *ssa.IndexAddr:
 		isLocalAddr(loc.X)
-	//case *ssa.Call:
-	//	if loc.Call.Value.Name() == "append" {
-	//		lastArg := loc.Call.Args[len(loc.Call.Args)-1]
-	//		if locSlice, ok := lastArg.(*ssa.Slice); ok {
-	//			if locAlloc, ok := locSlice.X.(*ssa.Alloc); ok {
-	//				if _, ok := allocMap[locAlloc]; ok || !locAlloc.Heap || locAlloc.Comment == "complit" {
-	//					return true
-	//				}
-	//			}
-	//		}
-	//	}
 	case *ssa.UnOp:
 		isLocalAddr(loc.X)
 	case *ssa.Alloc:
@@ -512,10 +516,16 @@ func (a *analysis) newGoroutine(info goroutineInfo) {
 }
 
 func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Instruction) {
-	indir := false
+	switch locType := location.(type) {
+	case *ssa.Parameter:
+		if locType.Object().Pkg().Name() == "reflect" { // ignore reflect library
+			return
+		}
+	}
+	indir := false // toggle for indirect query (global variables)
 	if pointer.CanPoint(location.Type()) {
 		a.ptaConfig.AddQuery(location)
-	} else if pointer.CanPoint(location.Type().Underlying().(*types.Pointer).Elem()) {
+	} else if underType, ok := location.Type().Underlying().(*types.Pointer); ok && pointer.CanPoint(underType.Elem()) {
 		indir = true
 		a.ptaConfig.AddIndirectQuery(location)
 	}
@@ -533,35 +543,53 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 	var fnName string
 	rightLoc := 0       // initialize index for the right points-to location
 	if len(PTSet) > 1 { // multiple targets returned
+		log.Debug("Pointer Analysis revealed ", len(PTSet), " targets for location - ", a.prog.Fset.Position(location.Pos()))
 		for ind, eachTarget := range PTSet { // check each target
-			if sliceContainsStr(storeIns, eachTarget.Value().Parent().Name()) { // calling function is in current goroutine
-				rightLoc = ind
-				continue
-			} else if sliceContainsStr(goStack[goID], eachTarget.Value().Parent().Name()) { // check callstack of current goroutine
-				rightLoc = ind
-				continue
+			if eachTarget.Value().Parent().Pkg.Pkg.Name() == "reflect" {
+				return
+			}
+			log.Debug("target No.", ind+1, " - ", eachTarget.Value().String(), " from function ", eachTarget.Value().Parent().Name())
+			if eachTarget.Value().Parent() != nil {
+				if sliceContainsStr(storeIns, eachTarget.Value().Parent().Name()) { // calling function is in current goroutine
+					rightLoc = ind
+					//break
+				} else {
+					var allStack []string
+					for i := 1; i <= goID; i++ {
+						allStack = append(allStack, goStack[i]...)
+					}
+					if sliceContainsStr(allStack, eachTarget.Value().Parent().Name()) { // check callstack of current goroutine
+						rightLoc = ind
+						break
+					}
+				}
 			}
 		}
+		log.Debug("Executing target No.", rightLoc+1)
 	} else if len(PTSet) == 0 {
 		return
 	}
 	switch theFunc := PTSet[rightLoc].Value().(type) {
 	case *ssa.Function:
 		fnName = theFunc.Name()
-		log.Debug(strings.Repeat(" ", levels[goID]), "PUSH ", fnName, " at lvl ", levels[goID])
-		levels[goID]++
-		storeIns = append(storeIns, fnName)
-		RWIns[goID] = append(RWIns[goID], theIns)
-		a.visitAllInstructions(theFunc, goID)
+		if !sliceContainsStr(storeIns, fnName) {
+			log.Debug(strings.Repeat(" ", levels[goID]), "PUSH ", fnName, " at lvl ", levels[goID])
+			levels[goID]++
+			storeIns = append(storeIns, fnName)
+			RWIns[goID] = append(RWIns[goID], theIns)
+			a.visitAllInstructions(theFunc, goID)
+		}
 	case *ssa.MakeInterface: // for abstract method calls
 		methodName := theIns.(*ssa.Call).Call.Method.Name()
 		check := a.prog.LookupMethod(ptrSet[location].PointsTo().DynamicTypes().Keys()[0], a.mains[0].Pkg, methodName)
 		fnName = check.Name()
-		log.Debug(strings.Repeat(" ", levels[goID]), "PUSH ", fnName, " at lvl ", levels[goID])
-		levels[goID]++
-		storeIns = append(storeIns, fnName)
-		RWIns[goID] = append(RWIns[goID], theIns)
-		a.visitAllInstructions(check, goID)
+		if !sliceContainsStr(storeIns, fnName) {
+			log.Debug(strings.Repeat(" ", levels[goID]), "PUSH ", fnName, " at lvl ", levels[goID])
+			levels[goID]++
+			storeIns = append(storeIns, fnName)
+			RWIns[goID] = append(RWIns[goID], theIns)
+			a.visitAllInstructions(check, goID)
+		}
 	default:
 		return
 	}
@@ -572,9 +600,9 @@ func (a *analysis) printRace(counter int, insPair []ssa.Instruction, addrPair []
 	log.Println(strings.Repeat("=", 100))
 	for i, anIns := range insPair {
 		if isWriteIns(anIns) {
-			log.Println("  Write of ", aurora.Magenta(addrPair[i].Name()), " in function ", aurora.BgBrightGreen(anIns.Parent().Name()), " at ", a.prog.Fset.Position(anIns.Pos()))
+			log.Println("  Write of ", color.MagentaString(addrPair[i].Name()), " in function ", color.GreenString(anIns.Parent().Name()), " at ", a.prog.Fset.Position(anIns.Pos()))
 		} else {
-			log.Println("  Read of  ", aurora.Magenta(addrPair[i].Name()), " in function ", aurora.BgBrightGreen(anIns.Parent().Name()), " at ", a.prog.Fset.Position(anIns.Pos()))
+			log.Println("  Read of  ", color.MagentaString(addrPair[i].Name()), " in function ", color.GreenString(anIns.Parent().Name()), " at ", a.prog.Fset.Position(anIns.Pos()))
 		}
 		var printStack []string
 		var printPos []token.Pos
@@ -595,9 +623,9 @@ func (a *analysis) printRace(counter int, insPair []ssa.Instruction, addrPair []
 		}
 		if len(printStack) > 0 {
 			log.Println("\tcalled by function[s]: ")
-		}
-		for p, toPrint := range printStack {
-			log.Println("\t ", strings.Repeat(" ", p), toPrint, a.prog.Fset.Position(printPos[p]))
+			for p, toPrint := range printStack {
+				log.Println("\t ", strings.Repeat(" ", p), toPrint, a.prog.Fset.Position(printPos[p]))
+			}
 		}
 		log.Println("\tin goroutine  ***", goNames[goIDs[i]], "[", goIDs[i], "] *** , with the following stack trace: ")
 		var pathGo []int
@@ -717,9 +745,11 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 					if fromPkgsOfInterest(deferIns.Call.StaticCallee()) && deferIns.Call.StaticCallee().Pkg.Pkg.Name() != "sync" {
 						fnName := deferIns.Call.Value.Name()
 						fnName = checkTokenNameDefer(fnName, deferIns)
-						updateRecords(fnName, goID, "PUSH ")
-						RWIns[goID] = append(RWIns[goID], dIns)
-						a.visitAllInstructions(dIns.(*ssa.Defer).Call.StaticCallee(), goID)
+						if !sliceContainsStr(storeIns, fnName) {
+							updateRecords(fnName, goID, "PUSH ")
+							RWIns[goID] = append(RWIns[goID], dIns)
+							a.visitAllInstructions(dIns.(*ssa.Defer).Call.StaticCallee(), goID)
+						}
 					} else if deferIns.Call.StaticCallee().Name() == "Unlock" {
 						lockLoc := deferIns.Call.Args[0]
 						if k := lockSetContainsAt(lockSet, lockLoc); k >= 0 {
@@ -734,8 +764,6 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				}
 			}
 			switch examIns := theIns.(type) {
-			case *ssa.Alloc: // reserves space for a variable
-				allocMap[examIns] = true // store addresses of reserved space for checking whether an address is local
 			case *ssa.Store: // write op
 				if !isLocalAddr(examIns.Addr) {
 					if len(storeIns) > 1 {
@@ -753,9 +781,11 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				}
 				if theFunc, storeFn := examIns.Val.(*ssa.Function); storeFn {
 					fnName := theFunc.Name()
-					updateRecords(fnName, goID, "PUSH ")
-					RWIns[goID] = append(RWIns[goID], theIns)
-					a.visitAllInstructions(theFunc, goID)
+					if !sliceContainsStr(storeIns, fnName) {
+						updateRecords(fnName, goID, "PUSH ")
+						RWIns[goID] = append(RWIns[goID], theIns)
+						a.visitAllInstructions(theFunc, goID)
+					}
 				}
 			case *ssa.UnOp: // read op
 				if examIns.Op == token.MUL && !isLocalAddr(examIns.X) {
@@ -778,15 +808,27 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 					a.ptaConfig.AddQuery(examIns.X)
 				}
 			case *ssa.Lookup: // look up element index, read op
-				readIns := examIns.X.(*ssa.UnOp)
-				if readIns.Op == token.MUL && !isLocalAddr(readIns.X) {
-					RWIns[goID] = append(RWIns[goID], theIns)
-					if len(lockSet) > 0 {
-						lockMap[theIns] = lockSet
+				switch readIns := examIns.X.(type) {
+				case *ssa.UnOp:
+					if readIns.Op == token.MUL && !isLocalAddr(readIns.X) {
+						RWIns[goID] = append(RWIns[goID], theIns)
+						if len(lockSet) > 0 {
+							lockMap[theIns] = lockSet
+						}
+						addrNameMap[readIns.X.Name()] = append(addrNameMap[readIns.X.Name()], readIns.X)
+						addrMap[readIns.X.Name()] = append(addrMap[readIns.X.Name()], RWInsInd{goID: goID, goInd: sliceContainsInsAt(RWIns[goID], theIns)})
+						a.ptaConfig.AddQuery(readIns.X)
 					}
-					addrNameMap[readIns.X.Name()] = append(addrNameMap[readIns.X.Name()], readIns.X)
-					addrMap[readIns.X.Name()] = append(addrMap[readIns.X.Name()], RWInsInd{goID: goID, goInd: sliceContainsInsAt(RWIns[goID], theIns)})
-					a.ptaConfig.AddQuery(readIns.X)
+				case *ssa.Parameter:
+					if !isLocalAddr(readIns) {
+						RWIns[goID] = append(RWIns[goID], theIns)
+						if len(lockSet) > 0 {
+							lockMap[theIns] = lockSet
+						}
+						addrNameMap[readIns.Name()] = append(addrNameMap[readIns.Name()], readIns)
+						addrMap[readIns.Name()] = append(addrMap[readIns.Name()], RWInsInd{goID: goID, goInd: sliceContainsInsAt(RWIns[goID], theIns)})
+						a.ptaConfig.AddQuery(readIns)
+					}
 				}
 			case *ssa.ChangeType: // a value-preserving type change, write op
 				switch mc := examIns.X.(type) {
@@ -794,12 +836,14 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 					theFn := mc.Fn.(*ssa.Function)
 					if fromPkgsOfInterest(theFn) {
 						fnName := mc.Fn.Name()
-						updateRecords(fnName, goID, "PUSH ")
-						RWIns[goID] = append(RWIns[goID], theIns)
-						if len(lockSet) > 0 {
-							lockMap[theIns] = lockSet
+						if !sliceContainsStr(storeIns, fnName) {
+							updateRecords(fnName, goID, "PUSH ")
+							RWIns[goID] = append(RWIns[goID], theIns)
+							if len(lockSet) > 0 {
+								lockMap[theIns] = lockSet
+							}
+							a.visitAllInstructions(theFn, goID)
 						}
-						a.visitAllInstructions(theFn, goID)
 					}
 				default:
 					continue
@@ -839,11 +883,13 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 					} else {
 						continue
 					}
-				} else if examIns.Call.Method != nil && examIns.Call.Method.Pkg().Name() != "sync" { // calling an method
-					if _, ok := examIns.Call.Value.(*ssa.Builtin); !ok {
-						a.pointerAnalysis(examIns.Call.Value, goID, theIns)
-					} else {
-						continue
+				} else if examIns.Call.Method != nil && examIns.Call.Method.Pkg() != nil { // calling an method
+					if examIns.Call.Method.Pkg().Name() != "sync" {
+						if _, ok := examIns.Call.Value.(*ssa.Builtin); !ok {
+							a.pointerAnalysis(examIns.Call.Value, goID, theIns)
+						} else {
+							continue
+						}
 					}
 				} else if fromPkgsOfInterest(examIns.Call.StaticCallee()) && examIns.Call.StaticCallee().Pkg.Pkg.Name() != "sync" { // calling a function
 					if examIns.Call.Value.Name() == "AfterFunc" && examIns.Call.StaticCallee().Pkg.Pkg.Name() == "time" { // calling time.AfterFunc()
@@ -870,16 +916,20 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 					}
 					fnName := examIns.Call.Value.Name()
 					fnName = checkTokenName(fnName, examIns)
-					updateRecords(fnName, goID, "PUSH ")
-					RWIns[goID] = append(RWIns[goID], theIns)
-					a.visitAllInstructions(examIns.Call.StaticCallee(), goID)
+					if !sliceContainsStr(storeIns, fnName) {
+						updateRecords(fnName, goID, "PUSH ")
+						RWIns[goID] = append(RWIns[goID], theIns)
+						a.visitAllInstructions(examIns.Call.StaticCallee(), goID)
+					}
 				} else if examIns.Call.StaticCallee().Pkg.Pkg.Name() == "sync" {
 					switch examIns.Call.Value.Name() {
 					case "Range":
 						fnName := examIns.Call.Value.Name()
-						updateRecords(fnName, goID, "PUSH ")
-						RWIns[goID] = append(RWIns[goID], theIns)
-						a.visitAllInstructions(examIns.Call.StaticCallee(), goID)
+						if !sliceContainsStr(storeIns, fnName) {
+							updateRecords(fnName, goID, "PUSH ")
+							RWIns[goID] = append(RWIns[goID], theIns)
+							a.visitAllInstructions(examIns.Call.StaticCallee(), goID)
+						}
 					case "Lock":
 						lockLoc := examIns.Call.Args[0]       // identifier for address of lock
 						if !sliceContains(lockSet, lockLoc) { // if lock is not already in active lockset
@@ -890,7 +940,13 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 						if p := lockSetContainsAt(lockSet, lockLoc); p >= 0 {
 							lockSet = deleteFromLockSet(lockSet, p)
 						}
+					case "Wait":
+						RWIns[goID] = append(RWIns[goID], theIns)
+					case "Done":
+						RWIns[goID] = append(RWIns[goID], theIns)
 					}
+				} else {
+					continue
 				}
 			case *ssa.Return:
 				if i != len(fnBlocks)-1 {
