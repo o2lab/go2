@@ -3,7 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/fatih/color"
+	"github.com/logrusorgru/aurora"
 	log "github.com/sirupsen/logrus"
 	"github.com/twmb/algoimpl/go/graph"
 	"go/token"
@@ -99,7 +99,7 @@ func deleteFromLockSet(s []ssa.Value, k int) []ssa.Value {
 
 func doAnalysis(args []string) error {
 	cfg := &packages.Config{
-		Mode:  packages.LoadAllSyntax, // the level o information returned for each package
+		Mode:  packages.LoadAllSyntax, // the level of information returned for each package
 		Dir:   "",                     // directory in which to run the build system's query tool
 		Tests: false,                  // setting Tests will include related test packages
 	}
@@ -404,6 +404,17 @@ func sliceContainsStr(s []string, e string) bool {
 	return false
 }
 
+func sliceContainsIns(s []ssa.Instruction, e ssa.Instruction) bool {
+	i := 0
+	for i < len(s) {
+		if s[i] == e {
+			return true
+		}
+		i++
+	}
+	return false
+}
+
 func sliceContainsInsAt(s []ssa.Instruction, e ssa.Instruction) int {
 	i := 0
 	for s[i] != e {
@@ -572,7 +583,7 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 	switch theFunc := PTSet[rightLoc].Value().(type) {
 	case *ssa.Function:
 		fnName = theFunc.Name()
-		if !sliceContainsStr(storeIns, fnName) {
+		if !sliceContainsIns(RWIns[goID], theIns) {
 			log.Debug(strings.Repeat(" ", levels[goID]), "PUSH ", fnName, " at lvl ", levels[goID])
 			levels[goID]++
 			storeIns = append(storeIns, fnName)
@@ -583,7 +594,7 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 		methodName := theIns.(*ssa.Call).Call.Method.Name()
 		check := a.prog.LookupMethod(ptrSet[location].PointsTo().DynamicTypes().Keys()[0], a.mains[0].Pkg, methodName)
 		fnName = check.Name()
-		if !sliceContainsStr(storeIns, fnName) {
+		if !sliceContainsIns(RWIns[goID], theIns) {
 			log.Debug(strings.Repeat(" ", levels[goID]), "PUSH ", fnName, " at lvl ", levels[goID])
 			levels[goID]++
 			storeIns = append(storeIns, fnName)
@@ -600,9 +611,9 @@ func (a *analysis) printRace(counter int, insPair []ssa.Instruction, addrPair []
 	log.Println(strings.Repeat("=", 100))
 	for i, anIns := range insPair {
 		if isWriteIns(anIns) {
-			log.Println("  Write of ", color.MagentaString(addrPair[i].Name()), " in function ", color.GreenString(anIns.Parent().Name()), " at ", a.prog.Fset.Position(anIns.Pos()))
+			log.Println("  Write of ", aurora.Magenta(addrPair[i].Name()), " in function ", aurora.BgBrightGreen(anIns.Parent().Name()), " at ", a.prog.Fset.Position(anIns.Pos()))
 		} else {
-			log.Println("  Read of  ", color.MagentaString(addrPair[i].Name()), " in function ", color.GreenString(anIns.Parent().Name()), " at ", a.prog.Fset.Position(anIns.Pos()))
+			log.Println("  Read of  ", aurora.Magenta(addrPair[i].Name()), " in function ", aurora.BgBrightGreen(anIns.Parent().Name()), " at ", a.prog.Fset.Position(anIns.Pos()))
 		}
 		var printStack []string
 		var printPos []token.Pos
@@ -745,7 +756,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 					if fromPkgsOfInterest(deferIns.Call.StaticCallee()) && deferIns.Call.StaticCallee().Pkg.Pkg.Name() != "sync" {
 						fnName := deferIns.Call.Value.Name()
 						fnName = checkTokenNameDefer(fnName, deferIns)
-						if !sliceContainsStr(storeIns, fnName) {
+						if !sliceContainsIns(RWIns[goID], theIns) {
 							updateRecords(fnName, goID, "PUSH ")
 							RWIns[goID] = append(RWIns[goID], dIns)
 							a.visitAllInstructions(dIns.(*ssa.Defer).Call.StaticCallee(), goID)
@@ -781,7 +792,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				}
 				if theFunc, storeFn := examIns.Val.(*ssa.Function); storeFn {
 					fnName := theFunc.Name()
-					if !sliceContainsStr(storeIns, fnName) {
+					if !sliceContainsIns(RWIns[goID], theIns) {
 						updateRecords(fnName, goID, "PUSH ")
 						RWIns[goID] = append(RWIns[goID], theIns)
 						a.visitAllInstructions(theFunc, goID)
@@ -836,7 +847,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 					theFn := mc.Fn.(*ssa.Function)
 					if fromPkgsOfInterest(theFn) {
 						fnName := mc.Fn.Name()
-						if !sliceContainsStr(storeIns, fnName) {
+						if !sliceContainsIns(RWIns[goID], theIns) {
 							updateRecords(fnName, goID, "PUSH ")
 							RWIns[goID] = append(RWIns[goID], theIns)
 							if len(lockSet) > 0 {
@@ -916,7 +927,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 					}
 					fnName := examIns.Call.Value.Name()
 					fnName = checkTokenName(fnName, examIns)
-					if !sliceContainsStr(storeIns, fnName) {
+					if !sliceContainsIns(RWIns[goID], theIns) {
 						updateRecords(fnName, goID, "PUSH ")
 						RWIns[goID] = append(RWIns[goID], theIns)
 						a.visitAllInstructions(examIns.Call.StaticCallee(), goID)
@@ -925,7 +936,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 					switch examIns.Call.Value.Name() {
 					case "Range":
 						fnName := examIns.Call.Value.Name()
-						if !sliceContainsStr(storeIns, fnName) {
+						if !sliceContainsIns(RWIns[goID], theIns) {
 							updateRecords(fnName, goID, "PUSH ")
 							RWIns[goID] = append(RWIns[goID], theIns)
 							a.visitAllInstructions(examIns.Call.StaticCallee(), goID)
