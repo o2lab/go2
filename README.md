@@ -1,17 +1,13 @@
-## Data Race Detection Using Static Analysis
+## Static Analysis - Concurrency Bug Detection in Go
+### Data Races
 
-For every ssa instruction, the tool determines:
-- whether or not it is a write or read operation; A pair of racy instructions should include at LEAST one write operation. 
-- whether or not it is an atomic operation; A pair of racy instructions should include at MOST one atomic operation
-- whether or not more than one operation are trying to access the same memory location; A pair of racy instructions will try to access the same memory location
-- identify the goroutine which the instruction is executed under; A pair of racy instructions should operate in different goroutines
-- analyze the scheduling of the instruction; A pair of racy instructions should be able to be executed in parallel, as a happens-before relationship cannot be established. 
+The tool makes use of __static single-assignment (SSA)__ form intermediate representation to construct goroutine-specific __stack traces__ discretely for the basis of static analysis. Throughout the process of constructing each stack trace, Andersen's inclusion-based __pointer analysis__ algorithm is used on an as-need basis[1]. Due to the flow-insensitive and context-insensitive nature of the adopted algorithm, there's potential for ambiguity in the points-to information returned by the analysis[2]. Upon completing the construction of stack traces, a __Happened-Before graph__[3] is built to enforce flow-sensitive analysis. Ultimately, racy instructions are reported, each along with its corresponding call stack. 
 
-With these rules in mind, we first attempt to generate conflicting pairs of instructions, taking into account pointer analysis for when two variables have the same address. After that, we try to establish Program Order using call graphs. As we traverse through each node of the call graph, all goroutines are assigned an ID number, with the mother goroutine always having a smaller ID than the child goroutine. 
+****************************************************************************************************
+_Work in Progress:_
 
-TODO:
+[1] such repetitive procedures are significantly costing performance of the tool. A more efficient algorithm may be put in place to minimize frequency of conducting pointer analysis. 
 
-Channel Operations: used to establish synchronization order between conflicting access pairs. 
+[2] for the time being, in the case of multiple targets being returned by pointer analysis, the call stack is used to determine which target in the points-to set to execute. Need a much more refined method to consider calling context of functions in the code base. 
 
-Synchronization Order: Sync blocks, separated by go instructions along with channel operations (send, receive, close) and mutex operations (lock and unlock) and atomic instructions. 
-
+[3] need to consider how Go handles communication and synchronization. ie. establish more graph edges, be more precise. 
