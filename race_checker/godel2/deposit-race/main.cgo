@@ -1,0 +1,10 @@
+def main.main():
+    letmem z0;
+    spawn main.main$1(z0);
+    spawn main.Deposit(z0);
+def main.Deposit(bal):
+    read bal;
+    write bal;
+def main.main$1(bal):
+    call main.Deposit(bal);
+    read bal;

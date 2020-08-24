@@ -1,0 +1,14 @@
+def main.main():
+    letmem z0;
+    let t1 = newchan main.main0.t1_chan2, 2;
+    spawn main.f(z0, t1);
+    send t1;
+    write z0;
+    recv t1;
+    send t1;
+    read z0;
+    recv t1;
+def main.f(x, ch):
+    send ch;
+    write x;
+    recv ch;

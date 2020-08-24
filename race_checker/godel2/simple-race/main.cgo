@@ -1,0 +1,7 @@
+def main.main():
+    letmem z0;
+    spawn main.Writer(z0);
+    read z0;
+def main.Writer(x):
+    read x;
+    write x;

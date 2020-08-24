@@ -1,0 +1,55 @@
+def main.main():
+    letmem t0;
+    letmem t1;
+    letmem t2;
+    let t3 = newchan main.main0.t3_chan0, 0;
+    let t4 = newchan main.main0.t4_chan0, 0;
+    let t5 = newchan main.main0.t5_chan0, 0;
+    spawn main.phil(t0, t1, t3, t4);
+    spawn main.phil(t1, t2, t4, t5);
+    spawn main.phil(t2, t0, t5, t3);
+    spawn main.Fork(t0, t3);
+    spawn main.Fork(t1, t4);
+    spawn main.Fork(t2, t5);
+def main.phil(fork1, fork2, ch1, ch2):
+    call main.phil#1(fork1, fork2, ch1, ch2);
+def main.phil#1(fork1, fork2, ch1, ch2):
+    read fork1;
+    read fork2;
+    select
+      case send ch1; call main.phil#2(fork1, fork2, ch1, ch2);
+      case send ch2; call main.phil#6(fork1, fork2, ch1, ch2);
+    endselect;
+def main.phil#2(fork1, fork2, ch1, ch2):
+    read fork2;
+    select
+      case send ch2; call main.phil#4(fork1, fork2, ch1, ch2);
+      case tau; call main.phil#5(fork1, fork2, ch1, ch2);
+    endselect;
+def main.phil#4(fork1, fork2, ch1, ch2):
+    recv ch1;
+    recv ch2;
+    call main.phil#1(fork1, fork2, ch1, ch2);
+def main.phil#5(fork1, fork2, ch1, ch2):
+    recv ch1;
+    call main.phil#1(fork1, fork2, ch1, ch2);
+def main.phil#6(fork1, fork2, ch1, ch2):
+    read fork1;
+    select
+      case send ch1; call main.phil#8(fork1, fork2, ch1, ch2);
+      case tau; call main.phil#9(fork1, fork2, ch1, ch2);
+    endselect;
+def main.phil#8(fork1, fork2, ch1, ch2):
+    recv ch1;
+    recv ch2;
+    call main.phil#1(fork1, fork2, ch1, ch2);
+def main.phil#9(fork1, fork2, ch1, ch2):
+    recv ch2;
+    call main.phil#1(fork1, fork2, ch1, ch2);
+def main.Fork(fork, ch):
+    call main.Fork#1(fork, ch);
+def main.Fork#1(fork, ch):
+    write fork;
+    recv ch;
+    send ch;
+    call main.Fork#1(fork, ch);
