@@ -61,7 +61,6 @@ var (
 	goStack      [][]string
 	goCaller     = make(map[int]int)
 	goNames      = make(map[int]string)
-	popBuffer    *ssa.Function // stores the most recently popped function instruction
 )
 
 func checkTokenName(fnName string, theIns *ssa.Call) string {
@@ -598,7 +597,7 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 	switch theFunc := PTSet[rightLoc].Value().(type) {
 	case *ssa.Function:
 		fnName = theFunc.Name()
-		if !sliceContainsIns(RWIns[goID], theIns) && theFunc != popBuffer {
+		if !sliceContainsIns(RWIns[goID], theIns) {
 			log.Debug(strings.Repeat(" ", levels[goID]), "PUSH ", fnName, " at lvl ", levels[goID])
 			levels[goID]++
 			storeIns = append(storeIns, fnName)
@@ -609,7 +608,7 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 		methodName := theIns.(*ssa.Call).Call.Method.Name()
 		check := a.prog.LookupMethod(ptrSet[location].PointsTo().DynamicTypes().Keys()[0], a.mains[0].Pkg, methodName)
 		fnName = check.Name()
-		if !sliceContainsIns(RWIns[goID], theIns) && check != popBuffer {
+		if !sliceContainsIns(RWIns[goID], theIns) {
 			log.Debug(strings.Repeat(" ", levels[goID]), "PUSH ", fnName, " at lvl ", levels[goID])
 			levels[goID]++
 			storeIns = append(storeIns, fnName)
@@ -748,9 +747,6 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 		fnBlocks = append(fnBlocks, toAppend...) // move return block to end of slice
 	}
 	repeatSwitch := false // triggered when encountering basic blocks for body of a forloop
-	if fn.Name() == "printHugoVersion" {
-		fmt.Println("ee")
-	}
 	for i := 0; i < len(fnBlocks); i++ {
 		aBlock := fnBlocks[i]
 		if strings.HasSuffix(aBlock.Comment, ".done") && i != len(fnBlocks)-1 && sliceContainsBloc(toAppend, aBlock) { // ignore return block if it doesn't have largest index
@@ -774,7 +770,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 					if fromPkgsOfInterest(deferIns.Call.StaticCallee()) && deferIns.Call.StaticCallee().Pkg.Pkg.Name() != "sync" {
 						fnName := deferIns.Call.Value.Name()
 						fnName = checkTokenNameDefer(fnName, deferIns)
-						if !sliceContainsIns(RWIns[goID], theIns) && dIns.(*ssa.Defer).Call.StaticCallee() != popBuffer {
+						if !sliceContainsIns(RWIns[goID], theIns) {
 							updateRecords(fnName, goID, "PUSH ")
 							RWIns[goID] = append(RWIns[goID], dIns)
 							a.visitAllInstructions(dIns.(*ssa.Defer).Call.StaticCallee(), goID)
@@ -810,7 +806,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				}
 				if theFunc, storeFn := examIns.Val.(*ssa.Function); storeFn {
 					fnName := theFunc.Name()
-					if !sliceContainsIns(RWIns[goID], theIns) && theFunc != popBuffer {
+					if !sliceContainsIns(RWIns[goID], theIns) {
 						updateRecords(fnName, goID, "PUSH ")
 						RWIns[goID] = append(RWIns[goID], theIns)
 						a.visitAllInstructions(theFunc, goID)
@@ -865,7 +861,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 					theFn := mc.Fn.(*ssa.Function)
 					if fromPkgsOfInterest(theFn) {
 						fnName := mc.Fn.Name()
-						if !sliceContainsIns(RWIns[goID], theIns) && theFn != popBuffer {
+						if !sliceContainsIns(RWIns[goID], theIns) {
 							updateRecords(fnName, goID, "PUSH ")
 							RWIns[goID] = append(RWIns[goID], theIns)
 							if len(lockSet) > 0 {
@@ -945,7 +941,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 					}
 					fnName := examIns.Call.Value.Name()
 					fnName = checkTokenName(fnName, examIns)
-					if !sliceContainsIns(RWIns[goID], theIns) && examIns.Call.StaticCallee() != popBuffer {
+					if !sliceContainsIns(RWIns[goID], theIns) {
 						updateRecords(fnName, goID, "PUSH ")
 						RWIns[goID] = append(RWIns[goID], theIns)
 						a.visitAllInstructions(examIns.Call.StaticCallee(), goID)
@@ -957,7 +953,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 					switch examIns.Call.Value.Name() {
 					case "Range":
 						fnName := examIns.Call.Value.Name()
-						if !sliceContainsIns(RWIns[goID], theIns) && examIns.Call.StaticCallee() != popBuffer {
+						if !sliceContainsIns(RWIns[goID], theIns) {
 							updateRecords(fnName, goID, "PUSH ")
 							RWIns[goID] = append(RWIns[goID], theIns)
 							a.visitAllInstructions(examIns.Call.StaticCallee(), goID)
@@ -990,12 +986,6 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 					if fnName == storeIns[len(storeIns)-1] {
 						updateRecords(fnName, goID, "POP  ")
 						RWIns[goID] = append(RWIns[goID], theIns)
-						for c := len(RWIns[goID]) - 2; c >= 0; c-- {
-							if pushIns, ok2 := RWIns[goID][c].(*ssa.Call); ok2 && pushIns.Call.Value.Name() == fnName {
-								popBuffer = pushIns.Call.StaticCallee()
-								break
-							}
-						}
 					}
 				}
 				if len(storeIns) == 0 && len(workList) != 0 { // finished reporting current goroutine and workList isn't empty
@@ -1026,7 +1016,6 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				goStack[newGoID] = append(goStack[newGoID], storeIns...)
 				workList = append(workList, info) // store encountered goroutines
 				log.Debug(strings.Repeat(" ", levels[goID]), "spawning Goroutine ----->  ", fnName)
-				popBuffer = examIns.Call.StaticCallee() // to re-initiate popBuffer
 			}
 		}
 		if i == len(fnBlocks)-1 && len(returnIns) > 0 {
