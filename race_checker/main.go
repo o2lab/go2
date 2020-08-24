@@ -61,6 +61,7 @@ var (
 	goStack      [][]string
 	goCaller     = make(map[int]int)
 	goNames      = make(map[int]string)
+	popBuffer    *ssa.Function // stores the most recently popped function instruction
 )
 
 func checkTokenName(fnName string, theIns *ssa.Call) string {
@@ -95,125 +96,6 @@ func deleteFromLockSet(s []ssa.Value, k int) []ssa.Value {
 	var res []ssa.Value
 	res = append(s[:k], s[k+1:]...)
 	return res
-}
-
-func doAnalysis(args []string) error {
-	cfg := &packages.Config{
-		Mode:  packages.LoadAllSyntax, // the level of information returned for each package
-		Dir:   "",                     // directory in which to run the build system's query tool
-		Tests: false,                  // setting Tests will include related test packages
-	}
-	log.Info("Loading input packages...")
-	initial, err := packages.Load(cfg, args...)
-	if err != nil {
-		return err
-	}
-	if packages.PrintErrors(initial) > 0 {
-		return fmt.Errorf("packages contain errors")
-	} else if len(initial) == 0 {
-		return fmt.Errorf("package list empty")
-	}
-
-	// Print the names of the source files
-	// for each package listed on the command line.
-	for nP, pkg := range initial {
-		log.Info(pkg.ID, pkg.GoFiles)
-		log.Infof("Done  -- %d packages loaded", nP+1)
-	}
-
-	// Create and build SSA-form program representation.
-	prog, pkgs := ssautil.AllPackages(initial, 0)
-
-	log.Info("Building SSA code for entire program...")
-	prog.Build()
-	log.Info("Done  -- SSA code built")
-
-	mains, err := mainPackages(pkgs)
-	if err != nil {
-		return err
-	}
-
-	// Configure pointer analysis to build call-graph
-	config := &pointer.Config{
-		Mains:          mains,
-		BuildCallGraph: true,
-	}
-	Analysis = &analysis{
-		prog:      prog,
-		pkgs:      pkgs,
-		mains:     mains,
-		ptaConfig: config,
-		RWinsMap:  make(map[ssa.Instruction]graph.Node),
-	}
-
-	log.Info("Compiling stack trace for every Goroutine... ")
-	log.Debug(strings.Repeat("-", 35), "Stack trace begins", strings.Repeat("-", 35))
-	Analysis.visitAllInstructions(mains[0].Func("main"), 0)
-	log.Debug(strings.Repeat("-", 35), "Stack trace ends", strings.Repeat("-", 35))
-	totalIns := 0
-	for g, _ := range RWIns {
-		totalIns += len(RWIns[g])
-	}
-	log.Info("Done  -- ", Analysis.analysisStat.nGoroutine, " goroutines analyzed! ", totalIns, " instructions of interest detected! ")
-
-	log.Info("Building Happened-Before graph... ")
-	Analysis.HBgraph = graph.New(graph.Directed)
-	var prevN graph.Node
-	var goCaller []graph.Node
-	var waitingN graph.Node
-	for nGo, insSlice := range RWIns {
-		for i, anIns := range insSlice {
-			if nGo == 0 && i == 0 { // main goroutine, first instruction
-				prevN = Analysis.HBgraph.MakeNode() // initiate for future nodes
-				*prevN.Value = anIns
-			} else {
-				currN := Analysis.HBgraph.MakeNode()
-				*currN.Value = anIns
-				if nGo != 0 && i == 0 {
-					prevN = goCaller[0]
-					goCaller = goCaller[1:] // pop from stack
-					err := Analysis.HBgraph.MakeEdge(prevN, currN)
-					if err != nil {
-						log.Fatal(err)
-					}
-				} else if _, ok := anIns.(*ssa.Go); ok {
-					goCaller = append(goCaller, currN) // sequentially store go calls in the same goroutine
-					err := Analysis.HBgraph.MakeEdge(prevN, currN)
-					if err != nil {
-						log.Fatal(err)
-					}
-				} else {
-					err := Analysis.HBgraph.MakeEdge(prevN, currN)
-					if err != nil {
-						log.Fatal(err)
-					}
-				}
-				prevN = currN
-			}
-			if isReadIns(anIns) || isWriteIns(anIns) {
-				Analysis.RWinsMap[anIns] = prevN
-			} else if callIns, ok := anIns.(*ssa.Call); ok {
-				if callIns.Call.Value.Name() == "Wait" {
-					waitingN = prevN
-				}
-			} else if callIns, ok := anIns.(*ssa.Call); ok && callIns.Call.Value.Name() == "Done" {
-				err := Analysis.HBgraph.MakeEdge(prevN, waitingN)
-				if err != nil {
-					log.Fatal(err)
-				}
-			}
-		}
-	}
-	log.Info("Done  -- Happened-Before graph built... ")
-
-	log.Info("Checking for data races... ")
-	result, err := pointer.Analyze(Analysis.ptaConfig) // conduct pointer analysis
-	if err != nil {
-		log.Fatal(err)
-	}
-	Analysis.result = result
-	Analysis.checkRacyPairs()
-	return nil
 }
 
 func fromPkgsOfInterest(fn *ssa.Function) bool {
@@ -344,10 +226,14 @@ func lockSetContainsAt(s []ssa.Value, e ssa.Value) int {
 func main() {
 	debug := flag.Bool("debug", false, "Prints debug messages.")
 	focus := flag.String("focus", "", "Specifies a list of packages to check races.")
+	ptrAnalysis := flag.Bool("ptrAnalysis", false, "Prints pointer analysis results. ")
 	//flag.BoolVar(&allPkg, "all-package", true, "Analyze all packages required by the main package.")
 	flag.Parse()
 	if *debug {
 		log.SetLevel(log.DebugLevel)
+	}
+	if *ptrAnalysis {
+		log.SetLevel(log.TraceLevel)
 	}
 	if *focus != "" {
 		focusPkgs = strings.Split(*focus, ",")
@@ -356,7 +242,11 @@ func main() {
 		allPkg = true
 	}
 
-	err := doAnalysis(flag.Args())
+	log.SetFormatter(&log.TextFormatter{
+		FullTimestamp: true,
+	})
+
+	err := staticAnalysis(flag.Args())
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -421,6 +311,131 @@ func sliceContainsInsAt(s []ssa.Instruction, e ssa.Instruction) int {
 		i++
 	}
 	return i
+}
+
+func staticAnalysis(args []string) error {
+	cfg := &packages.Config{
+		Mode:  packages.LoadAllSyntax, // the level of information returned for each package
+		Dir:   "",                     // directory in which to run the build system's query tool
+		Tests: false,                  // setting Tests will include related test packages
+	}
+	log.Info("Loading input packages...")
+	initial, err := packages.Load(cfg, args...)
+	if err != nil {
+		return err
+	}
+	if packages.PrintErrors(initial) > 0 {
+		return fmt.Errorf("packages contain errors")
+	} else if len(initial) == 0 {
+		return fmt.Errorf("package list empty")
+	}
+
+	// Print the names of the source files
+	// for each package listed on the command line.
+	for nP, pkg := range initial {
+		log.Info(pkg.ID, pkg.GoFiles)
+		log.Infof("Done  -- %d packages loaded", nP+1)
+	}
+
+	// Create and build SSA-form program representation.
+	prog, pkgs := ssautil.AllPackages(initial, 0)
+
+	log.Info("Building SSA code for entire program...")
+	prog.Build()
+	log.Info("Done  -- SSA code built")
+
+	mains, err := mainPackages(pkgs)
+	if err != nil {
+		return err
+	}
+
+	// Configure pointer analysis to build call-graph
+	config := &pointer.Config{
+		Mains:          mains,
+		BuildCallGraph: true,
+	}
+	Analysis = &analysis{
+		prog:      prog,
+		pkgs:      pkgs,
+		mains:     mains,
+		ptaConfig: config,
+		RWinsMap:  make(map[ssa.Instruction]graph.Node),
+	}
+
+	log.Info("Compiling stack trace for every Goroutine... ")
+	log.Debug(strings.Repeat("-", 35), "Stack trace begins", strings.Repeat("-", 35))
+	Analysis.visitAllInstructions(mains[0].Func("main"), 0)
+	log.Debug(strings.Repeat("-", 35), "Stack trace ends", strings.Repeat("-", 35))
+	totalIns := 0
+	for g, _ := range RWIns {
+		totalIns += len(RWIns[g])
+	}
+	log.Info("Done  -- ", Analysis.analysisStat.nGoroutine, " goroutines analyzed! ", totalIns, " instructions of interest detected! ")
+
+	log.Info("Building Happened-Before graph... ")
+	Analysis.HBgraph = graph.New(graph.Directed)
+	var prevN graph.Node
+	var goCaller []graph.Node
+	var waitingN graph.Node
+	for nGo, insSlice := range RWIns {
+		for i, anIns := range insSlice {
+			if nGo == 0 && i == 0 { // main goroutine, first instruction
+				if _, ok := anIns.(*ssa.Go); !ok {
+					prevN = Analysis.HBgraph.MakeNode() // initiate for future nodes
+					*prevN.Value = anIns
+				} else {
+					prevN = Analysis.HBgraph.MakeNode() // initiate for future nodes
+					*prevN.Value = anIns
+					goCaller = append(goCaller, prevN) // sequentially store go calls in the same goroutine
+				}
+			} else {
+				currN := Analysis.HBgraph.MakeNode()
+				*currN.Value = anIns
+				if nGo != 0 && i == 0 { // worker goroutine, first instruction
+					prevN = goCaller[0]
+					goCaller = goCaller[1:] // pop from stack
+					err := Analysis.HBgraph.MakeEdge(prevN, currN)
+					if err != nil {
+						log.Fatal(err)
+					}
+				} else if _, ok := anIns.(*ssa.Go); ok {
+					goCaller = append(goCaller, currN) // sequentially store go calls in the same goroutine
+					err := Analysis.HBgraph.MakeEdge(prevN, currN)
+					if err != nil {
+						log.Fatal(err)
+					}
+				} else {
+					err := Analysis.HBgraph.MakeEdge(prevN, currN)
+					if err != nil {
+						log.Fatal(err)
+					}
+				}
+				prevN = currN
+			}
+			if isReadIns(anIns) || isWriteIns(anIns) {
+				Analysis.RWinsMap[anIns] = prevN
+			} else if callIns, ok := anIns.(*ssa.Call); ok {
+				if callIns.Call.Value.Name() == "Wait" {
+					waitingN = prevN
+				}
+			} else if callIns, ok := anIns.(*ssa.Call); ok && callIns.Call.Value.Name() == "Done" {
+				err := Analysis.HBgraph.MakeEdge(prevN, waitingN)
+				if err != nil {
+					log.Fatal(err)
+				}
+			}
+		}
+	}
+	log.Info("Done  -- Happened-Before graph built... ")
+
+	log.Info("Checking for data races... ")
+	result, err := pointer.Analyze(Analysis.ptaConfig) // conduct pointer analysis
+	if err != nil {
+		log.Fatal(err)
+	}
+	Analysis.result = result
+	Analysis.checkRacyPairs()
+	return nil
 }
 
 func updateRecords(fnName string, goID int, pushPop string) {
@@ -548,19 +563,17 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 	ptrSet := a.result.Queries                    // set of pointers from result of pointer analysis
 	PTSet := ptrSet[location].PointsTo().Labels() // set of labels for locations that the pointer points to
 	if indir {
+		log.Debug("********************indirect queries need to be analyzed********************")
 		//ptrSetIndir := a.result.IndirectQueries
 		//PTSetIndir := ptrSetIndir[location].PointsTo().Labels()
 	}
 	var fnName string
 	rightLoc := 0       // initialize index for the right points-to location
 	if len(PTSet) > 1 { // multiple targets returned
-		log.Debug("Pointer Analysis revealed ", len(PTSet), " targets for location - ", a.prog.Fset.Position(location.Pos()))
+		log.Trace("***Pointer Analysis revealed ", len(PTSet), " targets for location - ", a.prog.Fset.Position(location.Pos()))
 		for ind, eachTarget := range PTSet { // check each target
-			if eachTarget.Value().Parent().Pkg.Pkg.Name() == "reflect" {
-				return
-			}
-			log.Debug("target No.", ind+1, " - ", eachTarget.Value().String(), " from function ", eachTarget.Value().Parent().Name())
 			if eachTarget.Value().Parent() != nil {
+				log.Trace("*****target No.", ind+1, " - ", eachTarget.Value().String(), " from function ", eachTarget.Value().Parent().Name())
 				if sliceContainsStr(storeIns, eachTarget.Value().Parent().Name()) { // calling function is in current goroutine
 					rightLoc = ind
 					//break
@@ -574,16 +587,18 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 						break
 					}
 				}
+			} else {
+				log.Debug("target No.", ind+1, " - ", eachTarget.Value().String(), " with no parent function*********")
 			}
 		}
-		log.Debug("Executing target No.", rightLoc+1)
+		log.Trace("***Executing target No.", rightLoc+1)
 	} else if len(PTSet) == 0 {
 		return
 	}
 	switch theFunc := PTSet[rightLoc].Value().(type) {
 	case *ssa.Function:
 		fnName = theFunc.Name()
-		if !sliceContainsIns(RWIns[goID], theIns) {
+		if !sliceContainsIns(RWIns[goID], theIns) && theFunc != popBuffer {
 			log.Debug(strings.Repeat(" ", levels[goID]), "PUSH ", fnName, " at lvl ", levels[goID])
 			levels[goID]++
 			storeIns = append(storeIns, fnName)
@@ -594,7 +609,7 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 		methodName := theIns.(*ssa.Call).Call.Method.Name()
 		check := a.prog.LookupMethod(ptrSet[location].PointsTo().DynamicTypes().Keys()[0], a.mains[0].Pkg, methodName)
 		fnName = check.Name()
-		if !sliceContainsIns(RWIns[goID], theIns) {
+		if !sliceContainsIns(RWIns[goID], theIns) && check != popBuffer {
 			log.Debug(strings.Repeat(" ", levels[goID]), "PUSH ", fnName, " at lvl ", levels[goID])
 			levels[goID]++
 			storeIns = append(storeIns, fnName)
@@ -638,7 +653,7 @@ func (a *analysis) printRace(counter int, insPair []ssa.Instruction, addrPair []
 				log.Println("\t ", strings.Repeat(" ", p), toPrint, a.prog.Fset.Position(printPos[p]))
 			}
 		}
-		log.Println("\tin goroutine  ***", goNames[goIDs[i]], "[", goIDs[i], "] *** , with the following stack trace: ")
+		log.Println("\tin goroutine  ***", goNames[goIDs[i]], "[", goIDs[i], "] *** , with the following call stack: ")
 		var pathGo []int
 		j := goIDs[i]
 		for j > 0 {
@@ -733,6 +748,9 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 		fnBlocks = append(fnBlocks, toAppend...) // move return block to end of slice
 	}
 	repeatSwitch := false // triggered when encountering basic blocks for body of a forloop
+	if fn.Name() == "printHugoVersion" {
+		fmt.Println("ee")
+	}
 	for i := 0; i < len(fnBlocks); i++ {
 		aBlock := fnBlocks[i]
 		if strings.HasSuffix(aBlock.Comment, ".done") && i != len(fnBlocks)-1 && sliceContainsBloc(toAppend, aBlock) { // ignore return block if it doesn't have largest index
@@ -756,7 +774,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 					if fromPkgsOfInterest(deferIns.Call.StaticCallee()) && deferIns.Call.StaticCallee().Pkg.Pkg.Name() != "sync" {
 						fnName := deferIns.Call.Value.Name()
 						fnName = checkTokenNameDefer(fnName, deferIns)
-						if !sliceContainsIns(RWIns[goID], theIns) {
+						if !sliceContainsIns(RWIns[goID], theIns) && dIns.(*ssa.Defer).Call.StaticCallee() != popBuffer {
 							updateRecords(fnName, goID, "PUSH ")
 							RWIns[goID] = append(RWIns[goID], dIns)
 							a.visitAllInstructions(dIns.(*ssa.Defer).Call.StaticCallee(), goID)
@@ -792,7 +810,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				}
 				if theFunc, storeFn := examIns.Val.(*ssa.Function); storeFn {
 					fnName := theFunc.Name()
-					if !sliceContainsIns(RWIns[goID], theIns) {
+					if !sliceContainsIns(RWIns[goID], theIns) && theFunc != popBuffer {
 						updateRecords(fnName, goID, "PUSH ")
 						RWIns[goID] = append(RWIns[goID], theIns)
 						a.visitAllInstructions(theFunc, goID)
@@ -847,7 +865,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 					theFn := mc.Fn.(*ssa.Function)
 					if fromPkgsOfInterest(theFn) {
 						fnName := mc.Fn.Name()
-						if !sliceContainsIns(RWIns[goID], theIns) {
+						if !sliceContainsIns(RWIns[goID], theIns) && theFn != popBuffer {
 							updateRecords(fnName, goID, "PUSH ")
 							RWIns[goID] = append(RWIns[goID], theIns)
 							if len(lockSet) > 0 {
@@ -927,16 +945,19 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 					}
 					fnName := examIns.Call.Value.Name()
 					fnName = checkTokenName(fnName, examIns)
-					if !sliceContainsIns(RWIns[goID], theIns) {
+					if !sliceContainsIns(RWIns[goID], theIns) && examIns.Call.StaticCallee() != popBuffer {
 						updateRecords(fnName, goID, "PUSH ")
 						RWIns[goID] = append(RWIns[goID], theIns)
 						a.visitAllInstructions(examIns.Call.StaticCallee(), goID)
 					}
+				} else if examIns.Call.StaticCallee() == nil {
+					log.Debug("***********************special case*****************************************")
+					return
 				} else if examIns.Call.StaticCallee().Pkg.Pkg.Name() == "sync" {
 					switch examIns.Call.Value.Name() {
 					case "Range":
 						fnName := examIns.Call.Value.Name()
-						if !sliceContainsIns(RWIns[goID], theIns) {
+						if !sliceContainsIns(RWIns[goID], theIns) && examIns.Call.StaticCallee() != popBuffer {
 							updateRecords(fnName, goID, "PUSH ")
 							RWIns[goID] = append(RWIns[goID], theIns)
 							a.visitAllInstructions(examIns.Call.StaticCallee(), goID)
@@ -969,6 +990,12 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 					if fnName == storeIns[len(storeIns)-1] {
 						updateRecords(fnName, goID, "POP  ")
 						RWIns[goID] = append(RWIns[goID], theIns)
+						for c := len(RWIns[goID]) - 2; c >= 0; c-- {
+							if pushIns, ok2 := RWIns[goID][c].(*ssa.Call); ok2 && pushIns.Call.Value.Name() == fnName {
+								popBuffer = pushIns.Call.StaticCallee()
+								break
+							}
+						}
 					}
 				}
 				if len(storeIns) == 0 && len(workList) != 0 { // finished reporting current goroutine and workList isn't empty
@@ -999,6 +1026,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				goStack[newGoID] = append(goStack[newGoID], storeIns...)
 				workList = append(workList, info) // store encountered goroutines
 				log.Debug(strings.Repeat(" ", levels[goID]), "spawning Goroutine ----->  ", fnName)
+				popBuffer = examIns.Call.StaticCallee() // to re-initiate popBuffer
 			}
 		}
 		if i == len(fnBlocks)-1 && len(returnIns) > 0 {
