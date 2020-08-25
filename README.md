@@ -1,7 +1,7 @@
 ## Static Analysis - Concurrency Bug Detection in Go
 ### Data Races
 
-The tool makes use of __static single-assignment (SSA)__ form intermediate representation to construct goroutine-specific __stack traces__ discretely for the basis of static analysis. Throughout the process of constructing each stack trace, Andersen's inclusion-based __pointer analysis__ algorithm is used on an as-need basis[1]. Due to the flow-insensitive and context-insensitive nature of the adopted algorithm, there's potential for ambiguity in the points-to information returned by the analysis[2]. Upon completing the construction of stack traces, a __Happened-Before graph__[3] is built to enforce flow-sensitive analysis. Ultimately, racy instructions are reported, each along with its corresponding call stack. 
+The tool makes use of __static single-assignment (SSA)__ form intermediate representation to construct goroutine-specific __stack traces__ discretely for the basis of static analysis. Throughout the process of constructing each stack trace, Andersen's inclusion-based __pointer analysis__ algorithm is used on an as-need basis[1]. Due to the flow-insensitive and context-insensitive nature of the adopted algorithm, there's potential for ambiguity in the points-to information returned by the analysis[2]. Upon completing the construction of stack traces, a __Happens-Before graph__[3] is built to enforce flow-sensitive analysis. Ultimately, racy instructions are reported, each along with its corresponding call stack. 
 
 ****************************************************************************************************
 _Work in Progress:_
