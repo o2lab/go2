@@ -28,10 +28,10 @@ Usage:
 
 ### Example
 
-Try some tests in the `tests` folder:
+Try some test cases in adopted micro-benchmarks:
 
 ```
-./race-checker tests/race_example1.go
-./race-checker tests/GoBench/GoBench_Etcd.go
+./race-checker GoBench/Kubernetes/81091/main.go
+./race-checker godel2/ch-as-lock-race/main.go
 ```
 
