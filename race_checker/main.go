@@ -171,7 +171,7 @@ func isReadIns(ins ssa.Instruction) bool { // is the instruction a read access?
 	case *ssa.Lookup:
 		return true
 	case *ssa.Call:
-		if insType.Call.Value.Name() != "delete" && !strings.HasPrefix(insType.Call.Value.Name(), "Add") && len(insType.Call.Args) > 0 {
+		if insType.Call.Value.Name() != "delete" && insType.Call.Value.Name() != "Wait" && insType.Call.Value.Name() != "Done" && !strings.HasPrefix(insType.Call.Value.Name(), "Add") && len(insType.Call.Args) > 0 {
 			return true
 		}
 	default:
@@ -346,11 +346,11 @@ func staticAnalysis(args []string) error {
 			} else if callIns, ok := anIns.(*ssa.Call); ok {
 				if callIns.Call.Value.Name() == "Wait" {
 					waitingN = prevN
-				}
-			} else if callIns, ok := anIns.(*ssa.Call); ok && callIns.Call.Value.Name() == "Done" {
-				err := Analysis.HBgraph.MakeEdge(prevN, waitingN)
-				if err != nil {
-					log.Fatal(err)
+				} else if callIns.Call.Value.Name() == "Done" {
+					err := Analysis.HBgraph.MakeEdge(prevN, waitingN)
+					if err != nil {
+						log.Fatal(err)
+					}
 				}
 			}
 		}
@@ -442,7 +442,7 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 					}
 					if sliceContainsStr(allStack, eachTarget.Value().Parent().Name()) { // check callstack of current goroutine
 						rightLoc = ind
-						break
+						//break
 					}
 				}
 			} else {
@@ -552,6 +552,8 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 						if k := a.lockSetContainsAt(lockSet, lockLoc); k >= 0 {
 							lockSet = deleteFromLockSet(lockSet, k)
 						}
+					} else if deferIns.Call.StaticCallee().Name() == "Done" {
+						RWIns[goID] = append(RWIns[goID], theIns)
 					}
 				}
 			}
