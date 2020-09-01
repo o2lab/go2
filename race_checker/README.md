@@ -24,12 +24,14 @@ Usage:
 
 `-focus`: Limit the analysis scope to a list of packages, separated by comas.
 
+`-ptrAnalysis`: Show occasions of pointer analysis returning multiple targets. Used for debugging purposes only. 
+
 ### Example
 
-Try some tests in the `tests` folder:
+Try some test cases in adopted micro-benchmarks:
 
 ```
-./race-checker tests/race_example1.go
-./race-checker tests/GoBench/GoBench_Etcd.go
+./race-checker GoBench/Kubernetes/81091/main.go
+./race-checker godel2/ch-as-lock-race/main.go
 ```
 
