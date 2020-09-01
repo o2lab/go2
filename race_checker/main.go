@@ -63,6 +63,8 @@ var (
 	goNames      = make(map[int]string)
 	chanBufMap   = make(map[string][]*ssa.Send)
 	chanName     string
+	insertIndMap = make(map[string]int)
+	chanMap      = make(map[ssa.Instruction][]string) // map each read/write access to a list of channels with value(s) already sent to it
 )
 
 func checkTokenName(fnName string, theIns *ssa.Call) string {
@@ -572,19 +574,23 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				} else { // buffered channel
 					chanBufMap[examIns.Name()] = make([]*ssa.Send, bufferLen)
 				}
+				insertIndMap[examIns.Name()] = 0 // initialize index
 			case *ssa.Send: // channel send op
-				insertInd := 0
+				var chName string
 				if _, ok := chanBufMap[examIns.Chan.Name()]; !ok { // if channel name can't be identified
 					a.pointerAnalysis(examIns.Chan, goID, theIns) // identifiable name will be returned by pointer analysis via variable chanName
-					for chanBufMap[chanName][insertInd] != nil && insertInd < len(chanBufMap[chanName])-1 {
-						insertInd++
-					}
-					chanBufMap[chanName][insertInd] = examIns
+					chName = chanName
 				} else {
-					for chanBufMap[examIns.Chan.Name()][insertInd] != nil && insertInd < len(chanBufMap[examIns.Chan.Name()])-1 {
-						insertInd++
-					}
-					chanBufMap[examIns.Chan.Name()][insertInd] = examIns
+					chName = examIns.Chan.Name()
+				}
+				for chanBufMap[chName][insertIndMap[chName]] != nil && insertIndMap[chName] < len(chanBufMap[chName])-1 {
+					insertIndMap[chName]++ // iterate until reaching an index with nil send value stored
+				}
+				if insertIndMap[chName] == len(chanBufMap[chName])-1 && chanBufMap[chName][insertIndMap[chName]] != nil {
+					// buffer length reached, channel will block
+					// TODO: use HB graph to handle blocked channel?
+				} else {
+					chanBufMap[chName][insertIndMap[chName]] = examIns
 				}
 			case *ssa.Store: // write op
 				if !isLocalAddr(examIns.Addr) {
@@ -596,6 +602,14 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 					RWIns[goID] = append(RWIns[goID], theIns)
 					if len(lockSet) > 0 {
 						lockMap[theIns] = lockSet
+					}
+					if len(chanBufMap) > 0 {
+						chanMap[theIns] = []string{}
+						for aChan, sSends := range chanBufMap {
+							if sSends[0] != nil && len(sSends) == 1 { // slice of channel sends contains exactly one value
+								chanMap[theIns] = append(chanMap[theIns], aChan)
+							}
+						}
 					}
 					addrNameMap[examIns.Addr.Name()] = append(addrNameMap[examIns.Addr.Name()], examIns.Addr)                                                 // map address name to address, used for checking points-to labels later
 					addrMap[examIns.Addr.Name()] = append(addrMap[examIns.Addr.Name()], RWInsInd{goID: goID, goInd: sliceContainsInsAt(RWIns[goID], theIns)}) // map address name to slice of instructions accessing the same address name
@@ -615,13 +629,33 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 					if len(lockSet) > 0 {
 						lockMap[theIns] = lockSet
 					}
+					if len(chanBufMap) > 0 {
+						chanMap[theIns] = []string{}
+						for aChan, sSends := range chanBufMap {
+							if sSends[0] != nil && len(sSends) == 1 { // slice of channel sends contains exactly one value
+								chanMap[theIns] = append(chanMap[theIns], aChan)
+							}
+						}
+					}
 					addrNameMap[examIns.X.Name()] = append(addrNameMap[examIns.X.Name()], examIns.X)
 					addrMap[examIns.X.Name()] = append(addrMap[examIns.X.Name()], RWInsInd{goID: goID, goInd: sliceContainsInsAt(RWIns[goID], theIns)})
 					a.ptaConfig.AddQuery(examIns.X)
 				} else if examIns.Op == token.ARROW { // channel receive op
+					var chName string
 					if _, ok := chanBufMap[examIns.X.Name()]; !ok { // if channel name can't be identified
 						a.pointerAnalysis(examIns.X, goID, theIns)
+						chName = chanName
 					} else {
+						chName = examIns.X.Name()
+					}
+					for i, aVal := range chanBufMap[chName] {
+						if aVal != nil { // channel is not empty
+							if len(chanBufMap[chName]) > i+1 {
+								chanBufMap[chName][i] = chanBufMap[chName][i+1] // move buffered values one place over
+							} else {
+								chanBufMap[chName][i] = nil // empty channel upon channel recv
+							}
+						}
 					}
 				}
 			case *ssa.FieldAddr:
@@ -629,6 +663,14 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 					RWIns[goID] = append(RWIns[goID], theIns)
 					if len(lockSet) > 0 {
 						lockMap[theIns] = lockSet
+					}
+					if len(chanBufMap) > 0 {
+						chanMap[theIns] = []string{}
+						for aChan, sSends := range chanBufMap {
+							if sSends[0] != nil && len(sSends) == 1 { // slice of channel sends contains exactly one value
+								chanMap[theIns] = append(chanMap[theIns], aChan)
+							}
+						}
 					}
 					addrNameMap[examIns.X.Name()] = append(addrNameMap[examIns.X.Name()], examIns.X)                                                    // map address name to address, used for checking points-to labels later
 					addrMap[examIns.X.Name()] = append(addrMap[examIns.X.Name()], RWInsInd{goID: goID, goInd: sliceContainsInsAt(RWIns[goID], theIns)}) // map address name to slice of instructions accessing the same address name
@@ -642,6 +684,14 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 						if len(lockSet) > 0 {
 							lockMap[theIns] = lockSet
 						}
+						if len(chanBufMap) > 0 {
+							chanMap[theIns] = []string{}
+							for aChan, sSends := range chanBufMap {
+								if sSends[0] != nil && len(sSends) == 1 { // slice of channel sends contains exactly one value
+									chanMap[theIns] = append(chanMap[theIns], aChan)
+								}
+							}
+						}
 						addrNameMap[readIns.X.Name()] = append(addrNameMap[readIns.X.Name()], readIns.X)
 						addrMap[readIns.X.Name()] = append(addrMap[readIns.X.Name()], RWInsInd{goID: goID, goInd: sliceContainsInsAt(RWIns[goID], theIns)})
 						a.ptaConfig.AddQuery(readIns.X)
@@ -651,6 +701,14 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 						RWIns[goID] = append(RWIns[goID], theIns)
 						if len(lockSet) > 0 {
 							lockMap[theIns] = lockSet
+						}
+						if len(chanBufMap) > 0 {
+							chanMap[theIns] = []string{}
+							for aChan, sSends := range chanBufMap {
+								if sSends[0] != nil && len(sSends) == 1 { // slice of channel sends contains exactly one value
+									chanMap[theIns] = append(chanMap[theIns], aChan)
+								}
+							}
 						}
 						addrNameMap[readIns.Name()] = append(addrNameMap[readIns.Name()], readIns)
 						addrMap[readIns.Name()] = append(addrMap[readIns.Name()], RWInsInd{goID: goID, goInd: sliceContainsInsAt(RWIns[goID], theIns)})
@@ -668,6 +726,14 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 							RWIns[goID] = append(RWIns[goID], theIns)
 							if len(lockSet) > 0 {
 								lockMap[theIns] = lockSet
+							}
+							if len(chanBufMap) > 0 {
+								chanMap[theIns] = []string{}
+								for aChan, sSends := range chanBufMap {
+									if sSends[0] != nil && len(sSends) == 1 { // slice of channel sends contains exactly one value
+										chanMap[theIns] = append(chanMap[theIns], aChan)
+									}
+								}
 							}
 							a.ptaConfig.AddQuery(examIns.X)
 							a.visitAllInstructions(theFn, goID)
@@ -703,6 +769,14 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 								if len(lockSet) > 0 {
 									lockMap[theIns] = lockSet
 								}
+								if len(chanBufMap) > 0 {
+									chanMap[theIns] = []string{}
+									for aChan, sSends := range chanBufMap {
+										if sSends[0] != nil && len(sSends) == 1 { // slice of channel sends contains exactly one value
+											chanMap[theIns] = append(chanMap[theIns], aChan)
+										}
+									}
+								}
 								addrNameMap[theVal.X.Name()] = append(addrNameMap[theVal.X.Name()], theVal)
 								addrMap[theVal.X.Name()] = append(addrMap[theVal.X.Name()], RWInsInd{goID: goID, goInd: sliceContainsInsAt(RWIns[goID], theIns)})
 								a.ptaConfig.AddQuery(theVal.X)
@@ -730,6 +804,14 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 								RWIns[goID] = append(RWIns[goID], theIns)
 								if len(lockSet) > 0 {
 									lockMap[theIns] = lockSet
+								}
+								if len(chanBufMap) > 0 {
+									chanMap[theIns] = []string{}
+									for aChan, sSends := range chanBufMap {
+										if sSends[0] != nil && len(sSends) == 1 { // slice of channel sends contains exactly one value
+											chanMap[theIns] = append(chanMap[theIns], aChan)
+										}
+									}
 								}
 								addrNameMap[access.X.Name()] = append(addrNameMap[access.X.Name()], access.X)                                                     // map address name to address, used for checking points-to labels later
 								addrMap[access.X.Name()] = append(addrMap[access.X.Name()], RWInsInd{goID: goID, goInd: sliceContainsInsAt(RWIns[goID], theIns)}) // map address name to slice of instructions accessing the same address name
