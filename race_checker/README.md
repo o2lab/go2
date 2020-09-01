@@ -24,6 +24,8 @@ Usage:
 
 `-focus`: Limit the analysis scope to a list of packages, separated by comas.
 
+`-ptrAnalysis`: Show occasions of pointer analysis returning multiple targets. Used for debugging purposes only. 
+
 ### Example
 
 Try some tests in the `tests` folder:
