@@ -1,0 +1,38 @@
+main:
+  PUSH m1
+      PUSH m2
+          PUSH m3
+          POP  m3
+          PUSH m3 === check under context [m1,m2], is the budget for m3 full or not? YES, budget exceeded, skip m3
+      POP m2
+      PUSH m3 == check under context [m1], is the budget for m3 full or not? NO, proceed
+        ....
+      POP m3
+      PUSH m2 == check under context [m1], is the budget for m2 full or not? YES, budget exceeded, skip m2
+          
+          
+          
+solution: initial budget 1
+ context: [m1,m2]
+ 
+ data structure: trie
+          root (main)
+          /  \
+        m1
+       /  \
+      m2   m3
+     /
+    m3
+    
+    context (call stack): 
+
+Trie Node
+
+API: 
+    bool isBudgetExceeded(func)
+    exploreFunction(func): increment the number of times for a function under the current context by one
+fields:
+    int LIMIT = 1 (user configurable)
+    int remainingBudget = LIMIT
+    map: func -> trie node
+    
