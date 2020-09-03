@@ -35,3 +35,12 @@ Try some test cases in adopted micro-benchmarks:
 ./race-checker godel2/ch-as-lock-race/main.go
 ```
 
+Or make use of the makefile:
+
+```
+make
+```
+then
+```
+make runGoBench
+```
