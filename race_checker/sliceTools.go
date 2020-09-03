@@ -1,9 +1,25 @@
 package main
 
+import "C"
 import (
 	"go/token"
 	"golang.org/x/tools/go/ssa"
+	"strings"
 )
+
+func insToCallStack(allIns []ssa.Instruction) ([]string, string) {
+	var callStack []string
+	var csStr string
+	for _, anIns := range allIns {
+		if fnCall, ok := anIns.(*ssa.Call); ok {
+			callStack = append(callStack, fnCall.Call.Value.Name())
+		} else if _, ok1 := anIns.(*ssa.Return); ok1 && len(callStack) > 0 {
+			callStack = callStack[:len(callStack)-1]
+		}
+	}
+	csStr = strings.Join(callStack, "...")
+	return callStack, csStr
+}
 
 func sliceContains(s []ssa.Value, e ssa.Value) bool {
 	for _, a := range s {
@@ -32,23 +48,13 @@ func sliceContainsStr(s []string, e string) bool {
 	return false
 }
 
-func sliceContainsIns(s []ssa.Instruction, e ssa.Instruction) bool {
-	i := 0
-	for i < len(s) {
-		if s[i] == e {
-			return true
-		}
-		i++
-	}
-	return false
-}
-
 func sliceContainsInsAt(s []ssa.Instruction, e ssa.Instruction) int {
-	i := 0
-	for s[i] != e {
-		i++
+	for i := 0; i < len(s); i++ {
+		if s[i] == e {
+			return i
+		}
 	}
-	return i
+	return -1
 }
 
 func deleteFromLockSet(s []ssa.Value, k int) []ssa.Value {

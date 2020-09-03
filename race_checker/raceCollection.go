@@ -119,6 +119,12 @@ func (a *analysis) locksetsInterset(insA ssa.Instruction, insB ssa.Instruction) 
 							return true
 						}
 					}
+				} else if param1, ok1 := addrA.(*ssa.FieldAddr); ok1 {
+					if param2, ok2 := addrB.(*ssa.FieldAddr); ok2 {
+						if param1.Pos() == param2.Pos() {
+							return true
+						}
+					}
 				}
 			}
 		}

@@ -25,6 +25,12 @@ type analysis struct {
 	analysisStat stat
 	HBgraph      *graph.Graph
 	RWinsMap     map[ssa.Instruction]graph.Node
+	trieMap      map[fnInfo]*trie // map each function to a trie node
+}
+
+type fnInfo struct {
+	fnName     string
+	contextStr string
 }
 
 type goroutineInfo struct {
@@ -36,6 +42,12 @@ type goroutineInfo struct {
 type stat struct {
 	nAccess    int
 	nGoroutine int
+}
+
+type trie struct {
+	fnName    string
+	budget    int
+	fnContext []string
 }
 
 type RWInsInd struct {
@@ -65,6 +77,7 @@ var (
 	chanName     string
 	insertIndMap = make(map[string]int)
 	chanMap      = make(map[ssa.Instruction][]string) // map each read/write access to a list of channels with value(s) already sent to it
+	trieLimit    = 2                                  // set as user config option later, an integer that dictates how many times a function can be called under identical context
 )
 
 func checkTokenName(fnName string, theIns *ssa.Call) string {
@@ -136,6 +149,38 @@ func init() {
 		"internal",
 		"impl",
 	}
+}
+
+func (a *analysis) exploredFunction(fn *ssa.Function, goID int) bool {
+	var visitedIns []ssa.Instruction
+	if len(RWIns) > 0 {
+		visitedIns = RWIns[goID]
+	} else {
+		visitedIns = []ssa.Instruction{}
+	}
+	csSlice, csStr := insToCallStack(visitedIns)
+	fnKey := fnInfo{
+		fnName:     fn.Name(),
+		contextStr: csStr,
+	}
+	if existingTrieNode, ok := a.trieMap[fnKey]; ok {
+		existingTrieNode.budget++ // increment the number of times for calling the function under the current context by one
+	} else {
+		newTrieNode := trie{
+			fnName:    fn.Name(),
+			budget:    1,
+			fnContext: csSlice,
+		}
+		a.trieMap[fnKey] = &newTrieNode
+	}
+	return a.trieMap[fnKey].isBudgetExceeded()
+}
+
+func (t trie) isBudgetExceeded() bool {
+	if t.budget > trieLimit {
+		return true
+	}
+	return false
 }
 
 func isLocalAddr(location ssa.Value) bool {
@@ -343,7 +388,7 @@ func staticAnalysis(args []string) error {
 			}
 			if isReadIns(anIns) || isWriteIns(anIns) {
 				Analysis.RWinsMap[anIns] = prevN
-			} else if callIns, ok := anIns.(*ssa.Call); ok {
+			} else if callIns, ok := anIns.(*ssa.Call); ok { // taking care of WG operations. TODO: identify different WG instances
 				if callIns.Call.Value.Name() == "Wait" {
 					waitingN = prevN
 				} else if callIns.Call.Value.Name() == "Done" {
@@ -456,10 +501,8 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 	switch theFunc := PTSet[rightLoc].Value().(type) {
 	case *ssa.Function:
 		fnName = theFunc.Name()
-		if !sliceContainsIns(RWIns[goID], theIns) {
-			log.Debug(strings.Repeat(" ", levels[goID]), "PUSH ", fnName, " at lvl ", levels[goID])
-			levels[goID]++
-			storeIns = append(storeIns, fnName)
+		if !a.exploredFunction(theFunc, goID) {
+			updateRecords(fnName, goID, "PUSH ")
 			RWIns[goID] = append(RWIns[goID], theIns)
 			a.visitAllInstructions(theFunc, goID)
 		}
@@ -467,10 +510,8 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 		methodName := theIns.(*ssa.Call).Call.Method.Name()
 		check := a.prog.LookupMethod(ptrSet[location].PointsTo().DynamicTypes().Keys()[0], a.mains[0].Pkg, methodName)
 		fnName = check.Name()
-		if !sliceContainsIns(RWIns[goID], theIns) {
-			log.Debug(strings.Repeat(" ", levels[goID]), "PUSH ", fnName, " at lvl ", levels[goID])
-			levels[goID]++
-			storeIns = append(storeIns, fnName)
+		if !a.exploredFunction(check, goID) {
+			updateRecords(fnName, goID, "PUSH ")
 			RWIns[goID] = append(RWIns[goID], theIns)
 			a.visitAllInstructions(check, goID)
 		}
@@ -493,6 +534,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 			levels[goID] = 0 // initialize level count at main entry
 			updateRecords(fn.Name(), goID, "PUSH ")
 			goStack = append(goStack, []string{}) // initialize first interior slice for main goroutine
+			a.trieMap = make(map[fnInfo]*trie)
 		}
 	}
 	if _, ok := levels[goID]; !ok && goID > 0 { // initialize level counter for new goroutine
@@ -542,7 +584,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 					if fromPkgsOfInterest(deferIns.Call.StaticCallee()) && deferIns.Call.StaticCallee().Pkg.Pkg.Name() != "sync" {
 						fnName := deferIns.Call.Value.Name()
 						fnName = checkTokenNameDefer(fnName, deferIns)
-						if !sliceContainsIns(RWIns[goID], theIns) {
+						if !a.exploredFunction(fn, goID) {
 							updateRecords(fnName, goID, "PUSH ")
 							RWIns[goID] = append(RWIns[goID], dIns)
 							a.visitAllInstructions(dIns.(*ssa.Defer).Call.StaticCallee(), goID)
@@ -619,7 +661,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				}
 				if theFunc, storeFn := examIns.Val.(*ssa.Function); storeFn {
 					fnName := theFunc.Name()
-					if !sliceContainsIns(RWIns[goID], theIns) {
+					if !a.exploredFunction(fn, goID) {
 						updateRecords(fnName, goID, "PUSH ")
 						RWIns[goID] = append(RWIns[goID], theIns)
 						a.visitAllInstructions(theFunc, goID)
@@ -723,7 +765,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 					theFn := mc.Fn.(*ssa.Function)
 					if fromPkgsOfInterest(theFn) {
 						fnName := mc.Fn.Name()
-						if !sliceContainsIns(RWIns[goID], theIns) {
+						if !a.exploredFunction(theFn, goID) {
 							updateRecords(fnName, goID, "PUSH ")
 							RWIns[goID] = append(RWIns[goID], theIns)
 							if len(lockSet) > 0 {
@@ -828,7 +870,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 					}
 					fnName := examIns.Call.Value.Name()
 					fnName = checkTokenName(fnName, examIns)
-					if !sliceContainsIns(RWIns[goID], theIns) {
+					if !a.exploredFunction(examIns.Call.StaticCallee(), goID) {
 						updateRecords(fnName, goID, "PUSH ")
 						RWIns[goID] = append(RWIns[goID], theIns)
 						a.visitAllInstructions(examIns.Call.StaticCallee(), goID)
@@ -840,7 +882,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 					switch examIns.Call.Value.Name() {
 					case "Range":
 						fnName := examIns.Call.Value.Name()
-						if !sliceContainsIns(RWIns[goID], theIns) {
+						if !a.exploredFunction(examIns.Call.StaticCallee(), goID) {
 							updateRecords(fnName, goID, "PUSH ")
 							RWIns[goID] = append(RWIns[goID], theIns)
 							a.visitAllInstructions(examIns.Call.StaticCallee(), goID)
@@ -859,6 +901,8 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 						RWIns[goID] = append(RWIns[goID], theIns)
 					case "Done":
 						RWIns[goID] = append(RWIns[goID], theIns)
+						//case "Add": // adds delta to the WG
+						//	fmt.Println("eee")// TODO: handle cases when WG counter is incremented by value greater than 1
 					}
 				} else {
 					continue
