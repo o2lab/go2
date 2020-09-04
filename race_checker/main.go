@@ -28,7 +28,7 @@ type analysis struct {
 	trieMap      map[fnInfo]*trie // map each function to a trie node
 }
 
-type fnInfo struct {
+type fnInfo struct { // all fields must be comparable for fnInfo to be used as key to trieMap
 	fnName     string
 	contextStr string
 }
@@ -78,6 +78,7 @@ var (
 	insertIndMap = make(map[string]int)
 	chanMap      = make(map[ssa.Instruction][]string) // map each read/write access to a list of channels with value(s) already sent to it
 	trieLimit    = 2                                  // set as user config option later, an integer that dictates how many times a function can be called under identical context
+	// proper forloop detection would require trieLimit of at least 2
 )
 
 func checkTokenName(fnName string, theIns *ssa.Call) string {
@@ -501,7 +502,7 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 	switch theFunc := PTSet[rightLoc].Value().(type) {
 	case *ssa.Function:
 		fnName = theFunc.Name()
-		if !a.exploredFunction(theFunc, goID) {
+		if !a.exploredFunction(theFunc, goID) && sliceContainsInsAt(RWIns[goID], theIns) < 0 {
 			updateRecords(fnName, goID, "PUSH ")
 			RWIns[goID] = append(RWIns[goID], theIns)
 			a.visitAllInstructions(theFunc, goID)
@@ -510,7 +511,7 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 		methodName := theIns.(*ssa.Call).Call.Method.Name()
 		check := a.prog.LookupMethod(ptrSet[location].PointsTo().DynamicTypes().Keys()[0], a.mains[0].Pkg, methodName)
 		fnName = check.Name()
-		if !a.exploredFunction(check, goID) {
+		if !a.exploredFunction(check, goID) && sliceContainsInsAt(RWIns[goID], theIns) < 0 {
 			updateRecords(fnName, goID, "PUSH ")
 			RWIns[goID] = append(RWIns[goID], theIns)
 			a.visitAllInstructions(check, goID)
@@ -584,7 +585,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 					if fromPkgsOfInterest(deferIns.Call.StaticCallee()) && deferIns.Call.StaticCallee().Pkg.Pkg.Name() != "sync" {
 						fnName := deferIns.Call.Value.Name()
 						fnName = checkTokenNameDefer(fnName, deferIns)
-						if !a.exploredFunction(fn, goID) {
+						if !a.exploredFunction(fn, goID) && sliceContainsInsAt(RWIns[goID], theIns) < 0 {
 							updateRecords(fnName, goID, "PUSH ")
 							RWIns[goID] = append(RWIns[goID], dIns)
 							a.visitAllInstructions(dIns.(*ssa.Defer).Call.StaticCallee(), goID)
@@ -661,7 +662,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				}
 				if theFunc, storeFn := examIns.Val.(*ssa.Function); storeFn {
 					fnName := theFunc.Name()
-					if !a.exploredFunction(fn, goID) {
+					if !a.exploredFunction(fn, goID) && sliceContainsInsAt(RWIns[goID], theIns) < 0 {
 						updateRecords(fnName, goID, "PUSH ")
 						RWIns[goID] = append(RWIns[goID], theIns)
 						a.visitAllInstructions(theFunc, goID)
@@ -765,7 +766,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 					theFn := mc.Fn.(*ssa.Function)
 					if fromPkgsOfInterest(theFn) {
 						fnName := mc.Fn.Name()
-						if !a.exploredFunction(theFn, goID) {
+						if !a.exploredFunction(theFn, goID) && sliceContainsInsAt(RWIns[goID], theIns) < 0 {
 							updateRecords(fnName, goID, "PUSH ")
 							RWIns[goID] = append(RWIns[goID], theIns)
 							if len(lockSet) > 0 {
@@ -870,7 +871,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 					}
 					fnName := examIns.Call.Value.Name()
 					fnName = checkTokenName(fnName, examIns)
-					if !a.exploredFunction(examIns.Call.StaticCallee(), goID) {
+					if !a.exploredFunction(examIns.Call.StaticCallee(), goID) && sliceContainsInsAt(RWIns[goID], theIns) < 0 {
 						updateRecords(fnName, goID, "PUSH ")
 						RWIns[goID] = append(RWIns[goID], theIns)
 						a.visitAllInstructions(examIns.Call.StaticCallee(), goID)
@@ -882,7 +883,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 					switch examIns.Call.Value.Name() {
 					case "Range":
 						fnName := examIns.Call.Value.Name()
-						if !a.exploredFunction(examIns.Call.StaticCallee(), goID) {
+						if !a.exploredFunction(examIns.Call.StaticCallee(), goID) && sliceContainsInsAt(RWIns[goID], theIns) < 0 {
 							updateRecords(fnName, goID, "PUSH ")
 							RWIns[goID] = append(RWIns[goID], theIns)
 							a.visitAllInstructions(examIns.Call.StaticCallee(), goID)

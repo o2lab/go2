@@ -17,7 +17,7 @@ func insToCallStack(allIns []ssa.Instruction) ([]string, string) {
 			callStack = callStack[:len(callStack)-1]
 		}
 	}
-	csStr = strings.Join(callStack, "...")
+	csStr = strings.Join(callStack, "...") // combine into one string because slices are not comparable
 	return callStack, csStr
 }
 
