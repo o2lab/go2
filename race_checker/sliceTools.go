@@ -48,6 +48,16 @@ func sliceContainsStr(s []string, e string) bool {
 	return false
 }
 
+func sliceContainsStrCtr(s []string, e string) int {
+	counter := 0
+	for _, a := range s {
+		if a == e {
+			counter++
+		}
+	}
+	return counter
+}
+
 func sliceContainsInsAt(s []ssa.Instruction, e ssa.Instruction) int {
 	for i := 0; i < len(s); i++ {
 		if s[i] == e {
