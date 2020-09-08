@@ -1,0 +1,3 @@
+[submodule "go_pointeranalysis"]
+	path = go_pointeranalysis
+	url = https://github.com/april1989/go_pointeranalysis.git
