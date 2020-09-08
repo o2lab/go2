@@ -13,7 +13,7 @@ The built binary by default is named `race-checker`.
 Usage:
 
 ```
-./race-checker [-debug] [-focus <coma-separated list of packages>] <path>
+./race-checker [-debug] [-ptrAnalysis] <path>
 ```
 
 `<path>` must lead to main.go file in the main package.
@@ -21,8 +21,6 @@ Usage:
 ### Flags
 
 `-debug`: Show debug information.
-
-`-focus`: Limit the analysis scope to a list of packages, separated by comas.
 
 `-ptrAnalysis`: Show occasions of pointer analysis returning multiple targets. Used for debugging purposes only. 
 
