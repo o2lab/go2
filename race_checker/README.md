@@ -16,7 +16,7 @@ Usage:
 ./race-checker [-debug] [-focus <coma-separated list of packages>] <path>
 ```
 
-`<path>` can be a file or a folder that must be the main package.
+`<path>` must lead to main.go file in the main package.
 
 ### Flags
 
