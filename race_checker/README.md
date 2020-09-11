@@ -42,3 +42,6 @@ then
 ```
 make runGoBench
 ```
+
+A catalogue of real-world programs to be tested on: 
+https://docs.google.com/spreadsheets/d/1XQznzDadxw9Tp6SVOCBndSTy3J65N1CscJUBRZwrcTU/edit?usp=sharing
