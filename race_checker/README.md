@@ -42,6 +42,8 @@ then
 ```
 make runGoBench
 ```
+positive race result would be shown as follows, 
+![Image of data race report](/tests/screenshot.png)
 
 A catalogue of real-world programs to be tested on: 
 https://docs.google.com/spreadsheets/d/1XQznzDadxw9Tp6SVOCBndSTy3J65N1CscJUBRZwrcTU/edit?usp=sharing
