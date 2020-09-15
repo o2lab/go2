@@ -572,25 +572,14 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 		RWIns = append(RWIns, []ssa.Instruction{})
 	}
 	fnBlocks := fn.Blocks
-	var returnIns []ssa.Instruction
 	var toAppend []*ssa.BasicBlock
 	var toDefer []ssa.Instruction // stack storing deferred calls
-	for j, nBlock := range fn.Blocks {
-		if strings.HasSuffix(nBlock.Comment, ".done") && j != len(fnBlocks)-1 { // when return block doesn't have largest index
-			bLen := len(nBlock.Instrs)
-			if _, ok := nBlock.Instrs[bLen-1].(*ssa.Return); ok {
-				toAppend = append([]*ssa.BasicBlock{nBlock}, toAppend...)
-			}
-		} else if nBlock.Comment == "recover" { // ignore built-in recover function
-			fnBlocks = append(fnBlocks[:j], fnBlocks[j+1:]...)
-		}
-	}
-	if len(toAppend) > 0 {
-		fnBlocks = append(fnBlocks, toAppend...) // move return block to end of slice
-	}
-	repeatSwitch := false // triggered when encountering basic blocks for body of a forloop
+	repeatSwitch := false         // triggered when encountering basic blocks for body of a forloop
 	for i := 0; i < len(fnBlocks); i++ {
 		aBlock := fnBlocks[i]
+		if aBlock.Comment == "recover" {
+			continue
+		}
 		if strings.HasSuffix(aBlock.Comment, ".done") && i != len(fnBlocks)-1 && sliceContainsBloc(toAppend, aBlock) { // ignore return block if it doesn't have largest index
 			continue
 		}
@@ -939,25 +928,6 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				} else {
 					continue
 				}
-			case *ssa.Return:
-				if i != len(fnBlocks)-1 {
-					returnIns = append([]ssa.Instruction{theIns}, returnIns...) // store return instructions that don't belong to final block
-					continue
-				}
-				if (fromPkgsOfInterest(examIns.Parent()) || isSynthetic(examIns.Parent())) && len(storeIns) > 0 {
-					fnName := examIns.Parent().Name()
-					if fnName == storeIns[len(storeIns)-1] {
-						updateRecords(fnName, goID, "POP  ")
-						RWIns[goID] = append(RWIns[goID], theIns)
-					}
-				}
-				if len(storeIns) == 0 && len(workList) != 0 { // finished reporting current goroutine and workList isn't empty
-					nextGoInfo := workList[0] // get the goroutine info at head of workList
-					workList = workList[1:]   // pop goroutine info from head of workList
-					a.newGoroutine(nextGoInfo)
-				} else {
-					return
-				}
 			case *ssa.Go: // for spawning of goroutines
 				var fnName string
 				switch anonFn := examIns.Call.Value.(type) {
@@ -979,25 +949,21 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				goStack[newGoID] = append(goStack[newGoID], storeIns...)
 				workList = append(workList, info) // store encountered goroutines
 				log.Debug(strings.Repeat(" ", levels[goID]), "spawning Goroutine ----->  ", fnName)
+			case *ssa.Return:
+				RWIns[goID] = append(RWIns[goID], theIns)
 			}
 		}
-		if i == len(fnBlocks)-1 && len(returnIns) > 0 {
-			theIns := returnIns[0]
-			examIns := theIns.(*ssa.Return)
-			if (fromPkgsOfInterest(examIns.Parent()) || isSynthetic(examIns.Parent())) && len(storeIns) > 0 {
-				fnName := examIns.Parent().Name()
-				if fnName == storeIns[len(storeIns)-1] {
-					updateRecords(fnName, goID, "POP  ")
-					RWIns[goID] = append(RWIns[goID], theIns)
-				}
-			}
-			if len(storeIns) == 0 && len(workList) != 0 { // finished reporting current goroutine and workList isn't empty
-				nextGoInfo := workList[0] // get the goroutine info at end of workList
-				workList = workList[1:]   // pop goroutine info from end of workList
-				a.newGoroutine(nextGoInfo)
-			} else {
-				return
-			}
-		}
+	}
+	// done with all instructions in function body, now pop the function
+	fnName := fn.Name()
+	if fnName == storeIns[len(storeIns)-1] {
+		updateRecords(fnName, goID, "POP  ")
+	}
+	if len(storeIns) == 0 && len(workList) != 0 { // finished reporting current goroutine and workList isn't empty
+		nextGoInfo := workList[0] // get the goroutine info at head of workList
+		workList = workList[1:]   // pop goroutine info from head of workList
+		a.newGoroutine(nextGoInfo)
+	} else {
+		return
 	}
 }
