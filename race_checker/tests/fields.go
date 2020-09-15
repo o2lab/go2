@@ -11,7 +11,7 @@ func main() {
 		b: 2,
 	}
 	go func() {
-		s.a = 1
+		s.a /* RACE Write */ = 1
 	}()
-	s.b = 2
+	s.b /* RACE Write */ = 2
 }
