@@ -152,41 +152,6 @@ func init() {
 	}
 }
 
-func (a *analysis) exploredFunction(fn *ssa.Function, goID int) bool {
-	var visitedIns []ssa.Instruction
-	if len(RWIns) > 0 {
-		visitedIns = RWIns[goID]
-	} else {
-		visitedIns = []ssa.Instruction{}
-	}
-	csSlice, csStr := insToCallStack(visitedIns)
-	if sliceContainsStrCtr(csSlice, fn.Name()) > trieLimit {
-		return true
-	}
-	fnKey := fnInfo{
-		fnName:     fn.Name(),
-		contextStr: csStr,
-	}
-	if existingTrieNode, ok := a.trieMap[fnKey]; ok {
-		existingTrieNode.budget++ // increment the number of times for calling the function under the current context by one
-	} else {
-		newTrieNode := trie{
-			fnName:    fn.Name(),
-			budget:    1,
-			fnContext: csSlice,
-		}
-		a.trieMap[fnKey] = &newTrieNode
-	}
-	return a.trieMap[fnKey].isBudgetExceeded()
-}
-
-func (t trie) isBudgetExceeded() bool {
-	if t.budget > trieLimit {
-		return true
-	}
-	return false
-}
-
 func isLocalAddr(location ssa.Value) bool {
 	if location.Pos() == token.NoPos {
 		return true
@@ -428,6 +393,50 @@ func updateRecords(fnName string, goID int, pushPop string) {
 	}
 }
 
+func (t trie) isBudgetExceeded() bool {
+	if t.budget > trieLimit {
+		return true
+	}
+	return false
+}
+
+func (a *analysis) exploredFunction(fn *ssa.Function, goID int, theIns ssa.Instruction) bool {
+	//if !fromPkgsOfInterest(fn) { // for temporary debugging purposes only
+	//	return true
+	//}
+	if sliceContainsInsAt(RWIns[goID], theIns) >= 0 {
+		return true
+	}
+	//if sliceContainsStr(storeIns, fn.Name()) { // for temporary debugging purposes only
+	//	return true
+	//}
+	var visitedIns []ssa.Instruction
+	if len(RWIns) > 0 {
+		visitedIns = RWIns[goID]
+	} else {
+		visitedIns = []ssa.Instruction{}
+	}
+	csSlice, csStr := insToCallStack(visitedIns)
+	if sliceContainsStrCtr(csSlice, fn.Name()) > trieLimit {
+		return true
+	}
+	fnKey := fnInfo{
+		fnName:     fn.Name(),
+		contextStr: csStr,
+	}
+	if existingTrieNode, ok := a.trieMap[fnKey]; ok {
+		existingTrieNode.budget++ // increment the number of times for calling the function under the current context by one
+	} else {
+		newTrieNode := trie{
+			fnName:    fn.Name(),
+			budget:    1,
+			fnContext: csSlice,
+		}
+		a.trieMap[fnKey] = &newTrieNode
+	}
+	return a.trieMap[fnKey].isBudgetExceeded()
+}
+
 func (a *analysis) newGoroutine(info goroutineInfo) {
 	storeIns = append(storeIns, info.entryMethod)
 	if info.goID >= len(RWIns) { // initialize interior slice for new goroutine
@@ -476,27 +485,34 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 	}
 	var fnName string
 	rightLoc := 0       // initialize index for the right points-to location
-	if len(PTSet) > 1 { // multiple targets returned
+	if len(PTSet) > 1 { // multiple targets returned by pointer analysis
 		log.Trace("***Pointer Analysis revealed ", len(PTSet), " targets for location - ", a.prog.Fset.Position(location.Pos()))
+		var fns []string
 		for ind, eachTarget := range PTSet { // check each target
 			if eachTarget.Value().Parent() != nil {
-				log.Trace("*****target No.", ind+1, " - ", eachTarget.Value().String(), " from function ", eachTarget.Value().Parent().Name())
+				fns = append(fns, eachTarget.Value().Parent().Name())
+				log.Trace("*****target No.", ind+1, " - ", eachTarget.Value().Name(), " from function ", eachTarget.Value().Parent().Name())
 				if sliceContainsStr(storeIns, eachTarget.Value().Parent().Name()) { // calling function is in current goroutine
 					rightLoc = ind
-					//break
-				} else {
-					var allStack []string
-					for i := 1; i <= goID; i++ {
-						allStack = append(allStack, goStack[i]...)
+				} else if goID > 0 {
+					i := goID
+					allStack := goStack[i] // first get stack from immediate caller
+					for i > 0 {
+						allStack = append(goStack[goCaller[i]], allStack...) // then get from all preceding caller goroutines
+						i = goCaller[i]
 					}
 					if sliceContainsStr(allStack, eachTarget.Value().Parent().Name()) { // check callstack of current goroutine
 						rightLoc = ind
-						break
 					}
 				}
 			} else {
-				log.Debug("target No.", ind+1, " - ", eachTarget.Value().String(), " with no parent function*********")
+				log.Debug("target No.", ind+1, " - ", eachTarget.Value().Name(), " with no parent function*********")
 			}
+		}
+		if sliceContainsDup(fns) { // multiple targets reside in same function
+			//for i, t := range PTSet {
+			//	if a.reachable(t.Value().Parent().Referrers(1), )
+			//}
 		}
 		log.Trace("***Executing target No.", rightLoc+1)
 	} else if len(PTSet) == 0 {
@@ -505,16 +521,19 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 	switch theFunc := PTSet[rightLoc].Value().(type) {
 	case *ssa.Function:
 		fnName = theFunc.Name()
-		if !a.exploredFunction(theFunc, goID) {
+		if !a.exploredFunction(theFunc, goID, theIns) {
 			updateRecords(fnName, goID, "PUSH ")
 			RWIns[goID] = append(RWIns[goID], theIns)
 			a.visitAllInstructions(theFunc, goID)
 		}
-	case *ssa.MakeInterface: // for abstract method calls
+	case *ssa.MakeInterface:
 		methodName := theIns.(*ssa.Call).Call.Method.Name()
+		if a.prog.MethodSets.MethodSet(ptrSet[location].PointsTo().DynamicTypes().Keys()[0]).Lookup(a.mains[0].Pkg, methodName) == nil { // ignore abstract methods
+			return
+		}
 		check := a.prog.LookupMethod(ptrSet[location].PointsTo().DynamicTypes().Keys()[0], a.mains[0].Pkg, methodName)
 		fnName = check.Name()
-		if !a.exploredFunction(check, goID) {
+		if !a.exploredFunction(check, goID, theIns) {
 			updateRecords(fnName, goID, "PUSH ")
 			RWIns[goID] = append(RWIns[goID], theIns)
 			a.visitAllInstructions(check, goID)
@@ -588,10 +607,10 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 					if fromPkgsOfInterest(deferIns.Call.StaticCallee()) && deferIns.Call.StaticCallee().Pkg.Pkg.Name() != "sync" {
 						fnName := deferIns.Call.Value.Name()
 						fnName = checkTokenNameDefer(fnName, deferIns)
-						if !a.exploredFunction(fn, goID) {
+						if !a.exploredFunction(deferIns.Call.StaticCallee(), goID, theIns) {
 							updateRecords(fnName, goID, "PUSH ")
 							RWIns[goID] = append(RWIns[goID], dIns)
-							a.visitAllInstructions(dIns.(*ssa.Defer).Call.StaticCallee(), goID)
+							a.visitAllInstructions(deferIns.Call.StaticCallee(), goID)
 						}
 					} else if deferIns.Call.StaticCallee().Name() == "Unlock" {
 						lockLoc := deferIns.Call.Args[0]
@@ -665,7 +684,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				}
 				if theFunc, storeFn := examIns.Val.(*ssa.Function); storeFn {
 					fnName := theFunc.Name()
-					if !a.exploredFunction(fn, goID) {
+					if !a.exploredFunction(theFunc, goID, theIns) {
 						updateRecords(fnName, goID, "PUSH ")
 						RWIns[goID] = append(RWIns[goID], theIns)
 						a.visitAllInstructions(theFunc, goID)
@@ -769,7 +788,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 					theFn := mc.Fn.(*ssa.Function)
 					if fromPkgsOfInterest(theFn) {
 						fnName := mc.Fn.Name()
-						if !a.exploredFunction(theFn, goID) {
+						if !a.exploredFunction(theFn, goID, theIns) {
 							updateRecords(fnName, goID, "PUSH ")
 							RWIns[goID] = append(RWIns[goID], theIns)
 							if len(lockSet) > 0 {
@@ -796,16 +815,20 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				if strings.Contains(examIns.X.String(), "complit") {
 					continue
 				}
-				if _, ok := examIns.X.(*ssa.Call); !ok {
-					if _, ok := examIns.X.(*ssa.Parameter); !ok {
-						continue
-					} else {
-						if _, ok1 := examIns.X.(*ssa.Parameter).Type().(*types.Basic); ok1 {
-							continue
-						}
+				switch insType := examIns.X.(type) {
+				case *ssa.Call:
+					a.pointerAnalysis(examIns.X, goID, theIns)
+				case *ssa.Parameter:
+					if _, ok := insType.Type().(*types.Basic); !ok {
+						a.pointerAnalysis(examIns.X, goID, theIns)
 					}
+					continue
+				case *ssa.UnOp:
+					if _, ok := insType.X.(*ssa.Global); !ok {
+						a.pointerAnalysis(examIns.X, goID, theIns)
+					}
+					continue
 				}
-				a.pointerAnalysis(examIns.X, goID, theIns)
 			case *ssa.Call:
 				if examIns.Call.StaticCallee() == nil && examIns.Call.Method == nil {
 					if _, ok := examIns.Call.Value.(*ssa.Builtin); !ok {
@@ -841,6 +864,9 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 							continue
 						}
 					}
+				} else if examIns.Call.StaticCallee() == nil {
+					//log.Debug("***********************special case*****************************************")
+					return
 				} else if fromPkgsOfInterest(examIns.Call.StaticCallee()) && examIns.Call.StaticCallee().Pkg.Pkg.Name() != "sync" { // calling a function
 					if examIns.Call.Value.Name() == "AfterFunc" && examIns.Call.StaticCallee().Pkg.Pkg.Name() == "time" { // calling time.AfterFunc()
 						paramFunc = examIns.Call.Args[1]
@@ -874,19 +900,16 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 					}
 					fnName := examIns.Call.Value.Name()
 					fnName = checkTokenName(fnName, examIns)
-					if !a.exploredFunction(examIns.Call.StaticCallee(), goID) {
+					if !a.exploredFunction(examIns.Call.StaticCallee(), goID, theIns) {
 						updateRecords(fnName, goID, "PUSH ")
 						RWIns[goID] = append(RWIns[goID], theIns)
 						a.visitAllInstructions(examIns.Call.StaticCallee(), goID)
 					}
-				} else if examIns.Call.StaticCallee() == nil {
-					log.Debug("***********************special case*****************************************")
-					return
 				} else if examIns.Call.StaticCallee().Pkg.Pkg.Name() == "sync" {
 					switch examIns.Call.Value.Name() {
 					case "Range":
 						fnName := examIns.Call.Value.Name()
-						if !a.exploredFunction(examIns.Call.StaticCallee(), goID) {
+						if !a.exploredFunction(examIns.Call.StaticCallee(), goID, theIns) {
 							updateRecords(fnName, goID, "PUSH ")
 							RWIns[goID] = append(RWIns[goID], theIns)
 							a.visitAllInstructions(examIns.Call.StaticCallee(), goID)

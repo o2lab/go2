@@ -1,9 +1,10 @@
 package main
 
-import "C"
+//import "C"
 import (
 	"go/token"
 	"golang.org/x/tools/go/ssa"
+	"sort"
 	"strings"
 )
 
@@ -34,6 +35,18 @@ func sliceContainsBloc(s []*ssa.BasicBlock, e *ssa.BasicBlock) bool {
 	for _, a := range s {
 		if a.Comment == e.Comment {
 			return true
+		}
+	}
+	return false
+}
+
+func sliceContainsDup(s []string) bool {
+	sort.Strings(s)
+	for i, n := range s {
+		if i > 0 {
+			if n == s[i-1] {
+				return true
+			}
 		}
 	}
 	return false

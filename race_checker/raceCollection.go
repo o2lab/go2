@@ -16,7 +16,7 @@ func (a *analysis) checkRacyPairs() {
 				for jj, goJ := range RWIns[j] {
 					insSlice := []ssa.Instruction{goI, goJ} // one instruction from each goroutine
 					addressPair := a.insAddress(insSlice)
-					if len(addressPair) > 1 && a.sameAddress(addressPair[0], addressPair[1]) && !sliceContains(reportedAddr, addressPair[0]) && !a.reachable(goI, goJ) && !a.locksetsInterset(insSlice[0], insSlice[1]) && !a.chanProtected(insSlice[0], insSlice[1]) {
+					if len(addressPair) > 1 && a.sameAddress(addressPair[0], addressPair[1]) && !sliceContains(reportedAddr, addressPair[0]) && !a.reachable(goI, goJ) && !a.lockSetsIntersect(insSlice[0], insSlice[1]) && !a.chanProtected(insSlice[0], insSlice[1]) {
 						reportedAddr = append(reportedAddr, addressPair[0])
 						counter++
 						goIDs := []int{i, j}    // store goroutine IDs
@@ -105,7 +105,7 @@ func (a *analysis) reachable(fromIns ssa.Instruction, toIns ssa.Instruction) boo
 	return false
 }
 
-func (a *analysis) locksetsInterset(insA ssa.Instruction, insB ssa.Instruction) bool {
+func (a *analysis) lockSetsIntersect(insA ssa.Instruction, insB ssa.Instruction) bool {
 	setA := lockMap[insA] // lockset of instruction-A
 	setB := lockMap[insB] // lockset of instruction-B
 	for _, addrA := range setA {
