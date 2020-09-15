@@ -18,6 +18,10 @@ Usage:
 
 `<path>` must lead to main.go file in the main package.
 
+### Running tests
+
+Run `go test` in the current folder.
+
 ### Flags
 
 `-debug`: Show debug information.
