@@ -8,7 +8,7 @@ type A struct {
 }
 
 func (a *A) SetX(x int) {
-	a.x = x
+	a.x /* RACE Write */ = x
 	fmt.Println(a.x)
 }
 
@@ -17,7 +17,7 @@ func main() {
 		2, 2,
 	}
 	go a.SetX(1)
-	fmt.Println(a.x)
+	fmt.Println(a.x /* RACE Read */)
 	s := []int{1, 2, 3, 4}
 	writeSlice(s)
 	fmt.Println(s)

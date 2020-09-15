@@ -1,10 +1,12 @@
 package main
 
 import (
+	"fmt"
 	"github.com/logrusorgru/aurora"
 	log "github.com/sirupsen/logrus"
 	"go/token"
 	"golang.org/x/tools/go/ssa"
+	"regexp"
 	"strings"
 )
 
@@ -149,11 +151,16 @@ func (a *analysis) printRace(counter int, insPair []ssa.Instruction, addrPair []
 	log.Printf("Data race #%d", counter)
 	log.Println(strings.Repeat("=", 100))
 	for i, anIns := range insPair {
+		var errMsg string
 		if isWriteIns(anIns) {
-			log.Println("  Write of ", aurora.Magenta(addrPair[i].Name()), " in function ", aurora.BgBrightGreen(anIns.Parent().Name()), " at ", a.prog.Fset.Position(anIns.Pos()))
+			errMsg = fmt.Sprint("  Write of ", aurora.Magenta(addrPair[i].String()), " in function ", aurora.BgBrightGreen(anIns.Parent().Name()), " at ", a.prog.Fset.Position(anIns.Pos()))
 		} else {
-			log.Println("  Read of  ", aurora.Magenta(addrPair[i].Name()), " in function ", aurora.BgBrightGreen(anIns.Parent().Name()), " at ", a.prog.Fset.Position(anIns.Pos()))
+			errMsg = fmt.Sprint("  Read of ", aurora.Magenta(addrPair[i].String()), " in function ", aurora.BgBrightGreen(anIns.Parent().Name()), " at ", a.prog.Fset.Position(anIns.Pos()))
 		}
+		colorOutput := regexp.MustCompile(`\x1b\[\d+m`)
+		errMsg = colorOutput.ReplaceAllString(errMsg, "")
+		racyStackTops = append(racyStackTops, errMsg)
+		log.Print(errMsg)
 		var printStack []string
 		var printPos []token.Pos
 		for p, everyIns := range RWIns[goIDs[i]] {

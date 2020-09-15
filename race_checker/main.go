@@ -56,28 +56,29 @@ type RWInsInd struct {
 }
 
 var (
-	Analysis     *analysis
-	focusPkgs    []string
-	excludedPkgs []string
-	allPkg       bool
-	levels       = make(map[int]int)
-	RWIns        [][]ssa.Instruction
-	storeIns     []string
-	workList     []goroutineInfo
-	reportedAddr []ssa.Value
-	lockMap      = make(map[ssa.Instruction][]ssa.Value) // map each read/write access to a snapshot of actively maintained lockset
-	lockSet      []ssa.Value                             // active lockset, to be maintained along instruction traversal
-	addrNameMap  = make(map[string][]ssa.Value)          // for potential optimization purposes
-	addrMap      = make(map[string][]RWInsInd)           // for potential optimization purposes
-	paramFunc    ssa.Value
-	goStack      [][]string
-	goCaller     = make(map[int]int)
-	goNames      = make(map[int]string)
-	chanBufMap   = make(map[string][]*ssa.Send)
-	chanName     string
-	insertIndMap = make(map[string]int)
-	chanMap      = make(map[ssa.Instruction][]string) // map each read/write access to a list of channels with value(s) already sent to it
-	trieLimit    = 2                                  // set as user config option later, an integer that dictates how many times a function can be called under identical context
+	Analysis      *analysis
+	focusPkgs     []string
+	excludedPkgs  []string
+	allPkg        = true
+	levels        = make(map[int]int)
+	RWIns         [][]ssa.Instruction
+	storeIns      []string
+	workList      []goroutineInfo
+	reportedAddr  []ssa.Value
+	racyStackTops []string
+	lockMap       = make(map[ssa.Instruction][]ssa.Value) // map each read/write access to a snapshot of actively maintained lockset
+	lockSet       []ssa.Value                             // active lockset, to be maintained along instruction traversal
+	addrNameMap   = make(map[string][]ssa.Value)          // for potential optimization purposes
+	addrMap       = make(map[string][]RWInsInd)           // for potential optimization purposes
+	paramFunc     ssa.Value
+	goStack       [][]string
+	goCaller      = make(map[int]int)
+	goNames       = make(map[int]string)
+	chanBufMap    = make(map[string][]*ssa.Send)
+	chanName      string
+	insertIndMap  = make(map[string]int)
+	chanMap       = make(map[ssa.Instruction][]string) // map each read/write access to a list of channels with value(s) already sent to it
+	trieLimit     = 2                                  // set as user config option later, an integer that dictates how many times a function can be called under identical context
 	// proper forloop detection would require trieLimit of at least 2
 )
 
@@ -216,8 +217,13 @@ func main() {
 	debug := flag.Bool("debug", false, "Prints debug messages.")
 	focus := flag.String("focus", "", "Specifies a list of packages to check races.")
 	ptrAnalysis := flag.Bool("ptrAnalysis", false, "Prints pointer analysis results. ")
+	help := flag.Bool("help", false, "Show all command-line options.")
 	//flag.BoolVar(&allPkg, "all-package", true, "Analyze all packages required by the main package.")
 	flag.Parse()
+	if *help {
+		flag.PrintDefaults()
+		return
+	}
 	if *debug {
 		log.SetLevel(log.DebugLevel)
 	}
@@ -227,8 +233,7 @@ func main() {
 	if *focus != "" {
 		focusPkgs = strings.Split(*focus, ",")
 		focusPkgs = append(focusPkgs, "command-line-arguments")
-	} else {
-		allPkg = true
+		allPkg = false
 	}
 
 	log.SetFormatter(&log.TextFormatter{
