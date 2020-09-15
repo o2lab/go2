@@ -1,3 +1,4 @@
-[submodule "go_pointeranalysis"]
-	path = go_pointeranalysis
-	url = https://github.com/april1989/go_pointeranalysis.git
+[submodule "go_pointeranlaysis"]
+	path = go_pointeranlaysis
+	url = https://github.tamu.edu/April1989/go_pointeranlaysis.git
+	branch = master
