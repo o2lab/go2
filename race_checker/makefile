@@ -1,5 +1,5 @@
 build:
-	go build -o main main.go sliceTools.go raceCollection.go
+	go build -o main main.go pointerAnalysis.go raceCollection.go sliceTools.go ssaInstructions.go staticAnalysis.go
 runCockroach:
 	./main GoBench/Cockroach/27659/main.go
 	./main GoBench/Cockroach/35501/main.go
