@@ -293,14 +293,14 @@ func (a *analysis) insMakeInterface(examIns *ssa.MakeInterface, goID int, theIns
 	}
 	switch insType := examIns.X.(type) {
 	case *ssa.Call:
-		//a.pointerAnalysis(examIns.X, goID, theIns)
+		a.pointerAnalysis(examIns.X, goID, theIns)
 	case *ssa.Parameter:
 		if _, ok := insType.Type().(*types.Basic); !ok {
-			//a.pointerAnalysis(examIns.X, goID, theIns)
+			a.pointerAnalysis(examIns.X, goID, theIns)
 		}
 	case *ssa.UnOp:
 		if _, ok := insType.X.(*ssa.Global); !ok {
-			//a.pointerAnalysis(examIns.X, goID, theIns)
+			a.pointerAnalysis(examIns.X, goID, theIns)
 		}
 	default:
 		return
@@ -311,7 +311,7 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 	stats.IncStat(stats.NCall)
 	if examIns.Call.StaticCallee() == nil && examIns.Call.Method == nil {
 		if _, ok := examIns.Call.Value.(*ssa.Builtin); !ok {
-			//a.pointerAnalysis(examIns.Call.Value, goID, theIns)
+			a.pointerAnalysis(examIns.Call.Value, goID, theIns)
 		} else if examIns.Call.Value.Name() == "delete" { // built-in delete op
 			if theVal, ok := examIns.Call.Args[0].(*ssa.UnOp); ok {
 				if theVal.Op == token.MUL && !isLocalAddr(theVal.X) {
@@ -338,7 +338,7 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 	} else if examIns.Call.Method != nil && examIns.Call.Method.Pkg() != nil { // calling an method
 		if examIns.Call.Method.Pkg().Name() != "sync" {
 			if _, ok := examIns.Call.Value.(*ssa.Builtin); !ok {
-				//a.pointerAnalysis(examIns.Call.Value, goID, theIns)
+				a.pointerAnalysis(examIns.Call.Value, goID, theIns)
 			} else {
 				return
 			}
