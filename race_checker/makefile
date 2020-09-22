@@ -1,101 +1,101 @@
 build:
 	go build -o main main.go pointerAnalysis.go raceCollection.go sliceTools.go ssaInstructions.go staticAnalysis.go
 runKubed:
-	./main test-kubed/main.go
+	go run ./main test-kubed/main.go
 runNakama:
-	./main test-nakama/main.go
+	go run ./main test-nakama/main.go
 runHugo:
-	./main test-hugo/hugo-master/main.go
+	go run ./main test-hugo/hugo-master/main.go
 runTalisman:
-	./main test-talisman/talisman.go
+	go run ./main test-talisman/talisman.go
 runJsonnet:
-	./main test-jsonnet/cmd/jsonnet/cmd.go
+	go run ./main test-jsonnet/cmd/jsonnet/cmd.go
 runKsonnet:
-	./main test-ksonnet/cmd/ks/main.go
+	go run ./main test-ksonnet/cmd/ks/main.go
 runGitea:
-	./main test-gitea/main.go
+	go run ./main test-gitea/main.go
 runFaas:
-	./main test-faas/gateway/main.go
+	go run ./main test-faas/gateway/main.go
 runKit:
-	./main test-kit/cmd/kitgen/main.go
+	go run ./main test-kit/cmd/kitgen/main.go
 runMicro:
-	./main test-micro/main.go
+	go run ./main test-micro/main.go
 runDelve:
-	./main test-delve/cmd/dlv/main.go
+	go run ./main test-delve/cmd/dlv/main.go
 runCockroach:
-	./main tests/GoBench/Cockroach/27659/main.go
-	./main tests/GoBench/Cockroach/35501/main.go
+	go run ./main tests/GoBench/Cockroach/27659/main.go
+	go run ./main tests/GoBench/Cockroach/35501/main.go
 runEtcd:
-	./main tests/GoBench/Etcd/4876/main.go
-	./main tests/GoBench/Etcd/8149/main.go
-	./main tests/GoBench/Etcd/9446/main.go
+	go run ./main tests/GoBench/Etcd/4876/main.go
+	go run ./main tests/GoBench/Etcd/8149/main.go
+	go run ./main tests/GoBench/Etcd/9446/main.go
 runGrpc:
-	./main tests/GoBench/Grpc/1748/main.go
-	./main tests/GoBench/Grpc/1862/main.go
-	./main tests/GoBench/Grpc/3090/main.go
+	go run ./main tests/GoBench/Grpc/1748/main.go
+	go run ./main tests/GoBench/Grpc/1862/main.go
+	go run ./main tests/GoBench/Grpc/3090/main.go
 runIstio:
-	./main tests/GoBench/Istio/8144/main.go
-	./main tests/GoBench/Istio/8214/main.go
-	./main tests/GoBench/Istio/8967/main.go
-	./main tests/GoBench/Istio/16742/main.go
+	go run ./main tests/GoBench/Istio/8144/main.go
+	go run ./main tests/GoBench/Istio/8214/main.go
+	go run ./main tests/GoBench/Istio/8967/main.go
+	go run ./main tests/GoBench/Istio/16742/main.go
 runServing:
-	./main tests/GoBench/Serving/3148/main.go
+	go run ./main tests/GoBench/Serving/3148/main.go
 runGoBench:
-	./main tests/GoBench/Cockroach/27659/main.go
-	./main tests/GoBench/Cockroach/35501/main.go
-	./main tests/GoBench/Etcd/4876/main.go
-	./main tests/GoBench/Etcd/8149/main.go
-	./main tests/GoBench/Etcd/9446/main.go
-	./main tests/GoBench/Grpc/1748/main.go
-	./main tests/GoBench/Grpc/1862/main.go
-	./main tests/GoBench/Grpc/3090/main.go
-	./main tests/GoBench/Istio/8144/main.go
-	./main tests/GoBench/Istio/8214/main.go
-	./main tests/GoBench/Istio/8967/main.go
-	./main tests/GoBench/Istio/16742/main.go
-	./main tests/GoBench/Kubernetes/79631/main.go
-	./main tests/GoBench/Kubernetes/80284/main.go
-	./main tests/GoBench/Kubernetes/81091/main.go
-	./main tests/GoBench/Kubernetes/81148/main.go
-	./main tests/GoBench/Kubernetes/88331/main.go
-	./main tests/GoBench/Serving/3148/main.go
+	go run ./main tests/GoBench/Cockroach/27659/main.go
+	go run ./main tests/GoBench/Cockroach/35501/main.go
+	go run ./main tests/GoBench/Etcd/4876/main.go
+	go run ./main tests/GoBench/Etcd/8149/main.go
+	go run ./main tests/GoBench/Etcd/9446/main.go
+	go run ./main tests/GoBench/Grpc/1748/main.go
+	go run ./main tests/GoBench/Grpc/1862/main.go
+	go run ./main tests/GoBench/Grpc/3090/main.go
+	go run ./main tests/GoBench/Istio/8144/main.go
+	go run ./main tests/GoBench/Istio/8214/main.go
+	go run ./main tests/GoBench/Istio/8967/main.go
+	go run ./main tests/GoBench/Istio/16742/main.go
+	go run ./main tests/GoBench/Kubernetes/79631/main.go
+	go run ./main tests/GoBench/Kubernetes/80284/main.go
+	go run ./main tests/GoBench/Kubernetes/81091/main.go
+	go run ./main tests/GoBench/Kubernetes/81148/main.go
+	go run ./main tests/GoBench/Kubernetes/88331/main.go
+	go run ./main tests/GoBench/Serving/3148/main.go
 runGodel2Race:
-	./main tests/godel2/ch-as-lock-race/main.go
-	./main tests/godel2/deposit-race/main.go
-	./main tests/godel2/prod-cons-race/main.go
-	./main tests/godel2/simple-race/main.go
-	./main tests/godel2/dine3-chan-race/main.go
-	./main tests/godel2/dine5-chan-race/main.go
+	go run ./main tests/godel2/ch-as-lock-race/main.go
+	go run ./main tests/godel2/deposit-race/main.go
+	go run ./main tests/godel2/prod-cons-race/main.go
+	go run ./main tests/godel2/simple-race/main.go
+	go run ./main tests/godel2/dine3-chan-race/main.go
+	go run ./main tests/godel2/dine5-chan-race/main.go
 runGodel2NoRace:
-	./main tests/godel2/ch-as-lock-fix/main.go
-	./main tests/godel2/deposit-fix/main.go
-	./main tests/godel2/prod-cons-fix/main.go
-	./main tests/godel2/simple-race-fix/main.go
-	./main tests/godel2/no-race/main.go
-	./main tests/godel2/dine3-chan-fix/main.go
-	./main tests/godel2/dine5-chan-fix/main.go
+	go run ./main tests/godel2/ch-as-lock-fix/main.go
+	go run ./main tests/godel2/deposit-fix/main.go
+	go run ./main tests/godel2/prod-cons-fix/main.go
+	go run ./main tests/godel2/simple-race-fix/main.go
+	go run ./main tests/godel2/no-race/main.go
+	go run ./main tests/godel2/dine3-chan-fix/main.go
+	go run ./main tests/godel2/dine5-chan-fix/main.go
 run:
-	./main tests/GoBench/Cockroach/27659/main.go
-	./main tests/GoBench/Cockroach/35501/main.go
-	./main tests/GoBench/Etcd/4876/main.go
-	./main tests/GoBench/Etcd/8149/main.go
-	./main tests/GoBench/Etcd/9446/main.go
-	./main tests/GoBench/Grpc/1748/main.go
-	./main tests/GoBench/Grpc/1862/main.go
-	./main tests/GoBench/Grpc/3090/main.go
-	./main tests/GoBench/Istio/8144/main.go
-	./main tests/GoBench/Istio/8214/main.go
-	./main tests/GoBench/Istio/8967/main.go
-	./main tests/GoBench/Istio/16742/main.go
-	./main tests/GoBench/Kubernetes/79631/main.go
-	./main tests/GoBench/Kubernetes/80284/main.go
-	./main tests/GoBench/Kubernetes/81091/main.go
-	./main tests/GoBench/Kubernetes/81148/main.go
-	./main tests/GoBench/Kubernetes/88331/main.go
-	./main tests/GoBench/Serving/3148/main.go
-	./main tests/godel2/ch-as-lock-race/main.go
-	./main tests/godel2/deposit-race/main.go
-	./main tests/godel2/prod-cons-race/main.go
-	./main tests/godel2/simple-race/main.go
-	./main tests/godel2/dine3-chan-race/main.go
-	./main tests/godel2/dine5-chan-race/main.go
+	go run ./main tests/GoBench/Cockroach/27659/main.go
+	go run ./main tests/GoBench/Cockroach/35501/main.go
+	go run ./main tests/GoBench/Etcd/4876/main.go
+	go run ./main tests/GoBench/Etcd/8149/main.go
+	go run ./main tests/GoBench/Etcd/9446/main.go
+	go run ./main tests/GoBench/Grpc/1748/main.go
+	go run ./main tests/GoBench/Grpc/1862/main.go
+	go run ./main tests/GoBench/Grpc/3090/main.go
+	go run ./main tests/GoBench/Istio/8144/main.go
+	go run ./main tests/GoBench/Istio/8214/main.go
+	go run ./main tests/GoBench/Istio/8967/main.go
+	go run ./main tests/GoBench/Istio/16742/main.go
+	go run ./main tests/GoBench/Kubernetes/79631/main.go
+	go run ./main tests/GoBench/Kubernetes/80284/main.go
+	go run ./main tests/GoBench/Kubernetes/81091/main.go
+	go run ./main tests/GoBench/Kubernetes/81148/main.go
+	go run ./main tests/GoBench/Kubernetes/88331/main.go
+	go run ./main tests/GoBench/Serving/3148/main.go
+	go run ./main tests/godel2/ch-as-lock-race/main.go
+	go run ./main tests/godel2/deposit-race/main.go
+	go run ./main tests/godel2/prod-cons-race/main.go
+	go run ./main tests/godel2/simple-race/main.go
+	go run ./main tests/godel2/dine3-chan-race/main.go
+	go run ./main tests/godel2/dine5-chan-race/main.go
