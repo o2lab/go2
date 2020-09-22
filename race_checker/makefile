@@ -1,27 +1,27 @@
 build:
 	go build -o main main.go pointerAnalysis.go raceCollection.go sliceTools.go ssaInstructions.go staticAnalysis.go
 runKubed:
-	go run ./main test-kubed/main.go
+	go run ./main tests/test-kubed/main.go
 runNakama:
-	go run ./main test-nakama/main.go
+	go run ./main tests/test-nakama/main.go
 runHugo:
-	go run ./main test-hugo/hugo-master/main.go
+	go run ./main tests/test-hugo/hugo-master/main.go
 runTalisman:
-	go run ./main test-talisman/talisman.go
+	go run ./main tests/test-talisman/talisman.go
 runJsonnet:
-	go run ./main test-jsonnet/cmd/jsonnet/cmd.go
+	go run ./main tests/test-jsonnet/cmd/jsonnet/cmd.go
 runKsonnet:
-	go run ./main test-ksonnet/cmd/ks/main.go
+	go run ./main tests/test-ksonnet/cmd/ks/main.go
 runGitea:
-	go run ./main test-gitea/main.go
+	go run ./main tests/test-gitea/main.go
 runFaas:
-	go run ./main test-faas/gateway/main.go
+	go run ./main tests/test-faas/gateway/main.go
 runKit:
-	go run ./main test-kit/cmd/kitgen/main.go
+	go run ./main tests/test-kit/cmd/kitgen/main.go
 runMicro:
-	go run ./main test-micro/main.go
+	go run ./main tests/test-micro/main.go
 runDelve:
-	go run ./main test-delve/cmd/dlv/main.go
+	go run ./main tests/test-delve/cmd/dlv/main.go
 runCockroach:
 	go run ./main tests/GoBench/Cockroach/27659/main.go
 	go run ./main tests/GoBench/Cockroach/35501/main.go
