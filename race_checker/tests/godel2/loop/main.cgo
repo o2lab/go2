@@ -1,0 +1,20 @@
+def main.main():
+    let t0 = newchan main.main0.t0_chan0, 0;
+    spawn main.helper(t0);
+    call main.main#3(t0);
+def main.helper(c):
+    call main.helper#3(c);
+def main.helper#1(c):
+    recv c;
+    call main.helper#3(c);
+def main.helper#2(c):
+    close c;
+def main.helper#3(c):
+    ifFor (int t3 = 0; (t3<5); t3 = t3 + 1) then call main.helper#1(c); else call main.helper#2(c); endif;
+def main.main#1(t0):
+    send t0;
+    call main.main#3(t0);
+def main.main#2(t0):
+    recv t0;
+def main.main#3(t0):
+    ifFor (int t3 = 0; (t3<5); t3 = t3 + 1) then call main.main#1(t0); else call main.main#2(t0); endif;
