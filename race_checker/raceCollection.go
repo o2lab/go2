@@ -18,11 +18,7 @@ func (a *analysis) checkRacyPairs() {
 				for jj, goJ := range RWIns[j] {
 					insSlice := []ssa.Instruction{goI, goJ} // one instruction from each goroutine
 					addressPair := a.insAddress(insSlice)
-					if len(addressPair) > 1 && a.sameAddress(addressPair[0], addressPair[1]) &&
-						!sliceContains(reportedAddr, addressPair[0]) &&
-						!a.reachable(goI, goJ) &&
-						!a.lockSetsIntersect(insSlice[0], insSlice[1]) &&
-						!a.chanProtected(insSlice[0], insSlice[1]) {
+					if len(addressPair) > 1 && a.sameAddress(addressPair[0], addressPair[1]) && !sliceContains(reportedAddr, addressPair[0]) && !a.reachable(goI, goJ) && !a.lockSetsIntersect(insSlice[0], insSlice[1]) && !a.chanProtected(insSlice[0], insSlice[1]) {
 						reportedAddr = append(reportedAddr, addressPair[0])
 						counter++
 						goIDs := []int{i, j}    // store goroutine IDs
@@ -91,7 +87,7 @@ func (a *analysis) sameAddress(addr1 ssa.Value, addr2 ssa.Value) bool {
 
 func (a *analysis) reachable(fromIns ssa.Instruction, toIns ssa.Instruction) bool {
 	fromBlock := fromIns.Block().Index
-	if strings.HasPrefix(fromIns.Block().Comment, "rangeindex") { // if checking in a forloop
+	if strings.HasPrefix(fromIns.Block().Comment, "rangeindex") && toIns.Parent() != nil && toIns.Parent().Parent() != nil { // checking both instructions belong to same forloop
 		if fromIns.Block().Comment == toIns.Parent().Parent().Blocks[fromBlock].Comment {
 			return false
 		}

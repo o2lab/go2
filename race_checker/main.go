@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/o2lab/race-checker/stats"
 	log "github.com/sirupsen/logrus"
 	"github.com/twmb/algoimpl/go/graph"
 	"golang.org/x/tools/go/pointer"
@@ -107,7 +106,6 @@ func main() {
 	debug := flag.Bool("debug", false, "Prints debug messages.")
 	focus := flag.String("focus", "", "Specifies a list of packages to check races.")
 	ptrAnalysis := flag.Bool("ptrAnalysis", false, "Prints pointer analysis results. ")
-	flag.BoolVar(&stats.CollectStats, "collectStats", false, "Collect analysis statistics.")
 	help := flag.Bool("help", false, "Show all command-line options.")
 	//flag.BoolVar(&allPkg, "all-package", true, "Analyze all packages required by the main package.")
 	flag.Parse()
@@ -128,14 +126,10 @@ func main() {
 	}
 
 	log.SetFormatter(&log.TextFormatter{
-		FullTimestamp:   true,
-		TimestampFormat: "15:04:05",
+		FullTimestamp: true,
 	})
 
 	err := staticAnalysis(flag.Args())
-	if stats.CollectStats {
-		stats.ShowStats()
-	}
 	if err != nil {
 		log.Fatal(err)
 	}

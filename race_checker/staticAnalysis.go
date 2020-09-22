@@ -112,13 +112,11 @@ func staticAnalysis(args []string) error {
 	Analysis.visitAllInstructions(mains[0].Func("main"), 0)
 	log.Debug(strings.Repeat("-", 35), "Stack trace ends", strings.Repeat("-", 35))
 	totalIns := 0
-	for g, _ := range RWIns {
+	for g := range RWIns {
 		totalIns += len(RWIns[g])
 	}
-	log.Info("Done  -- ", len(RWIns), " goroutines analyzed! ", totalIns, " instructions of interest detected! ")
-	if len(RWIns) < 2 {
-		return error(fmt.Errorf("race is not possible in one goroutine"))
-	}
+	log.Info("Done  -- ", Analysis.analysisStat.nGoroutine, " goroutines analyzed! ", totalIns, " instructions of interest detected! ")
+
 	log.Info("Building Happens-Before graph... ")
 	Analysis.HBgraph = graph.New(graph.Directed)
 	var prevN graph.Node
@@ -174,14 +172,13 @@ func staticAnalysis(args []string) error {
 		}
 	}
 	log.Info("Done  -- Happens-Before graph built ")
-	log.Infof("Solving PTA")
+
+	log.Info("Checking for data races... ")
 	result, err := pointer.Analyze(Analysis.ptaConfig) // conduct pointer analysis
-	log.Infof("Solving PTA Done")
 	if err != nil {
 		log.Fatal(err)
 	}
 	Analysis.result = result
-	log.Info("Checking for data races... ")
 	Analysis.checkRacyPairs()
 	return nil
 }
