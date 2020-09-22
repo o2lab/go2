@@ -54,7 +54,7 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 	} else if len(PTSet) == 0 {
 		return
 	}
-	switch theFunc := PTSet[0].Value().(type) {
+	switch theFunc := PTSet[rightLoc].Value().(type) {
 	case *ssa.Function:
 		fnName = theFunc.Name()
 		if !a.exploredFunction(theFunc, goID, theIns) {
