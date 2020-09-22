@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/rogpeppe/go-internal/testenv"
+	"github.com/sirupsen/logrus"
 	"go/ast"
 	"go/importer"
 	"go/parser"
@@ -27,7 +28,21 @@ var tests = []string{
 	"tests/cg.go",
 	"tests/test1.go",
 	"tests/waitgroup.go",
+	"tests/lock.go",
+	"tests/context1.go",
+	"tests/fields.go",
+	"tests/race80269-kubn.go",
+	"tests/global_ownership.go",
+	"tests/map_race.go",
+	"tests/select.go",
+	"tests/test_neo.go",
+	"tests/race_cfg.go",
+	"tests/race_example1.go",
+	"tests/race_example2.go",
+	"tests/race_example3.go",
 }
+
+var passed = 0
 
 var fset = token.NewFileSet()
 
@@ -115,7 +130,7 @@ func errMap(t *testing.T, testname string, files []*ast.File) map[string][]strin
 	return errmap
 }
 
-func eliminate(t *testing.T, errmap map[string][]string, racyStackTops []error) {
+func eliminate(t *testing.T, errmap map[string][]string, racyStackTops []error) bool {
 	for _, err := range racyStackTops {
 		pos, gotMsg := splitError(err)
 		list := errmap[pos]
@@ -144,8 +159,10 @@ func eliminate(t *testing.T, errmap map[string][]string, racyStackTops []error) 
 			}
 		} else {
 			t.Errorf("%s: no race expected: %q", pos, gotMsg)
+			return false
 		}
 	}
+	return true
 }
 
 func runChecker(t *testing.T, filenames []string) ([]*ast.File, []error) {
@@ -202,8 +219,12 @@ func checkFile(t *testing.T, testfiles []string) {
 	// match and eliminate errors;
 	// we are expecting the following errors
 	errmap := errMap(t, pkgName, files)
-	eliminate(t, errmap, errlist)
 
+	marker := "."
+	eliminated := eliminate(t, errmap, errlist)
+	if !eliminated {
+		marker = "+"
+	}
 	// there should be no expected errors left
 	if len(errmap) > 0 {
 		t.Errorf("--- %s: %d source positions with expected (but not reported) races:", pkgName, len(errmap))
@@ -212,10 +233,20 @@ func checkFile(t *testing.T, testfiles []string) {
 				t.Errorf("%s: %q", pos, rx)
 			}
 		}
+		if marker == "." {
+			marker = "-"
+		} else {
+			marker += "-"
+		}
 	}
+	if marker == "." {
+		passed++
+	}
+	fmt.Printf("%28s %s\n", testfiles, marker)
 }
 
 func TestRace(t *testing.T) {
+	logrus.SetLevel(logrus.FatalLevel)
 	testenv.MustHaveGoBuild(t)
 
 	// If explicit test files are specified, only check those.
@@ -228,4 +259,6 @@ func TestRace(t *testing.T) {
 	for _, file := range tests {
 		checkFile(t, []string{file})
 	}
+
+	fmt.Printf("Passed %d/%d\n", passed, len(tests))
 }

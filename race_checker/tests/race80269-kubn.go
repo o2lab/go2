@@ -14,7 +14,7 @@ func mayRace() {
 	ch1 := make(chan bool)
 	ch2 := make(chan bool)
 	go func() {
-		i = 1 // racy write
+		i /* RACE Write */ = 1
 		ch1 <- true
 	}()
 	go func() {
@@ -26,7 +26,7 @@ func mayRace() {
 	case <-ch2:
 		fmt.Print("ch2 ")
 	}
-	fmt.Print(i, "\n") // racy read
+	fmt.Print(i /* RACE Read */, "\n")
 }
 
 func showBB(j int) int {

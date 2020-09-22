@@ -4,7 +4,7 @@ var j int
 
 func main() {
 	go func() {
-		_ = j
+		_ = j /* RACE Read */
 	}()
-	j = 1
+	j /* RACE Write */ = 1
 }

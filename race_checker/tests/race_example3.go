@@ -5,11 +5,11 @@ type S struct {
 }
 
 func (s *S) read() int {
-	return s.i
+	return s.i /* RACE Read */
 }
 
 func (s *S) write(i int) {
-	s.i = i
+	s.i /* RACE Write */ = i
 }
 
 func main() {
@@ -21,4 +21,3 @@ func main() {
 	}()
 	s.read()
 }
-

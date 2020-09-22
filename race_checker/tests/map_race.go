@@ -11,10 +11,10 @@ func main() {
 	m[1] = 2
 	m[2] = 3
 	go func() {
-		m[3] = 3
+		m[3] /* RACE Write */ = 3
 	}()
 	go func() {
-		m[4] = 4
+		m[4] /* RACE Write */ = 4
 	}()
 }
 

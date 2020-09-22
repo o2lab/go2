@@ -18,6 +18,9 @@ func main() {
 		m.Unlock()
 		wg.Done()
 	}()
+	go func() {
+		fmt.Println("pass")
+	}()
 	m.Lock()
 	a := x
 	m.Unlock()

@@ -7,11 +7,11 @@ var mutex sync.Mutex
 func main() {
 	i := 1
 	go func() {
-		i = 1
+		i /* RACE Write */ = 1
 		mutex.Lock()
 		mutex.Unlock()
 	}()
 	mutex.Lock()
 	mutex.Unlock()
-	i = 1
+	_ = i /* RACE Read */
 }
