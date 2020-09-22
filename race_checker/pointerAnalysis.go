@@ -47,25 +47,11 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 				log.Trace("*****target No.", ind+1, " - ", eachTarget.Value().Name(), " from function ", eachTarget.Value().Parent().Name())
 				if sliceContainsStr(storeIns, eachTarget.Value().Parent().Name()) { // calling function is in current goroutine
 					rightLoc = ind
-				} else if goID > 0 {
-					i := goID
-					allStack := goStack[i] // first get stack from immediate caller
-					for i > 0 {
-						allStack = append(goStack[goCaller[i]], allStack...) // then get from all preceding caller goroutines
-						i = goCaller[i]
-					}
-					if sliceContainsStr(allStack, eachTarget.Value().Parent().Name()) { // check callstack of current goroutine
-						rightLoc = ind
-					}
+					break
 				}
 			} else {
-				log.Debug("target No.", ind+1, " - ", eachTarget.Value().Name(), " with no parent function*********")
+				continue
 			}
-		}
-		if sliceContainsDup(fns) { // multiple targets reside in same function
-			//for i, t := range PTSet {
-			//	if a.reachable(t.Value().Parent().Referrers(1), )
-			//}
 		}
 		log.Trace("***Executing target No.", rightLoc+1)
 	} else if len(PTSet) == 0 {
@@ -82,7 +68,7 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 	case *ssa.MakeInterface:
 		methodName := theIns.(*ssa.Call).Call.Method.Name()
 		if a.prog.MethodSets.MethodSet(ptrSet[location].PointsTo().DynamicTypes().Keys()[0]).Lookup(a.mains[0].Pkg, methodName) == nil { // ignore abstract methods
-			return
+			break
 		}
 		check := a.prog.LookupMethod(ptrSet[location].PointsTo().DynamicTypes().Keys()[0], a.mains[0].Pkg, methodName)
 		fnName = check.Name()
@@ -94,6 +80,6 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 	case *ssa.MakeChan:
 		chanName = theFunc.Name()
 	default:
-		return
+		break
 	}
 }
