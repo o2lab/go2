@@ -1,13 +1,14 @@
 package main
 
 import (
+	"github.com/o2lab/race-checker/stats"
 	log "github.com/sirupsen/logrus"
 	"go/constant"
 	"go/token"
 	"go/types"
 	"golang.org/x/tools/go/ssa"
-	"strings"
 	"strconv"
+	"strings"
 )
 
 func checkTokenName(fnName string, theIns *ssa.Call) string {
@@ -83,6 +84,7 @@ func updateRecords(fnName string, goID int, pushPop string) {
 }
 
 func (a *analysis) insMakeChan(examIns *ssa.MakeChan) {
+	stats.IncStat(stats.NMakeChan)
 	var bufferLen int64
 	if bufferInfo, ok := examIns.Size.(*ssa.Const); ok { // buffer length passed via constant
 		temp, _ := constant.Int64Val(constant.ToInt(bufferInfo.Value))
@@ -99,6 +101,7 @@ func (a *analysis) insMakeChan(examIns *ssa.MakeChan) {
 }
 
 func (a *analysis) insSend(examIns *ssa.Send, goID int, theIns ssa.Instruction) {
+	stats.IncStat(stats.NSend)
 	var chName string
 	if _, ok := chanBufMap[examIns.Chan.Name()]; !ok { // if channel name can't be identified
 		a.pointerAnalysis(examIns.Chan, goID, theIns) // identifiable name will be returned by pointer analysis via variable chanName
@@ -106,18 +109,19 @@ func (a *analysis) insSend(examIns *ssa.Send, goID int, theIns ssa.Instruction) 
 	} else {
 		chName = examIns.Chan.Name()
 	}
-	for chanBufMap[chName][insertIndMap[chName]] != nil && insertIndMap[chName] < len(chanBufMap[chName])-1 {
+	for insertIndMap[chName] < len(chanBufMap[chName]) && chanBufMap[chName][insertIndMap[chName]] != nil {
 		insertIndMap[chName]++ // iterate until reaching an index with nil send value stored
 	}
 	if insertIndMap[chName] == len(chanBufMap[chName])-1 && chanBufMap[chName][insertIndMap[chName]] != nil {
 		// buffer length reached, channel will block
 		// TODO: use HB graph to handle blocked channel?
-	} else {
+	} else if insertIndMap[chName] < len(chanBufMap[chName]) {
 		chanBufMap[chName][insertIndMap[chName]] = examIns
 	}
 }
 
 func (a *analysis) insStore(examIns *ssa.Store, goID int, theIns ssa.Instruction) {
+	stats.IncStat(stats.NStore)
 	if !isLocalAddr(examIns.Addr) {
 		if len(storeIns) > 1 {
 			if storeIns[len(storeIns)-2] == "AfterFunc" { // ignore this write instruction as AfterFunc is analyzed elsewhere
@@ -151,6 +155,7 @@ func (a *analysis) insStore(examIns *ssa.Store, goID int, theIns ssa.Instruction
 }
 
 func (a *analysis) insUnOp(examIns *ssa.UnOp, goID int, theIns ssa.Instruction) {
+	stats.IncStat(stats.NUnOp)
 	if examIns.Op == token.MUL && !isLocalAddr(examIns.X) { // read op
 		RWIns[goID] = append(RWIns[goID], theIns)
 		if len(lockSet) > 0 {
@@ -168,6 +173,7 @@ func (a *analysis) insUnOp(examIns *ssa.UnOp, goID int, theIns ssa.Instruction) 
 		addrMap[examIns.X.Name()] = append(addrMap[examIns.X.Name()], RWInsInd{goID: goID, goInd: sliceContainsInsAt(RWIns[goID], theIns)})
 		a.ptaConfig.AddQuery(examIns.X)
 	} else if examIns.Op == token.ARROW { // channel receive op
+		stats.IncStat(stats.NChanRecv)
 		var chName string
 		if _, ok := chanBufMap[examIns.X.Name()]; !ok { // if channel name can't be identified
 			a.pointerAnalysis(examIns.X, goID, theIns)
@@ -188,6 +194,7 @@ func (a *analysis) insUnOp(examIns *ssa.UnOp, goID int, theIns ssa.Instruction) 
 }
 
 func (a *analysis) insFieldAddr(examIns *ssa.FieldAddr, goID int, theIns ssa.Instruction) {
+	stats.IncStat(stats.NFieldAddr)
 	if !isLocalAddr(examIns.X) {
 		RWIns[goID] = append(RWIns[goID], theIns)
 		if len(lockSet) > 0 {
@@ -208,6 +215,7 @@ func (a *analysis) insFieldAddr(examIns *ssa.FieldAddr, goID int, theIns ssa.Ins
 }
 
 func (a *analysis) insLookUp(examIns *ssa.Lookup, goID int, theIns ssa.Instruction) {
+	stats.IncStat(stats.NLookup)
 	switch readIns := examIns.X.(type) {
 	case *ssa.UnOp:
 		if readIns.Op == token.MUL && !isLocalAddr(readIns.X) {
@@ -249,6 +257,7 @@ func (a *analysis) insLookUp(examIns *ssa.Lookup, goID int, theIns ssa.Instructi
 }
 
 func (a *analysis) insChangeType(examIns *ssa.ChangeType, goID int, theIns ssa.Instruction) {
+	stats.IncStat(stats.NChangeType)
 	switch mc := examIns.X.(type) {
 	case *ssa.MakeClosure: // yield closure value for *Function and free variable values supplied by Bindings
 		theFn := mc.Fn.(*ssa.Function)
@@ -278,19 +287,20 @@ func (a *analysis) insChangeType(examIns *ssa.ChangeType, goID int, theIns ssa.I
 }
 
 func (a *analysis) insMakeInterface(examIns *ssa.MakeInterface, goID int, theIns ssa.Instruction) {
+	stats.IncStat(stats.NMakeInterface)
 	if strings.Contains(examIns.X.String(), "complit") {
 		return
 	}
 	switch insType := examIns.X.(type) {
 	case *ssa.Call:
-		a.pointerAnalysis(examIns.X, goID, theIns)
+		//a.pointerAnalysis(examIns.X, goID, theIns)
 	case *ssa.Parameter:
 		if _, ok := insType.Type().(*types.Basic); !ok {
-			a.pointerAnalysis(examIns.X, goID, theIns)
+			//a.pointerAnalysis(examIns.X, goID, theIns)
 		}
 	case *ssa.UnOp:
 		if _, ok := insType.X.(*ssa.Global); !ok {
-			a.pointerAnalysis(examIns.X, goID, theIns)
+			//a.pointerAnalysis(examIns.X, goID, theIns)
 		}
 	default:
 		return
@@ -298,9 +308,10 @@ func (a *analysis) insMakeInterface(examIns *ssa.MakeInterface, goID int, theIns
 }
 
 func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) {
+	stats.IncStat(stats.NCall)
 	if examIns.Call.StaticCallee() == nil && examIns.Call.Method == nil {
 		if _, ok := examIns.Call.Value.(*ssa.Builtin); !ok {
-			a.pointerAnalysis(examIns.Call.Value, goID, theIns)
+			//a.pointerAnalysis(examIns.Call.Value, goID, theIns)
 		} else if examIns.Call.Value.Name() == "delete" { // built-in delete op
 			if theVal, ok := examIns.Call.Args[0].(*ssa.UnOp); ok {
 				if theVal.Op == token.MUL && !isLocalAddr(theVal.X) {
@@ -327,7 +338,7 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 	} else if examIns.Call.Method != nil && examIns.Call.Method.Pkg() != nil { // calling an method
 		if examIns.Call.Method.Pkg().Name() != "sync" {
 			if _, ok := examIns.Call.Value.(*ssa.Builtin); !ok {
-				a.pointerAnalysis(examIns.Call.Value, goID, theIns)
+				//a.pointerAnalysis(examIns.Call.Value, goID, theIns)
 			} else {
 				return
 			}
@@ -383,18 +394,22 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 				a.visitAllInstructions(examIns.Call.StaticCallee(), goID)
 			}
 		case "Lock":
+			stats.IncStat(stats.NLock)
 			lockLoc := examIns.Call.Args[0]       // identifier for address of lock
 			if !sliceContains(lockSet, lockLoc) { // if lock is not already in active lockset
 				lockSet = append(lockSet, lockLoc)
 			}
 		case "Unlock":
+			stats.IncStat(stats.NUnlock)
 			lockLoc := examIns.Call.Args[0]
 			if p := a.lockSetContainsAt(lockSet, lockLoc); p >= 0 {
 				lockSet = deleteFromLockSet(lockSet, p)
 			}
 		case "Wait":
+			stats.IncStat(stats.NWaitGroupWait)
 			RWIns[goID] = append(RWIns[goID], theIns)
 		case "Done":
+			stats.IncStat(stats.NWaitGroupDone)
 			RWIns[goID] = append(RWIns[goID], theIns)
 			//case "Add": // adds delta to the WG
 			//	fmt.Println("eee")// TODO: handle cases when WG counter is incremented by value greater than 1
@@ -405,6 +420,7 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 }
 
 func (a *analysis) insGo(examIns *ssa.Go, goID int, theIns ssa.Instruction) {
+	stats.IncStat(stats.NGo)
 	var fnName string
 	switch anonFn := examIns.Call.Value.(type) {
 	case *ssa.MakeClosure: // go call for anonymous function

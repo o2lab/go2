@@ -115,8 +115,10 @@ func staticAnalysis(args []string) error {
 	for g, _ := range RWIns {
 		totalIns += len(RWIns[g])
 	}
-	log.Info("Done  -- ", Analysis.analysisStat.nGoroutine, " goroutines analyzed! ", totalIns, " instructions of interest detected! ")
-
+	log.Info("Done  -- ", len(RWIns), " goroutines analyzed! ", totalIns, " instructions of interest detected! ")
+	if len(RWIns) < 2 {
+		return error(fmt.Errorf("race is not possible in one goroutine"))
+	}
 	log.Info("Building Happens-Before graph... ")
 	Analysis.HBgraph = graph.New(graph.Directed)
 	var prevN graph.Node
@@ -172,13 +174,14 @@ func staticAnalysis(args []string) error {
 		}
 	}
 	log.Info("Done  -- Happens-Before graph built ")
-
-	log.Info("Checking for data races... ")
+	log.Infof("Solving PTA")
 	result, err := pointer.Analyze(Analysis.ptaConfig) // conduct pointer analysis
+	log.Infof("Solving PTA Done")
 	if err != nil {
 		log.Fatal(err)
 	}
 	Analysis.result = result
+	log.Info("Checking for data races... ")
 	Analysis.checkRacyPairs()
 	return nil
 }

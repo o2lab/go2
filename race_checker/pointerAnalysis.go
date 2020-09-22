@@ -8,6 +8,9 @@ import (
 )
 
 func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Instruction) {
+	log.Debugf("Solving PTA with %d/%d queries at %s", len(a.ptaConfig.Queries), len(a.ptaConfig.IndirectQueries),
+		a.prog.Fset.Position(location.Pos()))
+	defer log.Debugf("Solving PTA done")
 	switch locType := location.(type) {
 	case *ssa.Parameter:
 		if locType.Object().Pkg().Name() == "reflect" { // ignore reflect library

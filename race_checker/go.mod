@@ -4,6 +4,7 @@ go 1.13
 
 require (
 	github.com/logrusorgru/aurora v0.0.0-20200102142835-e9ef32dff381
+	github.com/rogpeppe/go-internal v1.6.2
 	github.com/sirupsen/logrus v1.4.2
 	github.com/twmb/algoimpl v0.0.0-20170717182524-076353e90b94
 	golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d // indirect
