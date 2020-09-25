@@ -63,7 +63,7 @@ type addrConn struct {
 }
 
 func (ac *addrConn) resetTransport() {
-	_ = minConnectTimeout // racy read on minConnectTimeout
+	_ = minConnectTimeout /* RACE Read */ // racy read on minConnectTimeout
 }
 
 func (ac *addrConn) transportMonitor() {
@@ -109,7 +109,7 @@ func (ccb *ccBalancerWrapper) watcher() {
 		balanceMutex.Lock()
 		if ccb.balancer != nil {
 			balanceMutex.Unlock()
-			ccb.balancer.HandleResolvedAddrs()
+			ccb.balancer. /* RACE Read */ HandleResolvedAddrs()
 		} else {
 			balanceMutex.Unlock()
 		}
@@ -130,7 +130,7 @@ func newCCBalancerWrapper(cc *ClientConn, b Builder) {
 	go ccb.watcher()
 	balanceMutex.Lock()
 	defer balanceMutex.Unlock()
-	ccb.balancer = b.Build(ccb)
+	ccb.balancer /* RACE Write */ = b.Build(ccb)
 }
 
 func TestGrpc1748(t *testing.T) {
@@ -141,7 +141,7 @@ func TestGrpc1748(t *testing.T) {
 		mctBkp := minConnectTimeout
 		// Call this only after transportMonitor goroutine has ended.
 		defer func() {
-			minConnectTimeout = mctBkp // racy write on minConnectTimeout
+			minConnectTimeout /* RACE Write */ = mctBkp // racy write on minConnectTimeout
 		}()
 		cc := &ClientConn{}
 		cc.switchBalancer() // spawns child goroutine that later triggers racy read

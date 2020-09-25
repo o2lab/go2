@@ -2,8 +2,8 @@
 package main
 
 import (
-	"testing"
 	"sync"
+	"testing"
 	"time"
 )
 
@@ -13,8 +13,9 @@ func TestGrpc1862(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		abort := false
-		time.AfterFunc(time.Nanosecond, func() { abort = true }) // spawns child goroutine in time package triggering racy write on abort
-		if abort {} // racy read on abort
+		time.AfterFunc(time.Nanosecond, func() { abort /* RACE Write */ = true }) // spawns child goroutine in time package triggering racy write on abort
+		if abort /* RACE Read */ {
+		} // racy read on abort
 	}()
 	wg.Wait()
 }

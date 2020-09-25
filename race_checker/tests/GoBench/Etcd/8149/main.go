@@ -1,9 +1,9 @@
 package main
 
 import (
-"sync"
-"testing"
-"time"
+	"sync"
+	"testing"
+	"time"
 )
 
 var leaseRevokeRate = 1000
@@ -11,13 +11,13 @@ var leaseRevokeRate = 1000
 func testLessorRenewExtendPileup() {
 	oldRevokeRate := leaseRevokeRate
 	defer func() { leaseRevokeRate = oldRevokeRate }()
-	leaseRevokeRate = 10 // racy write on leaseRevokeRate
+	leaseRevokeRate /* RACE Write */ = 10
 }
 
-type Lease struct {}
+type Lease struct{}
 
 type lessor struct {
-	mu sync.Mutex
+	mu    sync.Mutex
 	stopC chan struct{}
 	doneC chan struct{}
 }
@@ -25,14 +25,14 @@ type lessor struct {
 func (le *lessor) runLoop() {
 	defer close(le.doneC)
 
-	for i:= 0; i < 10; i ++{
+	for i := 0; i < 10; i++ {
 		var ls []*Lease
 
 		ls = append(ls, &Lease{})
 
 		if len(ls) != 0 {
 			// rate limit
-			if len(ls) > leaseRevokeRate/2 { // racy read on leaseRevokeRates
+			if len(ls) > leaseRevokeRate /* RACE Read */ /2 {
 				ls = ls[:leaseRevokeRate/2]
 			}
 			select {
@@ -50,7 +50,7 @@ func (le *lessor) runLoop() {
 	}
 }
 
-func newLessor () *lessor {
+func newLessor() *lessor {
 	l := &lessor{}
 	go l.runLoop()
 	return l

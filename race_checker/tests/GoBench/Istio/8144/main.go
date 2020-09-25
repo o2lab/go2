@@ -13,11 +13,11 @@ type callbackRecorder struct {
 }
 
 func (c *callbackRecorder) callback() {
-	c.callbacks++ // racy write on callbacks field
+	c.callbacks++ /* RACE Write */
 }
 
 type ttlCache struct {
-	entries sync.Map
+	entries  sync.Map
 	callback func()
 }
 
@@ -36,7 +36,7 @@ func (c *ttlCache) SetWithExpiration(key interface{}, value interface{}) {
 	c.entries.Store(key, value)
 }
 
-func NewTTLWithCallback(callback EvictionCallback) *ttlCache{
+func NewTTLWithCallback(callback EvictionCallback) *ttlCache {
 	c := &ttlCache{
 		callback: callback,
 	}
@@ -51,8 +51,9 @@ func TestIstio8144(t *testing.T) {
 		defer wg.Done()
 		c := &callbackRecorder{callbacks: 0}
 		ttl := NewTTLWithCallback(c.callback) // spawns child goroutine that triggers racy write
-		ttl.SetWithExpiration(1,1)
-		if c.callbacks != 1 {} // racy read on callbacks field
+		ttl.SetWithExpiration(1, 1)
+		if c.callbacks /* RACE Read */ != 1 {
+		} // racy read on callbacks field
 	}()
 	wg.Wait()
 }

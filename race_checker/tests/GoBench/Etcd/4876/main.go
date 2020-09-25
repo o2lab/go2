@@ -31,7 +31,7 @@ type WatchServer interface {
 type serverWatchStream struct{}
 
 func (sws *serverWatchStream) sendLoop() {
-	_ = time.NewTicker(ProgressReportInterval) // racy read on ProgressReportInterval
+	_ = time.NewTicker(ProgressReportInterval /* RACE Read */)
 }
 
 type watchServer struct{}
@@ -50,7 +50,7 @@ func TestEtcd4876(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			testInterval := 3 * time.Second
-			ProgressReportInterval = testInterval // racy write on ProgressReportInterval
+			ProgressReportInterval /* RACE Write */ = testInterval
 		}()
 		go func() {
 			defer wg.Done()

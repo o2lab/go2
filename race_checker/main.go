@@ -50,6 +50,7 @@ type RWInsInd struct {
 	goInd int
 }
 
+// TODO (issue #24): most of the globals below should be encapsulated in struct analysis.
 var (
 	Analysis      *analysis
 	focusPkgs     []string
@@ -73,9 +74,10 @@ var (
 	chanName      string
 	insertIndMap  = make(map[string]int)
 	chanMap       = make(map[ssa.Instruction][]string) // map each read/write access to a list of channels with value(s) already sent to it
-	trieLimit     = 2                                  // set as user config option later, an integer that dictates how many times a function can be called under identical context
 	// proper forloop detection would require trieLimit of at least 2
 )
+
+const trieLimit = 2 // set as user config option later, an integer that dictates how many times a function can be called under identical context
 
 func init() {
 	excludedPkgs = []string{

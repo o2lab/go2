@@ -23,7 +23,7 @@ type Cache struct {
 
 func (cc *Cache) Set() {
 	cc.cache.SetWithExpiration() // will trigger racy write
-	cc.recordStats() // will trigger racy read
+	cc.recordStats()             // will trigger racy read
 }
 
 func (cc *Cache) recordStats() {
@@ -39,7 +39,7 @@ type lruCache struct {
 }
 
 func (c *lruCache) Stats() Stats {
-	return c.stats // racy read on stats field
+	return c.stats /* RACE Read */
 }
 
 func (c *lruCache) Set() {
@@ -47,7 +47,7 @@ func (c *lruCache) Set() {
 }
 
 func (c *lruCache) SetWithExpiration() {
-	atomic.AddUint64(&c.stats.Writes, 1) // racy write on stats field
+	atomic.AddUint64 /* RACE Write */ (&c.stats.Writes, 1) // racy write on stats field
 }
 
 type grpcServer struct {
@@ -70,7 +70,7 @@ func TestIstio8214(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		s := &grpcServer{
-			cache:&Cache{
+			cache: &Cache{
 				cache: &lruCache{},
 			},
 		}

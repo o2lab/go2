@@ -54,9 +54,9 @@ func (*SchemaChanger) validateChecks(checks []ConstraintToValidate) {
 	func() {
 		tableDesc := GetTableDescFromID()
 		desc := NewImmutableTableDescriptor(*tableDesc).MakeFirstMutationPublic()
-		for _, c := range checks { // racy write on c (Name field)
+		for _, c /* RACE Write */ := range checks { // racy write on c (Name field)
 			go func() {
-				validateCheckInTxn(desc, &c.Name) // will trigger racy read
+				validateCheckInTxn(desc, &c.Name /* RACE Read */) // will trigger racy read
 			}()
 		}
 	}()
