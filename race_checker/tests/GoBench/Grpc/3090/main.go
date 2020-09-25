@@ -40,7 +40,7 @@ type ccResolverWrapper struct {
 
 func (ccr *ccResolverWrapper) resolveNow() {
 	ccr.mu.Lock()
-	ccr.resolver.ResolveNow() // racy read on resolver field
+	ccr.resolver. /* RACE Read */ ResolveNow() // racy read on resolver field
 	ccr.mu.Unlock()
 }
 
@@ -59,7 +59,7 @@ func (ccr *ccResolverWrapper) UpdateState() {
 func newCCResolverWrapper(cc *ClientConn) {
 	rb := cc.dopts.resolverBuilder
 	ccr := &ccResolverWrapper{}
-	ccr.resolver = rb.Build(ccr) // racy write on resolver field,
+	ccr.resolver /* RACE Write */ = rb.Build(ccr) // racy write on resolver field,
 	// the Build method will later spawn child goroutine and trigger racy read
 }
 

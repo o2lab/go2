@@ -48,7 +48,7 @@ func (p *PriorityQueue) flushUnschedulableQLeftover() {
 	defer p.lock.Unlock()
 
 	for _, pInfo := range p.unschedulableQ.podInfoMap {
-		_ = pInfo.Timestamp // racy read on Timestamp
+		_ = pInfo.Timestamp /* RACE Read */
 	}
 }
 
@@ -117,7 +117,7 @@ func TestKubernetes81148(t *testing.T) {
 		q := NewPriorityQueue(nil) // will trigger child goroutine that leads to racy read
 		highPod := Pod("1")
 		addOrUpdateUnschedulablePod(q, highPod)
-		q.unschedulableQ.podInfoMap[GetPodFullName(highPod)].Timestamp = time.Now().Add(-1 * unschedulableQTimeInterval) // racy write on Timestamp
+		q.unschedulableQ.podInfoMap[GetPodFullName(highPod)].Timestamp /* RACE Write */ = time.Now().Add(-1 * unschedulableQTimeInterval) // racy write on Timestamp
 	}()
 	wg.Wait()
 }

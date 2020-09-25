@@ -31,7 +31,7 @@ var tests = []string{
 	"tests/lock.go",
 	"tests/context1.go",
 	"tests/fields.go",
-	"tests/race80269-kubn.go",
+	"tests/k8s_issue80269.go",
 	"tests/global_ownership.go",
 	"tests/map_race.go",
 	"tests/select.go",
@@ -40,6 +40,30 @@ var tests = []string{
 	"tests/race_example1.go",
 	"tests/race_example2.go",
 	"tests/race_example3.go",
+	"tests/GoBench/Cockroach/27659/main.go",
+	"tests/GoBench/Cockroach/35501/main.go",
+	"tests/GoBench/Etcd/4876/main.go",
+	"tests/GoBench/Etcd/8149/main.go",
+	"tests/GoBench/Etcd/9446/main.go",
+	"tests/GoBench/Grpc/1748/main.go",
+	"tests/GoBench/Grpc/1862/main.go",
+	"tests/GoBench/Grpc/3090/main.go",
+	"tests/GoBench/Istio/8144/main.go",
+	"tests/GoBench/Istio/8214/main.go",
+	"tests/GoBench/Istio/8967/main.go",
+	"tests/GoBench/Istio/16742/main.go",
+	"tests/GoBench/Kubernetes/79631/main.go",
+	"tests/GoBench/Kubernetes/80284/main.go",
+	"tests/GoBench/Kubernetes/81091/main.go",
+	"tests/GoBench/Kubernetes/81148/main.go",
+	"tests/GoBench/Kubernetes/88331/main.go",
+	"tests/GoBench/Serving/3148/main.go",
+	"tests/godel2/ch-as-lock-race/main.go",
+	"tests/godel2/deposit-race/main.go",
+	"tests/godel2/prod-cons-race/main.go",
+	"tests/godel2/simple-race/main.go",
+	"tests/godel2/dine3-chan-race/main.go",
+	"tests/godel2/dine5-chan-race/main.go",
 }
 
 var passed = 0
@@ -158,7 +182,7 @@ func eliminate(t *testing.T, errmap map[string][]string, racyStackTops []error) 
 				delete(errmap, pos)
 			}
 		} else {
-			t.Errorf("%s: no race expected: %q", pos, gotMsg)
+			t.Errorf("No race expected but got %q\n  %s", gotMsg, pos)
 			return false
 		}
 	}
@@ -230,7 +254,7 @@ func checkFile(t *testing.T, testfiles []string) {
 		t.Errorf("--- %s: %d source positions with expected (but not reported) races:", pkgName, len(errmap))
 		for pos, list := range errmap {
 			for _, rx := range list {
-				t.Errorf("%s: %q", pos, rx)
+				t.Errorf("Expected Race %q:\n  %s", rx, pos)
 			}
 		}
 		if marker == "." {

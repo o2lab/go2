@@ -1,13 +1,14 @@
 //TestCockroach27659
 package main
+
 import (
-	"testing"
 	"sync"
+	"testing"
 )
 
 type Timestamp struct {
 	WallTime uint64
-	Logical int32
+	Logical  int32
 }
 
 type Sender interface {
@@ -23,7 +24,7 @@ type Txn struct {
 }
 
 func (txn *Txn) resetDeadline() {
-	txn.deadline = nil // racy write on deadline field
+	txn.deadline /* RACE Write */ = nil // racy write on deadline field
 }
 func (txn *Txn) updateStateOnRetryableErrLocked() {
 	txn.resetDeadline()
@@ -38,7 +39,8 @@ func (txn *Txn) Run() {
 }
 
 func (txn *Txn) UpdateDeadlineMaybe() {
-	if txn.deadline == nil {} // racy read on deadline field
+	if txn.deadline /* RACE Read */ == nil {
+	}
 }
 
 type SenderFunc func()
@@ -47,13 +49,12 @@ func sendAndFill(send SenderFunc) {
 	send()
 }
 
-
 func TestCockroach27659(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(2)
 	go func() {
 		defer wg.Done()
-		txn := &Txn{deadline:&Timestamp{}}
+		txn := &Txn{deadline: &Timestamp{}}
 		go func() {
 			defer wg.Done()
 			txn.Run() // triggers racy write
