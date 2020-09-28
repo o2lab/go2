@@ -190,7 +190,6 @@ func eliminate(t *testing.T, errmap map[string][]string, racyStackTops []error) 
 }
 
 func runChecker(t *testing.T, filenames []string) ([]*ast.File, []error) {
-	clearState()
 	var files []*ast.File
 	for _, filename := range filenames {
 		file, err := parser.ParseFile(fset, filename, nil, parser.AllErrors)
@@ -204,7 +203,7 @@ func runChecker(t *testing.T, filenames []string) ([]*ast.File, []error) {
 		t.Fatal(err)
 	}
 	var raceErrors []error
-	for _, msg := range racyStackTops {
+	for _, msg := range Analysis.racyStackTops {
 		raceErrors = append(raceErrors, fmt.Errorf(msg))
 	}
 
