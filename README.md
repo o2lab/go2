@@ -1,3 +1,7 @@
+# Go2 Race Detector
+
+[![Github Actions Status]](https://github.com/dopelsunce/race-go2/actions)
+
 ## Static Analysis - Concurrency Bug Detection in Go
 ### Data Races
 
