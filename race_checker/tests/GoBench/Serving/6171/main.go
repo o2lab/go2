@@ -2,8 +2,8 @@
 package main
 
 import (
-	"testing"
 	"sync"
+	"testing"
 )
 
 type TestingT interface {
@@ -24,12 +24,13 @@ func (ce *CheckedEntry) Write() {
 		ce.cores[i].Write()
 	}
 }
+
 type testingWriter struct {
 	t TestingT
 }
 
 func newTestingWriter(t TestingT) testingWriter {
-	return testingWriter{t:t}
+	return testingWriter{t: t}
 }
 
 func (w testingWriter) Write() {
@@ -102,12 +103,12 @@ func (s *SugaredLogger) Errorw(args ...interface{}) {
 }
 
 type revisionWatcher struct {
-	logger    *SugaredLogger
+	logger *SugaredLogger
 }
 
 func newRevisionWatcher(logger *SugaredLogger) *revisionWatcher {
 	return &revisionWatcher{
-		logger:logger,
+		logger: logger,
 	}
 }
 
@@ -135,8 +136,8 @@ func TestServing6171(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		t.Run("TestServing6171", func(t *testing.T){
-			rbm := &revisionBackendsManager{logger:testing_TestLogger(t)}
+		t.Run("TestServing6171", func(t *testing.T) {
+			rbm := &revisionBackendsManager{logger: testing_TestLogger(t)}
 			rbm.getOrCreateRevisionWatcher()
 		})
 	}()

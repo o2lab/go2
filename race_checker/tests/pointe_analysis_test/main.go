@@ -42,7 +42,7 @@ type genericScheduler struct {
 	framework Framework
 }
 
-func NewGenericScheduler(framework Framework,) *genericScheduler {
+func NewGenericScheduler(framework Framework) *genericScheduler {
 	return &genericScheduler{
 		framework: framework,
 	}
@@ -52,12 +52,12 @@ func (g *genericScheduler) findNodesThatFit() {
 	checkNode := func(i int) {
 		g.framework.RunFilterPlugins() // will lead to racy pair
 	}
-	ParallelizeUntil(2,2, checkNode)
+	ParallelizeUntil(2, 2, checkNode)
 
 	checkNode1 := func(i int) {
 		g.framework.RunFilterPlugins() // will lead to racy pair
 	}
-	ParallelizeUntil(3,3, checkNode1)
+	ParallelizeUntil(3, 3, checkNode1)
 }
 
 //func (g *genericScheduler) findNodesThatDontFit() {
@@ -71,7 +71,6 @@ func (g *genericScheduler) Schedule() {
 	g.findNodesThatFit() // will lead to race
 	//g.findNodesThatDontFit()
 }
-
 
 type DoWorkPieceFunc func(piece int)
 

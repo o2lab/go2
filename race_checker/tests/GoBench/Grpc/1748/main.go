@@ -109,7 +109,8 @@ func (ccb *ccBalancerWrapper) watcher() {
 		balanceMutex.Lock()
 		if ccb.balancer != nil {
 			balanceMutex.Unlock()
-			ccb.balancer. /* RACE Read */ HandleResolvedAddrs()
+			balancer := ccb.balancer /* RACE Read */
+			balancer.HandleResolvedAddrs()
 		} else {
 			balanceMutex.Unlock()
 		}

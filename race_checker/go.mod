@@ -3,6 +3,7 @@ module github.com/o2lab/race-checker
 go 1.13
 
 require (
+	github.com/boltdb/bolt v1.3.1
 	github.com/logrusorgru/aurora v0.0.0-20200102142835-e9ef32dff381
 	github.com/rogpeppe/go-internal v1.6.2
 	github.com/sirupsen/logrus v1.4.2
