@@ -117,7 +117,8 @@ func staticAnalysis(args []string) error {
 	}
 	log.Info("Done  -- ", len(RWIns), " goroutines analyzed! ", totalIns, " instructions of interest detected! ")
 	if len(RWIns) < 2 {
-		return error(fmt.Errorf("race is not possible in one goroutine"))
+		log.Debug("race is not possible in one goroutine")
+		return nil
 	}
 	log.Info("Building Happens-Before graph... ")
 	Analysis.HBgraph = graph.New(graph.Directed)

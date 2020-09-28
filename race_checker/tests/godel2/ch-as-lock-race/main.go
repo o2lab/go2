@@ -9,7 +9,7 @@ func main() {
 	ch := make(chan int, 2)
 	go f(&x, ch)
 	ch <- 0
-	x = 1
+	x /* RACE Write */ = 1
 	<-ch
 	ch <- 0
 	fmt.Println("x is", x)
@@ -18,6 +18,6 @@ func main() {
 
 func f(x *int, ch chan int) {
 	ch <- 0
-	*x = -1
+	* /* RACE Write */ x = -1
 	<-ch
 }

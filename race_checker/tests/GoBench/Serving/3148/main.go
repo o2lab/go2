@@ -146,12 +146,12 @@ type Fake struct {
 }
 
 func (c *Fake) Invokes() {
-	for _ = range c.ReactionChain {
+	for _ = range c.ReactionChain /* RACE Read */ {
 	} // racy read on ReactionChain field
 }
 
 func (c *Fake) PrependReactor() {
-	c.ReactionChain = append([]Reactor{&SimpleReactor{}}) // racy write on ReactionChain field
+	c.ReactionChain /* RACE Write */ = append([]Reactor{&SimpleReactor{}}) // racy write on ReactionChain field
 }
 
 func TestServing3148(t *testing.T) {

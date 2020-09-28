@@ -157,3 +157,26 @@ func mainPackages(pkgs []*ssa.Package) ([]*ssa.Package, error) {
 	}
 	return mains, nil
 }
+
+// clearState clears global states defined in this file.
+// This function should only be called in tests.
+func clearState() {
+	levels = make(map[int]int)
+	RWIns = [][]ssa.Instruction{}
+	storeIns = []string{}
+	workList = []goroutineInfo{}
+	reportedAddr = []ssa.Value{}
+	racyStackTops = []string{}
+	lockMap = make(map[ssa.Instruction][]ssa.Value)
+	lockSet = []ssa.Value{}
+	addrNameMap = make(map[string][]ssa.Value)
+	addrMap = make(map[string][]RWInsInd)
+	paramFunc = nil
+	goStack = [][]string{}
+	goCaller = make(map[int]int)
+	goNames = make(map[int]string)
+	chanBufMap = make(map[string][]*ssa.Send)
+	chanName = ""
+	insertIndMap = make(map[string]int)
+	chanMap = make(map[ssa.Instruction][]string)
+}

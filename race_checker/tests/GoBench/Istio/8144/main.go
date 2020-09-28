@@ -13,7 +13,7 @@ type callbackRecorder struct {
 }
 
 func (c *callbackRecorder) callback() {
-	c.callbacks++ /* RACE Write */
+	c.callbacks /* RACE Write */ ++
 }
 
 type ttlCache struct {

@@ -7,11 +7,11 @@ import (
 )
 
 func Writer(x *int) {
-	*x++
+	* /* RACE Write */ x++
 }
 
 func main() {
 	var x int
 	go Writer(&x)
-	fmt.Println("x is", x)
+	fmt.Println("x is", x /* RACE Read */)
 }

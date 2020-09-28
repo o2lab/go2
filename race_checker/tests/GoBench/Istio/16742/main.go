@@ -2,8 +2,8 @@
 package main
 
 import (
-	"testing"
 	"sync"
+	"testing"
 )
 
 var (
@@ -19,14 +19,14 @@ type ConfigGenerator interface {
 	BuildHTTPRoutes(node *Proxy)
 }
 
-type ConfigGeneratorImpl struct {}
+type ConfigGeneratorImpl struct{}
 
 func (configgen *ConfigGeneratorImpl) BuildHTTPRoutes(node *Proxy) {
 	configgen.buildSidecarOutboundHTTPRouteConfig(node)
 }
 
 func (configgen *ConfigGeneratorImpl) buildSidecarOutboundHTTPRouteConfig(node *Proxy) {
-	BuildSidecarVirtualHostsFromConfigAndRegistry(node.WorkloadLabels) // racy read on WorkloadLabels
+	BuildSidecarVirtualHostsFromConfigAndRegistry(node.WorkloadLabels /* RACE Read */) // racy read on WorkloadLabels
 }
 
 type Proxy struct {
@@ -70,7 +70,7 @@ func (s *DiscoveryServer) pushRoute(con *XdsConnection) {
 func (s *DiscoveryServer) WorkloadUpdate() {
 	adsClientsMutex.RLock()
 	for _, connection := range adsClients {
-		connection.modelNode.WorkloadLabels = nil // racy write on WorkloadLabels
+		connection.modelNode.WorkloadLabels /* RACE Write */ = nil // racy write on WorkloadLabels
 	}
 	adsClientsMutex.RUnlock()
 }
@@ -93,7 +93,7 @@ func TestIstio16742(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		registry := &MemServiceDiscovery{
-			EDSUpdater:&DiscoveryServer{
+			EDSUpdater: &DiscoveryServer{
 				ConfigGenerator: &ConfigGeneratorImpl{},
 			},
 		}

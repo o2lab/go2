@@ -11,7 +11,7 @@ type data struct {
 }
 
 func (h *data) Pop() {
-	h.queue = h.queue[0 : len(h.queue)-1] // racy write on queue
+	h.queue /* RACE Write */ = h.queue[0 : len(h.queue)-1] // racy write on queue
 }
 
 type Interface interface {
@@ -30,7 +30,7 @@ func (h *Heap) Pop() {
 	Pop(h.data)
 }
 func (h *Heap) Len() int {
-	return len(h.data.queue) // racy read on queue
+	return len(h.data.queue /* RACE Read */) // racy read on queue
 }
 
 func NewWithRecorder() *Heap {

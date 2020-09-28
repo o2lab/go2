@@ -20,7 +20,7 @@ func (s *fsSource) Start() {
 	go func() {
 		for {
 			select {
-			case <-s.donec: // racy read on donec field
+			case <-s.donec /* RACE Read */ : // racy read on donec field
 				return
 			}
 		}
@@ -29,7 +29,7 @@ func (s *fsSource) Start() {
 
 func (s *fsSource) Stop() {
 	close(s.donec)
-	s.donec = nil // racy write on donec field
+	s.donec /* RACE Write */ = nil // racy write on donec field
 }
 
 func newFsSource() *fsSource {

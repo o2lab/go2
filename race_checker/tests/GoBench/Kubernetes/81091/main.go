@@ -12,7 +12,7 @@ type FakeFilterPlugin struct {
 }
 
 func (fp *FakeFilterPlugin) Filter() {
-	fp.numFilterCalled++ // racy read and write
+	fp.numFilterCalled /* RACE Read */ /* RACE Write*/ ++ // racy read and write
 }
 
 type FilterPlugin interface {
@@ -43,7 +43,7 @@ type genericScheduler struct {
 	framework Framework
 }
 
-func NewGenericScheduler(framework Framework,) *genericScheduler {
+func NewGenericScheduler(framework Framework) *genericScheduler {
 	return &genericScheduler{
 		framework: framework,
 	}
@@ -53,13 +53,12 @@ func (g *genericScheduler) findNodesThatFit() {
 	checkNode := func(i int) {
 		g.framework.RunFilterPlugins() // will lead to racy pair
 	}
-	ParallelizeUntil(2,2, checkNode)
+	ParallelizeUntil(2, 2, checkNode)
 }
 
 func (g *genericScheduler) Schedule() {
 	g.findNodesThatFit() // will lead to race
 }
-
 
 type DoWorkPieceFunc func(piece int)
 

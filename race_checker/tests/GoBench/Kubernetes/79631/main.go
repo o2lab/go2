@@ -11,7 +11,7 @@ type heapData struct {
 }
 
 func (h *heapData) Pop() {
-	delete(h.items, "1") // racy write on items
+	delete( /* RACE Write */ h.items, "1") // racy write on items
 }
 
 type Interface interface {
@@ -31,7 +31,7 @@ func (h *Heap) Pop() {
 }
 
 func (h *Heap) GetByKey() {
-	_ = h.data.items["1"] // racy read on items
+	_ = h.data.items /* RACE Read */ ["1"] // racy read on items
 }
 
 func (h *Heap) Get() {

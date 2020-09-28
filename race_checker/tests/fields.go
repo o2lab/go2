@@ -6,12 +6,15 @@ type T struct {
 }
 
 func main() {
-	s := &T{
+	s := T{
 		a: 1,
 		b: 2,
 	}
+	ch := make(chan struct{})
 	go func() {
-		s.a /* RACE Write */ = 1
+		s.a = 1
+		ch <- struct{}{}
 	}()
-	s.b /* RACE Write */ = 2
+	s.b = 2
+	<-ch
 }

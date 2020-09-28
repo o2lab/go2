@@ -8,10 +8,10 @@ import (
 )
 
 func Producer(mut *sync.Mutex, x *int, end chan int) {
-	for i:=0; i<5; {
-		if *x == 0 {	// Read not fenced, may not see other Producers
+	for i := 0; i < 5; {
+		if * /*RACE Read*/ x == 0 { // Read not fenced, may not see other Producers
 			i++
-			*x = i	// Write not fenced, may clash with other Producers
+			* /* RACE Write */ x = i // Write not fenced, may clash with other Producers
 		}
 	}
 	close(end)
@@ -20,7 +20,7 @@ func Producer(mut *sync.Mutex, x *int, end chan int) {
 func Consumer(mut *sync.Mutex, x *int) {
 	for {
 		mut.Lock()
-		if *x != 0 {	// Correct fencing here, but may clash with Producers that are not fenced.
+		if *x != 0 { // Correct fencing here, but may clash with Producers that are not fenced.
 			print(*x)
 			*x = 0
 		}
@@ -38,5 +38,5 @@ func main() {
 	go Consumer(m, &x)
 	<-end1
 	<-end2
-	time.Sleep(200*time.Millisecond)
+	time.Sleep(200 * time.Millisecond)
 }

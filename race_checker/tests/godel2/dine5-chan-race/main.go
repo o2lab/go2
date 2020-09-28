@@ -9,7 +9,7 @@ import (
 
 func Fork(fork *int, ch chan int) {
 	for {
-		*fork = 1
+		* /* RACE Write */ /* RACE Write */ fork = 1
 		<-ch
 		ch <- 0
 	}
@@ -18,7 +18,7 @@ func Fork(fork *int, ch chan int) {
 func phil(fork1, fork2 *int, ch1, ch2 chan int, id int) {
 	for {
 		select {
-		case ch1 <- *fork1:
+		case ch1 <- * /* RACE Read */ fork1:
 			select {
 			case ch2 <- *fork2:
 				fmt.Printf("phil %d got both fork\n", id)
@@ -27,7 +27,7 @@ func phil(fork1, fork2 *int, ch1, ch2 chan int, id int) {
 			default:
 				<-ch1
 			}
-		case ch2 <- *fork2:
+		case ch2 <- * /* RACE Read */ fork2:
 			select {
 			case ch1 <- *fork1:
 				fmt.Printf("phil %d got both fork\n", id)
@@ -57,5 +57,5 @@ func main() {
 	go Fork(&fork3, ch3)
 	go Fork(&fork4, ch4)
 	go Fork(&fork5, ch5)
-	time.Sleep(10*time.Second)
+	time.Sleep(10 * time.Second)
 }

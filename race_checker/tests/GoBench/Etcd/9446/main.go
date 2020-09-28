@@ -11,14 +11,14 @@ type txBuffer struct {
 
 func (txb *txBuffer) reSet() {
 	for k, _ := range txb.buckets {
-		delete(txb.buckets /* RACE Write */, k) // racy write on buckets field
+		delete( /* RACE Write */ txb.buckets, k) // racy write on buckets field
 	}
 }
 
 type txReadBuffer struct{ txBuffer }
 
 func (txr *txReadBuffer) Range() {
-	_ = txr.buckets["1"] /* RACE Read */ // racy read on buckets field
+	_ = txr.buckets /* RACE Read */ ["1"] // racy read on buckets field
 }
 
 type readTx struct {

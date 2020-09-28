@@ -47,7 +47,7 @@ func (c *lruCache) Set() {
 }
 
 func (c *lruCache) SetWithExpiration() {
-	atomic.AddUint64 /* RACE Write */ (&c.stats.Writes, 1) // racy write on stats field
+	atomic.AddUint64(&c.stats. /* RACE Write */ Writes, 1) // racy write on stats field
 }
 
 type grpcServer struct {
