@@ -109,14 +109,16 @@ func (a *analysis) insSend(examIns *ssa.Send, goID int, theIns ssa.Instruction) 
 	} else {
 		chName = examIns.Chan.Name()
 	}
-	for a.insertIndMap[chName] < len(a.chanBufMap[chName]) && a.chanBufMap[chName][a.insertIndMap[chName]] != nil {
-		a.insertIndMap[chName]++ // iterate until reaching an index with nil send value stored
-	}
-	if a.insertIndMap[chName] == len(a.chanBufMap[chName])-1 && a.chanBufMap[chName][a.insertIndMap[chName]] != nil {
-		// buffer length reached, channel will block
-		// TODO: use HB graph to handle blocked channel?
-	} else if a.insertIndMap[chName] < len(a.chanBufMap[chName]) {
-		a.chanBufMap[chName][a.insertIndMap[chName]] = examIns
+	if len(a.chanBufMap[chName]) > 0 {
+		for a.insertIndMap[chName] < len(a.chanBufMap[chName]) && a.chanBufMap[chName][a.insertIndMap[chName]] != nil {
+			a.insertIndMap[chName]++ // iterate until reaching an index with nil send value stored
+		}
+		if a.insertIndMap[chName] == len(a.chanBufMap[chName])-1 && a.chanBufMap[chName][a.insertIndMap[chName]] != nil {
+			// buffer length reached, channel will block
+			// TODO: use HB graph to handle blocked channel?
+		} else if a.insertIndMap[chName] < len(a.chanBufMap[chName]) {
+			a.chanBufMap[chName][a.insertIndMap[chName]] = examIns
+		}
 	}
 }
 
@@ -395,7 +397,7 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 			}
 		case "Lock":
 			stats.IncStat(stats.NLock)
-			lockLoc := examIns.Call.Args[0]       // identifier for address of lock
+			lockLoc := examIns.Call.Args[0]         // identifier for address of lock
 			if !sliceContains(a.lockSet, lockLoc) { // if lock is not already in active lockset
 				a.lockSet = append(a.lockSet, lockLoc)
 			}
@@ -437,7 +439,7 @@ func (a *analysis) insGo(examIns *ssa.Go, goID int, theIns ssa.Instruction) {
 	a.RWIns[goID] = append(a.RWIns[goID], theIns)
 	var info = goroutineInfo{examIns, fnName, newGoID}
 	a.goStack = append(a.goStack, []string{}) // initialize interior slice
-	a.goCaller[newGoID] = goID              // map caller goroutine
+	a.goCaller[newGoID] = goID                // map caller goroutine
 	a.goStack[newGoID] = append(a.goStack[newGoID], a.storeIns...)
 	a.workList = append(a.workList, info) // store encountered goroutines
 	log.Debug(strings.Repeat(" ", a.levels[goID]), "spawning Goroutine ----->  ", fnName)
