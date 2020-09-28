@@ -12,18 +12,14 @@ import (
 
 func (a *analysis) checkRacyPairs() {
 	counter := 0 // initialize race counter
-	for i := 0; i < len(RWIns); i++ {
-		for j := i + 1; j < len(RWIns); j++ { // must be in different goroutines, j always greater than i
-			for ii, goI := range RWIns[i] {
-				for jj, goJ := range RWIns[j] {
+	for i := 0; i < len(a.RWIns); i++ {
+		for j := i + 1; j < len(a.RWIns); j++ { // must be in different goroutines, j always greater than i
+			for ii, goI := range a.RWIns[i] {
+				for jj, goJ := range a.RWIns[j] {
 					insSlice := []ssa.Instruction{goI, goJ} // one instruction from each goroutine
 					addressPair := a.insAddress(insSlice)
-					if len(addressPair) > 1 && a.sameAddress(addressPair[0], addressPair[1]) &&
-						!sliceContains(reportedAddr, addressPair[0]) &&
-						!a.reachable(goI, goJ) &&
-						!a.lockSetsIntersect(insSlice[0], insSlice[1]) &&
-						!a.chanProtected(insSlice[0], insSlice[1]) {
-						reportedAddr = append(reportedAddr, addressPair[0])
+					if len(addressPair) > 1 && a.sameAddress(addressPair[0], addressPair[1]) && !sliceContains(a.reportedAddr, addressPair[0]) && !a.reachable(goI, goJ) && !a.lockSetsIntersect(insSlice[0], insSlice[1]) && !a.chanProtected(insSlice[0], insSlice[1]) {
+						a.reportedAddr = append(a.reportedAddr, addressPair[0])
 						counter++
 						goIDs := []int{i, j}    // store goroutine IDs
 						insInd := []int{ii, jj} // store index of instruction within worker goroutine
@@ -112,8 +108,8 @@ func (a *analysis) reachable(fromIns ssa.Instruction, toIns ssa.Instruction) boo
 }
 
 func (a *analysis) lockSetsIntersect(insA ssa.Instruction, insB ssa.Instruction) bool {
-	setA := lockMap[insA] // lockset of instruction-A
-	setB := lockMap[insB] // lockset of instruction-B
+	setA := a.lockMap[insA] // lockset of instruction-A
+	setB := a.lockMap[insB] // lockset of instruction-B
 	for _, addrA := range setA {
 		for _, addrB := range setB {
 			if a.sameAddress(addrA, addrB) {
@@ -139,8 +135,8 @@ func (a *analysis) lockSetsIntersect(insA ssa.Instruction, insB ssa.Instruction)
 }
 
 func (a *analysis) chanProtected(insA ssa.Instruction, insB ssa.Instruction) bool {
-	setA := chanMap[insA] // channelSet of instruction-A
-	setB := chanMap[insB] // channelSet of instruction-B
+	setA := a.chanMap[insA] // channelSet of instruction-A
+	setB := a.chanMap[insB] // channelSet of instruction-B
 	for _, chanA := range setA {
 		for _, chanB := range setB {
 			if chanA == chanB {
@@ -163,11 +159,11 @@ func (a *analysis) printRace(counter int, insPair []ssa.Instruction, addrPair []
 		}
 		colorOutput := regexp.MustCompile(`\x1b\[\d+m`)
 		errMsg = colorOutput.ReplaceAllString(errMsg, "")
-		racyStackTops = append(racyStackTops, errMsg)
+		a.racyStackTops = append(a.racyStackTops, errMsg)
 		log.Print(errMsg)
 		var printStack []string
 		var printPos []token.Pos
-		for p, everyIns := range RWIns[goIDs[i]] {
+		for p, everyIns := range a.RWIns[goIDs[i]] {
 			if p < insInd[i]-1 {
 				if isFunc, ok := everyIns.(*ssa.Call); ok {
 					printName := isFunc.Call.Value.Name()
@@ -188,19 +184,19 @@ func (a *analysis) printRace(counter int, insPair []ssa.Instruction, addrPair []
 				log.Println("\t ", strings.Repeat(" ", p), toPrint, a.prog.Fset.Position(printPos[p]))
 			}
 		}
-		log.Println("\tin goroutine  ***", goNames[goIDs[i]], "[", goIDs[i], "] *** , with the following call stack: ")
+		log.Println("\tin goroutine  ***", a.goNames[goIDs[i]], "[", goIDs[i], "] *** , with the following call stack: ")
 		var pathGo []int
 		j := goIDs[i]
 		for j > 0 {
 			pathGo = append([]int{j}, pathGo...)
-			temp := goCaller[j]
+			temp := a.goCaller[j]
 			j = temp
 		}
 		for q, eachGo := range pathGo {
-			eachStack := goStack[eachGo]
+			eachStack := a.goStack[eachGo]
 			for k, eachFn := range eachStack {
 				if k == 0 {
-					log.Println("\t ", strings.Repeat(" ", q), "--> Goroutine: ", eachFn, "[", goCaller[eachGo], "]")
+					log.Println("\t ", strings.Repeat(" ", q), "--> Goroutine: ", eachFn, "[", a.goCaller[eachGo], "]")
 				} else {
 					log.Println("\t   ", strings.Repeat(" ", q), strings.Repeat(" ", k), eachFn)
 				}

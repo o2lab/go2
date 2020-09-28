@@ -8,9 +8,6 @@ import (
 )
 
 func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Instruction) {
-	log.Debugf("Solving PTA with %d/%d queries at %s", len(a.ptaConfig.Queries), len(a.ptaConfig.IndirectQueries),
-		a.prog.Fset.Position(location.Pos()))
-	defer log.Debugf("Solving PTA done")
 	switch locType := location.(type) {
 	case *ssa.Parameter:
 		if locType.Object().Pkg().Name() == "reflect" { // ignore reflect library
@@ -45,7 +42,7 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 			if eachTarget.Value().Parent() != nil {
 				fns = append(fns, eachTarget.Value().Parent().Name())
 				log.Trace("*****target No.", ind+1, " - ", eachTarget.Value().Name(), " from function ", eachTarget.Value().Parent().Name())
-				if sliceContainsStr(storeIns, eachTarget.Value().Parent().Name()) { // calling function is in current goroutine
+				if sliceContainsStr(a.storeIns, eachTarget.Value().Parent().Name()) { // calling function is in current goroutine
 					rightLoc = ind
 					break
 				}
@@ -61,8 +58,8 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 	case *ssa.Function:
 		fnName = theFunc.Name()
 		if !a.exploredFunction(theFunc, goID, theIns) {
-			updateRecords(fnName, goID, "PUSH ")
-			RWIns[goID] = append(RWIns[goID], theIns)
+			a.updateRecords(fnName, goID, "PUSH ")
+			a.RWIns[goID] = append(a.RWIns[goID], theIns)
 			a.visitAllInstructions(theFunc, goID)
 		}
 	case *ssa.MakeInterface:
@@ -73,12 +70,12 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 		check := a.prog.LookupMethod(ptrSet[location].PointsTo().DynamicTypes().Keys()[0], a.mains[0].Pkg, methodName)
 		fnName = check.Name()
 		if !a.exploredFunction(check, goID, theIns) {
-			updateRecords(fnName, goID, "PUSH ")
-			RWIns[goID] = append(RWIns[goID], theIns)
+			a.updateRecords(fnName, goID, "PUSH ")
+			a.RWIns[goID] = append(a.RWIns[goID], theIns)
 			a.visitAllInstructions(check, goID)
 		}
 	case *ssa.MakeChan:
-		chanName = theFunc.Name()
+		a.chanName = theFunc.Name()
 	default:
 		break
 	}

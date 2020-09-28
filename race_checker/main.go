@@ -8,7 +8,6 @@ import (
 	"github.com/twmb/algoimpl/go/graph"
 	"golang.org/x/tools/go/pointer"
 	"golang.org/x/tools/go/ssa"
-	"strings"
 )
 
 type analysis struct {
@@ -21,6 +20,22 @@ type analysis struct {
 	HBgraph      *graph.Graph
 	RWinsMap     map[ssa.Instruction]graph.Node
 	trieMap      map[fnInfo]*trie // map each function to a trie node
+	RWIns         [][]ssa.Instruction
+	storeIns      []string
+	workList      []goroutineInfo
+	reportedAddr  []ssa.Value
+	racyStackTops []string
+	levels        map[int]int
+	lockMap       map[ssa.Instruction][]ssa.Value // map each read/write access to a snapshot of actively maintained lockset
+	lockSet       []ssa.Value                             // active lockset, to be maintained along instruction traversal
+	paramFunc     ssa.Value
+	goStack       [][]string
+	goCaller      map[int]int
+	goNames       map[int]string
+	chanBufMap    map[string][]*ssa.Send
+	insertIndMap  map[string]int
+	chanMap       map[ssa.Instruction][]string // map each read/write access to a list of channels with value(s) already sent to it
+	chanName      string
 }
 
 type fnInfo struct { // all fields must be comparable for fnInfo to be used as key to trieMap
@@ -45,39 +60,16 @@ type trie struct {
 	fnContext []string
 }
 
-type RWInsInd struct {
-	goID  int
-	goInd int
-}
-
-// TODO (issue #24): most of the globals below should be encapsulated in struct analysis.
 var (
 	Analysis      *analysis
-	focusPkgs     []string
+	allPkg		  = true
 	excludedPkgs  []string
-	allPkg        = true
-	levels        = make(map[int]int)
-	RWIns         [][]ssa.Instruction
-	storeIns      []string
-	workList      []goroutineInfo
-	reportedAddr  []ssa.Value
-	racyStackTops []string
-	lockMap       = make(map[ssa.Instruction][]ssa.Value) // map each read/write access to a snapshot of actively maintained lockset
-	lockSet       []ssa.Value                             // active lockset, to be maintained along instruction traversal
-	addrNameMap   = make(map[string][]ssa.Value)          // for potential optimization purposes
-	addrMap       = make(map[string][]RWInsInd)           // for potential optimization purposes
-	paramFunc     ssa.Value
-	goStack       [][]string
-	goCaller      = make(map[int]int)
-	goNames       = make(map[int]string)
-	chanBufMap    = make(map[string][]*ssa.Send)
-	chanName      string
-	insertIndMap  = make(map[string]int)
-	chanMap       = make(map[ssa.Instruction][]string) // map each read/write access to a list of channels with value(s) already sent to it
-	// proper forloop detection would require trieLimit of at least 2
+	//addrNameMap   = make(map[string][]ssa.Value)          // for potential optimization purposes
+	//addrMap       = make(map[string][]RWInsInd)           // for potential optimization purposes
 )
 
 const trieLimit = 2 // set as user config option later, an integer that dictates how many times a function can be called under identical context
+const efficiency    = false // configuration setting to avoid recursion in tested program
 
 func init() {
 	excludedPkgs = []string{
@@ -107,11 +99,9 @@ func init() {
 
 func main() {
 	debug := flag.Bool("debug", false, "Prints debug messages.")
-	focus := flag.String("focus", "", "Specifies a list of packages to check races.")
 	ptrAnalysis := flag.Bool("ptrAnalysis", false, "Prints pointer analysis results. ")
 	flag.BoolVar(&stats.CollectStats, "collectStats", false, "Collect analysis statistics.")
 	help := flag.Bool("help", false, "Show all command-line options.")
-	//flag.BoolVar(&allPkg, "all-package", true, "Analyze all packages required by the main package.")
 	flag.Parse()
 	if *help {
 		flag.PrintDefaults()
@@ -122,11 +112,6 @@ func main() {
 	}
 	if *ptrAnalysis {
 		log.SetLevel(log.TraceLevel)
-	}
-	if *focus != "" {
-		focusPkgs = strings.Split(*focus, ",")
-		focusPkgs = append(focusPkgs, "command-line-arguments")
-		allPkg = false
 	}
 
 	log.SetFormatter(&log.TextFormatter{
@@ -158,25 +143,3 @@ func mainPackages(pkgs []*ssa.Package) ([]*ssa.Package, error) {
 	return mains, nil
 }
 
-// clearState clears global states defined in this file.
-// This function should only be called in tests.
-func clearState() {
-	levels = make(map[int]int)
-	RWIns = [][]ssa.Instruction{}
-	storeIns = []string{}
-	workList = []goroutineInfo{}
-	reportedAddr = []ssa.Value{}
-	racyStackTops = []string{}
-	lockMap = make(map[ssa.Instruction][]ssa.Value)
-	lockSet = []ssa.Value{}
-	addrNameMap = make(map[string][]ssa.Value)
-	addrMap = make(map[string][]RWInsInd)
-	paramFunc = nil
-	goStack = [][]string{}
-	goCaller = make(map[int]int)
-	goNames = make(map[int]string)
-	chanBufMap = make(map[string][]*ssa.Send)
-	chanName = ""
-	insertIndMap = make(map[string]int)
-	chanMap = make(map[ssa.Instruction][]string)
-}

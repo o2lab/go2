@@ -71,15 +71,15 @@ func isWriteIns(ins ssa.Instruction) bool { // is the instruction a write access
 	return false
 }
 
-func updateRecords(fnName string, goID int, pushPop string) {
+func (a *analysis) updateRecords(fnName string, goID int, pushPop string) {
 	if pushPop == "POP  " {
-		storeIns = storeIns[:len(storeIns)-1]
-		levels[goID]--
+		a.storeIns = a.storeIns[:len(a.storeIns)-1]
+		a.levels[goID]--
 	}
-	log.Debug(strings.Repeat(" ", levels[goID]), pushPop, fnName, " at lvl ", levels[goID])
+	log.Debug(strings.Repeat(" ", a.levels[goID]), pushPop, fnName, " at lvl ", a.levels[goID])
 	if pushPop == "PUSH " {
-		storeIns = append(storeIns, fnName)
-		levels[goID]++
+		a.storeIns = append(a.storeIns, fnName)
+		a.levels[goID]++
 	}
 }
 
@@ -93,50 +93,50 @@ func (a *analysis) insMakeChan(examIns *ssa.MakeChan) {
 		bufferLen = 10 // TODO: assuming channel can buffer up to 10 values could result in false positives
 	}
 	if bufferLen < 2 { // unbuffered channel
-		chanBufMap[examIns.Name()] = make([]*ssa.Send, 1)
+		a.chanBufMap[examIns.Name()] = make([]*ssa.Send, 1)
 	} else { // buffered channel
-		chanBufMap[examIns.Name()] = make([]*ssa.Send, bufferLen)
+		a.chanBufMap[examIns.Name()] = make([]*ssa.Send, bufferLen)
 	}
-	insertIndMap[examIns.Name()] = 0 // initialize index
+	a.insertIndMap[examIns.Name()] = 0 // initialize index
 }
 
 func (a *analysis) insSend(examIns *ssa.Send, goID int, theIns ssa.Instruction) {
 	stats.IncStat(stats.NSend)
 	var chName string
-	if _, ok := chanBufMap[examIns.Chan.Name()]; !ok { // if channel name can't be identified
+	if _, ok := a.chanBufMap[examIns.Chan.Name()]; !ok { // if channel name can't be identified
 		a.pointerAnalysis(examIns.Chan, goID, theIns) // identifiable name will be returned by pointer analysis via variable chanName
-		chName = chanName
+		chName = a.chanName
 	} else {
 		chName = examIns.Chan.Name()
 	}
-	for insertIndMap[chName] < len(chanBufMap[chName]) && chanBufMap[chName][insertIndMap[chName]] != nil {
-		insertIndMap[chName]++ // iterate until reaching an index with nil send value stored
+	for a.insertIndMap[chName] < len(a.chanBufMap[chName]) && a.chanBufMap[chName][a.insertIndMap[chName]] != nil {
+		a.insertIndMap[chName]++ // iterate until reaching an index with nil send value stored
 	}
-	if insertIndMap[chName] == len(chanBufMap[chName])-1 && chanBufMap[chName][insertIndMap[chName]] != nil {
+	if a.insertIndMap[chName] == len(a.chanBufMap[chName])-1 && a.chanBufMap[chName][a.insertIndMap[chName]] != nil {
 		// buffer length reached, channel will block
 		// TODO: use HB graph to handle blocked channel?
-	} else if insertIndMap[chName] < len(chanBufMap[chName]) {
-		chanBufMap[chName][insertIndMap[chName]] = examIns
+	} else if a.insertIndMap[chName] < len(a.chanBufMap[chName]) {
+		a.chanBufMap[chName][a.insertIndMap[chName]] = examIns
 	}
 }
 
 func (a *analysis) insStore(examIns *ssa.Store, goID int, theIns ssa.Instruction) {
 	stats.IncStat(stats.NStore)
 	if !isLocalAddr(examIns.Addr) {
-		if len(storeIns) > 1 {
-			if storeIns[len(storeIns)-2] == "AfterFunc" { // ignore this write instruction as AfterFunc is analyzed elsewhere
+		if len(a.storeIns) > 1 {
+			if a.storeIns[len(a.storeIns)-2] == "AfterFunc" { // ignore this write instruction as AfterFunc is analyzed elsewhere
 				return
 			}
 		}
-		RWIns[goID] = append(RWIns[goID], theIns)
-		if len(lockSet) > 0 {
-			lockMap[theIns] = lockSet
+		a.RWIns[goID] = append(a.RWIns[goID], theIns)
+		if len(a.lockSet) > 0 {
+			a.lockMap[theIns] = a.lockSet
 		}
-		if len(chanBufMap) > 0 {
-			chanMap[theIns] = []string{}
-			for aChan, sSends := range chanBufMap {
+		if len(a.chanBufMap) > 0 {
+			a.chanMap[theIns] = []string{}
+			for aChan, sSends := range a.chanBufMap {
 				if sSends[0] != nil && len(sSends) == 1 { // slice of channel sends contains exactly one value
-					chanMap[theIns] = append(chanMap[theIns], aChan)
+					a.chanMap[theIns] = append(a.chanMap[theIns], aChan)
 				}
 			}
 		}
@@ -147,8 +147,8 @@ func (a *analysis) insStore(examIns *ssa.Store, goID int, theIns ssa.Instruction
 	if theFunc, storeFn := examIns.Val.(*ssa.Function); storeFn {
 		fnName := theFunc.Name()
 		if !a.exploredFunction(theFunc, goID, theIns) {
-			updateRecords(fnName, goID, "PUSH ")
-			RWIns[goID] = append(RWIns[goID], theIns)
+			a.updateRecords(fnName, goID, "PUSH ")
+			a.RWIns[goID] = append(a.RWIns[goID], theIns)
 			a.visitAllInstructions(theFunc, goID)
 		}
 	}
@@ -157,36 +157,36 @@ func (a *analysis) insStore(examIns *ssa.Store, goID int, theIns ssa.Instruction
 func (a *analysis) insUnOp(examIns *ssa.UnOp, goID int, theIns ssa.Instruction) {
 	stats.IncStat(stats.NUnOp)
 	if examIns.Op == token.MUL && !isLocalAddr(examIns.X) { // read op
-		RWIns[goID] = append(RWIns[goID], theIns)
-		if len(lockSet) > 0 {
-			lockMap[theIns] = lockSet
+		a.RWIns[goID] = append(a.RWIns[goID], theIns)
+		if len(a.lockSet) > 0 {
+			a.lockMap[theIns] = a.lockSet
 		}
-		if len(chanBufMap) > 0 {
-			chanMap[theIns] = []string{}
-			for aChan, sSends := range chanBufMap {
+		if len(a.chanBufMap) > 0 {
+			a.chanMap[theIns] = []string{}
+			for aChan, sSends := range a.chanBufMap {
 				if sSends[0] != nil && len(sSends) == 1 { // slice of channel sends contains exactly one value
-					chanMap[theIns] = append(chanMap[theIns], aChan)
+					a.chanMap[theIns] = append(a.chanMap[theIns], aChan)
 				}
 			}
 		}
-		addrNameMap[examIns.X.Name()] = append(addrNameMap[examIns.X.Name()], examIns.X)
-		addrMap[examIns.X.Name()] = append(addrMap[examIns.X.Name()], RWInsInd{goID: goID, goInd: sliceContainsInsAt(RWIns[goID], theIns)})
+		//addrNameMap[examIns.X.Name()] = append(addrNameMap[examIns.X.Name()], examIns.X)
+		//addrMap[examIns.X.Name()] = append(addrMap[examIns.X.Name()], RWInsInd{goID: goID, goInd: sliceContainsInsAt(RWIns[goID], theIns)})
 		a.ptaConfig.AddQuery(examIns.X)
 	} else if examIns.Op == token.ARROW { // channel receive op
 		stats.IncStat(stats.NChanRecv)
 		var chName string
-		if _, ok := chanBufMap[examIns.X.Name()]; !ok { // if channel name can't be identified
+		if _, ok := a.chanBufMap[examIns.X.Name()]; !ok { // if channel name can't be identified
 			a.pointerAnalysis(examIns.X, goID, theIns)
-			chName = chanName
+			chName = a.chanName
 		} else {
 			chName = examIns.X.Name()
 		}
-		for i, aVal := range chanBufMap[chName] {
+		for i, aVal := range a.chanBufMap[chName] {
 			if aVal != nil { // channel is not empty
-				if len(chanBufMap[chName]) > i+1 {
-					chanBufMap[chName][i] = chanBufMap[chName][i+1] // move buffered values one place over
+				if len(a.chanBufMap[chName]) > i+1 {
+					a.chanBufMap[chName][i] = a.chanBufMap[chName][i+1] // move buffered values one place over
 				} else {
-					chanBufMap[chName][i] = nil // empty channel upon channel recv
+					a.chanBufMap[chName][i] = nil // empty channel upon channel recv
 				}
 			}
 		}
@@ -196,15 +196,15 @@ func (a *analysis) insUnOp(examIns *ssa.UnOp, goID int, theIns ssa.Instruction) 
 func (a *analysis) insFieldAddr(examIns *ssa.FieldAddr, goID int, theIns ssa.Instruction) {
 	stats.IncStat(stats.NFieldAddr)
 	if !isLocalAddr(examIns.X) {
-		RWIns[goID] = append(RWIns[goID], theIns)
-		if len(lockSet) > 0 {
-			lockMap[theIns] = lockSet
+		a.RWIns[goID] = append(a.RWIns[goID], theIns)
+		if len(a.lockSet) > 0 {
+			a.lockMap[theIns] = a.lockSet
 		}
-		if len(chanBufMap) > 0 {
-			chanMap[theIns] = []string{}
-			for aChan, sSends := range chanBufMap {
+		if len(a.chanBufMap) > 0 {
+			a.chanMap[theIns] = []string{}
+			for aChan, sSends := range a.chanBufMap {
 				if sSends[0] != nil && len(sSends) == 1 { // slice of channel sends contains exactly one value
-					chanMap[theIns] = append(chanMap[theIns], aChan)
+					a.chanMap[theIns] = append(a.chanMap[theIns], aChan)
 				}
 			}
 		}
@@ -219,38 +219,38 @@ func (a *analysis) insLookUp(examIns *ssa.Lookup, goID int, theIns ssa.Instructi
 	switch readIns := examIns.X.(type) {
 	case *ssa.UnOp:
 		if readIns.Op == token.MUL && !isLocalAddr(readIns.X) {
-			RWIns[goID] = append(RWIns[goID], theIns)
-			if len(lockSet) > 0 {
-				lockMap[theIns] = lockSet
+			a.RWIns[goID] = append(a.RWIns[goID], theIns)
+			if len(a.lockSet) > 0 {
+				a.lockMap[theIns] = a.lockSet
 			}
-			if len(chanBufMap) > 0 {
-				chanMap[theIns] = []string{}
-				for aChan, sSends := range chanBufMap {
+			if len(a.chanBufMap) > 0 {
+				a.chanMap[theIns] = []string{}
+				for aChan, sSends := range a.chanBufMap {
 					if sSends[0] != nil && len(sSends) == 1 { // slice of channel sends contains exactly one value
-						chanMap[theIns] = append(chanMap[theIns], aChan)
+						a.chanMap[theIns] = append(a.chanMap[theIns], aChan)
 					}
 				}
 			}
-			addrNameMap[readIns.X.Name()] = append(addrNameMap[readIns.X.Name()], readIns.X)
-			addrMap[readIns.X.Name()] = append(addrMap[readIns.X.Name()], RWInsInd{goID: goID, goInd: sliceContainsInsAt(RWIns[goID], theIns)})
+			//addrNameMap[readIns.X.Name()] = append(addrNameMap[readIns.X.Name()], readIns.X)
+			//addrMap[readIns.X.Name()] = append(addrMap[readIns.X.Name()], RWInsInd{goID: goID, goInd: sliceContainsInsAt(RWIns[goID], theIns)})
 			a.ptaConfig.AddQuery(readIns.X)
 		}
 	case *ssa.Parameter:
 		if !isLocalAddr(readIns) {
-			RWIns[goID] = append(RWIns[goID], theIns)
-			if len(lockSet) > 0 {
-				lockMap[theIns] = lockSet
+			a.RWIns[goID] = append(a.RWIns[goID], theIns)
+			if len(a.lockSet) > 0 {
+				a.lockMap[theIns] = a.lockSet
 			}
-			if len(chanBufMap) > 0 {
-				chanMap[theIns] = []string{}
-				for aChan, sSends := range chanBufMap {
+			if len(a.chanBufMap) > 0 {
+				a.chanMap[theIns] = []string{}
+				for aChan, sSends := range a.chanBufMap {
 					if sSends[0] != nil && len(sSends) == 1 { // slice of channel sends contains exactly one value
-						chanMap[theIns] = append(chanMap[theIns], aChan)
+						a.chanMap[theIns] = append(a.chanMap[theIns], aChan)
 					}
 				}
 			}
-			addrNameMap[readIns.Name()] = append(addrNameMap[readIns.Name()], readIns)
-			addrMap[readIns.Name()] = append(addrMap[readIns.Name()], RWInsInd{goID: goID, goInd: sliceContainsInsAt(RWIns[goID], theIns)})
+			//addrNameMap[readIns.Name()] = append(addrNameMap[readIns.Name()], readIns)
+			//addrMap[readIns.Name()] = append(addrMap[readIns.Name()], RWInsInd{goID: goID, goInd: sliceContainsInsAt(RWIns[goID], theIns)})
 			a.ptaConfig.AddQuery(readIns)
 		}
 	}
@@ -264,16 +264,16 @@ func (a *analysis) insChangeType(examIns *ssa.ChangeType, goID int, theIns ssa.I
 		if fromPkgsOfInterest(theFn) {
 			fnName := mc.Fn.Name()
 			if !a.exploredFunction(theFn, goID, theIns) {
-				updateRecords(fnName, goID, "PUSH ")
-				RWIns[goID] = append(RWIns[goID], theIns)
-				if len(lockSet) > 0 {
-					lockMap[theIns] = lockSet
+				a.updateRecords(fnName, goID, "PUSH ")
+				a.RWIns[goID] = append(a.RWIns[goID], theIns)
+				if len(a.lockSet) > 0 {
+					a.lockMap[theIns] = a.lockSet
 				}
-				if len(chanBufMap) > 0 {
-					chanMap[theIns] = []string{}
-					for aChan, sSends := range chanBufMap {
+				if len(a.chanBufMap) > 0 {
+					a.chanMap[theIns] = []string{}
+					for aChan, sSends := range a.chanBufMap {
 						if sSends[0] != nil && len(sSends) == 1 { // slice of channel sends contains exactly one value
-							chanMap[theIns] = append(chanMap[theIns], aChan)
+							a.chanMap[theIns] = append(a.chanMap[theIns], aChan)
 						}
 					}
 				}
@@ -315,20 +315,20 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 		} else if examIns.Call.Value.Name() == "delete" { // built-in delete op
 			if theVal, ok := examIns.Call.Args[0].(*ssa.UnOp); ok {
 				if theVal.Op == token.MUL && !isLocalAddr(theVal.X) {
-					RWIns[goID] = append(RWIns[goID], theIns)
-					if len(lockSet) > 0 {
-						lockMap[theIns] = lockSet
+					a.RWIns[goID] = append(a.RWIns[goID], theIns)
+					if len(a.lockSet) > 0 {
+						a.lockMap[theIns] = a.lockSet
 					}
-					if len(chanBufMap) > 0 {
-						chanMap[theIns] = []string{}
-						for aChan, sSends := range chanBufMap {
+					if len(a.chanBufMap) > 0 {
+						a.chanMap[theIns] = []string{}
+						for aChan, sSends := range a.chanBufMap {
 							if sSends[0] != nil && len(sSends) == 1 { // slice of channel sends contains exactly one value
-								chanMap[theIns] = append(chanMap[theIns], aChan)
+								a.chanMap[theIns] = append(a.chanMap[theIns], aChan)
 							}
 						}
 					}
-					addrNameMap[theVal.X.Name()] = append(addrNameMap[theVal.X.Name()], theVal)
-					addrMap[theVal.X.Name()] = append(addrMap[theVal.X.Name()], RWInsInd{goID: goID, goInd: sliceContainsInsAt(RWIns[goID], theIns)})
+					//addrNameMap[theVal.X.Name()] = append(addrNameMap[theVal.X.Name()], theVal)
+					//addrMap[theVal.X.Name()] = append(addrMap[theVal.X.Name()], RWInsInd{goID: goID, goInd: sliceContainsInsAt(RWIns[goID], theIns)})
 					a.ptaConfig.AddQuery(theVal.X)
 				}
 			}
@@ -348,26 +348,26 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 		return
 	} else if fromPkgsOfInterest(examIns.Call.StaticCallee()) && examIns.Call.StaticCallee().Pkg.Pkg.Name() != "sync" { // calling a function
 		if examIns.Call.Value.Name() == "AfterFunc" && examIns.Call.StaticCallee().Pkg.Pkg.Name() == "time" { // calling time.AfterFunc()
-			paramFunc = examIns.Call.Args[1]
+			a.paramFunc = examIns.Call.Args[1]
 		}
 		for _, checkArgs := range examIns.Call.Args {
 			switch access := checkArgs.(type) {
 			case *ssa.FieldAddr:
 				if !isLocalAddr(access.X) && strings.HasPrefix(examIns.Call.Value.Name(), "Add") {
-					RWIns[goID] = append(RWIns[goID], theIns)
-					if len(lockSet) > 0 {
-						lockMap[theIns] = lockSet
+					a.RWIns[goID] = append(a.RWIns[goID], theIns)
+					if len(a.lockSet) > 0 {
+						a.lockMap[theIns] = a.lockSet
 					}
-					if len(chanBufMap) > 0 {
-						chanMap[theIns] = []string{}
-						for aChan, sSends := range chanBufMap {
+					if len(a.chanBufMap) > 0 {
+						a.chanMap[theIns] = []string{}
+						for aChan, sSends := range a.chanBufMap {
 							if sSends[0] != nil && len(sSends) == 1 { // slice of channel sends contains exactly one value
-								chanMap[theIns] = append(chanMap[theIns], aChan)
+								a.chanMap[theIns] = append(a.chanMap[theIns], aChan)
 							}
 						}
 					}
-					addrNameMap[access.X.Name()] = append(addrNameMap[access.X.Name()], access.X)                                                     // map address name to address, used for checking points-to labels later
-					addrMap[access.X.Name()] = append(addrMap[access.X.Name()], RWInsInd{goID: goID, goInd: sliceContainsInsAt(RWIns[goID], theIns)}) // map address name to slice of instructions accessing the same address name
+					//addrNameMap[access.X.Name()] = append(addrNameMap[access.X.Name()], access.X)                                                     // map address name to address, used for checking points-to labels later
+					//addrMap[access.X.Name()] = append(addrMap[access.X.Name()], RWInsInd{goID: goID, goInd: sliceContainsInsAt(RWIns[goID], theIns)}) // map address name to slice of instructions accessing the same address name
 					a.ptaConfig.AddQuery(access.X)
 				}
 			default:
@@ -380,8 +380,8 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 		fnName := examIns.Call.Value.Name()
 		fnName = checkTokenName(fnName, examIns)
 		if !a.exploredFunction(examIns.Call.StaticCallee(), goID, theIns) {
-			updateRecords(fnName, goID, "PUSH ")
-			RWIns[goID] = append(RWIns[goID], theIns)
+			a.updateRecords(fnName, goID, "PUSH ")
+			a.RWIns[goID] = append(a.RWIns[goID], theIns)
 			a.visitAllInstructions(examIns.Call.StaticCallee(), goID)
 		}
 	} else if examIns.Call.StaticCallee().Pkg.Pkg.Name() == "sync" {
@@ -389,28 +389,28 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 		case "Range":
 			fnName := examIns.Call.Value.Name()
 			if !a.exploredFunction(examIns.Call.StaticCallee(), goID, theIns) {
-				updateRecords(fnName, goID, "PUSH ")
-				RWIns[goID] = append(RWIns[goID], theIns)
+				a.updateRecords(fnName, goID, "PUSH ")
+				a.RWIns[goID] = append(a.RWIns[goID], theIns)
 				a.visitAllInstructions(examIns.Call.StaticCallee(), goID)
 			}
 		case "Lock":
 			stats.IncStat(stats.NLock)
 			lockLoc := examIns.Call.Args[0]       // identifier for address of lock
-			if !sliceContains(lockSet, lockLoc) { // if lock is not already in active lockset
-				lockSet = append(lockSet, lockLoc)
+			if !sliceContains(a.lockSet, lockLoc) { // if lock is not already in active lockset
+				a.lockSet = append(a.lockSet, lockLoc)
 			}
 		case "Unlock":
 			stats.IncStat(stats.NUnlock)
 			lockLoc := examIns.Call.Args[0]
-			if p := a.lockSetContainsAt(lockSet, lockLoc); p >= 0 {
-				lockSet = deleteFromLockSet(lockSet, p)
+			if p := a.lockSetContainsAt(a.lockSet, lockLoc); p >= 0 {
+				a.lockSet = deleteFromLockSet(a.lockSet, p)
 			}
 		case "Wait":
 			stats.IncStat(stats.NWaitGroupWait)
-			RWIns[goID] = append(RWIns[goID], theIns)
+			a.RWIns[goID] = append(a.RWIns[goID], theIns)
 		case "Done":
 			stats.IncStat(stats.NWaitGroupDone)
-			RWIns[goID] = append(RWIns[goID], theIns)
+			a.RWIns[goID] = append(a.RWIns[goID], theIns)
 			//case "Add": // adds delta to the WG
 			//	fmt.Println("eee")// TODO: handle cases when WG counter is incremented by value greater than 1
 		}
@@ -428,17 +428,17 @@ func (a *analysis) insGo(examIns *ssa.Go, goID int, theIns ssa.Instruction) {
 	case *ssa.Function:
 		fnName = anonFn.Name()
 	case *ssa.TypeAssert:
-		fnName = paramFunc.(*ssa.MakeClosure).Fn.Name()
+		fnName = a.paramFunc.(*ssa.MakeClosure).Fn.Name()
 	}
 	newGoID := goID + 1 // increment goID for child goroutine
-	if len(workList) > 0 {
-		newGoID = workList[len(workList)-1].goID + 1
+	if len(a.workList) > 0 {
+		newGoID = a.workList[len(a.workList)-1].goID + 1
 	}
-	RWIns[goID] = append(RWIns[goID], theIns)
+	a.RWIns[goID] = append(a.RWIns[goID], theIns)
 	var info = goroutineInfo{examIns, fnName, newGoID}
-	goStack = append(goStack, []string{}) // initialize interior slice
-	goCaller[newGoID] = goID              // map caller goroutine
-	goStack[newGoID] = append(goStack[newGoID], storeIns...)
-	workList = append(workList, info) // store encountered goroutines
-	log.Debug(strings.Repeat(" ", levels[goID]), "spawning Goroutine ----->  ", fnName)
+	a.goStack = append(a.goStack, []string{}) // initialize interior slice
+	a.goCaller[newGoID] = goID              // map caller goroutine
+	a.goStack[newGoID] = append(a.goStack[newGoID], a.storeIns...)
+	a.workList = append(a.workList, info) // store encountered goroutines
+	log.Debug(strings.Repeat(" ", a.levels[goID]), "spawning Goroutine ----->  ", fnName)
 }
