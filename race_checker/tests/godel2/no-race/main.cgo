@@ -1,0 +1,10 @@
+def main.main():
+    letmem z0;
+    letmem z1;
+    call main.Writer(z0);
+    call main.Writer(z1);
+    read z0;
+    read z1;
+def main.Writer(x):
+    read x;
+    write x;

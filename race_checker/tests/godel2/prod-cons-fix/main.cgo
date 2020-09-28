@@ -1,0 +1,39 @@
+def main.main():
+    letsync m0 mutex;
+    letmem z1;
+    let t2 = newchan main.main0.t2_chan0, 0;
+    let t3 = newchan main.main0.t3_chan0, 0;
+    spawn main.Producer(m0, z1, t2);
+    spawn main.Producer(m0, z1, t3);
+    spawn main.Consumer(m0, z1);
+    recv t2;
+    recv t3;
+def main.Producer(mut, x, end):
+    call main.Producer#3(mut, x, end);
+def main.Producer#1(mut, x, end):
+    lock mut;
+    read x;
+    if call main.Producer#4(mut, x, end); else call main.Producer#5(mut, x, end); endif;
+def main.Producer#2(mut, x, end):
+    close end;
+def main.Producer#3(mut, x, end):
+    if call main.Producer#1(mut, x, end); else call main.Producer#2(mut, x, end); endif;
+def main.Producer#4(mut, x, end):
+    write x;
+    call main.Producer#5(mut, x, end);
+def main.Producer#5(mut, x, end):
+    unlock mut;
+    call main.Producer#3(mut, x, end);
+def main.Consumer(mut, x):
+    call main.Consumer#1(mut, x);
+def main.Consumer#1(mut, x):
+    lock mut;
+    read x;
+    if call main.Consumer#2(mut, x); else call main.Consumer#3(mut, x); endif;
+def main.Consumer#2(mut, x):
+    read x;
+    write x;
+    call main.Consumer#3(mut, x);
+def main.Consumer#3(mut, x):
+    unlock mut;
+    call main.Consumer#1(mut, x);

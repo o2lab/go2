@@ -1,0 +1,15 @@
+def main.main():
+    letsync m0 mutex;
+    letmem z1;
+    spawn main.main$1(m0,z1);
+    spawn main.Deposit(m0,z1);
+def main.Deposit(mut, bal):
+    lock mut;
+    read bal;
+    write bal;
+    unlock mut;
+def main.main$1(mut, bal):
+    call main.Deposit(mut, bal);
+    lock mut;
+    read bal;
+    unlock mut;
