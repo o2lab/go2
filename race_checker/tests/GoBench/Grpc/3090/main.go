@@ -40,7 +40,7 @@ type ccResolverWrapper struct {
 
 func (ccr *ccResolverWrapper) resolveNow() {
 	ccr.mu.Lock()
-	ccr.resolver. /* RACE Read */ ResolveNow() // racy read on resolver field
+	ccr.resolver/* RACE Read */.ResolveNow() // racy read on resolver field
 	ccr.mu.Unlock()
 }
 
