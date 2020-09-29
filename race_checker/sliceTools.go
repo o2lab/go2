@@ -8,6 +8,7 @@ import (
 	"strings"
 )
 
+// insToCallStack will return the callStack of the input instructions that called a function but did not return
 func insToCallStack(allIns []ssa.Instruction) ([]string, string) {
 	var callStack []string
 	var csStr string
@@ -22,6 +23,7 @@ func insToCallStack(allIns []ssa.Instruction) ([]string, string) {
 	return callStack, csStr
 }
 
+// sliceContains if the e value is present in the slice, s, of ssa values that true, and false otherwise
 func sliceContains(s []ssa.Value, e ssa.Value) bool {
 	for _, a := range s {
 		if a == e {
@@ -31,6 +33,7 @@ func sliceContains(s []ssa.Value, e ssa.Value) bool {
 	return false
 }
 
+// sliceContainsBloc determines if BasicBlock e is in s
 func sliceContainsBloc(s []*ssa.BasicBlock, e *ssa.BasicBlock) bool {
 	for _, a := range s {
 		if a.Comment == e.Comment {
@@ -40,6 +43,7 @@ func sliceContainsBloc(s []*ssa.BasicBlock, e *ssa.BasicBlock) bool {
 	return false
 }
 
+// sliceContainsDup determines if slice s has duplicate values
 func sliceContainsDup(s []string) bool {
 	sort.Strings(s)
 	for i, n := range s {
@@ -52,6 +56,7 @@ func sliceContainsDup(s []string) bool {
 	return false
 }
 
+// sliceContainsStr will determine if slice s has an element e of type string
 func sliceContainsStr(s []string, e string) bool {
 	for _, a := range s {
 		if a == e {
@@ -61,6 +66,7 @@ func sliceContainsStr(s []string, e string) bool {
 	return false
 }
 
+// sliceContainsStrCtr will determine how many times e is in s
 func sliceContainsStrCtr(s []string, e string) int {
 	counter := 0
 	for _, a := range s {
@@ -71,6 +77,7 @@ func sliceContainsStrCtr(s []string, e string) int {
 	return counter
 }
 
+// sliceContainsInsAt finds the index of e in instruction slice s
 func sliceContainsInsAt(s []ssa.Instruction, e ssa.Instruction) int {
 	for i := 0; i < len(s); i++ {
 		if s[i] == e {
@@ -80,12 +87,14 @@ func sliceContainsInsAt(s []ssa.Instruction, e ssa.Instruction) int {
 	return -1
 }
 
+// deleteFromLockSet removes k from s
 func deleteFromLockSet(s []ssa.Value, k int) []ssa.Value {
 	var res []ssa.Value
 	res = append(s[:k], s[k+1:]...)
 	return res
 }
 
+// lockSetContainsAt returns the index of e in s
 func (a *analysis) lockSetContainsAt(s []ssa.Value, e ssa.Value) int {
 	var aPos, bPos token.Pos
 	for i, k := range s {
