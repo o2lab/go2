@@ -13,6 +13,7 @@ import (
 	"strings"
 )
 
+// fromPkgsOfInterest determines if a function is from a package of interest
 func fromPkgsOfInterest(fn *ssa.Function) bool {
 	if fn.Pkg == nil || fn.Pkg.Pkg == nil {
 		return false
@@ -25,6 +26,7 @@ func fromPkgsOfInterest(fn *ssa.Function) bool {
 	return allPkg
 }
 
+// isLocalAddr returns whether location is a local address or not
 func isLocalAddr(location ssa.Value) bool {
 	if location.Pos() == token.NoPos {
 		return true
@@ -49,10 +51,12 @@ func isLocalAddr(location ssa.Value) bool {
 	return false
 }
 
+// isSynthetic returns whether fn is synthetic or not
 func isSynthetic(fn *ssa.Function) bool { // ignore functions that are NOT true source functions
 	return fn.Synthetic != "" || fn.Pkg == nil
 }
 
+// staticAnalysis builds a Happens-Before Graph and calls other functions like visitAllInstructions to drive the program further
 func staticAnalysis(args []string) error {
 	cfg := &packages.Config{
 		Mode:  packages.LoadAllSyntax, // the level of information returned for each package
@@ -187,6 +191,7 @@ func staticAnalysis(args []string) error {
 	return nil
 }
 
+// visitAllInstructions visits each line and calls the corresponding helper function to drive the tool
 func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 	a.analysisStat.nGoroutine = goID + 1 // keep count of goroutine quantity
 	if !isSynthetic(fn) {                // if function is NOT synthetic
@@ -300,6 +305,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 	}
 }
 
+// newGoroutine goes through the go routine, logs its info, and goes through the instructions within,   the r isn't capitalized?
 func (a *analysis) newGoroutine(info goroutineInfo) {
 	a.storeIns = append(a.storeIns, info.entryMethod)
 	if info.goID >= len(a.RWIns) { // initialize interior slice for new goroutine
@@ -320,6 +326,7 @@ func (a *analysis) newGoroutine(info goroutineInfo) {
 	}
 }
 
+// exploredFunction determines if we already visited this function
 func (a *analysis) exploredFunction(fn *ssa.Function, goID int, theIns ssa.Instruction) bool {
 	if efficiency && !fromPkgsOfInterest(fn) { // for temporary debugging purposes only
 		return true
@@ -357,6 +364,7 @@ func (a *analysis) exploredFunction(fn *ssa.Function, goID int, theIns ssa.Instr
 	return a.trieMap[fnKey].isBudgetExceeded()
 }
 
+// isBudgetExceeded determines if the budget has exceeded the limit
 func (t trie) isBudgetExceeded() bool {
 	if t.budget > trieLimit {
 		return true
