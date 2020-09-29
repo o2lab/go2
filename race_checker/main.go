@@ -96,7 +96,7 @@ func init() {
 		"impl",
 	}
 }
-
+// main sets up arguments and calls staticAnalysis function
 func main() {
 	debug := flag.Bool("debug", false, "Prints debug messages.")
 	ptrAnalysis := flag.Bool("ptrAnalysis", false, "Prints pointer analysis results. ")
