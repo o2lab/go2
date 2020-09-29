@@ -11,6 +11,7 @@ import (
 	"strings"
 )
 
+// checkTokenName will return original name of an input function rather than a token
 func checkTokenName(fnName string, theIns *ssa.Call) string {
 	if strings.HasPrefix(fnName, "t") { // function name begins with letter t
 		if _, err := strconv.Atoi(string([]rune(fnName)[1:])); err == nil { // function name after first character look like an integer
@@ -25,6 +26,7 @@ func checkTokenName(fnName string, theIns *ssa.Call) string {
 	return fnName
 }
 
+// checkTokenNameDefer will return original name of an input defered function rather than a token
 func checkTokenNameDefer(fnName string, theIns *ssa.Defer) string {
 	if strings.HasPrefix(fnName, "t") { // function name begins with letter t
 		if _, err := strconv.Atoi(string([]rune(fnName)[1:])); err == nil { // function name after first character look like an integer
@@ -39,7 +41,8 @@ func checkTokenNameDefer(fnName string, theIns *ssa.Defer) string {
 	return fnName
 }
 
-func isReadIns(ins ssa.Instruction) bool { // is the instruction a read access?
+// isReadIns determines if the instruction is a read access
+func isReadIns(ins ssa.Instruction) bool {
 	switch insType := ins.(type) {
 	case *ssa.UnOp:
 		return true
@@ -57,7 +60,8 @@ func isReadIns(ins ssa.Instruction) bool { // is the instruction a read access?
 	return false
 }
 
-func isWriteIns(ins ssa.Instruction) bool { // is the instruction a write access?
+// isWriteIns determines if the instruction is a write access
+func isWriteIns(ins ssa.Instruction) bool {
 	switch insType := ins.(type) {
 	case *ssa.Store:
 		return true
@@ -71,6 +75,7 @@ func isWriteIns(ins ssa.Instruction) bool { // is the instruction a write access
 	return false
 }
 
+// updateRecords will print out the stack trace
 func (a *analysis) updateRecords(fnName string, goID int, pushPop string) {
 	if pushPop == "POP  " {
 		a.storeIns = a.storeIns[:len(a.storeIns)-1]
@@ -83,6 +88,7 @@ func (a *analysis) updateRecords(fnName string, goID int, pushPop string) {
 	}
 }
 
+// insMakeChan takes make channel instructions and stores their name and buffer size
 func (a *analysis) insMakeChan(examIns *ssa.MakeChan) {
 	stats.IncStat(stats.NMakeChan)
 	var bufferLen int64
@@ -100,6 +106,7 @@ func (a *analysis) insMakeChan(examIns *ssa.MakeChan) {
 	a.insertIndMap[examIns.Name()] = 0 // initialize index
 }
 
+// insSend ???
 func (a *analysis) insSend(examIns *ssa.Send, goID int, theIns ssa.Instruction) {
 	stats.IncStat(stats.NSend)
 	var chName string
@@ -122,6 +129,7 @@ func (a *analysis) insSend(examIns *ssa.Send, goID int, theIns ssa.Instruction) 
 	}
 }
 
+// insStore  ???
 func (a *analysis) insStore(examIns *ssa.Store, goID int, theIns ssa.Instruction) {
 	stats.IncStat(stats.NStore)
 	if !isLocalAddr(examIns.Addr) {
@@ -156,6 +164,7 @@ func (a *analysis) insStore(examIns *ssa.Store, goID int, theIns ssa.Instruction
 	}
 }
 
+// insUnOp ???
 func (a *analysis) insUnOp(examIns *ssa.UnOp, goID int, theIns ssa.Instruction) {
 	stats.IncStat(stats.NUnOp)
 	if examIns.Op == token.MUL && !isLocalAddr(examIns.X) { // read op
@@ -195,6 +204,7 @@ func (a *analysis) insUnOp(examIns *ssa.UnOp, goID int, theIns ssa.Instruction) 
 	}
 }
 
+// insFieldAddr ???
 func (a *analysis) insFieldAddr(examIns *ssa.FieldAddr, goID int, theIns ssa.Instruction) {
 	stats.IncStat(stats.NFieldAddr)
 	if !isLocalAddr(examIns.X) {
@@ -216,6 +226,7 @@ func (a *analysis) insFieldAddr(examIns *ssa.FieldAddr, goID int, theIns ssa.Ins
 	}
 }
 
+// insLookUp ???
 func (a *analysis) insLookUp(examIns *ssa.Lookup, goID int, theIns ssa.Instruction) {
 	stats.IncStat(stats.NLookup)
 	switch readIns := examIns.X.(type) {
@@ -258,6 +269,7 @@ func (a *analysis) insLookUp(examIns *ssa.Lookup, goID int, theIns ssa.Instructi
 	}
 }
 
+// insChangeType ??? couldn't switch be an if?
 func (a *analysis) insChangeType(examIns *ssa.ChangeType, goID int, theIns ssa.Instruction) {
 	stats.IncStat(stats.NChangeType)
 	switch mc := examIns.X.(type) {
@@ -288,6 +300,7 @@ func (a *analysis) insChangeType(examIns *ssa.ChangeType, goID int, theIns ssa.I
 	}
 }
 
+// insMakeInterface ???
 func (a *analysis) insMakeInterface(examIns *ssa.MakeInterface, goID int, theIns ssa.Instruction) {
 	stats.IncStat(stats.NMakeInterface)
 	if strings.Contains(examIns.X.String(), "complit") {
@@ -309,6 +322,7 @@ func (a *analysis) insMakeInterface(examIns *ssa.MakeInterface, goID int, theIns
 	}
 }
 
+// insCall ???
 func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) {
 	stats.IncStat(stats.NCall)
 	if examIns.Call.StaticCallee() == nil && examIns.Call.Method == nil {
@@ -421,6 +435,7 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 	}
 }
 
+// insGo ???
 func (a *analysis) insGo(examIns *ssa.Go, goID int, theIns ssa.Instruction) {
 	stats.IncStat(stats.NGo)
 	var fnName string
