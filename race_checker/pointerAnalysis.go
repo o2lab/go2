@@ -7,6 +7,7 @@ import (
 	"golang.org/x/tools/go/ssa"
 )
 
+// pointerAnalysis conducts pointer analysis using various built in pointer tools
 func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Instruction) {
 	switch locType := location.(type) {
 	case *ssa.Parameter:
