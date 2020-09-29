@@ -10,6 +10,7 @@ import (
 	"strings"
 )
 
+// checkRacyPairs determines how many data races are present(race must access variable in at least 2 goroutines and one instruction must be a write)
 func (a *analysis) checkRacyPairs() {
 	counter := 0 // initialize race counter
 	for i := 0; i < len(a.RWIns); i++ {
@@ -36,6 +37,7 @@ func (a *analysis) checkRacyPairs() {
 	}
 }
 
+// insAddress takes a slice of ssa instructions and returns a slice of their corresponding addresses
 func (a *analysis) insAddress(insSlice []ssa.Instruction) []ssa.Value { // obtain addresses of instructions
 	minWrite := 0 // at least one write access
 	theAddrs := []ssa.Value{}
@@ -72,8 +74,8 @@ func (a *analysis) insAddress(insSlice []ssa.Instruction) []ssa.Value { // obtai
 	return []ssa.Value{}
 }
 
+// sameAddress determines if two addresses have the same global address(for package-level variables only)
 func (a *analysis) sameAddress(addr1 ssa.Value, addr2 ssa.Value) bool {
-	// check if both are the same global address. for package-level variables only.
 	if global1, ok1 := addr1.(*ssa.Global); ok1 {
 		if global2, ok2 := addr2.(*ssa.Global); ok2 {
 			return global1.Pos() == global2.Pos() // compare position of identifiers
@@ -85,6 +87,7 @@ func (a *analysis) sameAddress(addr1 ssa.Value, addr2 ssa.Value) bool {
 	return ptset[addr1].PointsTo().Intersects(ptset[addr2].PointsTo())
 }
 
+// reachable determines if 2 input instructions are connected in the Happens-Before Graph
 func (a *analysis) reachable(fromIns ssa.Instruction, toIns ssa.Instruction) bool {
 	fromBlock := fromIns.Block().Index
 	if strings.HasPrefix(fromIns.Block().Comment, "rangeindex") && toIns.Parent() != nil && toIns.Parent().Parent() != nil { // checking both instructions belong to same forloop
@@ -107,6 +110,7 @@ func (a *analysis) reachable(fromIns ssa.Instruction, toIns ssa.Instruction) boo
 	return false
 }
 
+// lockSetsIntersect determines if two input instructions are trying to access a variable that is protected by the same set of locks
 func (a *analysis) lockSetsIntersect(insA ssa.Instruction, insB ssa.Instruction) bool {
 	setA := a.lockMap[insA] // lockset of instruction-A
 	setB := a.lockMap[insB] // lockset of instruction-B
@@ -134,6 +138,7 @@ func (a *analysis) lockSetsIntersect(insA ssa.Instruction, insB ssa.Instruction)
 	return false
 }
 
+// chanProtected will determine if 2 input instructions are both using the same channel
 func (a *analysis) chanProtected(insA ssa.Instruction, insB ssa.Instruction) bool {
 	setA := a.chanMap[insA] // channelSet of instruction-A
 	setB := a.chanMap[insB] // channelSet of instruction-B
@@ -147,6 +152,7 @@ func (a *analysis) chanProtected(insA ssa.Instruction, insB ssa.Instruction) boo
 	return false
 }
 
+// printRace will print the details of a data race such as the write/read of a variable and other helpful information
 func (a *analysis) printRace(counter int, insPair []ssa.Instruction, addrPair []ssa.Value, goIDs []int, insInd []int) {
 	log.Printf("Data race #%d", counter)
 	log.Println(strings.Repeat("=", 100))
