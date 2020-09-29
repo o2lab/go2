@@ -1,6 +1,6 @@
 # Go race detector
 
-![Tests](https://github.com/dopelsunce/race-go2/workflows/Tests/badge.svg)
+![Tests](https://github.com/o2lab/go2/workflows/Tests/badge.svg)
 
 ## Build instructions
 
