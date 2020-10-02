@@ -1,3 +1,4 @@
 race_checker/.*
 race_checker/go.*
 race_checker/race_checker
+.DS_STORE
