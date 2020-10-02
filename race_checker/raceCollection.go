@@ -12,28 +12,29 @@ import (
 
 // checkRacyPairs determines how many data races are present(race must access variable in at least 2 goroutines and one instruction must be a write)
 func (a *analysis) checkRacyPairs() {
-	counter := 0 // initialize race counter
 	for i := 0; i < len(a.RWIns); i++ {
 		for j := i + 1; j < len(a.RWIns); j++ { // must be in different goroutines, j always greater than i
 			for ii, goI := range a.RWIns[i] {
+				if i == 0 && ii < a.insDRA {
+					continue // do not check race-free instructions
+				}
 				for jj, goJ := range a.RWIns[j] {
 					insSlice := []ssa.Instruction{goI, goJ} // one instruction from each goroutine
 					addressPair := a.insAddress(insSlice)
 					if len(addressPair) > 1 && a.sameAddress(addressPair[0], addressPair[1]) && !sliceContains(a.reportedAddr, addressPair[0]) && !a.reachable(goI, goJ) && !a.lockSetsIntersect(insSlice[0], insSlice[1]) && !a.chanProtected(insSlice[0], insSlice[1]) {
 						a.reportedAddr = append(a.reportedAddr, addressPair[0])
-						counter++
 						goIDs := []int{i, j}    // store goroutine IDs
 						insInd := []int{ii, jj} // store index of instruction within worker goroutine
-						a.printRace(counter, insSlice, addressPair, goIDs, insInd)
+						a.printRace(len(a.reportedAddr), insSlice, addressPair, goIDs, insInd)
 					}
 				}
 			}
 		}
 	}
-	if counter > 1 {
-		log.Println("Done  -- ", counter, "races found! ")
-	} else {
-		log.Println("Done  -- ", counter, "race found! ")
+	if len(a.reportedAddr) > 1 {
+		log.Println("Done  -- ", len(a.reportedAddr), "races found! ")
+	} else { // singular data race
+		log.Println("Done  -- ", len(a.reportedAddr), "race found! ")
 	}
 }
 

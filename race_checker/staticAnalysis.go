@@ -104,6 +104,7 @@ func staticAnalysis(args []string) error {
 		mains:        mains,
 		ptaConfig:    config,
 		RWinsMap:     make(map[ssa.Instruction]graph.Node),
+		insDRA:       0,
 		levels:       make(map[int]int),
 		lockMap:      make(map[ssa.Instruction][]ssa.Value),
 		goCaller:     make(map[int]int),
