@@ -76,10 +76,10 @@ func staticAnalysis(args []string) error {
 
 	// Print the names of the source files
 	// for each package listed on the command line.
-	for nP, pkg := range initial {
+	for _, pkg := range initial {
 		log.Info(pkg.ID, pkg.GoFiles)
-		log.Infof("Done  -- %d packages loaded", nP+1)
 	}
+	log.Infof("Done  -- packages loaded")
 
 	// Create and build SSA-form program representation.
 	prog, pkgs := ssautil.AllPackages(initial, 0)
@@ -99,18 +99,18 @@ func staticAnalysis(args []string) error {
 		BuildCallGraph: true,
 	}
 	Analysis = &analysis{
-		prog:      prog,
-		pkgs:      pkgs,
-		mains:     mains,
-		ptaConfig: config,
-		RWinsMap:  make(map[ssa.Instruction]graph.Node),
-		levels:    make(map[int]int),
-		lockMap:   make(map[ssa.Instruction][]ssa.Value),
-		goCaller:  make(map[int]int),
-		goNames:   make(map[int]string),
-		chanBufMap:make(map[string][]*ssa.Send),
-		insertIndMap:make(map[string]int),
-		chanMap:   make(map[ssa.Instruction][]string), // map each read/write access to a list of channels with value(s) already sent to it
+		prog:         prog,
+		pkgs:         pkgs,
+		mains:        mains,
+		ptaConfig:    config,
+		RWinsMap:     make(map[ssa.Instruction]graph.Node),
+		levels:       make(map[int]int),
+		lockMap:      make(map[ssa.Instruction][]ssa.Value),
+		goCaller:     make(map[int]int),
+		goNames:      make(map[int]string),
+		chanBufMap:   make(map[string][]*ssa.Send),
+		insertIndMap: make(map[string]int),
+		chanMap:      make(map[ssa.Instruction][]string), // map each read/write access to a list of channels with value(s) already sent to it
 	}
 
 	log.Info("Compiling stack trace for every Goroutine... ")
@@ -240,7 +240,9 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 					if _, ok := deferIns.Call.Value.(*ssa.Builtin); ok {
 						continue
 					}
-					if fromPkgsOfInterest(deferIns.Call.StaticCallee()) && deferIns.Call.StaticCallee().Pkg.Pkg.Name() != "sync" {
+					if deferIns.Call.StaticCallee() == nil {
+						continue
+					} else if fromPkgsOfInterest(deferIns.Call.StaticCallee()) && deferIns.Call.StaticCallee().Pkg.Pkg.Name() != "sync" {
 						fnName := deferIns.Call.Value.Name()
 						fnName = checkTokenNameDefer(fnName, deferIns)
 						if !a.exploredFunction(deferIns.Call.StaticCallee(), goID, theIns) {
@@ -298,7 +300,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 	}
 	if len(a.storeIns) == 0 && len(a.workList) != 0 { // finished reporting current goroutine and workList isn't empty
 		nextGoInfo := a.workList[0] // get the goroutine info at head of workList
-		a.workList = a.workList[1:]   // pop goroutine info from head of workList
+		a.workList = a.workList[1:] // pop goroutine info from head of workList
 		a.newGoroutine(nextGoInfo)
 	} else {
 		return

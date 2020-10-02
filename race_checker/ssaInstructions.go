@@ -445,7 +445,12 @@ func (a *analysis) insGo(examIns *ssa.Go, goID int, theIns ssa.Instruction) {
 	case *ssa.Function:
 		fnName = anonFn.Name()
 	case *ssa.TypeAssert:
-		fnName = a.paramFunc.(*ssa.MakeClosure).Fn.Name()
+		switch paramType := a.paramFunc.(type) {
+		case *ssa.Function:
+			fnName = paramType.Name()
+		case *ssa.MakeClosure:
+			fnName = paramType.Fn.Name()
+		}
 	}
 	newGoID := goID + 1 // increment goID for child goroutine
 	if len(a.workList) > 0 {
