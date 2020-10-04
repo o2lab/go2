@@ -49,7 +49,7 @@ var tests = []string{
 	"tests/GoBench/Grpc/1862/main.go",
 	"tests/GoBench/Grpc/3090/main.go",
 	"tests/GoBench/Istio/8144/main.go",
-	//"tests/GoBench/Istio/8214/main.go",
+	"tests/GoBench/Istio/8214/main.go",
 	"tests/GoBench/Istio/8967/main.go",
 	"tests/GoBench/Istio/16742/main.go",
 	"tests/GoBench/Kubernetes/79631/main.go",

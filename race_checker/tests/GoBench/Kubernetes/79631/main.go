@@ -11,7 +11,7 @@ type heapData struct {
 }
 
 func (h *heapData) Pop() {
-	delete( /* RACE Write */ h.items, "1") // racy write on items
+	delete(h.items /* RACE Write */, "1") // racy write on items
 }
 
 type Interface interface {

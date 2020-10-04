@@ -51,8 +51,12 @@ func isReadIns(ins ssa.Instruction) bool {
 	case *ssa.Lookup:
 		return true
 	case *ssa.Call:
-		if insType.Call.Value.Name() != "delete" && insType.Call.Value.Name() != "Wait" && insType.Call.Value.Name() != "Done" && !strings.HasPrefix(insType.Call.Value.Name(), "Add") && len(insType.Call.Args) > 0 {
-			return true
+		if len(insType.Call.Args) > 0 {
+			for _, anArg := range insType.Call.Args {
+				if _, ok := anArg.(*ssa.FieldAddr); ok {
+					return true
+				}
+			}
 		}
 	default:
 		_ = insType
@@ -68,7 +72,7 @@ func isWriteIns(ins ssa.Instruction) bool {
 	case *ssa.Call:
 		if insType.Call.Value.Name() == "delete" {
 			return true
-		} else if strings.HasPrefix(insType.Call.Value.Name(), "Add") {
+		} else if strings.HasPrefix(insType.Call.Value.Name(), "Add") && insType.Call.StaticCallee().Pkg.Pkg.Name() == "atomic" {
 			return true
 		}
 	}
@@ -150,8 +154,6 @@ func (a *analysis) insStore(examIns *ssa.Store, goID int, theIns ssa.Instruction
 				}
 			}
 		}
-		//addrNameMap[examIns.Addr.Name()] = append(addrNameMap[examIns.Addr.Name()], examIns.Addr) // map address name to address, used for checking points-to labels later
-		//addrMap[examIns.Addr.Name()] = append(addrMap[examIns.Addr.Name()], RWInsInd{goID: goID, goInd: sliceContainsInsAt(RWIns[goID], theIns)}) // map address name to slice of instructions accessing the same address name
 		a.ptaConfig.AddQuery(examIns.Addr)
 	}
 	if theFunc, storeFn := examIns.Val.(*ssa.Function); storeFn {
@@ -180,8 +182,6 @@ func (a *analysis) insUnOp(examIns *ssa.UnOp, goID int, theIns ssa.Instruction) 
 				}
 			}
 		}
-		//addrNameMap[examIns.X.Name()] = append(addrNameMap[examIns.X.Name()], examIns.X)
-		//addrMap[examIns.X.Name()] = append(addrMap[examIns.X.Name()], RWInsInd{goID: goID, goInd: sliceContainsInsAt(RWIns[goID], theIns)})
 		a.ptaConfig.AddQuery(examIns.X)
 	} else if examIns.Op == token.ARROW { // channel receive op
 		stats.IncStat(stats.NChanRecv)
@@ -220,8 +220,6 @@ func (a *analysis) insFieldAddr(examIns *ssa.FieldAddr, goID int, theIns ssa.Ins
 				}
 			}
 		}
-		//addrNameMap[examIns.X.Name()] = append(addrNameMap[examIns.X.Name()], examIns.X)    // map address name to address, used for checking points-to labels later
-		//addrMap[examIns.X.Name()] = append(addrMap[examIns.X.Name()], RWInsInd{goID: goID, goInd: sliceContainsInsAt(RWIns[goID], theIns)}) // map address name to slice of instructions accessing the same address name
 		a.ptaConfig.AddQuery(examIns.X)
 	}
 }
@@ -244,8 +242,6 @@ func (a *analysis) insLookUp(examIns *ssa.Lookup, goID int, theIns ssa.Instructi
 					}
 				}
 			}
-			//addrNameMap[readIns.X.Name()] = append(addrNameMap[readIns.X.Name()], readIns.X)
-			//addrMap[readIns.X.Name()] = append(addrMap[readIns.X.Name()], RWInsInd{goID: goID, goInd: sliceContainsInsAt(RWIns[goID], theIns)})
 			a.ptaConfig.AddQuery(readIns.X)
 		}
 	case *ssa.Parameter:
@@ -262,8 +258,6 @@ func (a *analysis) insLookUp(examIns *ssa.Lookup, goID int, theIns ssa.Instructi
 					}
 				}
 			}
-			//addrNameMap[readIns.Name()] = append(addrNameMap[readIns.Name()], readIns)
-			//addrMap[readIns.Name()] = append(addrMap[readIns.Name()], RWInsInd{goID: goID, goInd: sliceContainsInsAt(RWIns[goID], theIns)})
 			a.ptaConfig.AddQuery(readIns)
 		}
 	}
@@ -343,8 +337,6 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 							}
 						}
 					}
-					//addrNameMap[theVal.X.Name()] = append(addrNameMap[theVal.X.Name()], theVal)
-					//addrMap[theVal.X.Name()] = append(addrMap[theVal.X.Name()], RWInsInd{goID: goID, goInd: sliceContainsInsAt(RWIns[goID], theIns)})
 					a.ptaConfig.AddQuery(theVal.X)
 				}
 			}
@@ -382,8 +374,6 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 							}
 						}
 					}
-					//addrNameMap[access.X.Name()] = append(addrNameMap[access.X.Name()], access.X)                                                     // map address name to address, used for checking points-to labels later
-					//addrMap[access.X.Name()] = append(addrMap[access.X.Name()], RWInsInd{goID: goID, goInd: sliceContainsInsAt(RWIns[goID], theIns)}) // map address name to slice of instructions accessing the same address name
 					a.ptaConfig.AddQuery(access.X)
 				}
 			default:

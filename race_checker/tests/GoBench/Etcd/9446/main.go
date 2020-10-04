@@ -11,7 +11,7 @@ type txBuffer struct {
 
 func (txb *txBuffer) reSet() {
 	for k, _ := range txb.buckets {
-		delete( /* RACE Write */ txb.buckets, k) // racy write on buckets field
+		delete(txb.buckets /* RACE Write */, k) // racy write on buckets field
 	}
 }
 

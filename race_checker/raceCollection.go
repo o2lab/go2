@@ -19,13 +19,15 @@ func (a *analysis) checkRacyPairs() {
 					continue // do not check race-free instructions
 				}
 				for jj, goJ := range a.RWIns[j] {
-					insSlice := []ssa.Instruction{goI, goJ} // one instruction from each goroutine
-					addressPair := a.insAddress(insSlice)
-					if len(addressPair) > 1 && a.sameAddress(addressPair[0], addressPair[1]) && !sliceContains(a.reportedAddr, addressPair[0]) && !a.reachable(goI, goJ) && !a.lockSetsIntersect(insSlice[0], insSlice[1]) && !a.chanProtected(insSlice[0], insSlice[1]) {
-						a.reportedAddr = append(a.reportedAddr, addressPair[0])
-						goIDs := []int{i, j}    // store goroutine IDs
-						insInd := []int{ii, jj} // store index of instruction within worker goroutine
-						a.printRace(len(a.reportedAddr), insSlice, addressPair, goIDs, insInd)
+					if (isWriteIns(goI) && isWriteIns(goJ)) || (isWriteIns(goI) && isReadIns(goJ)) || (isReadIns(goI) && isWriteIns(goJ)) { // two addresses at least one of which is write
+						insSlice := []ssa.Instruction{goI, goJ} // one instruction from each goroutine
+						addressPair := a.insAddress(insSlice)
+						if len(addressPair) > 0 && a.sameAddress(addressPair[0], addressPair[1]) && !sliceContains(a.reportedAddr, addressPair[0]) && !a.reachable(goI, goJ) && !a.lockSetsIntersect(insSlice[0], insSlice[1]) && !a.chanProtected(insSlice[0], insSlice[1]) {
+							a.reportedAddr = append(a.reportedAddr, addressPair[0])
+							goIDs := []int{i, j}    // store goroutine IDs
+							insInd := []int{ii, jj} // store index of instruction within worker goroutine
+							a.printRace(len(a.reportedAddr), insSlice, addressPair, goIDs, insInd)
+						}
 					}
 				}
 			}
@@ -40,19 +42,15 @@ func (a *analysis) checkRacyPairs() {
 
 // insAddress takes a slice of ssa instructions and returns a slice of their corresponding addresses
 func (a *analysis) insAddress(insSlice []ssa.Instruction) []ssa.Value { // obtain addresses of instructions
-	minWrite := 0 // at least one write access
 	theAddrs := []ssa.Value{}
 	for _, anIns := range insSlice {
 		switch theIns := anIns.(type) {
 		case *ssa.Store:
-			minWrite++
 			theAddrs = append(theAddrs, theIns.Addr)
 		case *ssa.Call:
 			if theIns.Call.Value.Name() == "delete" {
-				minWrite++
 				theAddrs = append(theAddrs, theIns.Call.Args[0].(*ssa.UnOp).X)
 			} else if strings.HasPrefix(theIns.Call.Value.Name(), "Add") && theIns.Call.StaticCallee().Pkg.Pkg.Name() == "atomic" {
-				minWrite++
 				theAddrs = append(theAddrs, theIns.Call.Args[0].(*ssa.FieldAddr).X)
 			} else if len(theIns.Call.Args) > 0 {
 				for _, anArg := range theIns.Call.Args {
@@ -69,10 +67,7 @@ func (a *analysis) insAddress(insSlice []ssa.Instruction) []ssa.Value { // obtai
 			theAddrs = append(theAddrs, theIns.X)
 		}
 	}
-	if minWrite > 0 && len(theAddrs) > 1 {
-		return theAddrs // write op always before read op
-	}
-	return []ssa.Value{}
+	return theAddrs
 }
 
 // sameAddress determines if two addresses have the same global address(for package-level variables only)
@@ -160,7 +155,11 @@ func (a *analysis) printRace(counter int, insPair []ssa.Instruction, addrPair []
 	for i, anIns := range insPair {
 		var errMsg string
 		if isWriteIns(anIns) {
-			errMsg = fmt.Sprint("  Write of ", aurora.Magenta(addrPair[i].String()), " in function ", aurora.BgBrightGreen(anIns.Parent().Name()), " at ", a.prog.Fset.Position(anIns.Pos()))
+			if _, ok := anIns.(*ssa.Call); ok {
+				errMsg = fmt.Sprint("  Write of ", aurora.Magenta(addrPair[i].String()), " in function ", aurora.BgBrightGreen(anIns.Parent().Name()), " at ", a.prog.Fset.Position(addrPair[i].Pos()))
+			} else {
+				errMsg = fmt.Sprint("  Write of ", aurora.Magenta(addrPair[i].String()), " in function ", aurora.BgBrightGreen(anIns.Parent().Name()), " at ", a.prog.Fset.Position(insPair[i].Pos()))
+			}
 		} else {
 			errMsg = fmt.Sprint("  Read of ", aurora.Magenta(addrPair[i].String()), " in function ", aurora.BgBrightGreen(anIns.Parent().Name()), " at ", a.prog.Fset.Position(anIns.Pos()))
 		}

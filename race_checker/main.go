@@ -21,10 +21,10 @@ type analysis struct {
 	RWinsMap      map[ssa.Instruction]graph.Node
 	trieMap       map[fnInfo]*trie // map each function to a trie node
 	RWIns         [][]ssa.Instruction
-	insDRA		  int // index of instruction (in main goroutine) at which to begin data race analysis
+	insDRA        int // index of instruction (in main goroutine) at which to begin data race analysis
 	storeIns      []string
 	workList      []goroutineInfo
-	reportedAddr  []ssa.Value
+	reportedAddr  []ssa.Value // stores racy addresses
 	racyStackTops []string
 	levels        map[int]int
 	lockMap       map[ssa.Instruction][]ssa.Value // map each read/write access to a snapshot of actively maintained lockset
@@ -65,12 +65,10 @@ var (
 	Analysis     *analysis
 	allPkg       = true
 	excludedPkgs []string
-	//addrNameMap   = make(map[string][]ssa.Value)          // for potential optimization purposes
-	//addrMap       = make(map[string][]RWInsInd)           // for potential optimization purposes
 )
 
 const trieLimit = 2      // set as user config option later, an integer that dictates how many times a function can be called under identical context
-const efficiency = false  // configuration setting to avoid recursion in tested program
+const efficiency = false // configuration setting to avoid recursion in tested program
 
 func init() {
 	excludedPkgs = []string{
