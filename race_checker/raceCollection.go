@@ -181,9 +181,10 @@ func (a *analysis) printRace(counter int, insPair []ssa.Instruction, addrPair []
 		} else {
 			errMsg = fmt.Sprint("  Read of ", aurora.Magenta(addrPair[i].String()), " in function ", aurora.BgBrightGreen(anIns.Parent().Name()), " at ", a.prog.Fset.Position(anIns.Pos()))
 		}
-		colorOutput := regexp.MustCompile(`\x1b\[\d+m`)
-		errMsg = colorOutput.ReplaceAllString(errMsg, "")
-		a.racyStackTops = append(a.racyStackTops, errMsg)
+		if testMode {
+			colorOutput := regexp.MustCompile(`\x1b\[\d+m`)
+			a.racyStackTops = append(a.racyStackTops, colorOutput.ReplaceAllString(errMsg, ""))
+		}
 		log.Print(errMsg)
 		var printStack []string
 		var printPos []token.Pos

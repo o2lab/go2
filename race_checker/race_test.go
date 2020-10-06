@@ -271,6 +271,7 @@ func checkFile(t *testing.T, testfiles []string) {
 func TestRace(t *testing.T) {
 	logrus.SetLevel(logrus.FatalLevel)
 	testenv.MustHaveGoBuild(t)
+	testMode = true
 
 	// If explicit test files are specified, only check those.
 	if files := *testFiles; files != "" {

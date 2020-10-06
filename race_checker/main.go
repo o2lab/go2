@@ -67,6 +67,7 @@ var (
 	Analysis     *analysis
 	allPkg       = true
 	excludedPkgs []string
+	testMode     = false // Used by race_test.go for collecting output.
 )
 
 const trieLimit = 2      // set as user config option later, an integer that dictates how many times a function can be called under identical context
