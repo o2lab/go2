@@ -33,7 +33,7 @@ var tests = []string{
 	"tests/fields.go",
 	//"tests/k8s_issue80269.go",
 	"tests/global_ownership.go",
-	//"tests/map_race.go",
+	"tests/map_race.go",
 	//"tests/select.go",
 	"tests/test_neo.go",
 	//"tests/race_cfg.go",

@@ -16,7 +16,7 @@ func (a *analysis) checkRacyPairs() {
 		for j := i + 1; j < len(a.RWIns); j++ { // must be in different goroutines, j always greater than i
 			for ii, goI := range a.RWIns[i] {
 				if i == 0 && ii < a.insDRA {
-					continue // do not check race-free instructions
+					continue // do not check race-free instructions in main goroutine
 				}
 				for jj, goJ := range a.RWIns[j] {
 					if (isWriteIns(goI) && isWriteIns(goJ)) || (isWriteIns(goI) && isReadIns(goJ)) || (isReadIns(goI) && isWriteIns(goJ)) { // two addresses at least one of which is write
@@ -65,6 +65,13 @@ func (a *analysis) insAddress(insSlice []ssa.Instruction) []ssa.Value { // obtai
 			theAddrs = append(theAddrs, theIns.X)
 		case *ssa.FieldAddr:
 			theAddrs = append(theAddrs, theIns.X)
+		case *ssa.MapUpdate:
+			switch accType := theIns.Map.(type) {
+			case *ssa.UnOp:
+				theAddrs = append(theAddrs, accType.X)
+			case *ssa.MakeMap:
+				//theAddrs = append(theAddrs, accType.Reserve)
+			}
 		}
 	}
 	return theAddrs
@@ -93,8 +100,12 @@ func (a *analysis) reachable(fromIns ssa.Instruction, toIns ssa.Instruction) boo
 	}
 	fromNode := a.RWinsMap[fromIns]
 	toNode := a.RWinsMap[toIns]
-	nexts := a.HBgraph.Neighbors(fromNode)
+	nexts := a.HBgraph.Neighbors(fromNode) // get all reachable nodes
+	//counter := 0
 	for len(nexts) > 0 {
+		//if efficiency && counter == 100 {
+		//	break // avoid loops
+		//}
 		curr := nexts[len(nexts)-1]
 		nexts = nexts[:len(nexts)-1]
 		next := a.HBgraph.Neighbors(curr)
@@ -102,6 +113,7 @@ func (a *analysis) reachable(fromIns ssa.Instruction, toIns ssa.Instruction) boo
 		if curr == toNode {
 			return true
 		}
+		//counter++
 	}
 	return false
 }
@@ -109,7 +121,13 @@ func (a *analysis) reachable(fromIns ssa.Instruction, toIns ssa.Instruction) boo
 // lockSetsIntersect determines if two input instructions are trying to access a variable that is protected by the same set of locks
 func (a *analysis) lockSetsIntersect(insA ssa.Instruction, insB ssa.Instruction) bool {
 	setA := a.lockMap[insA] // lockset of instruction-A
+	if isReadIns(insA) {
+		setA = append(setA, a.RlockMap[insA]...)
+	}
 	setB := a.lockMap[insB] // lockset of instruction-B
+	if isReadIns(insB) {
+		setB = append(setB, a.RlockMap[insB]...)
+	}
 	for _, addrA := range setA {
 		for _, addrB := range setB {
 			if a.sameAddress(addrA, addrB) {
