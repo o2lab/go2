@@ -515,8 +515,8 @@ func (a *analysis) insMapUpdate(examIns *ssa.MapUpdate, goID int, theIns ssa.Ins
 	switch ptType := examIns.Map.(type) {
 	case *ssa.UnOp:
 		a.ptaConfig.AddQuery(ptType.X)
-	case *ssa.MakeMap:
-		//a.ptaConfig.AddQuery(ptType.Reserve)
+	default:
+		// doing nothing otherwise
 	}
 
 }
