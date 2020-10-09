@@ -12,7 +12,7 @@ type FakeFilterPlugin struct {
 }
 
 func (fp *FakeFilterPlugin) Filter() {
-	fp.numFilterCalled /* RACE Read */ /* RACE Write*/ ++ // racy read and write
+	fp.numFilterCalled /* RACE Write */ /* RACE Write*/ ++ // racy read and write
 }
 
 type FilterPlugin interface {

@@ -44,8 +44,6 @@ runIstio:
 	./main tests/GoBench/Istio/16742/main.go
 runServing:
 	./main tests/GoBench/Serving/3148/main.go
-runFailingKub:
-	./main tests/GoBench/Kubernetes/81091/main.go
 runGoBench:
 	./main tests/GoBench/Cockroach/27659/main.go
 	./main tests/GoBench/Cockroach/35501/main.go
