@@ -16,19 +16,16 @@ func (a *analysis) checkRacyPairs() {
 		for j := i + 1; j < len(a.RWIns); j++ { // must be in different goroutines, j always greater than i
 			for ii, goI := range a.RWIns[i] {
 				if i == 0 && ii < a.insDRA {
-					continue // do not check race-free instructions
+					continue // do not check race-free instructions in main goroutine
 				}
 				for jj, goJ := range a.RWIns[j] {
-					insSlice := []ssa.Instruction{goI, goJ} // one instruction from each goroutine
-					log.Info(insSlice)
-					addressPair := a.insAddress(insSlice)
-					if len(addressPair) > 1 && a.sameAddress(addressPair[0], addressPair[1]) && !sliceContains(a.reportedAddr, addressPair[0]) &&( !a.reachable(goI, goJ)&&!a.reachable(goJ, goI) )&& !a.lockSetsIntersect(insSlice[0], insSlice[1]) && !a.chanProtected(insSlice[0], insSlice[1]) {
-						a.reportedAddr = append(a.reportedAddr, addressPair[0])
-						log.Info(insSlice)
-						log.Info()
-						goIDs := []int{i, j}    // store goroutine IDs
-						insInd := []int{ii, jj} // store index of instruction within worker goroutine
-						a.printRace(len(a.reportedAddr), insSlice, addressPair, goIDs, insInd)
+					if (isWriteIns(goI) && isWriteIns(goJ)) || (isWriteIns(goI) && isReadIns(goJ)) || (isReadIns(goI) && isWriteIns(goJ)) { // only read and write instructions
+						insSlice := []ssa.Instruction{goI, goJ}
+						addressPair := a.insAddress(insSlice) // one instruction from each goroutine
+						if len(addressPair) > 1 && a.sameAddress(addressPair[0], addressPair[1]) && !sliceContains(a.reportedAddr, addressPair[0]) && !a.reachable(goI, goJ) && !a.reachable(goJ,goI) && !a.lockSetsIntersect(insSlice[0], insSlice[1]) && !a.chanProtected(insSlice[0], insSlice[1]) {
+							a.reportedAddr = append(a.reportedAddr, addressPair[0])
+							a.printRace(len(a.reportedAddr), insSlice, addressPair, []int{i, j}, []int{ii, jj})
+						}
 					}
 				}
 			}
@@ -43,39 +40,38 @@ func (a *analysis) checkRacyPairs() {
 
 // insAddress takes a slice of ssa instructions and returns a slice of their corresponding addresses
 func (a *analysis) insAddress(insSlice []ssa.Instruction) []ssa.Value { // obtain addresses of instructions
-	minWrite := 0 // at least one write access
 	theAddrs := []ssa.Value{}
 	for _, anIns := range insSlice {
 		switch theIns := anIns.(type) {
-		case *ssa.Store:
-			minWrite++
+		case *ssa.Store: // write
 			theAddrs = append(theAddrs, theIns.Addr)
 		case *ssa.Call:
-			if theIns.Call.Value.Name() == "delete" {
-				minWrite++
+			if theIns.Call.Value.Name() == "delete" { // write
 				theAddrs = append(theAddrs, theIns.Call.Args[0].(*ssa.UnOp).X)
-			} else if strings.HasPrefix(theIns.Call.Value.Name(), "Add") && theIns.Call.StaticCallee().Pkg.Pkg.Name() == "atomic" {
-				minWrite++
+			} else if strings.HasPrefix(theIns.Call.Value.Name(), "Add") && theIns.Call.StaticCallee().Pkg.Pkg.Name() == "atomic" { // write
 				theAddrs = append(theAddrs, theIns.Call.Args[0].(*ssa.FieldAddr).X)
-			} else if len(theIns.Call.Args) > 0 {
+			} else if len(theIns.Call.Args) > 0 { // read
 				for _, anArg := range theIns.Call.Args {
 					if readAcc, ok := anArg.(*ssa.FieldAddr); ok {
 						theAddrs = append(theAddrs, readAcc.X)
 					}
 				}
 			}
-		case *ssa.UnOp:
+		case *ssa.UnOp: // read
 			theAddrs = append(theAddrs, theIns.X)
-		case *ssa.Lookup:
+		case *ssa.Lookup: // read
 			theAddrs = append(theAddrs, theIns.X)
-		case *ssa.FieldAddr:
+		case *ssa.FieldAddr: // read
 			theAddrs = append(theAddrs, theIns.X)
+		case *ssa.MapUpdate: // write
+			switch accType := theIns.Map.(type) {
+			case *ssa.UnOp:
+				theAddrs = append(theAddrs, accType.X)
+			case *ssa.MakeMap:
+			}
 		}
 	}
-	if minWrite > 0 && len(theAddrs) > 1 {
-		return theAddrs // write op always before read op
-	}
-	return []ssa.Value{}
+	return theAddrs
 }
 
 // sameAddress determines if two addresses have the same global address(for package-level variables only)
@@ -83,6 +79,10 @@ func (a *analysis) sameAddress(addr1 ssa.Value, addr2 ssa.Value) bool {
 	if global1, ok1 := addr1.(*ssa.Global); ok1 {
 		if global2, ok2 := addr2.(*ssa.Global); ok2 {
 			return global1.Pos() == global2.Pos() // compare position of identifiers
+		}
+	} else if freevar1, ok1 := addr1.(*ssa.FreeVar); ok1 {
+		if freevar2, ok2 := addr2.(*ssa.FreeVar); ok2 {
+			return freevar1.Pos() == freevar2.Pos() // compare position of identifiers
 		}
 	}
 
@@ -101,8 +101,12 @@ func (a *analysis) reachable(fromIns ssa.Instruction, toIns ssa.Instruction) boo
 	}
 	fromNode := a.RWinsMap[fromIns]
 	toNode := a.RWinsMap[toIns]
-	nexts := a.HBgraph.Neighbors(fromNode)
+	nexts := a.HBgraph.Neighbors(fromNode) // get all reachable nodes
+	counter := 0
 	for len(nexts) > 0 {
+		if counter == 10000 {
+			break
+		}
 		curr := nexts[len(nexts)-1]
 		nexts = nexts[:len(nexts)-1]
 		next := a.HBgraph.Neighbors(curr)
@@ -110,6 +114,7 @@ func (a *analysis) reachable(fromIns ssa.Instruction, toIns ssa.Instruction) boo
 		if curr == toNode {
 			return true
 		}
+		counter++
 	}
 	return false
 }
@@ -117,7 +122,13 @@ func (a *analysis) reachable(fromIns ssa.Instruction, toIns ssa.Instruction) boo
 // lockSetsIntersect determines if two input instructions are trying to access a variable that is protected by the same set of locks
 func (a *analysis) lockSetsIntersect(insA ssa.Instruction, insB ssa.Instruction) bool {
 	setA := a.lockMap[insA] // lockset of instruction-A
+	if isReadIns(insA) {
+		setA = append(setA, a.RlockMap[insA]...)
+	}
 	setB := a.lockMap[insB] // lockset of instruction-B
+	if isReadIns(insB) {
+		setB = append(setB, a.RlockMap[insB]...)
+	}
 	for _, addrA := range setA {
 		for _, addrB := range setB {
 			if a.sameAddress(addrA, addrB) {
@@ -162,14 +173,30 @@ func (a *analysis) printRace(counter int, insPair []ssa.Instruction, addrPair []
 	log.Println(strings.Repeat("=", 100))
 	for i, anIns := range insPair {
 		var errMsg string
+		var access string
 		if isWriteIns(anIns) {
-			errMsg = fmt.Sprint("  Write of ", aurora.Magenta(addrPair[i].String()), " in function ", aurora.BgBrightGreen(anIns.Parent().Name()), " at ", a.prog.Fset.Position(anIns.Pos()))
+			if i == 0 {
+				access = " Previous Write of "
+			} else {
+				access = " Write of "
+			}
+			if _, ok := anIns.(*ssa.Call); ok {
+				errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].String()), " in function ", aurora.BgBrightGreen(anIns.Parent().Name()), " at ", a.prog.Fset.Position(addrPair[i].Pos()))
+			} else {
+				errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].String()), " in function ", aurora.BgBrightGreen(anIns.Parent().Name()), " at ", a.prog.Fset.Position(insPair[i].Pos()))
+			}
 		} else {
-			errMsg = fmt.Sprint("  Read of ", aurora.Magenta(addrPair[i].String()), " in function ", aurora.BgBrightGreen(anIns.Parent().Name()), " at ", a.prog.Fset.Position(anIns.Pos()))
+			if i == 0 {
+				access = " Previous Read of "
+			} else {
+				access = " Read of "
+			}
+			errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].String()), " in function ", aurora.BgBrightGreen(anIns.Parent().Name()), " at ", a.prog.Fset.Position(anIns.Pos()))
 		}
-		colorOutput := regexp.MustCompile(`\x1b\[\d+m`)
-		errMsg = colorOutput.ReplaceAllString(errMsg, "")
-		a.racyStackTops = append(a.racyStackTops, errMsg)
+		if testMode {
+			colorOutput := regexp.MustCompile(`\x1b\[\d+m`)
+			a.racyStackTops = append(a.racyStackTops, colorOutput.ReplaceAllString(errMsg, ""))
+		}
 		log.Print(errMsg)
 		var printStack []string
 		var printPos []token.Pos

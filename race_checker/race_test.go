@@ -28,12 +28,12 @@ var tests = []string{
 	"tests/cg.go",
 	"tests/test1.go",
 	"tests/waitgroup.go",
-	//"tests/lock.go",
+	"tests/lock.go",
 	"tests/context1.go",
 	"tests/fields.go",
 	//"tests/k8s_issue80269.go",
 	"tests/global_ownership.go",
-	//"tests/map_race.go",
+	"tests/map_race.go",
 	//"tests/select.go",
 	"tests/test_neo.go",
 	//"tests/race_cfg.go",
@@ -49,7 +49,7 @@ var tests = []string{
 	"tests/GoBench/Grpc/1862/main.go",
 	"tests/GoBench/Grpc/3090/main.go",
 	"tests/GoBench/Istio/8144/main.go",
-	//"tests/GoBench/Istio/8214/main.go",
+	"tests/GoBench/Istio/8214/main.go",
 	"tests/GoBench/Istio/8967/main.go",
 	"tests/GoBench/Istio/16742/main.go",
 	"tests/GoBench/Kubernetes/79631/main.go",
@@ -271,6 +271,7 @@ func checkFile(t *testing.T, testfiles []string) {
 func TestRace(t *testing.T) {
 	logrus.SetLevel(logrus.FatalLevel)
 	testenv.MustHaveGoBuild(t)
+	testMode = true
 
 	// If explicit test files are specified, only check those.
 	if files := *testFiles; files != "" {

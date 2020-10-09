@@ -14,5 +14,5 @@ func main() {
 		wg.Done()
 	}()
 	wg.Wait()
-	fmt.Println(x) // no race
+	fmt.Println(x)
 }

@@ -51,8 +51,12 @@ func isReadIns(ins ssa.Instruction) bool {
 	case *ssa.Lookup:
 		return true
 	case *ssa.Call:
-		if insType.Call.Value.Name() != "delete" && insType.Call.Value.Name() != "Wait" && insType.Call.Value.Name() != "Done" && !strings.HasPrefix(insType.Call.Value.Name(), "Add") && len(insType.Call.Args) > 0 {
-			return true
+		if len(insType.Call.Args) > 0 {
+			for _, anArg := range insType.Call.Args {
+				if _, ok := anArg.(*ssa.FieldAddr); ok {
+					return true
+				}
+			}
 		}
 	default:
 		_ = insType
@@ -68,9 +72,11 @@ func isWriteIns(ins ssa.Instruction) bool {
 	case *ssa.Call:
 		if insType.Call.Value.Name() == "delete" {
 			return true
-		} else if strings.HasPrefix(insType.Call.Value.Name(), "Add") {
+		} else if strings.HasPrefix(insType.Call.Value.Name(), "Add") && insType.Call.StaticCallee().Pkg.Pkg.Name() == "atomic" {
 			return true
 		}
+	case *ssa.MapUpdate:
+		return true
 	}
 	return false
 }
@@ -142,6 +148,9 @@ func (a *analysis) insStore(examIns *ssa.Store, goID int, theIns ssa.Instruction
 		if len(a.lockSet) > 0 {
 			a.lockMap[theIns] = a.lockSet
 		}
+		if len(a.RlockSet) > 0 {
+			a.RlockMap[theIns] = a.RlockSet
+		}
 		if len(a.chanBufMap) > 0 {
 			a.chanMap[theIns] = []string{}
 			for aChan, sSends := range a.chanBufMap {
@@ -150,8 +159,6 @@ func (a *analysis) insStore(examIns *ssa.Store, goID int, theIns ssa.Instruction
 				}
 			}
 		}
-		//addrNameMap[examIns.Addr.Name()] = append(addrNameMap[examIns.Addr.Name()], examIns.Addr) // map address name to address, used for checking points-to labels later
-		//addrMap[examIns.Addr.Name()] = append(addrMap[examIns.Addr.Name()], RWInsInd{goID: goID, goInd: sliceContainsInsAt(RWIns[goID], theIns)}) // map address name to slice of instructions accessing the same address name
 		a.ptaConfig.AddQuery(examIns.Addr)
 	}
 	if theFunc, storeFn := examIns.Val.(*ssa.Function); storeFn {
@@ -172,6 +179,9 @@ func (a *analysis) insUnOp(examIns *ssa.UnOp, goID int, theIns ssa.Instruction) 
 		if len(a.lockSet) > 0 {
 			a.lockMap[theIns] = a.lockSet
 		}
+		if len(a.RlockSet) > 0 {
+			a.RlockMap[theIns] = a.RlockSet
+		}
 		if len(a.chanBufMap) > 0 {
 			a.chanMap[theIns] = []string{}
 			for aChan, sSends := range a.chanBufMap {
@@ -180,8 +190,6 @@ func (a *analysis) insUnOp(examIns *ssa.UnOp, goID int, theIns ssa.Instruction) 
 				}
 			}
 		}
-		//addrNameMap[examIns.X.Name()] = append(addrNameMap[examIns.X.Name()], examIns.X)
-		//addrMap[examIns.X.Name()] = append(addrMap[examIns.X.Name()], RWInsInd{goID: goID, goInd: sliceContainsInsAt(RWIns[goID], theIns)})
 		a.ptaConfig.AddQuery(examIns.X)
 	} else if examIns.Op == token.ARROW { // channel receive op
 		stats.IncStat(stats.NChanRecv)
@@ -212,6 +220,9 @@ func (a *analysis) insFieldAddr(examIns *ssa.FieldAddr, goID int, theIns ssa.Ins
 		if len(a.lockSet) > 0 {
 			a.lockMap[theIns] = a.lockSet
 		}
+		if len(a.RlockSet) > 0 {
+			a.RlockMap[theIns] = a.RlockSet
+		}
 		if len(a.chanBufMap) > 0 {
 			a.chanMap[theIns] = []string{}
 			for aChan, sSends := range a.chanBufMap {
@@ -220,8 +231,6 @@ func (a *analysis) insFieldAddr(examIns *ssa.FieldAddr, goID int, theIns ssa.Ins
 				}
 			}
 		}
-		//addrNameMap[examIns.X.Name()] = append(addrNameMap[examIns.X.Name()], examIns.X)    // map address name to address, used for checking points-to labels later
-		//addrMap[examIns.X.Name()] = append(addrMap[examIns.X.Name()], RWInsInd{goID: goID, goInd: sliceContainsInsAt(RWIns[goID], theIns)}) // map address name to slice of instructions accessing the same address name
 		a.ptaConfig.AddQuery(examIns.X)
 	}
 }
@@ -236,6 +245,9 @@ func (a *analysis) insLookUp(examIns *ssa.Lookup, goID int, theIns ssa.Instructi
 			if len(a.lockSet) > 0 {
 				a.lockMap[theIns] = a.lockSet
 			}
+			if len(a.RlockSet) > 0 {
+				a.RlockMap[theIns] = a.RlockSet
+			}
 			if len(a.chanBufMap) > 0 {
 				a.chanMap[theIns] = []string{}
 				for aChan, sSends := range a.chanBufMap {
@@ -244,8 +256,6 @@ func (a *analysis) insLookUp(examIns *ssa.Lookup, goID int, theIns ssa.Instructi
 					}
 				}
 			}
-			//addrNameMap[readIns.X.Name()] = append(addrNameMap[readIns.X.Name()], readIns.X)
-			//addrMap[readIns.X.Name()] = append(addrMap[readIns.X.Name()], RWInsInd{goID: goID, goInd: sliceContainsInsAt(RWIns[goID], theIns)})
 			a.ptaConfig.AddQuery(readIns.X)
 		}
 	case *ssa.Parameter:
@@ -254,6 +264,9 @@ func (a *analysis) insLookUp(examIns *ssa.Lookup, goID int, theIns ssa.Instructi
 			if len(a.lockSet) > 0 {
 				a.lockMap[theIns] = a.lockSet
 			}
+			if len(a.RlockSet) > 0 {
+				a.RlockMap[theIns] = a.RlockSet
+			}
 			if len(a.chanBufMap) > 0 {
 				a.chanMap[theIns] = []string{}
 				for aChan, sSends := range a.chanBufMap {
@@ -262,8 +275,6 @@ func (a *analysis) insLookUp(examIns *ssa.Lookup, goID int, theIns ssa.Instructi
 					}
 				}
 			}
-			//addrNameMap[readIns.Name()] = append(addrNameMap[readIns.Name()], readIns)
-			//addrMap[readIns.Name()] = append(addrMap[readIns.Name()], RWInsInd{goID: goID, goInd: sliceContainsInsAt(RWIns[goID], theIns)})
 			a.ptaConfig.AddQuery(readIns)
 		}
 	}
@@ -282,6 +293,9 @@ func (a *analysis) insChangeType(examIns *ssa.ChangeType, goID int, theIns ssa.I
 				a.RWIns[goID] = append(a.RWIns[goID], theIns)
 				if len(a.lockSet) > 0 {
 					a.lockMap[theIns] = a.lockSet
+				}
+				if len(a.RlockSet) > 0 {
+					a.RlockMap[theIns] = a.RlockSet
 				}
 				if len(a.chanBufMap) > 0 {
 					a.chanMap[theIns] = []string{}
@@ -335,6 +349,9 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 					if len(a.lockSet) > 0 {
 						a.lockMap[theIns] = a.lockSet
 					}
+					if len(a.RlockSet) > 0 {
+						a.RlockMap[theIns] = a.RlockSet
+					}
 					if len(a.chanBufMap) > 0 {
 						a.chanMap[theIns] = []string{}
 						for aChan, sSends := range a.chanBufMap {
@@ -343,8 +360,6 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 							}
 						}
 					}
-					//addrNameMap[theVal.X.Name()] = append(addrNameMap[theVal.X.Name()], theVal)
-					//addrMap[theVal.X.Name()] = append(addrMap[theVal.X.Name()], RWInsInd{goID: goID, goInd: sliceContainsInsAt(RWIns[goID], theIns)})
 					a.ptaConfig.AddQuery(theVal.X)
 				}
 			}
@@ -374,6 +389,9 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 					if len(a.lockSet) > 0 {
 						a.lockMap[theIns] = a.lockSet
 					}
+					if len(a.RlockSet) > 0 {
+						a.RlockMap[theIns] = a.RlockSet
+					}
 					if len(a.chanBufMap) > 0 {
 						a.chanMap[theIns] = []string{}
 						for aChan, sSends := range a.chanBufMap {
@@ -382,8 +400,6 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 							}
 						}
 					}
-					//addrNameMap[access.X.Name()] = append(addrNameMap[access.X.Name()], access.X)                                                     // map address name to address, used for checking points-to labels later
-					//addrMap[access.X.Name()] = append(addrMap[access.X.Name()], RWInsInd{goID: goID, goInd: sliceContainsInsAt(RWIns[goID], theIns)}) // map address name to slice of instructions accessing the same address name
 					a.ptaConfig.AddQuery(access.X)
 				}
 			default:
@@ -420,6 +436,16 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 			lockLoc := examIns.Call.Args[0]
 			if p := a.lockSetContainsAt(a.lockSet, lockLoc); p >= 0 {
 				a.lockSet = deleteFromLockSet(a.lockSet, p)
+			}
+		case "RLock":
+			RlockLoc := examIns.Call.Args[0]          // identifier for address of lock
+			if !sliceContains(a.RlockSet, RlockLoc) { // if lock is not already in active lockset
+				a.RlockSet = append(a.RlockSet, RlockLoc)
+			}
+		case "RUnlock":
+			RlockLoc := examIns.Call.Args[0]
+			if p := a.lockSetContainsAt(a.RlockSet, RlockLoc); p >= 0 {
+				a.RlockSet = deleteFromLockSet(a.RlockSet, p)
 			}
 		case "Wait":
 			stats.IncStat(stats.NWaitGroupWait)
@@ -467,4 +493,30 @@ func (a *analysis) insGo(examIns *ssa.Go, goID int, theIns ssa.Instruction) {
 	a.goStack[newGoID] = append(a.goStack[newGoID], a.storeIns...)
 	a.workList = append(a.workList, info) // store encountered goroutines
 	log.Debug(strings.Repeat(" ", a.levels[goID]), "spawning Goroutine ----->  ", fnName)
+}
+
+func (a *analysis) insMapUpdate(examIns *ssa.MapUpdate, goID int, theIns ssa.Instruction) {
+	stats.IncStat(stats.NStore)
+	a.RWIns[goID] = append(a.RWIns[goID], theIns)
+	if len(a.lockSet) > 0 {
+		a.lockMap[theIns] = a.lockSet
+	}
+	if len(a.RlockSet) > 0 {
+		a.RlockMap[theIns] = a.RlockSet
+	}
+	if len(a.chanBufMap) > 0 {
+		a.chanMap[theIns] = []string{}
+		for aChan, sSends := range a.chanBufMap {
+			if sSends[0] != nil && len(sSends) == 1 { // slice of channel sends contains exactly one value
+				a.chanMap[theIns] = append(a.chanMap[theIns], aChan)
+			}
+		}
+	}
+	switch ptType := examIns.Map.(type) {
+	case *ssa.UnOp:
+		a.ptaConfig.AddQuery(ptType.X)
+	default:
+		// doing nothing otherwise
+	}
+
 }

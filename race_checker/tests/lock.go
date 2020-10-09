@@ -12,9 +12,9 @@ func main() {
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
-		y = 1
+		y /* RACE Write */ = 1 // write y (race condition)
 		m.Lock()
-		x = 2
+		x = 2 // write x (protected)
 		m.Unlock()
 		wg.Done()
 	}()
@@ -22,11 +22,10 @@ func main() {
 		fmt.Println("pass")
 	}()
 	m.Lock()
-	a := x
+	a := x // read x (protected)
 	m.Unlock()
-	if a == 2 {
-		fmt.Println("READ y", y)
+	if a != 0 {
+		fmt.Println("READ y", y /* RACE Read */ ) // read y (race condition)
 	}
 	wg.Wait()
-	//fmt.Println(y)
 }

@@ -107,6 +107,7 @@ func staticAnalysis(args []string) error {
 		insDRA:       0,
 		levels:       make(map[int]int),
 		lockMap:      make(map[ssa.Instruction][]ssa.Value),
+		RlockMap:     make(map[ssa.Instruction][]ssa.Value),
 		goCaller:     make(map[int]int),
 		goNames:      make(map[int]string),
 		chanBufMap:   make(map[string][]*ssa.Send),
@@ -329,7 +330,10 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				a.insGo(examIns, goID, theIns)
 			case *ssa.Return:
 				a.RWIns[goID] = append(a.RWIns[goID], theIns)
+			case *ssa.MapUpdate:
+				a.insMapUpdate(examIns, goID, theIns)
 			}
+
 		}
 	}
 	// done with all instructions in function body, now pop the function
