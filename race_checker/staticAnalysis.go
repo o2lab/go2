@@ -132,6 +132,7 @@ func staticAnalysis(args []string) error {
 	var prevN graph.Node
 	var goCaller []graph.Node
 	var waitingN graph.Node
+	waitgroupEdges  := make(map[string][]graph.Node)
 	for nGo, insSlice := range Analysis.RWIns {
 		for i, anIns := range insSlice {
 			if nGo == 0 && i == 0 { // main goroutine, first instruction
@@ -169,10 +170,47 @@ func staticAnalysis(args []string) error {
 			}
 			if isReadIns(anIns) || isWriteIns(anIns) {
 				Analysis.RWinsMap[anIns] = prevN
+				if callIns, ok := anIns.(*ssa.Call); ok{
+					if strings.HasPrefix(callIns.Call.Value.Name(), "Add") {
+						waitgrp :=strings.Split(callIns.Call.Args[0].String()," ")
+						//addVall :=strings.Split(callIns.Call.Args[1].String()," ")
+						if len(waitgrp)>2{
+							waitgrpval := waitgrp[2][strings.Index(waitgrp[2],"(")+1:strings.Index(waitgrp[2],")")]
+							//waitval := addVall[0][:strings.Index(addVall[0],":")]
+							//waitgroupMap[waitgrpval] =waitval
+							for _, edge := range waitgroupEdges[waitgrpval]{
+								err := Analysis.HBgraph.MakeEdge(edge, prevN)
+								if err != nil {
+									log.Fatal(err)
+								}
+							}
+						}
+					}
+				}
 			} else if callIns, ok := anIns.(*ssa.Call); ok { // taking care of WG operations. TODO: identify different WG instances
 				if callIns.Call.Value.Name() == "Wait" {
-					waitingN = prevN
+					waitgrp :=strings.Split(callIns.Call.Args[0].String()," ")
+					if len(waitgrp)>2{
+						waitgrpval := waitgrp[2][strings.Index(waitgrp[2],"(")+1:strings.Index(waitgrp[2],")")]
+						for _, edge := range waitgroupEdges[waitgrpval] {
+							err := Analysis.HBgraph.MakeEdge(edge,prevN)
+							if err != nil {
+								log.Fatal(err)
+							}
+						}
+					}
+					waitingN = prevN// TODO: make for multiple waitgroups
 				} else if callIns.Call.Value.Name() == "Done" {
+					waitgrp :=strings.Split(callIns.Call.Args[0].String()," ")
+					waitgrpval := waitgrp[1]
+					//waitgroupMap[waitgrpval] = waitgroupMap[waitgrpval]-1
+					if waitgroupEdges[waitgrpval]!=nil{
+						waitgroupEdges[waitgrpval] = append(waitgroupEdges[waitgrpval], prevN)
+					}else {
+						slice := make([]graph.Node, 1)
+						slice[0] =prevN
+						waitgroupEdges[waitgrpval] = slice
+					}
 					err := Analysis.HBgraph.MakeEdge(prevN, waitingN)
 					if err != nil {
 						log.Fatal(err)

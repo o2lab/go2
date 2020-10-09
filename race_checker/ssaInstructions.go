@@ -427,8 +427,8 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 		case "Done":
 			stats.IncStat(stats.NWaitGroupDone)
 			a.RWIns[goID] = append(a.RWIns[goID], theIns)
-			//case "Add": // adds delta to the WG
-			//	fmt.Println("eee")// TODO: handle cases when WG counter is incremented by value greater than 1
+		case "Add":
+			a.RWIns[goID] = append(a.RWIns[goID], theIns)
 		}
 	} else {
 		return

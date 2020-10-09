@@ -20,9 +20,12 @@ func (a *analysis) checkRacyPairs() {
 				}
 				for jj, goJ := range a.RWIns[j] {
 					insSlice := []ssa.Instruction{goI, goJ} // one instruction from each goroutine
+					log.Info(insSlice)
 					addressPair := a.insAddress(insSlice)
-					if len(addressPair) > 1 && a.sameAddress(addressPair[0], addressPair[1]) && !sliceContains(a.reportedAddr, addressPair[0]) && !a.reachable(goI, goJ) && !a.lockSetsIntersect(insSlice[0], insSlice[1]) && !a.chanProtected(insSlice[0], insSlice[1]) {
+					if len(addressPair) > 1 && a.sameAddress(addressPair[0], addressPair[1]) && !sliceContains(a.reportedAddr, addressPair[0]) &&( !a.reachable(goI, goJ)&&!a.reachable(goJ, goI) )&& !a.lockSetsIntersect(insSlice[0], insSlice[1]) && !a.chanProtected(insSlice[0], insSlice[1]) {
 						a.reportedAddr = append(a.reportedAddr, addressPair[0])
+						log.Info(insSlice)
+						log.Info()
 						goIDs := []int{i, j}    // store goroutine IDs
 						insInd := []int{ii, jj} // store index of instruction within worker goroutine
 						a.printRace(len(a.reportedAddr), insSlice, addressPair, goIDs, insInd)

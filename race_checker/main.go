@@ -37,6 +37,7 @@ type analysis struct {
 	insertIndMap  map[string]int
 	chanMap       map[ssa.Instruction][]string // map each read/write access to a list of channels with value(s) already sent to it
 	chanName      string
+	waitgroupMap  map[string]int
 }
 
 type fnInfo struct { // all fields must be comparable for fnInfo to be used as key to trieMap

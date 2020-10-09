@@ -7,10 +7,10 @@ import (
 
 func main() {
 	wg := sync.WaitGroup{}
-	x /* RACE Write */ := 1
+	x := 1
 	wg.Add(1)
 	go func() {
-		x /* RACE Write */ = 1
+		x = 1
 		wg.Done()
 	}()
 	wg.Wait()
