@@ -28,7 +28,7 @@ var tests = []string{
 	"tests/cg.go",
 	"tests/test1.go",
 	//"tests/waitgroup.go",
-	//"tests/lock.go",
+	"tests/lock.go",
 	"tests/context1.go",
 	"tests/fields.go",
 	//"tests/k8s_issue80269.go",

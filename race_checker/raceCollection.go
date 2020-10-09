@@ -19,14 +19,12 @@ func (a *analysis) checkRacyPairs() {
 					continue // do not check race-free instructions in main goroutine
 				}
 				for jj, goJ := range a.RWIns[j] {
-					if (isWriteIns(goI) && isWriteIns(goJ)) || (isWriteIns(goI) && isReadIns(goJ)) || (isReadIns(goI) && isWriteIns(goJ)) { // two addresses at least one of which is write
-						insSlice := []ssa.Instruction{goI, goJ} // one instruction from each goroutine
-						addressPair := a.insAddress(insSlice)
-						if len(addressPair) > 0 && a.sameAddress(addressPair[0], addressPair[1]) && !sliceContains(a.reportedAddr, addressPair[0]) && !a.reachable(goI, goJ) && !a.lockSetsIntersect(insSlice[0], insSlice[1]) && !a.chanProtected(insSlice[0], insSlice[1]) {
+					if (isWriteIns(goI) && isWriteIns(goJ)) || (isWriteIns(goI) && isReadIns(goJ)) || (isReadIns(goI) && isWriteIns(goJ)) { // only read and write instructions
+						insSlice := []ssa.Instruction{goI, goJ}
+						addressPair := a.insAddress(insSlice) // one instruction from each goroutine
+						if len(addressPair) > 1 && a.sameAddress(addressPair[0], addressPair[1]) && !sliceContains(a.reportedAddr, addressPair[0]) && !a.reachable(goI, goJ) && !a.lockSetsIntersect(insSlice[0], insSlice[1]) && !a.chanProtected(insSlice[0], insSlice[1]) {
 							a.reportedAddr = append(a.reportedAddr, addressPair[0])
-							goIDs := []int{i, j}    // store goroutine IDs
-							insInd := []int{ii, jj} // store index of instruction within worker goroutine
-							a.printRace(len(a.reportedAddr), insSlice, addressPair, goIDs, insInd)
+							a.printRace(len(a.reportedAddr), insSlice, addressPair, []int{i, j}, []int{ii, jj})
 						}
 					}
 				}
@@ -45,32 +43,31 @@ func (a *analysis) insAddress(insSlice []ssa.Instruction) []ssa.Value { // obtai
 	theAddrs := []ssa.Value{}
 	for _, anIns := range insSlice {
 		switch theIns := anIns.(type) {
-		case *ssa.Store:
+		case *ssa.Store: // write
 			theAddrs = append(theAddrs, theIns.Addr)
 		case *ssa.Call:
-			if theIns.Call.Value.Name() == "delete" {
+			if theIns.Call.Value.Name() == "delete" { // write
 				theAddrs = append(theAddrs, theIns.Call.Args[0].(*ssa.UnOp).X)
-			} else if strings.HasPrefix(theIns.Call.Value.Name(), "Add") && theIns.Call.StaticCallee().Pkg.Pkg.Name() == "atomic" {
+			} else if strings.HasPrefix(theIns.Call.Value.Name(), "Add") && theIns.Call.StaticCallee().Pkg.Pkg.Name() == "atomic" { // write
 				theAddrs = append(theAddrs, theIns.Call.Args[0].(*ssa.FieldAddr).X)
-			} else if len(theIns.Call.Args) > 0 {
+			} else if len(theIns.Call.Args) > 0 { // read
 				for _, anArg := range theIns.Call.Args {
 					if readAcc, ok := anArg.(*ssa.FieldAddr); ok {
 						theAddrs = append(theAddrs, readAcc.X)
 					}
 				}
 			}
-		case *ssa.UnOp:
+		case *ssa.UnOp: // read
 			theAddrs = append(theAddrs, theIns.X)
-		case *ssa.Lookup:
+		case *ssa.Lookup: // read
 			theAddrs = append(theAddrs, theIns.X)
-		case *ssa.FieldAddr:
+		case *ssa.FieldAddr: // read
 			theAddrs = append(theAddrs, theIns.X)
-		case *ssa.MapUpdate:
+		case *ssa.MapUpdate: // write
 			switch accType := theIns.Map.(type) {
 			case *ssa.UnOp:
 				theAddrs = append(theAddrs, accType.X)
 			case *ssa.MakeMap:
-				//theAddrs = append(theAddrs, accType.Reserve)
 			}
 		}
 	}
@@ -82,6 +79,10 @@ func (a *analysis) sameAddress(addr1 ssa.Value, addr2 ssa.Value) bool {
 	if global1, ok1 := addr1.(*ssa.Global); ok1 {
 		if global2, ok2 := addr2.(*ssa.Global); ok2 {
 			return global1.Pos() == global2.Pos() // compare position of identifiers
+		}
+	} else if freevar1, ok1 := addr1.(*ssa.FreeVar); ok1 {
+		if freevar2, ok2 := addr2.(*ssa.FreeVar); ok2 {
+			return freevar1.Pos() == freevar2.Pos() // compare position of identifiers
 		}
 	}
 
@@ -101,11 +102,11 @@ func (a *analysis) reachable(fromIns ssa.Instruction, toIns ssa.Instruction) boo
 	fromNode := a.RWinsMap[fromIns]
 	toNode := a.RWinsMap[toIns]
 	nexts := a.HBgraph.Neighbors(fromNode) // get all reachable nodes
-	//counter := 0
+	counter := 0
 	for len(nexts) > 0 {
-		//if efficiency && counter == 100 {
-		//	break // avoid loops
-		//}
+		if counter == 10000 {
+			break
+		}
 		curr := nexts[len(nexts)-1]
 		nexts = nexts[:len(nexts)-1]
 		next := a.HBgraph.Neighbors(curr)
@@ -113,7 +114,7 @@ func (a *analysis) reachable(fromIns ssa.Instruction, toIns ssa.Instruction) boo
 		if curr == toNode {
 			return true
 		}
-		//counter++
+		counter++
 	}
 	return false
 }
@@ -172,14 +173,25 @@ func (a *analysis) printRace(counter int, insPair []ssa.Instruction, addrPair []
 	log.Println(strings.Repeat("=", 100))
 	for i, anIns := range insPair {
 		var errMsg string
+		var access string
 		if isWriteIns(anIns) {
-			if _, ok := anIns.(*ssa.Call); ok {
-				errMsg = fmt.Sprint("  Write of ", aurora.Magenta(addrPair[i].String()), " in function ", aurora.BgBrightGreen(anIns.Parent().Name()), " at ", a.prog.Fset.Position(addrPair[i].Pos()))
+			if i == 0 {
+				access = " Previous Write of "
 			} else {
-				errMsg = fmt.Sprint("  Write of ", aurora.Magenta(addrPair[i].String()), " in function ", aurora.BgBrightGreen(anIns.Parent().Name()), " at ", a.prog.Fset.Position(insPair[i].Pos()))
+				access = " Write of "
+			}
+			if _, ok := anIns.(*ssa.Call); ok {
+				errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].String()), " in function ", aurora.BgBrightGreen(anIns.Parent().Name()), " at ", a.prog.Fset.Position(addrPair[i].Pos()))
+			} else {
+				errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].String()), " in function ", aurora.BgBrightGreen(anIns.Parent().Name()), " at ", a.prog.Fset.Position(insPair[i].Pos()))
 			}
 		} else {
-			errMsg = fmt.Sprint("  Read of ", aurora.Magenta(addrPair[i].String()), " in function ", aurora.BgBrightGreen(anIns.Parent().Name()), " at ", a.prog.Fset.Position(anIns.Pos()))
+			if i == 0 {
+				access = " Previous Read of "
+			} else {
+				access = " Read of "
+			}
+			errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].String()), " in function ", aurora.BgBrightGreen(anIns.Parent().Name()), " at ", a.prog.Fset.Position(anIns.Pos()))
 		}
 		if testMode {
 			colorOutput := regexp.MustCompile(`\x1b\[\d+m`)

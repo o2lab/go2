@@ -108,9 +108,8 @@ func (ccb *ccBalancerWrapper) watcher() {
 	for i := 0; i < 10; i++ {
 		balanceMutex.Lock()
 		if ccb.balancer != nil {
+			ccb.balancer.HandleResolvedAddrs()
 			balanceMutex.Unlock()
-			balancer := ccb.balancer /* RACE Read */
-			balancer.HandleResolvedAddrs()
 		} else {
 			balanceMutex.Unlock()
 		}
@@ -131,7 +130,7 @@ func newCCBalancerWrapper(cc *ClientConn, b Builder) {
 	go ccb.watcher()
 	balanceMutex.Lock()
 	defer balanceMutex.Unlock()
-	ccb.balancer /* RACE Write */ = b.Build(ccb)
+	ccb.balancer = b.Build(ccb)
 }
 
 func TestGrpc1748(t *testing.T) {

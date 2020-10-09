@@ -96,6 +96,11 @@ func init() {
 		"reflect",
 		"internal",
 		"impl",
+		"json", // added for testing gRPC
+		"context", // added for testing gRPC
+		"channelz", // added for testing gRPC
+		"backoff", // added for testing gRPC
+		"url", // added for testing gRPC
 	}
 }
 
