@@ -22,7 +22,12 @@ func (a *analysis) checkRacyPairs() {
 					if (isWriteIns(goI) && isWriteIns(goJ)) || (isWriteIns(goI) && isReadIns(goJ)) || (isReadIns(goI) && isWriteIns(goJ)) { // only read and write instructions
 						insSlice := []ssa.Instruction{goI, goJ}
 						addressPair := a.insAddress(insSlice) // one instruction from each goroutine
-						if len(addressPair) > 1 && a.sameAddress(addressPair[0], addressPair[1]) && !sliceContains(a.reportedAddr, addressPair[0]) && !a.reachable(goI, goJ) && !a.lockSetsIntersect(insSlice[0], insSlice[1]) && !a.chanProtected(insSlice[0], insSlice[1]) {
+						if len(addressPair) > 1 &&
+							a.sameAddress(addressPair[0], addressPair[1]) &&
+							!sliceContains(a.reportedAddr, addressPair[0]) &&
+							!a.reachable(goI, goJ) &&
+							!a.lockSetsIntersect(insSlice[0], insSlice[1]) &&
+							!a.chanProtected(insSlice[0], insSlice[1]) {
 							a.reportedAddr = append(a.reportedAddr, addressPair[0])
 							a.printRace(len(a.reportedAddr), insSlice, addressPair, []int{i, j}, []int{ii, jj})
 						}
@@ -93,27 +98,32 @@ func (a *analysis) sameAddress(addr1 ssa.Value, addr2 ssa.Value) bool {
 
 // reachable determines if 2 input instructions are connected in the Happens-Before Graph
 func (a *analysis) reachable(fromIns ssa.Instruction, toIns ssa.Instruction) bool {
+	for _, wIns := range a.WaitIns { // reverse reaching direction if target node is one being waited on
+		if sliceContainsInsAt(wIns, toIns) > -1 {
+			return a.reachable(toIns, fromIns)
+		}
+	}
 	fromBlock := fromIns.Block().Index
 	if strings.HasPrefix(fromIns.Block().Comment, "rangeindex") && toIns.Parent() != nil && toIns.Parent().Parent() != nil { // checking both instructions belong to same forloop
 		if fromIns.Block().Comment == toIns.Parent().Parent().Blocks[fromBlock].Comment {
 			return false
 		}
 	}
-	fromNode := a.RWinsMap[fromIns]
-	toNode := a.RWinsMap[toIns]
-	nexts := a.HBgraph.Neighbors(fromNode) // get all reachable nodes
-	counter := 0
-	for len(nexts) > 0 {
+	fromNode := a.RWinsMap[fromIns] // starting node
+	toNode := a.RWinsMap[toIns] // target node
+	nexts := a.HBgraph.Neighbors(fromNode) // store reachable nodes in a stack
+	counter := 0 // for gauging performance only
+	for len(nexts) > 0 { // DFS
 		if counter == 10000 {
 			break
 		}
-		curr := nexts[len(nexts)-1]
-		nexts = nexts[:len(nexts)-1]
-		next := a.HBgraph.Neighbors(curr)
-		nexts = append(nexts, next...)
+		curr := nexts[len(nexts)-1] // get last node in stack
+		nexts = nexts[:len(nexts)-1] // pop last node in stack
 		if curr == toNode {
 			return true
 		}
+		next := a.HBgraph.Neighbors(curr)
+		nexts = append(nexts, next...)
 		counter++
 	}
 	return false

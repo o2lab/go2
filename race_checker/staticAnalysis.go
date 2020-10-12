@@ -113,6 +113,7 @@ func staticAnalysis(args []string) error {
 		chanBufMap:   make(map[string][]*ssa.Send),
 		insertIndMap: make(map[string]int),
 		chanMap:      make(map[ssa.Instruction][]string), // map each read/write access to a list of channels with value(s) already sent to it
+		WaitIns:      make(map[string][]ssa.Instruction),
 	}
 
 	log.Info("Compiling stack trace for every Goroutine... ")
@@ -172,9 +173,9 @@ func staticAnalysis(args []string) error {
 				Analysis.RWinsMap[anIns] = prevN
 			} else if callIns, ok := anIns.(*ssa.Call); ok { // taking care of WG operations. TODO: identify different WG instances
 				if callIns.Call.Value.Name() == "Wait" {
-					waitingN = prevN
+					waitingN = prevN // store Wait node for later edge creation TO this node
 				} else if callIns.Call.Value.Name() == "Done" {
-					err := Analysis.HBgraph.MakeEdge(prevN, waitingN)
+					err := Analysis.HBgraph.MakeEdge(prevN, waitingN) // create edge from Done node to Edge node
 					if err != nil {
 						log.Fatal(err)
 					}
