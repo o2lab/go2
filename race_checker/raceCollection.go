@@ -22,9 +22,24 @@ func (a *analysis) checkRacyPairs() {
 					if (isWriteIns(goI) && isWriteIns(goJ)) || (isWriteIns(goI) && isReadIns(goJ)) || (isReadIns(goI) && isWriteIns(goJ)) { // only read and write instructions
 						insSlice := []ssa.Instruction{goI, goJ}
 						addressPair := a.insAddress(insSlice) // one instruction from each goroutine
-						if len(addressPair) > 1 && a.sameAddress(addressPair[0], addressPair[1]) && !sliceContains(a.reportedAddr, addressPair[0]) && !a.reachable(goI, goJ) && !a.reachable(goJ,goI) && !a.lockSetsIntersect(insSlice[0], insSlice[1]) && !a.chanProtected(insSlice[0], insSlice[1]) {
-							a.reportedAddr = append(a.reportedAddr, addressPair[0])
-							a.printRace(len(a.reportedAddr), insSlice, addressPair, []int{i, j}, []int{ii, jj})
+						log.Println(insSlice)
+						log.Println(!a.reachable(goI, goJ) )
+						log.Println(!a.reachable(goJ, goI) )
+						if len(addressPair) > 1 && a.sameAddress(addressPair[0], addressPair[1]) && !sliceContains(a.reportedAddr, addressPair[0]) && !a.lockSetsIntersect(insSlice[0], insSlice[1]) && !a.chanProtected(insSlice[0], insSlice[1]) {
+							if (isWriteIns(goI) && isReadIns(goJ)) && !a.reachable(goI, goJ) {
+								a.reportedAddr = append(a.reportedAddr, addressPair[0])
+								a.printRace(len(a.reportedAddr), insSlice, addressPair, []int{i, j}, []int{ii, jj})
+							}else{
+								if (isReadIns(goI) && isWriteIns(goJ)) && !a.reachable(goJ,goI) {
+									a.reportedAddr = append(a.reportedAddr, addressPair[0])
+									a.printRace(len(a.reportedAddr), insSlice, addressPair, []int{i, j}, []int{ii, jj})
+								}else{
+									if (isWriteIns(goI) && isWriteIns(goJ)) && !a.reachable(goJ,goI) && !a.reachable(goI, goJ){
+										a.reportedAddr = append(a.reportedAddr, addressPair[0])
+										a.printRace(len(a.reportedAddr), insSlice, addressPair, []int{i, j}, []int{ii, jj})
+									}
+								}
+							}
 						}
 					}
 				}

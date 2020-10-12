@@ -26,6 +26,16 @@ runMicro:
 	./main tests/test-micro/main.go
 runDelve:
 	./main tests/test-delve/cmd/dlv/main.go
+runK:
+	./main tests/GoBench/Kubernetes/81091/main.go
+runDeposite:
+	./main tests/godel2/deposit-race/main.go
+runProd:
+	./main tests/godel2/prod-cons-race/main.go
+runI:
+	./main tests/GoBench/Istio/8214/main.go
+runWait:
+	./main tests/waitgroup.go
 runCockroach:
 	./main tests/GoBench/Cockroach/27659/main.go
 	./main tests/GoBench/Cockroach/35501/main.go

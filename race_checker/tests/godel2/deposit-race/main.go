@@ -8,7 +8,7 @@ import (
 )
 
 func Deposit(bal *int, amt int) {
-	* /* RACE Write */ /* RACE Write */ /* RACE Write */ bal += amt
+	* /* RACE Write */ /* RACE Write */ /* RACE Read */ bal += amt
 }
 
 func main() {

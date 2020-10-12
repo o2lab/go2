@@ -9,9 +9,9 @@ import (
 
 func Producer(mut *sync.Mutex, x *int, end chan int) {
 	for i := 0; i < 5; {
-		if *x == 0 { // Read not fenced, may not see other Producers
+		if * /*RACE Read*/ x == 0 { // Read not fenced, may not see other Producers
 			i++
-			* /* RACE Write */ /* RACE Write */ x = i // Write not fenced, may clash with other Producers
+			* /* RACE Write */ x = i // Write not fenced, may clash with other Producers
 		}
 	}
 	close(end)
