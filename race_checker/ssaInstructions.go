@@ -42,10 +42,14 @@ func checkTokenNameDefer(fnName string, theIns *ssa.Defer) string {
 }
 
 // isReadIns determines if the instruction is a read access
-func isReadIns(ins ssa.Instruction) bool {
+func (a *analysis) isReadIns(ins ssa.Instruction) bool {
 	switch insType := ins.(type) {
 	case *ssa.UnOp:
-		return true
+		if ins, ok := insType.X.(*ssa.Alloc); ok && sliceContainsStr(a.nonBlockChans, ins.Comment) {
+			return false // a channel receive, handled differently than typical read ins
+		} else {
+			return true
+		}
 	case *ssa.FieldAddr:
 		return true
 	case *ssa.Lookup:
@@ -115,6 +119,7 @@ func (a *analysis) insMakeChan(examIns *ssa.MakeChan) {
 // insSend ???
 func (a *analysis) insSend(examIns *ssa.Send, goID int, theIns ssa.Instruction) {
 	stats.IncStat(stats.NSend)
+	a.RWIns[goID] = append(a.RWIns[goID], theIns)
 	var chName string
 	if _, ok := a.chanBufMap[examIns.Chan.Name()]; !ok { // if channel name can't be identified
 		a.pointerAnalysis(examIns.Chan, goID, theIns) // identifiable name will be returned by pointer analysis via variable chanName
@@ -154,8 +159,8 @@ func (a *analysis) insStore(examIns *ssa.Store, goID int, theIns ssa.Instruction
 		if len(a.chanBufMap) > 0 {
 			a.chanMap[theIns] = []string{}
 			for aChan, sSends := range a.chanBufMap {
-				if sSends[0] != nil && len(sSends) == 1 { // slice of channel sends contains exactly one value
-					a.chanMap[theIns] = append(a.chanMap[theIns], aChan)
+				if sSends[0] != nil && len(sSends) == 1 { // exactly one instance of channel send up to now
+					a.chanMap[theIns] = append(a.chanMap[theIns], aChan) // unbuffered channels create HB among multiple channel sends
 				}
 			}
 		}
@@ -526,7 +531,16 @@ func (a *analysis) insMapUpdate(examIns *ssa.MapUpdate, goID int, theIns ssa.Ins
 	case *ssa.UnOp:
 		a.ptaConfig.AddQuery(ptType.X)
 	default:
-		// doing nothing otherwise
 	}
+}
 
+func (a *analysis) insSelect(examIns *ssa.Select, goID int, theIns ssa.Instruction) {
+	a.RWIns[goID] = append(a.RWIns[goID], theIns)
+	for _, states := range examIns.States {
+		if rcv, ok := states.Chan.(*ssa.UnOp); ok { // value available in channel receive
+			if recv, ok := rcv.X.(*ssa.Alloc); ok {
+				a.nonBlockChans = append(a.nonBlockChans, recv.Comment)
+			}
+		}
+	}
 }

@@ -19,7 +19,7 @@ func (a *analysis) checkRacyPairs() {
 					continue // do not check race-free instructions in main goroutine
 				}
 				for jj, goJ := range a.RWIns[j] {
-					if (isWriteIns(goI) && isWriteIns(goJ)) || (isWriteIns(goI) && isReadIns(goJ)) || (isReadIns(goI) && isWriteIns(goJ)) { // only read and write instructions
+					if (isWriteIns(goI) && isWriteIns(goJ)) || (isWriteIns(goI) && a.isReadIns(goJ)) || (a.isReadIns(goI) && isWriteIns(goJ)) { // only read and write instructions
 						insSlice := []ssa.Instruction{goI, goJ}
 						addressPair := a.insAddress(insSlice) // one instruction from each goroutine
 						if len(addressPair) > 1 &&
@@ -112,8 +112,8 @@ func (a *analysis) reachable(fromIns ssa.Instruction, toIns ssa.Instruction) boo
 	fromNode := a.RWinsMap[fromIns] // starting node
 	toNode := a.RWinsMap[toIns] // target node
 	nexts := a.HBgraph.Neighbors(fromNode) // store reachable nodes in a stack
-	counter := 0 // for gauging performance only
-	for len(nexts) > 0 { // DFS
+	counter := 0 // for managing performance only
+	for len(nexts) > 0 {
 		if counter == 10000 {
 			break
 		}
@@ -132,11 +132,11 @@ func (a *analysis) reachable(fromIns ssa.Instruction, toIns ssa.Instruction) boo
 // lockSetsIntersect determines if two input instructions are trying to access a variable that is protected by the same set of locks
 func (a *analysis) lockSetsIntersect(insA ssa.Instruction, insB ssa.Instruction) bool {
 	setA := a.lockMap[insA] // lockset of instruction-A
-	if isReadIns(insA) {
+	if a.isReadIns(insA) {
 		setA = append(setA, a.RlockMap[insA]...)
 	}
 	setB := a.lockMap[insB] // lockset of instruction-B
-	if isReadIns(insB) {
+	if a.isReadIns(insB) {
 		setB = append(setB, a.RlockMap[insB]...)
 	}
 	for _, addrA := range setA {
@@ -163,7 +163,7 @@ func (a *analysis) lockSetsIntersect(insA ssa.Instruction, insB ssa.Instruction)
 	return false
 }
 
-// chanProtected will determine if 2 input instructions are both using the same channel
+// chanProtected
 func (a *analysis) chanProtected(insA ssa.Instruction, insB ssa.Instruction) bool {
 	setA := a.chanMap[insA] // channelSet of instruction-A
 	setB := a.chanMap[insB] // channelSet of instruction-B
