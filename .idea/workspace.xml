@@ -4,11 +4,10 @@
     <list default="true" id="8a7219d7-5093-420c-9475-c9b819cba73d" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/race_checker/main" beforeDir="false" afterPath="$PROJECT_DIR$/race_checker/main" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/race_checker/makefile" beforeDir="false" afterPath="$PROJECT_DIR$/race_checker/makefile" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/race_checker/main.go" beforeDir="false" afterPath="$PROJECT_DIR$/race_checker/main.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/race_checker/raceCollection.go" beforeDir="false" afterPath="$PROJECT_DIR$/race_checker/raceCollection.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/race_checker/tests/GoBench/Kubernetes/81091/main.go" beforeDir="false" afterPath="$PROJECT_DIR$/race_checker/tests/GoBench/Kubernetes/81091/main.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/race_checker/tests/godel2/deposit-race/main.go" beforeDir="false" afterPath="$PROJECT_DIR$/race_checker/tests/godel2/deposit-race/main.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/race_checker/tests/godel2/prod-cons-race/main.go" beforeDir="false" afterPath="$PROJECT_DIR$/race_checker/tests/godel2/prod-cons-race/main.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/race_checker/ssaInstructions.go" beforeDir="false" afterPath="$PROJECT_DIR$/race_checker/ssaInstructions.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/race_checker/staticAnalysis.go" beforeDir="false" afterPath="$PROJECT_DIR$/race_checker/staticAnalysis.go" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -60,10 +59,10 @@
       <screen x="0" y="0" width="1536" height="824" />
     </state>
     <state x="225" y="11" width="1086" height="813" key="#com.intellij.execution.impl.EditConfigurationsDialog/0.0.1536.824@0.0.1536.824" timestamp="1602008190692" />
-    <state x="541" y="215" key="#com.intellij.fileTypes.FileTypeChooser" timestamp="1602274891146">
+    <state x="541" y="215" key="#com.intellij.fileTypes.FileTypeChooser" timestamp="1602477213621">
       <screen x="0" y="0" width="1536" height="824" />
     </state>
-    <state x="541" y="215" key="#com.intellij.fileTypes.FileTypeChooser/0.0.1536.824@0.0.1536.824" timestamp="1602274891145" />
+    <state x="541" y="215" key="#com.intellij.fileTypes.FileTypeChooser/0.0.1536.824@0.0.1536.824" timestamp="1602477213621" />
     <state x="550" y="180" key="FileChooserDialogImpl" timestamp="1602008145612">
       <screen x="0" y="0" width="1536" height="824" />
     </state>
@@ -100,16 +99,9 @@
       <screen x="0" y="0" width="1536" height="824" />
     </state>
     <state width="1493" height="262" key="GridCell.Tab.1.right/0.0.1536.824@0.0.1536.824" timestamp="1602008620960" />
-  </component>
-  <component name="XDebuggerManager">
-    <breakpoint-manager>
-      <breakpoints>
-        <line-breakpoint enabled="true" type="DlvLineBreakpoint">
-          <url>file://$PROJECT_DIR$/race_checker/ssaInstructions.go</url>
-          <line>456</line>
-          <option name="timeStamp" value="1" />
-        </line-breakpoint>
-      </breakpoints>
-    </breakpoint-manager>
+    <state x="431" y="145" width="672" height="678" key="search.everywhere.popup" timestamp="1602528779513">
+      <screen x="0" y="0" width="1536" height="824" />
+    </state>
+    <state x="431" y="145" width="672" height="678" key="search.everywhere.popup/0.0.1536.824@0.0.1536.824" timestamp="1602528779513" />
   </component>
 </project>

@@ -452,8 +452,18 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 			a.RWIns[goID] = append(a.RWIns[goID], theIns)
 		case "Done":
 			stats.IncStat(stats.NWaitGroupDone)
-			a.RWIns[goID] = append(a.RWIns[goID], theIns)
-		case "Add":
+			var wgName string
+			switch wg := examIns.Call.Args[0].(type) {
+			case *ssa.Alloc:
+				wgName = wg.Comment
+			case *ssa.FreeVar:
+				wgName = wg.Name()
+			}
+			if ins, ok := a.WaitIns[wgName]; ok {
+				a.WaitIns[wgName] = append(ins, a.RWIns[goID]...)
+			} else {
+				a.WaitIns[wgName] = a.RWIns[goID]
+			}
 			a.RWIns[goID] = append(a.RWIns[goID], theIns)
 		}
 	} else {

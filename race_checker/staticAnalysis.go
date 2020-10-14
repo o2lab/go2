@@ -113,6 +113,8 @@ func staticAnalysis(args []string) error {
 		chanBufMap:   make(map[string][]*ssa.Send),
 		insertIndMap: make(map[string]int),
 		chanMap:      make(map[ssa.Instruction][]string), // map each read/write access to a list of channels with value(s) already sent to it
+		WaitIns:      make(map[string][]ssa.Instruction),
+		afterWaitIns:      make(map[string][]ssa.Instruction),
 	}
 
 	log.Info("Compiling stack trace for every Goroutine... ")
@@ -132,8 +134,7 @@ func staticAnalysis(args []string) error {
 	Analysis.HBgraph = graph.New(graph.Directed)
 	var prevN graph.Node
 	var goCaller []graph.Node
-	var waitingN graph.Node
-	waitgroupEdges  := make(map[string][]graph.Node)
+	waitingN := make(map[string]graph.Node)
 	for nGo, insSlice := range Analysis.RWIns {
 		for i, anIns := range insSlice {
 			if nGo == 0 && i == 0 { // main goroutine, first instruction
@@ -171,48 +172,25 @@ func staticAnalysis(args []string) error {
 			}
 			if isReadIns(anIns) || isWriteIns(anIns) {
 				Analysis.RWinsMap[anIns] = prevN
-				if callIns, ok := anIns.(*ssa.Call); ok{
-					if strings.HasPrefix(callIns.Call.Value.Name(), "Add") {
-						waitgrp :=strings.Split(callIns.Call.Args[0].String()," ")
-						//addVall :=strings.Split(callIns.Call.Args[1].String()," ")
-						if len(waitgrp)>2{
-							waitgrpval := waitgrp[2][strings.Index(waitgrp[2],"(")+1:strings.Index(waitgrp[2],")")]
-							//waitval := addVall[0][:strings.Index(addVall[0],":")]
-							//waitgroupMap[waitgrpval] =waitval
-							for _, edge := range waitgroupEdges[waitgrpval]{
-								err := Analysis.HBgraph.MakeEdge(edge, prevN)
-								if err != nil {
-									log.Fatal(err)
-								}
-							}
-						}
-					}
-				}
 			} else if callIns, ok := anIns.(*ssa.Call); ok { // taking care of WG operations. TODO: identify different WG instances
 				if callIns.Call.Value.Name() == "Wait" {
-					waitgrp :=strings.Split(callIns.Call.Args[0].String()," ")
-					if len(waitgrp)>2{
-						waitgrpval := waitgrp[2][strings.Index(waitgrp[2],"(")+1:strings.Index(waitgrp[2],")")]
-						for _, edge := range waitgroupEdges[waitgrpval] {
-							err := Analysis.HBgraph.MakeEdge(edge,prevN)
-							if err != nil {
-								log.Fatal(err)
-							}
-						}
+					var waitgrpval string
+					switch waitgrp := callIns.Call.Args[0].(type) {
+					case *ssa.Alloc:
+						waitgrpval = waitgrp.Comment
+					case *ssa.FreeVar:
+						waitgrpval = waitgrp.Name()
 					}
-					waitingN = prevN// TODO: make for multiple waitgroups
+					waitingN[waitgrpval] = prevN // store Wait node for later edge creation TO this node
 				} else if callIns.Call.Value.Name() == "Done" {
-					waitgrp :=strings.Split(callIns.Call.Args[0].String()," ")
-					waitgrpval := waitgrp[1]
-					//waitgroupMap[waitgrpval] = waitgroupMap[waitgrpval]-1
-					if waitgroupEdges[waitgrpval]!=nil{
-						waitgroupEdges[waitgrpval] = append(waitgroupEdges[waitgrpval], prevN)
-					}else {
-						slice := make([]graph.Node, 1)
-						slice[0] =prevN
-						waitgroupEdges[waitgrpval] = slice
+					var waitgrpval string
+					switch waitgrp := callIns.Call.Args[0].(type) {
+					case *ssa.Alloc:
+						waitgrpval = waitgrp.Comment
+					case *ssa.FreeVar:
+						waitgrpval = waitgrp.Name()
 					}
-					err := Analysis.HBgraph.MakeEdge(prevN, waitingN)
+					err := Analysis.HBgraph.MakeEdge(prevN, waitingN[waitgrpval]) // create edge from Done node to Edge node
 					if err != nil {
 						log.Fatal(err)
 					}
@@ -233,6 +211,7 @@ func staticAnalysis(args []string) error {
 
 // visitAllInstructions visits each line and calls the corresponding helper function to drive the tool
 func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
+	hadAWait := ""
 	a.analysisStat.nGoroutine = goID + 1 // keep count of goroutine quantity
 	if !isSynthetic(fn) {                // if function is NOT synthetic
 		for _, excluded := range excludedPkgs { // TODO: need revision
@@ -274,6 +253,13 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 			}
 		}
 		for _, theIns := range aBlock.Instrs { // examine each instruction
+			if len(hadAWait)>0{
+				if ins, ok := a.afterWaitIns[hadAWait]; ok {
+					a.afterWaitIns[hadAWait] = append(ins, a.RWIns[goID]...)
+				} else {
+					a.afterWaitIns[hadAWait] = a.RWIns[goID]
+				}
+			}
 			if theIns.String() == "rundefers" { // execute deferred calls at this index
 				for _, dIns := range toDefer {
 					deferIns := dIns.(*ssa.Defer)
@@ -325,6 +311,14 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 			case *ssa.MakeInterface: // construct instance of interface type
 				a.insMakeInterface(examIns, goID, theIns)
 			case *ssa.Call:
+				if examIns.Call.Value.Name()=="Wait"{
+					switch wg := examIns.Call.Args[0].(type) {
+					case *ssa.Alloc:
+						hadAWait = wg.Comment
+					case *ssa.FreeVar:
+						hadAWait = wg.Name()
+					}
+				}
 				a.insCall(examIns, goID, theIns)
 			case *ssa.Go: // for spawning of goroutines
 				a.insGo(examIns, goID, theIns)
