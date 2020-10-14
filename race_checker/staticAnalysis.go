@@ -135,6 +135,7 @@ func staticAnalysis(args []string) error {
 	var prevN graph.Node
 	var goCaller []graph.Node
 	waitingN := make(map[string]graph.Node)
+	var chanRecvs []graph.Node
 	for nGo, insSlice := range Analysis.RWIns {
 		for i, anIns := range insSlice {
 			if nGo == 0 && i == 0 { // main goroutine, first instruction
@@ -170,7 +171,7 @@ func staticAnalysis(args []string) error {
 				}
 				prevN = currN
 			}
-			if isReadIns(anIns) || isWriteIns(anIns) {
+			if Analysis.isReadIns(anIns) || isWriteIns(anIns) {
 				Analysis.RWinsMap[anIns] = prevN
 			} else if callIns, ok := anIns.(*ssa.Call); ok { // taking care of WG operations. TODO: identify different WG instances
 				if callIns.Call.Value.Name() == "Wait" {
@@ -193,6 +194,23 @@ func staticAnalysis(args []string) error {
 					err := Analysis.HBgraph.MakeEdge(prevN, waitingN[waitgrpval]) // create edge from Done node to Edge node
 					if err != nil {
 						log.Fatal(err)
+					}
+				}
+			}
+			if recvIns, ok := anIns.(*ssa.UnOp); ok {
+				if rcvIns, ok1 := recvIns.X.(*ssa.Alloc); ok1 && sliceContainsStr(Analysis.nonBlockChans, rcvIns.Comment) {
+					chanRecvs = append(chanRecvs, prevN)
+				}
+			} else if sendIns, ok := anIns.(*ssa.Send); ok {
+				if sndIns, ok := sendIns.Chan.(*ssa.UnOp); ok && sliceContainsStr(Analysis.nonBlockChans, sndIns.X.Name()) {
+					for i, _ := range chanRecvs {
+						n := *chanRecvs[i].Value
+						if n.(*ssa.UnOp).X.(*ssa.Alloc).Comment == sendIns.Chan.(*ssa.UnOp).X.Name() {
+							err := Analysis.HBgraph.MakeEdge(prevN, chanRecvs[i]) // create edge from Send node to Receive node
+							if err != nil {
+								log.Fatal(err)
+							}
+						}
 					}
 				}
 			}
@@ -326,8 +344,12 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				a.RWIns[goID] = append(a.RWIns[goID], theIns)
 			case *ssa.MapUpdate:
 				a.insMapUpdate(examIns, goID, theIns)
+			case *ssa.Select:
+				if examIns.Blocking {
+					a.insSelect(examIns, goID, theIns)
+				} else { // select contains default case, which becomes race-prone
+				}
 			}
-
 		}
 	}
 	// done with all instructions in function body, now pop the function
