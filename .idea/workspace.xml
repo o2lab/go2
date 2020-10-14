@@ -3,11 +3,7 @@
   <component name="ChangeListManager">
     <list default="true" id="8a7219d7-5093-420c-9475-c9b819cba73d" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/race_checker/main" beforeDir="false" afterPath="$PROJECT_DIR$/race_checker/main" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/race_checker/main.go" beforeDir="false" afterPath="$PROJECT_DIR$/race_checker/main.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/race_checker/raceCollection.go" beforeDir="false" afterPath="$PROJECT_DIR$/race_checker/raceCollection.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/race_checker/ssaInstructions.go" beforeDir="false" afterPath="$PROJECT_DIR$/race_checker/ssaInstructions.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/race_checker/staticAnalysis.go" beforeDir="false" afterPath="$PROJECT_DIR$/race_checker/staticAnalysis.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/race_checker/race_test.go" beforeDir="false" afterPath="$PROJECT_DIR$/race_checker/race_test.go" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
