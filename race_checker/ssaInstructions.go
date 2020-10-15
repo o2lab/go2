@@ -45,7 +45,7 @@ func checkTokenNameDefer(fnName string, theIns *ssa.Defer) string {
 func (a *analysis) isReadIns(ins ssa.Instruction) bool {
 	switch insType := ins.(type) {
 	case *ssa.UnOp:
-		if ins, ok := insType.X.(*ssa.Alloc); ok && sliceContainsStr(a.nonBlockChans, ins.Comment) {
+		if ins, ok := insType.X.(*ssa.Alloc); ok && sliceContainsStr(a.selectedChans, ins.Comment) {
 			return false // a channel receive, handled differently than typical read ins
 		} else {
 			return true
@@ -457,18 +457,6 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 			a.RWIns[goID] = append(a.RWIns[goID], theIns)
 		case "Done":
 			stats.IncStat(stats.NWaitGroupDone)
-			var wgName string
-			switch wg := examIns.Call.Args[0].(type) {
-			case *ssa.Alloc:
-				wgName = wg.Comment
-			case *ssa.FreeVar:
-				wgName = wg.Name()
-			}
-			if ins, ok := a.WaitIns[wgName]; ok {
-				a.WaitIns[wgName] = append(ins, a.RWIns[goID]...)
-			} else {
-				a.WaitIns[wgName] = a.RWIns[goID]
-			}
 			a.RWIns[goID] = append(a.RWIns[goID], theIns)
 		}
 	} else {
@@ -539,7 +527,7 @@ func (a *analysis) insSelect(examIns *ssa.Select, goID int, theIns ssa.Instructi
 	for _, states := range examIns.States {
 		if rcv, ok := states.Chan.(*ssa.UnOp); ok { // value available in channel receive
 			if recv, ok := rcv.X.(*ssa.Alloc); ok {
-				a.nonBlockChans = append(a.nonBlockChans, recv.Comment)
+				a.selectedChans = append(a.selectedChans, recv.Comment)
 			}
 		}
 	}

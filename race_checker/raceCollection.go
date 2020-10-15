@@ -25,7 +25,8 @@ func (a *analysis) checkRacyPairs() {
 						if len(addressPair) > 1 &&
 							a.sameAddress(addressPair[0], addressPair[1]) &&
 							!sliceContains(a.reportedAddr, addressPair[0]) &&
-							!a.reachable(goI, goJ) &&
+							!a.reachable(goI, i, goJ, j) &&
+							!a.reachable(goJ, j, goI, i) &&
 							!a.lockSetsIntersect(insSlice[0], insSlice[1]) &&
 							!a.chanProtected(insSlice[0], insSlice[1]) {
 							a.reportedAddr = append(a.reportedAddr, addressPair[0])
@@ -97,24 +98,17 @@ func (a *analysis) sameAddress(addr1 ssa.Value, addr2 ssa.Value) bool {
 }
 
 // reachable determines if 2 input instructions are connected in the Happens-Before Graph
-func (a *analysis) reachable(fromIns ssa.Instruction, toIns ssa.Instruction) bool {
-	waiting := ""
-	for key, wIns := range a.WaitIns { // reverse reaching direction if target node is one being waited on
-		if sliceContainsInsAt(wIns, toIns) > -1 {
-			waiting= key
-		}
-	}
-	if sliceContainsInsAt(a.afterWaitIns[waiting], fromIns) > -1 {
-		return a.reachable(toIns, fromIns)
-	}
+func (a *analysis) reachable(fromIns ssa.Instruction, fromGo int, toIns ssa.Instruction, toGo int) bool {
 	fromBlock := fromIns.Block().Index
 	if strings.HasPrefix(fromIns.Block().Comment, "rangeindex") && toIns.Parent() != nil && toIns.Parent().Parent() != nil { // checking both instructions belong to same forloop
 		if fromIns.Block().Comment == toIns.Parent().Parent().Blocks[fromBlock].Comment {
 			return false
 		}
 	}
-	fromNode := a.RWinsMap[fromIns] // starting node
-	toNode := a.RWinsMap[toIns] // target node
+	fromInsKey := goIns{ins: fromIns, goID: fromGo}
+	toInsKey := goIns{ins: toIns, goID: toGo}
+	fromNode := a.RWinsMap[fromInsKey] // starting node
+	toNode := a.RWinsMap[toInsKey] // target node
 	nexts := a.HBgraph.Neighbors(fromNode) // store reachable nodes in a stack
 	counter := 0 // for managing performance only
 	for len(nexts) > 0 {
@@ -189,22 +183,14 @@ func (a *analysis) printRace(counter int, insPair []ssa.Instruction, addrPair []
 		var errMsg string
 		var access string
 		if isWriteIns(anIns) {
-			if i == 0 {
-				access = " Previous Write of "
-			} else {
-				access = " Write of "
-			}
+			access = " Write of "
 			if _, ok := anIns.(*ssa.Call); ok {
 				errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].String()), " in function ", aurora.BgBrightGreen(anIns.Parent().Name()), " at ", a.prog.Fset.Position(addrPair[i].Pos()))
 			} else {
 				errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].String()), " in function ", aurora.BgBrightGreen(anIns.Parent().Name()), " at ", a.prog.Fset.Position(insPair[i].Pos()))
 			}
 		} else {
-			if i == 0 {
-				access = " Previous Read of "
-			} else {
-				access = " Read of "
-			}
+			access = " Read of "
 			errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].String()), " in function ", aurora.BgBrightGreen(anIns.Parent().Name()), " at ", a.prog.Fset.Position(anIns.Pos()))
 		}
 		if testMode {

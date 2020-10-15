@@ -18,7 +18,7 @@ type analysis struct {
 	ptaConfig     *pointer.Config
 	analysisStat  stat
 	HBgraph       *graph.Graph
-	RWinsMap      map[ssa.Instruction]graph.Node
+	RWinsMap      map[goIns]graph.Node
 	trieMap       map[fnInfo]*trie // map each function to a trie node
 	RWIns         [][]ssa.Instruction
 	insDRA        int // index of instruction (in main goroutine) at which to begin data race analysis
@@ -39,14 +39,17 @@ type analysis struct {
 	insertIndMap  map[string]int
 	chanMap       map[ssa.Instruction][]string // map each read/write access to a list of channels with value(s) already sent to it
 	chanName      string
-	WaitIns		  map[string][]ssa.Instruction // store instructions that each WaitGroup waits on
-	afterWaitIns		 map[string][]ssa.Instruction
-	nonBlockChans []string
+	selectedChans []string
 }
 
 type fnInfo struct { // all fields must be comparable for fnInfo to be used as key to trieMap
 	fnName     string
 	contextStr string
+}
+
+type goIns struct { // an ssa.Instruction with goroutine info
+	ins			ssa.Instruction
+	goID 		int
 }
 
 type goroutineInfo struct {

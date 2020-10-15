@@ -103,7 +103,7 @@ func staticAnalysis(args []string) error {
 		pkgs:         pkgs,
 		mains:        mains,
 		ptaConfig:    config,
-		RWinsMap:     make(map[ssa.Instruction]graph.Node),
+		RWinsMap:     make(map[goIns]graph.Node),
 		insDRA:       0,
 		levels:       make(map[int]int),
 		lockMap:      make(map[ssa.Instruction][]ssa.Value),
@@ -113,8 +113,6 @@ func staticAnalysis(args []string) error {
 		chanBufMap:   make(map[string][]*ssa.Send),
 		insertIndMap: make(map[string]int),
 		chanMap:      make(map[ssa.Instruction][]string), // map each read/write access to a list of channels with value(s) already sent to it
-		WaitIns:      make(map[string][]ssa.Instruction),
-		afterWaitIns:      make(map[string][]ssa.Instruction),
 	}
 
 	log.Info("Compiling stack trace for every Goroutine... ")
@@ -134,22 +132,23 @@ func staticAnalysis(args []string) error {
 	Analysis.HBgraph = graph.New(graph.Directed)
 	var prevN graph.Node
 	var goCaller []graph.Node
-	waitingN := make(map[string]graph.Node)
-	var chanRecvs []graph.Node
+	waitingN := make(map[string]graph.Node) // map WG name to graph node
+	chanRecvs := make(map[string]graph.Node) // map channel name to graph node
 	for nGo, insSlice := range Analysis.RWIns {
 		for i, anIns := range insSlice {
+			insKey := goIns{ins: anIns, goID: nGo}
 			if nGo == 0 && i == 0 { // main goroutine, first instruction
 				if _, ok := anIns.(*ssa.Go); !ok {
 					prevN = Analysis.HBgraph.MakeNode() // initiate for future nodes
-					*prevN.Value = anIns
+					*prevN.Value = insKey
 				} else {
 					prevN = Analysis.HBgraph.MakeNode() // initiate for future nodes
-					*prevN.Value = anIns
+					*prevN.Value = insKey
 					goCaller = append(goCaller, prevN) // sequentially store go calls in the same goroutine
 				}
 			} else {
 				currN := Analysis.HBgraph.MakeNode()
-				*currN.Value = anIns
+				*currN.Value = insKey
 				if nGo != 0 && i == 0 { // worker goroutine, first instruction
 					prevN = goCaller[0]
 					goCaller = goCaller[1:] // pop from stack
@@ -172,45 +171,40 @@ func staticAnalysis(args []string) error {
 				prevN = currN
 			}
 			if Analysis.isReadIns(anIns) || isWriteIns(anIns) {
-				Analysis.RWinsMap[anIns] = prevN
+				Analysis.RWinsMap[insKey] = prevN
 			} else if callIns, ok := anIns.(*ssa.Call); ok { // taking care of WG operations. TODO: identify different WG instances
 				if callIns.Call.Value.Name() == "Wait" {
-					var waitgrpval string
-					switch waitgrp := callIns.Call.Args[0].(type) {
+					var wgName string
+					switch wg := callIns.Call.Args[0].(type) {
 					case *ssa.Alloc:
-						waitgrpval = waitgrp.Comment
+						wgName = wg.Comment
 					case *ssa.FreeVar:
-						waitgrpval = waitgrp.Name()
+						wgName = wg.Name()
 					}
-					waitingN[waitgrpval] = prevN // store Wait node for later edge creation TO this node
+					waitingN[wgName] = prevN // store Wait node for later edge creation TO this node
 				} else if callIns.Call.Value.Name() == "Done" {
-					var waitgrpval string
-					switch waitgrp := callIns.Call.Args[0].(type) {
+					var wgName string
+					switch wg := callIns.Call.Args[0].(type) {
 					case *ssa.Alloc:
-						waitgrpval = waitgrp.Comment
+						wgName = wg.Comment
 					case *ssa.FreeVar:
-						waitgrpval = waitgrp.Name()
+						wgName = wg.Name()
 					}
-					err := Analysis.HBgraph.MakeEdge(prevN, waitingN[waitgrpval]) // create edge from Done node to Edge node
+					err := Analysis.HBgraph.MakeEdge(prevN, waitingN[wgName]) // create edge from Done node to Wait node
 					if err != nil {
 						log.Fatal(err)
 					}
 				}
 			}
-			if recvIns, ok := anIns.(*ssa.UnOp); ok {
-				if rcvIns, ok1 := recvIns.X.(*ssa.Alloc); ok1 && sliceContainsStr(Analysis.nonBlockChans, rcvIns.Comment) {
-					chanRecvs = append(chanRecvs, prevN)
+			if recvIns, ok := anIns.(*ssa.UnOp); ok { // detect (blocking) channel receive operation
+				if rcvIns, ok1 := recvIns.X.(*ssa.Alloc); ok1 && sliceContainsStr(Analysis.selectedChans, rcvIns.Comment) {
+					chanRecvs[rcvIns.Comment] = prevN
 				}
-			} else if sendIns, ok := anIns.(*ssa.Send); ok {
-				if sndIns, ok := sendIns.Chan.(*ssa.UnOp); ok && sliceContainsStr(Analysis.nonBlockChans, sndIns.X.Name()) {
-					for i, _ := range chanRecvs {
-						n := *chanRecvs[i].Value
-						if n.(*ssa.UnOp).X.(*ssa.Alloc).Comment == sendIns.Chan.(*ssa.UnOp).X.Name() {
-							err := Analysis.HBgraph.MakeEdge(prevN, chanRecvs[i]) // create edge from Send node to Receive node
-							if err != nil {
-								log.Fatal(err)
-							}
-						}
+			} else if sendIns, ok := anIns.(*ssa.Send); ok { // detect matching channel send operations
+				if sndIns, ok := sendIns.Chan.(*ssa.UnOp); ok && sliceContainsStr(Analysis.selectedChans, sndIns.X.Name()) {
+					err := Analysis.HBgraph.MakeEdge(prevN, chanRecvs[sndIns.X.Name()]) // create edge from Send node to Receive node
+					if err != nil {
+						log.Fatal(err)
 					}
 				}
 			}
@@ -229,7 +223,6 @@ func staticAnalysis(args []string) error {
 
 // visitAllInstructions visits each line and calls the corresponding helper function to drive the tool
 func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
-	hadAWait := ""
 	a.analysisStat.nGoroutine = goID + 1 // keep count of goroutine quantity
 	if !isSynthetic(fn) {                // if function is NOT synthetic
 		for _, excluded := range excludedPkgs { // TODO: need revision
@@ -259,6 +252,14 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 		if aBlock.Comment == "recover" {
 			continue
 		}
+		if aBlock.Comment == "select.next" {
+			if isBlock, ok := aBlock.Instrs[0].(*ssa.MakeInterface); ok {
+				if noMatch, ok1 := isBlock.X.(*ssa.Const); ok1 && strings.Contains(noMatch.String(), "blocking") {
+					// WIP...
+					continue
+				}
+			}
+		}
 		if strings.HasSuffix(aBlock.Comment, ".done") && i != len(fnBlocks)-1 && sliceContainsBloc(toAppend, aBlock) { // ignore return block if it doesn't have largest index
 			continue
 		}
@@ -271,13 +272,6 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 			}
 		}
 		for _, theIns := range aBlock.Instrs { // examine each instruction
-			if len(hadAWait)>0{
-				if ins, ok := a.afterWaitIns[hadAWait]; ok {
-					a.afterWaitIns[hadAWait] = append(ins, a.RWIns[goID]...)
-				} else {
-					a.afterWaitIns[hadAWait] = a.RWIns[goID]
-				}
-			}
 			if theIns.String() == "rundefers" { // execute deferred calls at this index
 				for _, dIns := range toDefer {
 					deferIns := dIns.(*ssa.Defer)
@@ -329,14 +323,6 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 			case *ssa.MakeInterface: // construct instance of interface type
 				a.insMakeInterface(examIns, goID, theIns)
 			case *ssa.Call:
-				if examIns.Call.Value.Name()=="Wait"{
-					switch wg := examIns.Call.Args[0].(type) {
-					case *ssa.Alloc:
-						hadAWait = wg.Comment
-					case *ssa.FreeVar:
-						hadAWait = wg.Name()
-					}
-				}
 				a.insCall(examIns, goID, theIns)
 			case *ssa.Go: // for spawning of goroutines
 				a.insGo(examIns, goID, theIns)
@@ -345,7 +331,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 			case *ssa.MapUpdate:
 				a.insMapUpdate(examIns, goID, theIns)
 			case *ssa.Select:
-				if examIns.Blocking {
+				if examIns.Blocking { // only analyze channels with available values
 					a.insSelect(examIns, goID, theIns)
 				} else { // select contains default case, which becomes race-prone
 				}
