@@ -98,10 +98,14 @@ func (a *analysis) sameAddress(addr1 ssa.Value, addr2 ssa.Value) bool {
 
 // reachable determines if 2 input instructions are connected in the Happens-Before Graph
 func (a *analysis) reachable(fromIns ssa.Instruction, toIns ssa.Instruction) bool {
-	for _, wIns := range a.WaitIns { // reverse reaching direction if target node is one being waited on
+	waiting := ""
+	for key, wIns := range a.WaitIns { // reverse reaching direction if target node is one being waited on
 		if sliceContainsInsAt(wIns, toIns) > -1 {
-			return a.reachable(toIns, fromIns)
+			waiting= key
 		}
+	}
+	if sliceContainsInsAt(a.afterWaitIns[waiting], fromIns) > -1 {
+		return a.reachable(toIns, fromIns)
 	}
 	fromBlock := fromIns.Block().Index
 	if strings.HasPrefix(fromIns.Block().Comment, "rangeindex") && toIns.Parent() != nil && toIns.Parent().Parent() != nil { // checking both instructions belong to same forloop

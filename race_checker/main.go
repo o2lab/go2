@@ -40,6 +40,7 @@ type analysis struct {
 	chanMap       map[ssa.Instruction][]string // map each read/write access to a list of channels with value(s) already sent to it
 	chanName      string
 	WaitIns		  map[string][]ssa.Instruction // store instructions that each WaitGroup waits on
+	afterWaitIns		 map[string][]ssa.Instruction
 	nonBlockChans []string
 }
 
