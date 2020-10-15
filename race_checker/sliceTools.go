@@ -124,3 +124,13 @@ func (a *analysis) lockSetContainsAt(s []ssa.Value, e ssa.Value) int {
 	}
 	return -1
 }
+
+
+func sliceContainsInt (s []int, e int) bool {
+	for _, n := range s {
+		if n == e {
+			return true
+		}
+	}
+	return false
+}

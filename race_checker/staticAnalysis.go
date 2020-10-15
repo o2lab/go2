@@ -244,6 +244,8 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 		a.RWIns = append(a.RWIns, []ssa.Instruction{})
 	}
 	fnBlocks := fn.Blocks
+	var caseStatus []int
+	var skipBBInd []int // these basic blocks and their successor blocks shall be omitted
 	var toAppend []*ssa.BasicBlock
 	var toDefer []ssa.Instruction // stack storing deferred calls
 	repeatSwitch := false         // triggered when encountering basic blocks for body of a forloop
@@ -252,12 +254,13 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 		if aBlock.Comment == "recover" {
 			continue
 		}
-		if aBlock.Comment == "select.next" {
-			if isBlock, ok := aBlock.Instrs[0].(*ssa.MakeInterface); ok {
-				if noMatch, ok1 := isBlock.X.(*ssa.Const); ok1 && strings.Contains(noMatch.String(), "blocking") {
-					// WIP...
-					continue
-				}
+		if aBlock.Comment == "select.body" && len(caseStatus) > 0 {
+			skipBBInd = append(skipBBInd, aBlock.Index)
+			if len(skipBBInd) <= len(caseStatus) && caseStatus[len(skipBBInd)-1] == 0 { // channel has no value (skip)
+				continue
+			}
+			if len(skipBBInd) > len(caseStatus) && sliceContainsInt(skipBBInd, aBlock.Preds[0].Index) {
+				continue
 			}
 		}
 		if strings.HasSuffix(aBlock.Comment, ".done") && i != len(fnBlocks)-1 && sliceContainsBloc(toAppend, aBlock) { // ignore return block if it doesn't have largest index
@@ -332,7 +335,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				a.insMapUpdate(examIns, goID, theIns)
 			case *ssa.Select:
 				if examIns.Blocking { // only analyze channels with available values
-					a.insSelect(examIns, goID, theIns)
+					caseStatus = a.insSelect(examIns, goID, theIns)
 				} else { // select contains default case, which becomes race-prone
 				}
 			}

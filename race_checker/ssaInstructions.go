@@ -522,13 +522,16 @@ func (a *analysis) insMapUpdate(examIns *ssa.MapUpdate, goID int, theIns ssa.Ins
 	}
 }
 
-func (a *analysis) insSelect(examIns *ssa.Select, goID int, theIns ssa.Instruction) {
+func (a *analysis) insSelect(examIns *ssa.Select, goID int, theIns ssa.Instruction) []int {
 	a.RWIns[goID] = append(a.RWIns[goID], theIns)
-	for _, states := range examIns.States {
+	caseStatus := make([]int, len(examIns.States))
+	for i, states := range examIns.States {
 		if rcv, ok := states.Chan.(*ssa.UnOp); ok { // value available in channel receive
 			if recv, ok := rcv.X.(*ssa.Alloc); ok {
 				a.selectedChans = append(a.selectedChans, recv.Comment)
 			}
+			caseStatus[i] = 1
 		}
 	}
+	return caseStatus
 }
