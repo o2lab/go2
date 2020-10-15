@@ -38,7 +38,7 @@ var tests = []string{
 	"tests/map_race.go",
 	//"tests/select.go",
 	"tests/test_neo.go",
-	//"tests/race_cfg.go",
+	"tests/race_cfg.go",
 	"tests/race_example1.go",
 	"tests/race_example2.go",
 	"tests/race_example3.go",
