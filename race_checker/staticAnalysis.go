@@ -337,6 +337,9 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				if examIns.Blocking { // only analyze channels with available values
 					caseStatus = a.insSelect(examIns, goID, theIns)
 				} else { // select contains default case, which becomes race-prone
+					if !a.isAnyChanSelected(examIns) {
+						caseStatus = a.insSelect(examIns, goID, theIns)
+					}
 				}
 			}
 		}
