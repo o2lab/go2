@@ -7,7 +7,7 @@ func main() {
 	ch2 := make(chan int)
 	x := 0
 	go func() {
-		x = 1
+		x /* RACE Write */= 1
 		ch1 <- 1
 	}()
 	select {
@@ -16,7 +16,7 @@ func main() {
 	case a := <-ch2:
 		x = a + 1
 	default:
-		x = 20
+		x /* RACE Write */= 20
 		fmt.Println(x)
 	}
 }

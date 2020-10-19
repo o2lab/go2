@@ -3,7 +3,9 @@
   <component name="ChangeListManager">
     <list default="true" id="8a7219d7-5093-420c-9475-c9b819cba73d" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/race_checker/race_test.go" beforeDir="false" afterPath="$PROJECT_DIR$/race_checker/race_test.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/race_checker/makefile" beforeDir="false" afterPath="$PROJECT_DIR$/race_checker/makefile" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/race_checker/tests/select_nonblock.go" beforeDir="false" afterPath="$PROJECT_DIR$/race_checker/tests/select_nonblock.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/race_checker/tests/single_case_select.go" beforeDir="false" afterPath="$PROJECT_DIR$/race_checker/tests/single_case_select.go" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />

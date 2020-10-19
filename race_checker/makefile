@@ -34,6 +34,10 @@ runProd:
 	./main tests/godel2/prod-cons-race/main.go
 runI:
 	./main tests/GoBench/Istio/8214/main.go
+runSelect2:
+	./main tests/select_nonblock.go
+runSelect3:
+	./main tests/single_case_select.go
 runWait:
 	./main tests/waitgroup.go
 runCockroach:

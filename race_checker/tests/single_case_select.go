@@ -11,11 +11,10 @@ func main() {
 		messages <- msg
 	}()
 	select {
-	case messages <- msg:
+	case a := <- messages:
+		fmt.Println(a)
 		x = 10
 		fmt.Println("sent message", msg)
-	default:
-		fmt.Println("no message sent")
 	}
 	fmt.Println(x)
 
