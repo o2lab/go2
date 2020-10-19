@@ -43,7 +43,7 @@ func isLocalAddr(location ssa.Value) bool {
 		isLocalAddr(loc.X)
 	case *ssa.Alloc:
 		if !loc.Heap {
-			return true // false heap means local alloc
+			return true
 		}
 	default:
 		return false
@@ -190,9 +190,11 @@ func staticAnalysis(args []string) error {
 					case *ssa.FreeVar:
 						wgName = wg.Name()
 					}
-					err := Analysis.HBgraph.MakeEdge(prevN, waitingN[wgName]) // create edge from Done node to Wait node
-					if err != nil {
-						log.Fatal(err)
+					if edgeTo, ok := waitingN[wgName]; ok {
+						err := Analysis.HBgraph.MakeEdge(prevN, edgeTo) // create edge from Done node to Wait node
+						if err != nil {
+							log.Fatal(err)
+						}
 					}
 				}
 			}
@@ -202,9 +204,11 @@ func staticAnalysis(args []string) error {
 				}
 			} else if sendIns, ok := anIns.(*ssa.Send); ok { // detect matching channel send operations
 				if sndIns, ok := sendIns.Chan.(*ssa.UnOp); ok && sliceContainsStr(Analysis.selectedChans, sndIns.X.Name()) {
-					err := Analysis.HBgraph.MakeEdge(prevN, chanRecvs[sndIns.X.Name()]) // create edge from Send node to Receive node
-					if err != nil {
-						log.Fatal(err)
+					if edgeTo, ok := chanRecvs[sndIns.X.Name()]; ok {
+						err := Analysis.HBgraph.MakeEdge(prevN, edgeTo) // create edge from Send node to Receive node
+						if err != nil {
+							log.Fatal(err)
+						}
 					}
 				}
 			}
