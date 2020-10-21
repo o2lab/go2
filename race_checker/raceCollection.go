@@ -142,23 +142,30 @@ func (a *analysis) lockSetsIntersect(insA ssa.Instruction, insB ssa.Instruction)
 			if a.sameAddress(addrA, addrB) {
 				return true
 			} else {
-				if param1, ok1 := addrA.(*ssa.Parameter); ok1 {
-					if param2, ok2 := addrB.(*ssa.Parameter); ok2 {
-						if param1.Pos() == param2.Pos() {
-							return true
-						}
-					}
-				} else if param1, ok1 := addrA.(*ssa.FieldAddr); ok1 {
-					if param2, ok2 := addrB.(*ssa.FieldAddr); ok2 {
-						if param1.Pos() == param2.Pos() {
-							return true
-						}
-					}
+				posA := getSrcPos(addrA)
+				posB := getSrcPos(addrB)
+				if posA == posB {
+					return true
 				}
 			}
 		}
 	}
 	return false
+}
+
+func getSrcPos(address ssa.Value) token.Pos {
+	var position token.Pos
+	switch param := address.(type) {
+	case *ssa.Parameter:
+		position = param.Pos()
+	case *ssa.FieldAddr:
+		position = param.Pos()
+	case *ssa.Alloc:
+		position = param.Pos()
+	case *ssa.FreeVar:
+		position = param.Pos()
+	}
+	return position
 }
 
 // chanProtected

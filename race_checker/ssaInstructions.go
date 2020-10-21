@@ -535,14 +535,3 @@ func (a *analysis) insSelect(examIns *ssa.Select, goID int, theIns ssa.Instructi
 	}
 	return caseStatus
 }
-
-func (a *analysis) isAnyChanSelected(examIns *ssa.Select) (bool) {
-	isAllClosed := true
-	for _, states := range examIns.States {
-		if _, ok := states.Chan.(*ssa.UnOp); ok { // value available in channel receive
-			isAllClosed = false
-			break
-		}
-	}
-	return isAllClosed
-}

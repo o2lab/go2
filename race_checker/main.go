@@ -107,6 +107,20 @@ func init() {
 		"channelz", // added for testing gRPC
 		"backoff", // added for testing gRPC
 		"url", // added for testing gRPC
+		"binarylog",
+		"net",
+		"test",
+		"hpack",
+		"dns2host",
+		"ndp",
+		"protoregistry",
+		"statsd_test",
+		"protoreflect",
+		"transport",
+		"grpctest",
+		"status",
+		"proto",
+		"spf",
 	}
 }
 

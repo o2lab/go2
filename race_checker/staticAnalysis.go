@@ -250,6 +250,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 	fnBlocks := fn.Blocks
 	var caseStatus []int
 	var skipBBInd []int // these basic blocks and their successor blocks shall be omitted
+	var defaultBB []int
 	var toAppend []*ssa.BasicBlock
 	var toDefer []ssa.Instruction // stack storing deferred calls
 	repeatSwitch := false         // triggered when encountering basic blocks for body of a forloop
@@ -258,8 +259,11 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 		if aBlock.Comment == "recover" {
 			continue
 		}
+		if aBlock.Comment == "select.done" {
+			defaultBB = append(defaultBB, aBlock.Preds[len(aBlock.Preds)-1].Index) // TODO: consider successor blocks
+		}
 		if aBlock.Comment == "select.body" && len(caseStatus) > 0 {
-			skipBBInd = append(skipBBInd, aBlock.Index)
+			skipBBInd = append(skipBBInd, aBlock.Index) // skipBBInd correlates with caseStatus
 			if len(skipBBInd) <= len(caseStatus) && caseStatus[len(skipBBInd)-1] == 0 { // channel has no value (skip)
 				continue
 			}
@@ -267,7 +271,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				continue
 			}
 		}
-		if strings.HasSuffix(aBlock.Comment, ".done") && i != len(fnBlocks)-1 && sliceContainsBloc(toAppend, aBlock) { // ignore return block if it doesn't have largest index
+		if strings.HasSuffix(aBlock.Comment, ".done") && i != len(fnBlocks)-1 && sliceContainsBloc(toAppend, aBlock) && aBlock.Comment != "select.done" { // ignore return block if it doesn't have largest index
 			continue
 		}
 		if aBlock.Comment == "for.body" || aBlock.Comment == "rangeindex.body" { // repeat unrolling of forloop
@@ -278,7 +282,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				repeatSwitch = false
 			}
 		}
-		for _, theIns := range aBlock.Instrs { // examine each instruction
+		for k, theIns := range aBlock.Instrs { // examine each instruction
 			if theIns.String() == "rundefers" { // execute deferred calls at this index
 				for _, dIns := range toDefer {
 					deferIns := dIns.(*ssa.Defer)
@@ -316,7 +320,15 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 			case *ssa.Send: // channel send op
 				a.insSend(examIns, goID, theIns)
 			case *ssa.Store: // write op
-				a.insStore(examIns, goID, theIns)
+				if k > 0 { // check if previous instruction is *ssa.Alloc
+					if assign, ok := aBlock.Instrs[k-1].(*ssa.Alloc); ok && assign == examIns.Addr {
+						// assignment statement won't race
+					} else {
+						a.insStore(examIns, goID, theIns)
+					}
+				} else {
+					a.insStore(examIns, goID, theIns)
+				}
 			case *ssa.UnOp:
 				a.insUnOp(examIns, goID, theIns)
 			case *ssa.FieldAddr:
@@ -340,10 +352,8 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 			case *ssa.Select:
 				if examIns.Blocking { // only analyze channels with available values
 					caseStatus = a.insSelect(examIns, goID, theIns)
-				} else { // select contains default case, which becomes race-prone
-					if !a.isAnyChanSelected(examIns) {
-						caseStatus = a.insSelect(examIns, goID, theIns)
-					}
+				} else { // select contains default case, which becomes race-prone (non-blocking channel ops)
+					//caseStatus = a.insSelect(examIns, goID, theIns)
 				}
 			}
 		}
