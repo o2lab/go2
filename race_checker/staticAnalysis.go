@@ -113,6 +113,8 @@ func staticAnalysis(args []string) error {
 		chanBufMap:   make(map[string][]*ssa.Send),
 		insertIndMap: make(map[string]int),
 		chanMap:      make(map[ssa.Instruction][]string), // map each read/write access to a list of channels with value(s) already sent to it
+		selectDefault:make(map[*ssa.Select]ssa.Instruction), // map select statement to first instruction in its default block
+		selectHB:	  make(map[ssa.Instruction]ssa.Instruction),
 	}
 
 	log.Info("Compiling stack trace for every Goroutine... ")
@@ -134,6 +136,8 @@ func staticAnalysis(args []string) error {
 	var goCaller []graph.Node
 	waitingN := make(map[string]graph.Node) // map WG name to graph node
 	chanRecvs := make(map[string]graph.Node) // map channel name to graph node
+	beforeSel := make(map[ssa.Instruction]graph.Node) // map ins before select straight to default clause
+	var selDefault []ssa.Instruction
 	for nGo, insSlice := range Analysis.RWIns {
 		for i, anIns := range insSlice {
 			insKey := goIns{ins: anIns, goID: nGo}
@@ -159,6 +163,18 @@ func staticAnalysis(args []string) error {
 				} else if _, ok := anIns.(*ssa.Go); ok {
 					goCaller = append(goCaller, currN) // sequentially store go calls in the same goroutine
 					err := Analysis.HBgraph.MakeEdge(prevN, currN)
+					if err != nil {
+						log.Fatal(err)
+					}
+				} else if sliceContainsInsAt(selDefault, anIns) > -1 {
+					var fromN graph.Node
+					for from, to := range Analysis.selectHB {
+						if to == anIns {
+							fromN = beforeSel[from]
+						}
+						break
+					}
+					err := Analysis.HBgraph.MakeEdge(fromN, currN)
 					if err != nil {
 						log.Fatal(err)
 					}
@@ -197,6 +213,11 @@ func staticAnalysis(args []string) error {
 						}
 					}
 				}
+			} else if selectIns, ok := anIns.(*ssa.Select); ok && !selectIns.Blocking {
+				selDefault = append(selDefault, Analysis.selectDefault[selectIns])
+			}
+			if _, ok := Analysis.selectHB[anIns]; ok {
+				beforeSel[anIns] = prevN
 			}
 			if recvIns, ok := anIns.(*ssa.UnOp); ok { // detect (blocking) channel receive operation
 				if rcvIns, ok1 := recvIns.X.(*ssa.Alloc); ok1 && sliceContainsStr(Analysis.selectedChans, rcvIns.Comment) {
@@ -250,7 +271,8 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 	fnBlocks := fn.Blocks
 	var caseStatus []int
 	var skipBBInd []int // these basic blocks and their successor blocks shall be omitted
-	var defaultBB []int
+	var selectNB *ssa.Select // non-blocking
+	var beforeSel ssa.Instruction // last instruction before encountering select
 	var toAppend []*ssa.BasicBlock
 	var toDefer []ssa.Instruction // stack storing deferred calls
 	repeatSwitch := false         // triggered when encountering basic blocks for body of a forloop
@@ -259,8 +281,9 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 		if aBlock.Comment == "recover" {
 			continue
 		}
-		if aBlock.Comment == "select.done" {
-			defaultBB = append(defaultBB, aBlock.Preds[len(aBlock.Preds)-1].Index) // TODO: consider successor blocks
+		if aBlock.Comment == "select.done" && len(caseStatus) < len(aBlock.Preds) { // more predecessors than number of cases, meaning last clause (pred) is default
+			a.selectDefault[selectNB] = aBlock.Preds[len(aBlock.Preds)-1].Instrs[0]
+			a.selectHB[beforeSel] = a.selectDefault[selectNB]
 		}
 		if aBlock.Comment == "select.body" && len(caseStatus) > 0 {
 			skipBBInd = append(skipBBInd, aBlock.Index) // skipBBInd correlates with caseStatus
@@ -271,7 +294,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				continue
 			}
 		}
-		if strings.HasSuffix(aBlock.Comment, ".done") && i != len(fnBlocks)-1 && sliceContainsBloc(toAppend, aBlock) && aBlock.Comment != "select.done" { // ignore return block if it doesn't have largest index
+		if strings.HasSuffix(aBlock.Comment, ".done") && i != len(fnBlocks)-1 && sliceContainsBloc(toAppend, aBlock) { // ignore return block if it doesn't have largest index
 			continue
 		}
 		if aBlock.Comment == "for.body" || aBlock.Comment == "rangeindex.body" { // repeat unrolling of forloop
@@ -353,7 +376,15 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				if examIns.Blocking { // only analyze channels with available values
 					caseStatus = a.insSelect(examIns, goID, theIns)
 				} else { // select contains default case, which becomes race-prone (non-blocking channel ops)
-					//caseStatus = a.insSelect(examIns, goID, theIns)
+					selectNB = examIns
+					caseStatus = a.insSelect(examIns, goID, theIns)
+					skipIns := 1
+					for _, val := range caseStatus {
+						if val == 1 {
+							skipIns++
+						}
+					}
+					beforeSel = aBlock.Instrs[k - skipIns]
 				}
 			}
 		}
