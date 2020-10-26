@@ -113,6 +113,7 @@ func staticAnalysis(args []string) error {
 		chanBufMap:   make(map[string][]*ssa.Send),
 		insertIndMap: make(map[string]int),
 		chanMap:      make(map[ssa.Instruction][]string), // map each read/write access to a list of channels with value(s) already sent to it
+		selectedChans:make(map[string]ssa.Instruction),
 		selectDefault:make(map[*ssa.Select]ssa.Instruction), // map select statement to first instruction in its default block
 		selectHB:	  make(map[ssa.Instruction]ssa.Instruction),
 	}
@@ -134,6 +135,8 @@ func staticAnalysis(args []string) error {
 	Analysis.HBgraph = graph.New(graph.Directed)
 	var prevN graph.Node
 	var goCaller []graph.Node
+	var caseEnd []ssa.Instruction
+	var caseN []graph.Node
 	waitingN := make(map[string]graph.Node) // map WG name to graph node
 	chanRecvs := make(map[string]graph.Node) // map channel name to graph node
 	beforeSel := make(map[ssa.Instruction]graph.Node) // map ins before select straight to default clause
@@ -178,6 +181,8 @@ func staticAnalysis(args []string) error {
 					if err != nil {
 						log.Fatal(err)
 					}
+				} else if sliceContainsInsAt(caseEnd, anIns) > -1 { // last instruction in clause
+					caseN = append(caseN, prevN)
 				} else {
 					err := Analysis.HBgraph.MakeEdge(prevN, currN)
 					if err != nil {
@@ -216,19 +221,24 @@ func staticAnalysis(args []string) error {
 			} else if selectIns, ok := anIns.(*ssa.Select); ok && !selectIns.Blocking {
 				selDefault = append(selDefault, Analysis.selectDefault[selectIns])
 			}
-			if _, ok := Analysis.selectHB[anIns]; ok {
+			if _, ok := Analysis.selectHB[anIns]; ok { // last instruction before encountering select
 				beforeSel[anIns] = prevN
 			}
 			if recvIns, ok := anIns.(*ssa.UnOp); ok { // detect (blocking) channel receive operation
-				if rcvIns, ok1 := recvIns.X.(*ssa.Alloc); ok1 && sliceContainsStr(Analysis.selectedChans, rcvIns.Comment) {
-					chanRecvs[rcvIns.Comment] = prevN
+				if rcvIns, ok1 := recvIns.X.(*ssa.Alloc); ok1 {
+					if _, ok2 := Analysis.selectedChans[rcvIns.Comment]; ok2 {
+						chanRecvs[rcvIns.Comment] = prevN
+						caseEnd = append(caseEnd, Analysis.selectedChans[rcvIns.Comment])
+					}
 				}
 			} else if sendIns, ok := anIns.(*ssa.Send); ok { // detect matching channel send operations
-				if sndIns, ok := sendIns.Chan.(*ssa.UnOp); ok && sliceContainsStr(Analysis.selectedChans, sndIns.X.Name()) {
-					if edgeTo, ok := chanRecvs[sndIns.X.Name()]; ok {
-						err := Analysis.HBgraph.MakeEdge(prevN, edgeTo) // create edge from Send node to Receive node
-						if err != nil {
-							log.Fatal(err)
+				if sndIns, ok0 := sendIns.Chan.(*ssa.UnOp); ok0 {
+					if _, ok1 := Analysis.selectedChans[sndIns.X.Name()]; ok1 {
+						if edgeTo, ok2 := chanRecvs[sndIns.X.Name()]; ok2 {
+							err := Analysis.HBgraph.MakeEdge(prevN, edgeTo) // create edge from Send node to Receive node
+							if err != nil {
+								log.Fatal(err)
+							}
 						}
 					}
 				}
@@ -270,6 +280,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 	}
 	fnBlocks := fn.Blocks
 	var caseStatus []int
+	var readyChans []string // may be better to use maps instead
 	var skipBBInd []int // these basic blocks and their successor blocks shall be omitted
 	var selectNB *ssa.Select // non-blocking
 	var beforeSel ssa.Instruction // last instruction before encountering select
@@ -289,10 +300,20 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 			skipBBInd = append(skipBBInd, aBlock.Index) // skipBBInd correlates with caseStatus
 			if len(skipBBInd) <= len(caseStatus) && caseStatus[len(skipBBInd)-1] == 0 { // channel has no value (skip)
 				continue
+			} else { // active channel
+				if len(readyChans) > 0 {
+					a.selectedChans[readyChans[0]] = aBlock.Instrs[len(aBlock.Instrs)-1] // map to last instruction
+					readyChans = readyChans[1:]
+				}
 			}
 			if len(skipBBInd) > len(caseStatus) && sliceContainsInt(skipBBInd, aBlock.Preds[0].Index) {
+				skipBBInd = append(skipBBInd, aBlock.Index)
 				continue
 			}
+		}
+		if aBlock.Comment == "select.next" && sliceContainsInt(skipBBInd, aBlock.Preds[0].Index) {
+			skipBBInd = append(skipBBInd, aBlock.Index)
+			continue
 		}
 		if strings.HasSuffix(aBlock.Comment, ".done") && i != len(fnBlocks)-1 && sliceContainsBloc(toAppend, aBlock) { // ignore return block if it doesn't have largest index
 			continue
@@ -374,18 +395,20 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				a.insMapUpdate(examIns, goID, theIns)
 			case *ssa.Select:
 				if examIns.Blocking { // only analyze channels with available values
-					caseStatus = a.insSelect(examIns, goID, theIns)
+					caseStatus, readyChans = a.insSelect(examIns, goID, theIns)
 				} else { // select contains default case, which becomes race-prone (non-blocking channel ops)
 					selectNB = examIns
-					caseStatus = a.insSelect(examIns, goID, theIns)
+					caseStatus, _ = a.insSelect(examIns, goID, theIns)
 					skipIns := 1
-					for _, val := range caseStatus {
+					for _, val := range caseStatus { // skip channel receive instructions to obtain last instruction encountered prior to encountering select
 						if val == 1 {
 							skipIns++
 						}
 					}
 					beforeSel = aBlock.Instrs[k - skipIns]
 				}
+			case *ssa.Jump:
+				a.RWIns[goID] = append(a.RWIns[goID], theIns)
 			}
 		}
 	}

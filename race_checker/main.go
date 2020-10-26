@@ -39,9 +39,10 @@ type analysis struct {
 	insertIndMap  map[string]int
 	chanMap       map[ssa.Instruction][]string // map each read/write access to a list of channels with value(s) already sent to it
 	chanName      string
-	selectedChans []string
+	selectedChans map[string]ssa.Instruction // map selected channel name to last instruction in its clause
 	selectDefault map[*ssa.Select]ssa.Instruction // map select statement to first instruction in its default block
 	selectHB	  map[ssa.Instruction]ssa.Instruction // map edge LEAVING node to ENTERING node
+	afterSelect	  ssa.Instruction
 }
 
 type fnInfo struct { // all fields must be comparable for fnInfo to be used as key to trieMap

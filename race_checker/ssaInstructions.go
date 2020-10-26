@@ -45,8 +45,12 @@ func checkTokenNameDefer(fnName string, theIns *ssa.Defer) string {
 func (a *analysis) isReadIns(ins ssa.Instruction) bool {
 	switch insType := ins.(type) {
 	case *ssa.UnOp:
-		if ins, ok := insType.X.(*ssa.Alloc); ok && sliceContainsStr(a.selectedChans, ins.Comment) {
-			return false // a channel receive, handled differently than typical read ins
+		if ins, ok := insType.X.(*ssa.Alloc); ok {
+			if _, ok1 := a.selectedChans[ins.Comment]; ok1{
+				return false // a channel receive, handled differently than typical read ins
+			} else {
+				return true
+			}
 		} else {
 			return true
 		}
@@ -522,16 +526,18 @@ func (a *analysis) insMapUpdate(examIns *ssa.MapUpdate, goID int, theIns ssa.Ins
 	}
 }
 
-func (a *analysis) insSelect(examIns *ssa.Select, goID int, theIns ssa.Instruction) []int {
+func (a *analysis) insSelect(examIns *ssa.Select, goID int, theIns ssa.Instruction) ([]int, []string) {
 	a.RWIns[goID] = append(a.RWIns[goID], theIns)
 	caseStatus := make([]int, len(examIns.States))
+	readyChans := []string{}
 	for i, states := range examIns.States {
 		if rcv, ok := states.Chan.(*ssa.UnOp); ok { // value available in channel receive
 			if recv, ok := rcv.X.(*ssa.Alloc); ok {
-				a.selectedChans = append(a.selectedChans, recv.Comment)
+				a.selectedChans[recv.Comment] = theIns // space holder for map value
+				readyChans = append(readyChans, recv.Comment)
 			}
 			caseStatus[i] = 1
 		}
 	}
-	return caseStatus
+	return caseStatus, readyChans
 }
