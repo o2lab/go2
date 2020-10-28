@@ -29,14 +29,14 @@ Channel sends and receives as case statements will block until they become valid
 
 ```
 ch1 := make(chan string)
-ch2 := make(chan string) // buffered channel
+ch2 := make(chan string)
 ch3 := make(chan string)
 
 snd1 := "1st msg"
 snd2 := "2nd msg"
 
 go func() {
-  msg := <-ch2 // corresponding channel receive
+  msg := <-ch2
   fmt.Println("received ", msg)
 }()
 
