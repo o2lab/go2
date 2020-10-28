@@ -176,3 +176,30 @@ Output:
 ### Handling the Default Clause:
 
 Always handle instructions in default clause, in addition to any case statements that are valid. 
+### Case 5 - No Selected Cases in Blocking Select Operations:
+
+```
+ch1 := make(chan int)
+	ch2 := make(chan int)
+	x := 0
+	go func() {
+		x = 1
+	}()
+	select {//no cases are ready
+	case a := <-ch1: 
+		x = a
+	case a := <-ch2:
+		x = a + 1
+	fmt.Println(x)
+	}
+```
+Program blocks at the select, because has no corresponding send operations or default. 
+
+Output:
+
+*nothing(runs forever due to frozen select)*
+
+
+### Handling the Stalled Blocking Select Clause:
+instructions after and in the select for the go routinue do NOT happen(don't analyse those instructions for race detection, because won't happen). Go routines called before select DO happen. Perhaps tell user the select was Stalled?
+
