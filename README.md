@@ -71,25 +71,25 @@ Anaylze all valid cases for potential races. Ignore instructions under blocking 
 
 ```
 message1 := make(chan string)
-	message2 := make(chan string)
-	msg1 := "hi"
-	msg2 := "hi again"
-	go func() {
-		time.Sleep(1*time.Second) 
-		message1 <- msg1 // becomes ready first
-	}()
-	go func() {
-		time.Sleep(2*time.Second)
-		message1 <- msg2
-	}()
-	for i := 0; i < 2; i++ {
-		select {
-		case a := <- message1:
-			fmt.Println("sent message", a)
-		case b := <- message2:
-			fmt.Println("sent another", b)
-		}
+message2 := make(chan string)
+msg1 := "hi"
+msg2 := "hi again"
+go func() {
+	time.Sleep(1*time.Second) 
+	message1 <- msg1 // becomes ready first
+}()
+go func() {
+	time.Sleep(2*time.Second)
+	message1 <- msg2
+}()
+for i := 0; i < 2; i++ {
+	select {
+	case a := <- message1:
+		fmt.Println("sent message", a)
+	case b := <- message2:
+		fmt.Println("sent another", b)
 	}
+}
 
 ```
 Each iteration of forloop will print different result. 
@@ -110,28 +110,28 @@ Unroll for loops twice. (typ.)
 
 ```
 ch1 := make(chan string)
-	ch2 := make(chan string)
-	go func() {
-		time.Sleep(2*time.Second) // greater than timeout allowance
-		ch1 <- "just in time - 1st attempt"
-	}()
-	select {
-	case check := <-ch1:
-		fmt.Println(check)
-	case <-time.After(1*time.Second):
-		fmt.Println("timeout - 1st attempt")
-	}
+ch2 := make(chan string)
+go func() {
+	time.Sleep(2*time.Second) // greater than timeout allowance
+	ch1 <- "just in time - 1st attempt"
+}()
+select {
+case check := <-ch1:
+	fmt.Println(check)
+case <-time.After(1*time.Second):
+	fmt.Println("timeout - 1st attempt")
+}
 
-	go func() {
-		time.Sleep(3*time.Second) // shorter than timeout allowance
-		ch2 <- "just in time - 2nd attempt"
-	}()
-	select {
-	case check := <-ch2:
-		fmt.Println(check)
-	case <-time.After(4*time.Second):
-		fmt.Println("timeout - 2nd attempt")
-	}
+go func() {
+	time.Sleep(3*time.Second) // shorter than timeout allowance
+	ch2 <- "just in time - 2nd attempt"
+}()
+select {
+case check := <-ch2:
+	fmt.Println(check)
+case <-time.After(4*time.Second):
+	fmt.Println("timeout - 2nd attempt")
+}
 ```
 Relieve blocked select after set amount of time. 
 
@@ -150,21 +150,21 @@ Always handle instructions in timeout clause, in addition to any case statements
 
 ```
 ch1 := make(chan int)
-	ch2 := make(chan int)
-	x := 0
-	go func() {
-		x /* RACE Write */= 1
-		ch1 <- 1
-	}()
-	select {
-	case a := <-ch1: // this case is ready
-		x = a
-	case a := <-ch2:
-		x = a + 1
-	default:
-		x /* RACE Write */= 20
-		fmt.Println(x)
-	}
+ch2 := make(chan int)
+x := 0
+go func() {
+	x /* RACE Write */= 1
+	ch1 <- 1
+}()
+select {
+case a := <-ch1: // this case is ready
+	x = a
+case a := <-ch2:
+	x = a + 1
+default:
+	x /* RACE Write */= 20
+	fmt.Println(x)
+}
 ```
 Both the first case and the default case may be executed. 
 
@@ -180,18 +180,18 @@ Always handle instructions in default clause, in addition to any case statements
 
 ```
 ch1 := make(chan int)
-	ch2 := make(chan int)
-	x := 0
-	go func() {
-		x = 1
-	}()
-	select {//no cases are ready
-	case a := <-ch1: 
-		x = a
-	case a := <-ch2:
-		x = a + 1
+ch2 := make(chan int)
+x := 0
+go func() {
+	x = 1
+}()
+select {//no cases are ready
+case a := <-ch1: 
+	x = a
+case a := <-ch2:
+	x = a + 1
 	fmt.Println(x)
-	}
+}
 ```
 Program blocks at the select, because has no corresponding send operations or default. 
 
