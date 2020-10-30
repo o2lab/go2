@@ -154,10 +154,10 @@ func (a *analysis) insStore(examIns *ssa.Store, goID int, theIns ssa.Instruction
 			}
 		}
 		a.RWIns[goID] = append(a.RWIns[goID], theIns)
-		if len(a.lockSet) > 0 {
+		if len(a.lockSet) > 0 && !a.mapFreeze {
 			a.lockMap[theIns] = a.lockSet
 		}
-		if len(a.RlockSet) > 0 {
+		if len(a.RlockSet) > 0 && !a.mapFreeze {
 			a.RlockMap[theIns] = a.RlockSet
 		}
 		if len(a.chanBufMap) > 0 {
@@ -185,10 +185,10 @@ func (a *analysis) insUnOp(examIns *ssa.UnOp, goID int, theIns ssa.Instruction) 
 	stats.IncStat(stats.NUnOp)
 	if examIns.Op == token.MUL && !isLocalAddr(examIns.X) { // read op
 		a.RWIns[goID] = append(a.RWIns[goID], theIns)
-		if len(a.lockSet) > 0 {
+		if len(a.lockSet) > 0 && !a.mapFreeze {
 			a.lockMap[theIns] = a.lockSet
 		}
-		if len(a.RlockSet) > 0 {
+		if len(a.RlockSet) > 0 && !a.mapFreeze {
 			a.RlockMap[theIns] = a.RlockSet
 		}
 		if len(a.chanBufMap) > 0 {
@@ -226,10 +226,10 @@ func (a *analysis) insFieldAddr(examIns *ssa.FieldAddr, goID int, theIns ssa.Ins
 	stats.IncStat(stats.NFieldAddr)
 	if !isLocalAddr(examIns.X) {
 		a.RWIns[goID] = append(a.RWIns[goID], theIns)
-		if len(a.lockSet) > 0 {
+		if len(a.lockSet) > 0 && !a.mapFreeze {
 			a.lockMap[theIns] = a.lockSet
 		}
-		if len(a.RlockSet) > 0 {
+		if len(a.RlockSet) > 0 && !a.mapFreeze {
 			a.RlockMap[theIns] = a.RlockSet
 		}
 		if len(a.chanBufMap) > 0 {
@@ -251,10 +251,10 @@ func (a *analysis) insLookUp(examIns *ssa.Lookup, goID int, theIns ssa.Instructi
 	case *ssa.UnOp:
 		if readIns.Op == token.MUL && !isLocalAddr(readIns.X) {
 			a.RWIns[goID] = append(a.RWIns[goID], theIns)
-			if len(a.lockSet) > 0 {
+			if len(a.lockSet) > 0 && !a.mapFreeze {
 				a.lockMap[theIns] = a.lockSet
 			}
-			if len(a.RlockSet) > 0 {
+			if len(a.RlockSet) > 0 && !a.mapFreeze {
 				a.RlockMap[theIns] = a.RlockSet
 			}
 			if len(a.chanBufMap) > 0 {
@@ -270,10 +270,10 @@ func (a *analysis) insLookUp(examIns *ssa.Lookup, goID int, theIns ssa.Instructi
 	case *ssa.Parameter:
 		if !isLocalAddr(readIns) {
 			a.RWIns[goID] = append(a.RWIns[goID], theIns)
-			if len(a.lockSet) > 0 {
+			if len(a.lockSet) > 0 && !a.mapFreeze {
 				a.lockMap[theIns] = a.lockSet
 			}
-			if len(a.RlockSet) > 0 {
+			if len(a.RlockSet) > 0 && !a.mapFreeze {
 				a.RlockMap[theIns] = a.RlockSet
 			}
 			if len(a.chanBufMap) > 0 {
@@ -300,10 +300,10 @@ func (a *analysis) insChangeType(examIns *ssa.ChangeType, goID int, theIns ssa.I
 			if !a.exploredFunction(theFn, goID, theIns) {
 				a.updateRecords(fnName, goID, "PUSH ")
 				a.RWIns[goID] = append(a.RWIns[goID], theIns)
-				if len(a.lockSet) > 0 {
+				if len(a.lockSet) > 0 && !a.mapFreeze {
 					a.lockMap[theIns] = a.lockSet
 				}
-				if len(a.RlockSet) > 0 {
+				if len(a.RlockSet) > 0 && !a.mapFreeze {
 					a.RlockMap[theIns] = a.RlockSet
 				}
 				if len(a.chanBufMap) > 0 {
@@ -355,10 +355,10 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 			if theVal, ok := examIns.Call.Args[0].(*ssa.UnOp); ok {
 				if theVal.Op == token.MUL && !isLocalAddr(theVal.X) {
 					a.RWIns[goID] = append(a.RWIns[goID], theIns)
-					if len(a.lockSet) > 0 {
+					if len(a.lockSet) > 0 && !a.mapFreeze {
 						a.lockMap[theIns] = a.lockSet
 					}
-					if len(a.RlockSet) > 0 {
+					if len(a.RlockSet) > 0 && !a.mapFreeze {
 						a.RlockMap[theIns] = a.RlockSet
 					}
 					if len(a.chanBufMap) > 0 {
@@ -395,10 +395,10 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 			case *ssa.FieldAddr:
 				if !isLocalAddr(access.X) && strings.HasPrefix(examIns.Call.Value.Name(), "Add") {
 					a.RWIns[goID] = append(a.RWIns[goID], theIns)
-					if len(a.lockSet) > 0 {
+					if len(a.lockSet) > 0 && !a.mapFreeze {
 						a.lockMap[theIns] = a.lockSet
 					}
-					if len(a.RlockSet) > 0 {
+					if len(a.RlockSet) > 0 && !a.mapFreeze {
 						a.RlockMap[theIns] = a.RlockSet
 					}
 					if len(a.chanBufMap) > 0 {
@@ -444,7 +444,11 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 			stats.IncStat(stats.NUnlock)
 			lockLoc := examIns.Call.Args[0]
 			if p := a.lockSetContainsAt(a.lockSet, lockLoc); p >= 0 {
-				a.lockSet = deleteFromLockSet(a.lockSet, p)
+				if examIns.Block().Comment != "if.then" {
+					a.lockSet = deleteFromLockSet(a.lockSet, p) // will be in if.else or other basic block
+				//} else { // work in progress....
+				//	a.mapFreeze = true
+				}
 			}
 		case "RLock":
 			RlockLoc := examIns.Call.Args[0]          // identifier for address of lock
@@ -505,10 +509,10 @@ func (a *analysis) insGo(examIns *ssa.Go, goID int, theIns ssa.Instruction) {
 func (a *analysis) insMapUpdate(examIns *ssa.MapUpdate, goID int, theIns ssa.Instruction) {
 	stats.IncStat(stats.NStore)
 	a.RWIns[goID] = append(a.RWIns[goID], theIns)
-	if len(a.lockSet) > 0 {
+	if len(a.lockSet) > 0 && !a.mapFreeze {
 		a.lockMap[theIns] = a.lockSet
 	}
-	if len(a.RlockSet) > 0 {
+	if len(a.RlockSet) > 0 && !a.mapFreeze {
 		a.RlockMap[theIns] = a.RlockSet
 	}
 	if len(a.chanBufMap) > 0 {
@@ -533,7 +537,7 @@ func (a *analysis) insSelect(examIns *ssa.Select, goID int, theIns ssa.Instructi
 	for i, states := range examIns.States {
 		if rcv, ok := states.Chan.(*ssa.UnOp); ok { // value available in channel receive
 			if recv, ok := rcv.X.(*ssa.Alloc); ok {
-				a.selectedChans[recv.Comment] = theIns // space holder for map value
+				a.selectedChans[recv.Comment] = theIns // space holder for map value, will be replaced with last instruction in clause
 				readyChans = append(readyChans, recv.Comment)
 			}
 			caseStatus[i] = 1

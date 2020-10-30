@@ -108,6 +108,7 @@ func staticAnalysis(args []string) error {
 		levels:       make(map[int]int),
 		lockMap:      make(map[ssa.Instruction][]ssa.Value),
 		RlockMap:     make(map[ssa.Instruction][]ssa.Value),
+		mapFreeze:    false,
 		goCaller:     make(map[int]int),
 		goNames:      make(map[int]string),
 		chanBufMap:   make(map[string][]*ssa.Send),
@@ -115,6 +116,7 @@ func staticAnalysis(args []string) error {
 		chanMap:      make(map[ssa.Instruction][]string), // map each read/write access to a list of channels with value(s) already sent to it
 		selectedChans:make(map[string]ssa.Instruction),
 		selectDefault:make(map[*ssa.Select]ssa.Instruction), // map select statement to first instruction in its default block
+		afterSelect:  make(map[*ssa.Select]ssa.Instruction),
 		selectHB:	  make(map[ssa.Instruction]ssa.Instruction),
 	}
 
@@ -169,27 +171,31 @@ func staticAnalysis(args []string) error {
 					if err != nil {
 						log.Fatal(err)
 					}
-				} else if sliceContainsInsAt(selDefault, anIns) > -1 {
-					var fromN graph.Node
-					for from, to := range Analysis.selectHB {
-						if to == anIns {
-							fromN = beforeSel[from]
-						}
-						break
-					}
-					err := Analysis.HBgraph.MakeEdge(fromN, currN)
-					if err != nil {
-						log.Fatal(err)
-					}
-				} else if sliceContainsInsAt(caseEnd, anIns) > -1 { // last instruction in clause
-					caseN = append(caseN, prevN)
+				//} else if sliceContainsInsAt(selDefault, anIns) > -1 {
+				//	for from, to := range Analysis.selectHB {
+				//		if to == anIns {
+				//			prevN = beforeSel[from]
+				//			err := Analysis.HBgraph.MakeEdge(prevN, currN)
+				//			if err != nil {
+				//				fmt.Println(len(beforeSel))
+				//				log.Fatal(err)
+				//			}
+				//		}
+				//		break
+				//	}
 				} else {
 					err := Analysis.HBgraph.MakeEdge(prevN, currN)
 					if err != nil {
 						log.Fatal(err)
 					}
+					if sliceContainsInsAt(caseEnd, anIns) > -1 { // last instruction in clause
+						caseN = append(caseN, currN)
+					}
 				}
 				prevN = currN
+			}
+			if _, ok := Analysis.selectHB[anIns]; ok { // last instruction before encountering select
+				beforeSel[anIns] = prevN
 			}
 			if Analysis.isReadIns(anIns) || isWriteIns(anIns) {
 				Analysis.RWinsMap[insKey] = prevN
@@ -220,9 +226,6 @@ func staticAnalysis(args []string) error {
 				}
 			} else if selectIns, ok := anIns.(*ssa.Select); ok && !selectIns.Blocking {
 				selDefault = append(selDefault, Analysis.selectDefault[selectIns])
-			}
-			if _, ok := Analysis.selectHB[anIns]; ok { // last instruction before encountering select
-				beforeSel[anIns] = prevN
 			}
 			if recvIns, ok := anIns.(*ssa.UnOp); ok { // detect (blocking) channel receive operation
 				if rcvIns, ok1 := recvIns.X.(*ssa.Alloc); ok1 {
@@ -280,21 +283,31 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 	}
 	fnBlocks := fn.Blocks
 	var caseStatus []int
-	var readyChans []string // may be better to use maps instead
-	var skipBBInd []int // these basic blocks and their successor blocks shall be omitted
-	var selectNB *ssa.Select // non-blocking
+	var readyChans []string       // may be better to use maps instead
+	var skipBBInd []int           // these basic blocks and their successor blocks shall be omitted
+	var selectIns *ssa.Select
 	var beforeSel ssa.Instruction // last instruction before encountering select
 	var toAppend []*ssa.BasicBlock
 	var toDefer []ssa.Instruction // stack storing deferred calls
 	repeatSwitch := false         // triggered when encountering basic blocks for body of a forloop
 	for i := 0; i < len(fnBlocks); i++ {
-		aBlock := fnBlocks[i]
+		var aBlock *ssa.BasicBlock
+		if i < len(fnBlocks) {
+			aBlock = fnBlocks[i]
+		} else {
+			aBlock = toAppend[i-len(fnBlocks)]
+		}
 		if aBlock.Comment == "recover" {
 			continue
 		}
-		if aBlock.Comment == "select.done" && len(caseStatus) < len(aBlock.Preds) { // more predecessors than number of cases, meaning last clause (pred) is default
-			a.selectDefault[selectNB] = aBlock.Preds[len(aBlock.Preds)-1].Instrs[0]
-			a.selectHB[beforeSel] = a.selectDefault[selectNB]
+		if selectIns != nil && aBlock.Comment == "select.done" && !selectIns.Blocking { // non-blocking select
+			k := len(aBlock.Preds)-1 // get index of basic block corresponding to default clause
+			for aBlock.Preds[k].Comment != "select.next" && k > 0 {
+				k--
+			}
+			a.selectDefault[selectIns] = aBlock.Preds[k].Instrs[0] // map select ins. to first ins. in its default clause
+			a.selectHB[beforeSel] = a.selectDefault[selectIns] // map last ins before select to first ins in default
+			a.afterSelect[selectIns] = aBlock.Instrs[0] // map select to first ins after select
 		}
 		if aBlock.Comment == "select.body" && len(caseStatus) > 0 {
 			skipBBInd = append(skipBBInd, aBlock.Index) // skipBBInd correlates with caseStatus
@@ -315,7 +328,8 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 			skipBBInd = append(skipBBInd, aBlock.Index)
 			continue
 		}
-		if strings.HasSuffix(aBlock.Comment, ".done") && i != len(fnBlocks)-1 && sliceContainsBloc(toAppend, aBlock) { // ignore return block if it doesn't have largest index
+		if strings.HasSuffix(aBlock.Comment, ".done") && i < len(fnBlocks)-1 && sliceContainsBloc(toAppend, aBlock) { // ignore return block if it doesn't have largest index
+			toAppend = append(toAppend, aBlock)
 			continue
 		}
 		if aBlock.Comment == "for.body" || aBlock.Comment == "rangeindex.body" { // repeat unrolling of forloop
@@ -397,7 +411,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				if examIns.Blocking { // only analyze channels with available values
 					caseStatus, readyChans = a.insSelect(examIns, goID, theIns)
 				} else { // select contains default case, which becomes race-prone (non-blocking channel ops)
-					selectNB = examIns
+					selectIns = examIns
 					caseStatus, _ = a.insSelect(examIns, goID, theIns)
 					skipIns := 1
 					for _, val := range caseStatus { // skip channel receive instructions to obtain last instruction encountered prior to encountering select
@@ -405,11 +419,16 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 							skipIns++
 						}
 					}
-					beforeSel = aBlock.Instrs[k - skipIns]
+					if k-skipIns >= 0 {
+						beforeSel = aBlock.Instrs[k - skipIns]
+					}
 				}
 			case *ssa.Jump:
 				a.RWIns[goID] = append(a.RWIns[goID], theIns)
 			}
+		}
+		if i == len(fnBlocks)+len(toAppend)-1 && a.mapFreeze {
+			a.mapFreeze = false // unfreeze lock maps so instructions in next block will be mapped to active lock-set
 		}
 	}
 	// done with all instructions in function body, now pop the function

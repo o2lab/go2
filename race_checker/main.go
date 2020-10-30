@@ -24,13 +24,14 @@ type analysis struct {
 	insDRA        int // index of instruction (in main goroutine) at which to begin data race analysis
 	storeIns      []string
 	workList      []goroutineInfo
-	reportedAddr  []ssa.Value // stores racy addresses
+	reportedAddr  []ssa.Value // stores already reported addresses
 	racyStackTops []string
 	levels        map[int]int
 	lockMap       map[ssa.Instruction][]ssa.Value // map each read/write access to a snapshot of actively maintained lockset
 	lockSet       []ssa.Value                     // active lockset, to be maintained along instruction traversal
 	RlockMap      map[ssa.Instruction][]ssa.Value // map each read/write access to a snapshot of actively maintained lockset
 	RlockSet      []ssa.Value                     // active lockset, to be maintained along instruction traversal
+	mapFreeze	  bool
 	paramFunc     ssa.Value
 	goStack       [][]string
 	goCaller      map[int]int
@@ -41,8 +42,8 @@ type analysis struct {
 	chanName      string
 	selectedChans map[string]ssa.Instruction // map selected channel name to last instruction in its clause
 	selectDefault map[*ssa.Select]ssa.Instruction // map select statement to first instruction in its default block
+	afterSelect	  map[*ssa.Select]ssa.Instruction // map select statement to first instruction after select is done
 	selectHB	  map[ssa.Instruction]ssa.Instruction // map edge LEAVING node to ENTERING node
-	afterSelect	  ssa.Instruction
 }
 
 type fnInfo struct { // all fields must be comparable for fnInfo to be used as key to trieMap
