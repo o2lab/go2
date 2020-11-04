@@ -76,7 +76,10 @@ func (a *analysis) isReadIns(ins ssa.Instruction) bool {
 func isWriteIns(ins ssa.Instruction) bool {
 	switch insType := ins.(type) {
 	case *ssa.Store:
-		return true
+		if _, ok := insType.Addr.(*ssa.Alloc); !ok {
+			return true
+		}
+		// WIP...
 	case *ssa.Call:
 		if insType.Call.Value.Name() == "delete" {
 			return true
@@ -345,7 +348,7 @@ func (a *analysis) insMakeInterface(examIns *ssa.MakeInterface, goID int, theIns
 	}
 }
 
-// insCall ???
+// insCall analyzes method calls
 func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) {
 	stats.IncStat(stats.NCall)
 	if examIns.Call.StaticCallee() == nil && examIns.Call.Method == nil {
@@ -438,21 +441,22 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 			stats.IncStat(stats.NLock)
 			lockLoc := examIns.Call.Args[0]         // identifier for address of lock
 			if !sliceContains(a.lockSet, lockLoc) { // if lock is not already in active lockset
+				log.Trace("Locking ", lockLoc.Name(), " at lvl ", len(a.lockSet))
 				a.lockSet = append(a.lockSet, lockLoc)
 			}
 		case "Unlock":
 			stats.IncStat(stats.NUnlock)
 			lockLoc := examIns.Call.Args[0]
 			if p := a.lockSetContainsAt(a.lockSet, lockLoc); p >= 0 {
-				if examIns.Block().Comment != "if.then" {
-					a.lockSet = deleteFromLockSet(a.lockSet, p) // will be in if.else or other basic block
-				//} else { // work in progress....
-				//	a.mapFreeze = true
+				if examIns.Block().Comment != "if.then" { // remove from active lock-set
+					a.lockSet = deleteFromLockSet(a.lockSet, p)
+				} else { // do NOT remove from active lock-set yet
+					a.mapFreeze = true
 				}
 			}
 		case "RLock":
 			RlockLoc := examIns.Call.Args[0]          // identifier for address of lock
-			if !sliceContains(a.RlockSet, RlockLoc) { // if lock is not already in active lockset
+			if !sliceContains(a.RlockSet, RlockLoc) { // if lock is not already in active lock-set
 				a.RlockSet = append(a.RlockSet, RlockLoc)
 			}
 		case "RUnlock":

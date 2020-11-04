@@ -214,7 +214,7 @@ func (a *analysis) printRace(counter int, insPair []ssa.Instruction, addrPair []
 					printName = checkTokenName(printName, everyIns.(*ssa.Call))
 					printStack = append(printStack, printName)
 					printPos = append(printPos, everyIns.Pos())
-				} else if _, ok1 := everyIns.(*ssa.Return); ok1 && len(printStack) > 0 { // TODO: need to consider function with multiple return statements
+				} else if _, ok1 := everyIns.(*ssa.Return); ok1 && len(printStack) > 0 {
 					printStack = printStack[:len(printStack)-1]
 					printPos = printPos[:len(printPos)-1]
 				}

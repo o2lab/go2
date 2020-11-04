@@ -19,8 +19,8 @@ func main() {
 	}()
 	select {
 	case <-ch:
-		x /* RACE Write */ = 1
-		fmt.Println(x)
+		x = 1
+		fmt.Println(x /* RACE Read */)
 	case t := <-ch2:
 		if t {
 			x = 2

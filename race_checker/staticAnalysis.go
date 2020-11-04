@@ -426,10 +426,11 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 			case *ssa.Jump:
 				a.RWIns[goID] = append(a.RWIns[goID], theIns)
 			}
+			if k == len(aBlock.Instrs)-1 && a.mapFreeze {
+				a.mapFreeze = false // unfreeze lock maps so instructions in next block will be mapped to active lock-set
+			}
 		}
-		if i == len(fnBlocks)+len(toAppend)-1 && a.mapFreeze {
-			a.mapFreeze = false // unfreeze lock maps so instructions in next block will be mapped to active lock-set
-		}
+
 	}
 	// done with all instructions in function body, now pop the function
 	fnName := fn.Name()
@@ -445,7 +446,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 	}
 }
 
-// newGoroutine goes through the go routine, logs its info, and goes through the instructions within,   the r isn't capitalized?
+// newGoroutine goes through the goroutine, logs its info, and goes through the instructions within
 func (a *analysis) newGoroutine(info goroutineInfo) {
 	a.storeIns = append(a.storeIns, info.entryMethod)
 	if info.goID >= len(a.RWIns) { // initialize interior slice for new goroutine

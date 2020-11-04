@@ -131,7 +131,7 @@ func init() {
 // main sets up arguments and calls staticAnalysis function
 func main() {
 	debug := flag.Bool("debug", false, "Prints debug messages.")
-	ptrAnalysis := flag.Bool("ptrAnalysis", false, "Prints pointer analysis results. ")
+	lockOps := flag.Bool("lockOps", false, "Prints lock and unlock operations. ")
 	flag.BoolVar(&stats.CollectStats, "collectStats", false, "Collect analysis statistics.")
 	help := flag.Bool("help", false, "Show all command-line options.")
 	flag.Parse()
@@ -142,7 +142,7 @@ func main() {
 	if *debug {
 		log.SetLevel(log.DebugLevel)
 	}
-	if *ptrAnalysis {
+	if *lockOps {
 		log.SetLevel(log.TraceLevel)
 	}
 
