@@ -9,10 +9,10 @@ func main() {
 	ch := make(chan int, 2)
 	go f(&x, ch)
 	ch <- 0
-	x = 1
+	x /* RACE Write */ = 1
 	<-ch
 	ch <- 0
-	fmt.Println("x is", x /* RACE Read */)
+	fmt.Println("x is", x)
 	<-ch
 }
 

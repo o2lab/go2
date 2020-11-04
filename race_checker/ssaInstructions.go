@@ -76,10 +76,7 @@ func (a *analysis) isReadIns(ins ssa.Instruction) bool {
 func isWriteIns(ins ssa.Instruction) bool {
 	switch insType := ins.(type) {
 	case *ssa.Store:
-		if _, ok := insType.Addr.(*ssa.Alloc); !ok {
-			return true
-		}
-		// WIP...
+		return true
 	case *ssa.Call:
 		if insType.Call.Value.Name() == "delete" {
 			return true

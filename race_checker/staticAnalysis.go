@@ -381,6 +381,10 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				if k > 0 { // check if previous instruction is *ssa.Alloc
 					if assign, ok := aBlock.Instrs[k-1].(*ssa.Alloc); ok && assign == examIns.Addr {
 						// assignment statement won't race
+					} else if _, ok := aBlock.Instrs[k-1].(*ssa.Extract); ok && k > 1 { // tuple assignment
+						if assign, ok := aBlock.Instrs[k-2].(*ssa.Alloc); ok && assign == examIns.Addr {
+							// assignment statement won't race
+						}
 					} else {
 						a.insStore(examIns, goID, theIns)
 					}
