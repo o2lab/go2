@@ -37,12 +37,12 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 	var fnName string
 	rightLoc := 0       // initialize index for the right points-to location
 	if len(PTSet) > 1 { // multiple targets returned by pointer analysis
-		log.Trace("***Pointer Analysis revealed ", len(PTSet), " targets for location - ", a.prog.Fset.Position(location.Pos()))
+		//log.Trace("***Pointer Analysis revealed ", len(PTSet), " targets for location - ", a.prog.Fset.Position(location.Pos()))
 		var fns []string
 		for ind, eachTarget := range PTSet { // check each target
 			if eachTarget.Value().Parent() != nil {
 				fns = append(fns, eachTarget.Value().Parent().Name())
-				log.Trace("*****target No.", ind+1, " - ", eachTarget.Value().Name(), " from function ", eachTarget.Value().Parent().Name())
+				//log.Trace("*****target No.", ind+1, " - ", eachTarget.Value().Name(), " from function ", eachTarget.Value().Parent().Name())
 				if sliceContainsStr(a.storeIns, eachTarget.Value().Parent().Name()) { // calling function is in current goroutine
 					rightLoc = ind
 					break
@@ -51,7 +51,7 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 				continue
 			}
 		}
-		log.Trace("***Executing target No.", rightLoc+1)
+		//log.Trace("***Executing target No.", rightLoc+1)
 	} else if len(PTSet) == 0 {
 		return
 	}

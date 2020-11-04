@@ -438,7 +438,7 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 			stats.IncStat(stats.NLock)
 			lockLoc := examIns.Call.Args[0]         // identifier for address of lock
 			if !sliceContains(a.lockSet, lockLoc) { // if lock is not already in active lockset
-				log.Trace("Locking ", lockLoc.Name(), " at lvl ", len(a.lockSet))
+				log.Trace("Locking   ", lockLoc.String(), "  (",  lockLoc.Name(), ") at lvl ", len(a.lockSet))
 				a.lockSet = append(a.lockSet, lockLoc)
 			}
 		case "Unlock":
