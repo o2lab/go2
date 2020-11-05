@@ -360,7 +360,8 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 					} else if deferIns.Call.StaticCallee().Name() == "Unlock" {
 						lockLoc := deferIns.Call.Args[0]
 						if k := a.lockSetContainsAt(a.lockSet, lockLoc); k >= 0 {
-							a.lockSet = deleteFromLockSet(a.lockSet, k)
+							log.Trace("Unlocking ", lockLoc.String(), "  (", a.lockSet[k].Pos(), ") removing index ", k, " from: ", lockSetVal(a.lockSet))
+							a.lockSet = a.deleteFromLockSet(a.lockSet, k)
 						}
 					} else if deferIns.Call.StaticCallee().Name() == "Done" {
 						a.RWIns[goID] = append(a.RWIns[goID], theIns)

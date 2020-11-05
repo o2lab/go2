@@ -2,7 +2,6 @@ package main
 
 //import "C"
 import (
-	log "github.com/sirupsen/logrus"
 	"go/token"
 	"golang.org/x/tools/go/ssa"
 	"sort"
@@ -89,8 +88,7 @@ func sliceContainsInsAt(s []ssa.Instruction, e ssa.Instruction) int {
 }
 
 // deleteFromLockSet removes k from s
-func deleteFromLockSet(s []ssa.Value, k int) []ssa.Value {
-	log.Trace("Unlocking ", s[k].String(), "  (", s[k].Name(), ") at lvl ", len(s)-1)
+func (a *analysis) deleteFromLockSet(s []ssa.Value, k int) []ssa.Value {
 	var res []ssa.Value
 	res = append(s[:k], s[k+1:]...)
 	return res
@@ -135,4 +133,12 @@ func sliceContainsInt (s []int, e int) bool {
 		}
 	}
 	return false
+}
+
+func lockSetVal (s []ssa.Value) []token.Pos {
+	res := make([]token.Pos, len(s))
+	for i, val := range s {
+		res[i] = val.Pos()
+	}
+	return res
 }

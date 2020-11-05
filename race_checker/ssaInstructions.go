@@ -438,15 +438,16 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 			stats.IncStat(stats.NLock)
 			lockLoc := examIns.Call.Args[0]         // identifier for address of lock
 			if !sliceContains(a.lockSet, lockLoc) { // if lock is not already in active lockset
-				log.Trace("Locking   ", lockLoc.String(), "  (",  lockLoc.Name(), ") at lvl ", len(a.lockSet))
 				a.lockSet = append(a.lockSet, lockLoc)
+				log.Trace("Locking   ", lockLoc.String(), "  (",  lockLoc.Pos(), ")  lockset now contains: ", lockSetVal(a.lockSet))
 			}
 		case "Unlock":
 			stats.IncStat(stats.NUnlock)
 			lockLoc := examIns.Call.Args[0]
 			if p := a.lockSetContainsAt(a.lockSet, lockLoc); p >= 0 {
 				if examIns.Block().Comment != "if.then" { // remove from active lock-set
-					a.lockSet = deleteFromLockSet(a.lockSet, p)
+					log.Trace("Unlocking ", lockLoc.String(), "  (", a.lockSet[p].Pos(), ") removing index ", p, " from: ", lockSetVal(a.lockSet))
+					a.lockSet = a.deleteFromLockSet(a.lockSet, p)
 				} else { // do NOT remove from active lock-set yet
 					a.mapFreeze = true
 				}
@@ -459,7 +460,8 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 		case "RUnlock":
 			RlockLoc := examIns.Call.Args[0]
 			if p := a.lockSetContainsAt(a.RlockSet, RlockLoc); p >= 0 {
-				a.RlockSet = deleteFromLockSet(a.RlockSet, p)
+				log.Trace("Unlocking ", RlockLoc.String(), "  (", RlockLoc.Name(), ") removing ", p+1, "th element in", lockSetVal(a.RlockSet))
+				a.RlockSet = a.deleteFromLockSet(a.RlockSet, p)
 			}
 		case "Wait":
 			stats.IncStat(stats.NWaitGroupWait)
