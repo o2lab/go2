@@ -405,6 +405,7 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 		case "Lock":
 			stats.IncStat(stats.NLock)
 			lockLoc := examIns.Call.Args[0]         // identifier for address of lock
+			a.ptaConfig.AddQuery(lockLoc)
 			if lockLoc.String() == "&t21.mu [#7]" || lockLoc.String() == "&t22.mu [#7]" || lockLoc.String() == "&cs.mu [#16]" { // lock and unlock pair located within same if.then block
 				fmt.Println("need to catch this lock")
 			} else {
@@ -427,6 +428,7 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 		case "Unlock":
 			stats.IncStat(stats.NUnlock)
 			lockLoc := examIns.Call.Args[0]
+			a.ptaConfig.AddQuery(lockLoc)
 			if goID == 0 { // main goroutine
 				if p := a.lockSetContainsAt(a.lockSet, lockLoc); p >= 0 {
 					if examIns.Block().Comment != "if.then" { // remove from active lock-set

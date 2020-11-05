@@ -361,6 +361,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 						}
 					} else if deferIns.Call.StaticCallee().Name() == "Unlock" {
 						lockLoc := deferIns.Call.Args[0]
+						a.ptaConfig.AddQuery(lockLoc)
 						if goID == 0 {
 							if k := a.lockSetContainsAt(a.lockSet, lockLoc); k >= 0 {
 								if deferIns.Block().Comment != "if.then" {

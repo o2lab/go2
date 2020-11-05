@@ -31,6 +31,7 @@ var tests = []string{
 	"tests/wrong_waitgroup.go",
 	"tests/multiple_waitgroups.go",
 	"tests/lock.go",
+	"tests/lock_grpc_sync.go",
 	//"tests/rwmutex_lock.go",
 	"tests/context1.go",
 	"tests/fields.go",
