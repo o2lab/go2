@@ -31,7 +31,9 @@ type analysis struct {
 	lockSet       []ssa.Value                     // active lockset, to be maintained along instruction traversal
 	RlockMap      map[ssa.Instruction][]ssa.Value // map each read/write access to a snapshot of actively maintained lockset
 	RlockSet      []ssa.Value                     // active lockset, to be maintained along instruction traversal
-	mapFreeze	  bool
+	goLockset     map[int][]ssa.Value             // map each goroutine to its initial lockset
+	goRLockset	  map[int][]ssa.Value			  // map each goroutine to its initial set of read locks
+	mapFreeze     bool
 	paramFunc     ssa.Value
 	goStack       [][]string
 	goCaller      map[int]int

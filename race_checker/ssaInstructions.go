@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"github.com/o2lab/race-checker/stats"
 	log "github.com/sirupsen/logrus"
 	"go/constant"
@@ -154,12 +155,7 @@ func (a *analysis) insStore(examIns *ssa.Store, goID int, theIns ssa.Instruction
 			}
 		}
 		a.RWIns[goID] = append(a.RWIns[goID], theIns)
-		if len(a.lockSet) > 0 && !a.mapFreeze {
-			a.lockMap[theIns] = a.lockSet
-		}
-		if len(a.RlockSet) > 0 && !a.mapFreeze {
-			a.RlockMap[theIns] = a.RlockSet
-		}
+		a.updateLockMap(goID, theIns)
 		if len(a.chanBufMap) > 0 {
 			a.chanMap[theIns] = []string{}
 			for aChan, sSends := range a.chanBufMap {
@@ -185,12 +181,8 @@ func (a *analysis) insUnOp(examIns *ssa.UnOp, goID int, theIns ssa.Instruction) 
 	stats.IncStat(stats.NUnOp)
 	if examIns.Op == token.MUL && !isLocalAddr(examIns.X) { // read op
 		a.RWIns[goID] = append(a.RWIns[goID], theIns)
-		if len(a.lockSet) > 0 && !a.mapFreeze {
-			a.lockMap[theIns] = a.lockSet
-		}
-		if len(a.RlockSet) > 0 && !a.mapFreeze {
-			a.RlockMap[theIns] = a.RlockSet
-		}
+		a.updateLockMap(goID, theIns)
+		a.updateRLockMap(goID, theIns)
 		if len(a.chanBufMap) > 0 {
 			a.chanMap[theIns] = []string{}
 			for aChan, sSends := range a.chanBufMap {
@@ -226,12 +218,8 @@ func (a *analysis) insFieldAddr(examIns *ssa.FieldAddr, goID int, theIns ssa.Ins
 	stats.IncStat(stats.NFieldAddr)
 	if !isLocalAddr(examIns.X) {
 		a.RWIns[goID] = append(a.RWIns[goID], theIns)
-		if len(a.lockSet) > 0 && !a.mapFreeze {
-			a.lockMap[theIns] = a.lockSet
-		}
-		if len(a.RlockSet) > 0 && !a.mapFreeze {
-			a.RlockMap[theIns] = a.RlockSet
-		}
+		a.updateLockMap(goID, theIns)
+		a.updateRLockMap(goID, theIns)
 		if len(a.chanBufMap) > 0 {
 			a.chanMap[theIns] = []string{}
 			for aChan, sSends := range a.chanBufMap {
@@ -251,12 +239,8 @@ func (a *analysis) insLookUp(examIns *ssa.Lookup, goID int, theIns ssa.Instructi
 	case *ssa.UnOp:
 		if readIns.Op == token.MUL && !isLocalAddr(readIns.X) {
 			a.RWIns[goID] = append(a.RWIns[goID], theIns)
-			if len(a.lockSet) > 0 && !a.mapFreeze {
-				a.lockMap[theIns] = a.lockSet
-			}
-			if len(a.RlockSet) > 0 && !a.mapFreeze {
-				a.RlockMap[theIns] = a.RlockSet
-			}
+			a.updateLockMap(goID, theIns)
+			a.updateRLockMap(goID, theIns)
 			if len(a.chanBufMap) > 0 {
 				a.chanMap[theIns] = []string{}
 				for aChan, sSends := range a.chanBufMap {
@@ -270,12 +254,8 @@ func (a *analysis) insLookUp(examIns *ssa.Lookup, goID int, theIns ssa.Instructi
 	case *ssa.Parameter:
 		if !isLocalAddr(readIns) {
 			a.RWIns[goID] = append(a.RWIns[goID], theIns)
-			if len(a.lockSet) > 0 && !a.mapFreeze {
-				a.lockMap[theIns] = a.lockSet
-			}
-			if len(a.RlockSet) > 0 && !a.mapFreeze {
-				a.RlockMap[theIns] = a.RlockSet
-			}
+			a.updateLockMap(goID, theIns)
+			a.updateRLockMap(goID, theIns)
 			if len(a.chanBufMap) > 0 {
 				a.chanMap[theIns] = []string{}
 				for aChan, sSends := range a.chanBufMap {
@@ -289,7 +269,7 @@ func (a *analysis) insLookUp(examIns *ssa.Lookup, goID int, theIns ssa.Instructi
 	}
 }
 
-// insChangeType ??? couldn't switch be an if?
+// insChangeType
 func (a *analysis) insChangeType(examIns *ssa.ChangeType, goID int, theIns ssa.Instruction) {
 	stats.IncStat(stats.NChangeType)
 	switch mc := examIns.X.(type) {
@@ -300,12 +280,8 @@ func (a *analysis) insChangeType(examIns *ssa.ChangeType, goID int, theIns ssa.I
 			if !a.exploredFunction(theFn, goID, theIns) {
 				a.updateRecords(fnName, goID, "PUSH ")
 				a.RWIns[goID] = append(a.RWIns[goID], theIns)
-				if len(a.lockSet) > 0 && !a.mapFreeze {
-					a.lockMap[theIns] = a.lockSet
-				}
-				if len(a.RlockSet) > 0 && !a.mapFreeze {
-					a.RlockMap[theIns] = a.RlockSet
-				}
+				a.updateLockMap(goID, theIns)
+				a.updateRLockMap(goID, theIns)
 				if len(a.chanBufMap) > 0 {
 					a.chanMap[theIns] = []string{}
 					for aChan, sSends := range a.chanBufMap {
@@ -355,12 +331,8 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 			if theVal, ok := examIns.Call.Args[0].(*ssa.UnOp); ok {
 				if theVal.Op == token.MUL && !isLocalAddr(theVal.X) {
 					a.RWIns[goID] = append(a.RWIns[goID], theIns)
-					if len(a.lockSet) > 0 && !a.mapFreeze {
-						a.lockMap[theIns] = a.lockSet
-					}
-					if len(a.RlockSet) > 0 && !a.mapFreeze {
-						a.RlockMap[theIns] = a.RlockSet
-					}
+					a.updateLockMap(goID, theIns)
+					a.updateRLockMap(goID, theIns)
 					if len(a.chanBufMap) > 0 {
 						a.chanMap[theIns] = []string{}
 						for aChan, sSends := range a.chanBufMap {
@@ -395,12 +367,8 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 			case *ssa.FieldAddr:
 				if !isLocalAddr(access.X) && strings.HasPrefix(examIns.Call.Value.Name(), "Add") {
 					a.RWIns[goID] = append(a.RWIns[goID], theIns)
-					if len(a.lockSet) > 0 && !a.mapFreeze {
-						a.lockMap[theIns] = a.lockSet
-					}
-					if len(a.RlockSet) > 0 && !a.mapFreeze {
-						a.RlockMap[theIns] = a.RlockSet
-					}
+					a.updateLockMap(goID, theIns)
+					a.updateRLockMap(goID, theIns)
 					if len(a.chanBufMap) > 0 {
 						a.chanMap[theIns] = []string{}
 						for aChan, sSends := range a.chanBufMap {
@@ -437,31 +405,72 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 		case "Lock":
 			stats.IncStat(stats.NLock)
 			lockLoc := examIns.Call.Args[0]         // identifier for address of lock
-			if !sliceContains(a.lockSet, lockLoc) { // if lock is not already in active lockset
-				a.lockSet = append(a.lockSet, lockLoc)
-				log.Trace("Locking   ", lockLoc.String(), "  (",  lockLoc.Pos(), ")  lockset now contains: ", lockSetVal(a.lockSet))
+			if lockLoc.String() == "&t21.mu [#7]" || lockLoc.String() == "&t22.mu [#7]" || lockLoc.String() == "&cs.mu [#16]" { // lock and unlock pair located within same if.then block
+				fmt.Println("need to catch this lock")
+			} else {
+				if goID == 0 { // main goroutine
+					if !sliceContains(a.lockSet, lockLoc) && !a.mapFreeze { // if lock is not already in active lockset
+						if lockLoc.String() == "&t21.mu [#7]" {
+							fmt.Println(lockLoc.String(), " <-- this lock needs investigation")
+						} else {
+							a.lockSet = append(a.lockSet, lockLoc)
+							log.Trace("Locking   ", lockLoc.String(), "  (",  lockLoc.Pos(), ")  lockset now contains: ", lockSetVal(a.lockSet))
+						}
+					}
+				} else { // worker goroutine
+					if !sliceContains(a.goLockset[goID], lockLoc) && !a.mapFreeze { // if lock is not already in active lockset
+						a.goLockset[goID] = append(a.goLockset[goID], lockLoc)
+						log.Trace("Locking   ", lockLoc.String(), "  (",  lockLoc.Pos(), ")  lockset now contains: ", lockSetVal(a.goLockset[goID]))
+					}
+				}
 			}
 		case "Unlock":
 			stats.IncStat(stats.NUnlock)
 			lockLoc := examIns.Call.Args[0]
-			if p := a.lockSetContainsAt(a.lockSet, lockLoc); p >= 0 {
-				if examIns.Block().Comment != "if.then" { // remove from active lock-set
-					log.Trace("Unlocking ", lockLoc.String(), "  (", a.lockSet[p].Pos(), ") removing index ", p, " from: ", lockSetVal(a.lockSet))
-					a.lockSet = a.deleteFromLockSet(a.lockSet, p)
-				} else { // do NOT remove from active lock-set yet
-					a.mapFreeze = true
+			if goID == 0 { // main goroutine
+				if p := a.lockSetContainsAt(a.lockSet, lockLoc); p >= 0 {
+					if examIns.Block().Comment != "if.then" { // remove from active lock-set
+						log.Trace("Unlocking ", lockLoc.String(), "  (", lockLoc.Pos(), ") removing index ", p, " from: ", lockSetVal(a.lockSet))
+						a.lockSet = a.deleteFromLockSet(a.lockSet, p)
+					} else { // do NOT remove from active lock-set yet
+						a.mapFreeze = true
+					}
+				}
+			} else { // worker goroutine
+				if p := a.lockSetContainsAt(a.goLockset[goID], lockLoc); p >= 0 {
+					if examIns.Block().Comment != "if.then" { // remove from active lock-set
+						log.Trace("Unlocking ", lockLoc.String(), "  (", lockLoc.Pos(), ") removing index ", p, " from: ", lockSetVal(a.goLockset[goID]))
+						a.goLockset[goID] = a.deleteFromLockSet(a.goLockset[goID], p)
+					} else { // do NOT remove from active lock-set yet
+						a.mapFreeze = true
+					}
 				}
 			}
 		case "RLock":
 			RlockLoc := examIns.Call.Args[0]          // identifier for address of lock
-			if !sliceContains(a.RlockSet, RlockLoc) { // if lock is not already in active lock-set
-				a.RlockSet = append(a.RlockSet, RlockLoc)
+			if goID == 0 {
+				if !sliceContains(a.RlockSet, RlockLoc) { // if lock is not already in active lock-set
+					a.RlockSet = append(a.RlockSet, RlockLoc)
+					log.Trace("RLocking   ", RlockLoc.String(), "  (",  RlockLoc.Pos(), ")  Rlockset now contains: ", lockSetVal(a.RlockSet))
+				}
+			} else {
+				if !sliceContains(a.RlockSet, RlockLoc) { // if lock is not already in active lock-set
+					a.goRLockset[goID] = append(a.goRLockset[goID], RlockLoc)
+					log.Trace("RLocking   ", RlockLoc.String(), "  (",  RlockLoc.Pos(), ")  Rlockset now contains: ", lockSetVal(a.goRLockset[goID]))
+				}
 			}
 		case "RUnlock":
 			RlockLoc := examIns.Call.Args[0]
-			if p := a.lockSetContainsAt(a.RlockSet, RlockLoc); p >= 0 {
-				log.Trace("Unlocking ", RlockLoc.String(), "  (", RlockLoc.Name(), ") removing ", p+1, "th element in", lockSetVal(a.RlockSet))
-				a.RlockSet = a.deleteFromLockSet(a.RlockSet, p)
+			if goID == 0 {
+				if p := a.lockSetContainsAt(a.RlockSet, RlockLoc); p >= 0 {
+					log.Trace("RUnlocking ", RlockLoc.String(), "  (", RlockLoc.Name(), ") removing index ", p, " from: ", lockSetVal(a.RlockSet))
+					a.RlockSet = a.deleteFromLockSet(a.RlockSet, p)
+				}
+			} else {
+				if p := a.lockSetContainsAt(a.goRLockset[goID], RlockLoc); p >= 0 {
+					log.Trace("RUnlocking ", RlockLoc.String(), "  (", RlockLoc.Name(), ") removing index ", p, " from: ", lockSetVal(a.goRLockset[goID]))
+					a.goRLockset[goID] = a.deleteFromLockSet(a.goRLockset[goID], p)
+				}
 			}
 		case "Wait":
 			stats.IncStat(stats.NWaitGroupWait)
@@ -475,7 +484,7 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 	}
 }
 
-// insGo ???
+// insGo analyzes go calls
 func (a *analysis) insGo(examIns *ssa.Go, goID int, theIns ssa.Instruction) {
 	stats.IncStat(stats.NGo)
 	var fnName string
@@ -507,17 +516,17 @@ func (a *analysis) insGo(examIns *ssa.Go, goID int, theIns ssa.Instruction) {
 	a.goStack[newGoID] = append(a.goStack[newGoID], a.storeIns...)
 	a.workList = append(a.workList, info) // store encountered goroutines
 	log.Debug(strings.Repeat(" ", a.levels[goID]), "spawning Goroutine ----->  ", fnName)
+	if goID == 0 { // this is a child spawned by main goroutine and there are currently active locks
+		a.goLockset[newGoID] = append(a.goLockset[newGoID], a.lockSet...) // inherit active lockset from parent goroutine
+	} else {
+		a.goLockset[newGoID] = append(a.goLockset[newGoID], a.goLockset[goID]...) // inherit from parent goroutine
+	}
 }
 
 func (a *analysis) insMapUpdate(examIns *ssa.MapUpdate, goID int, theIns ssa.Instruction) {
 	stats.IncStat(stats.NStore)
 	a.RWIns[goID] = append(a.RWIns[goID], theIns)
-	if len(a.lockSet) > 0 && !a.mapFreeze {
-		a.lockMap[theIns] = a.lockSet
-	}
-	if len(a.RlockSet) > 0 && !a.mapFreeze {
-		a.RlockMap[theIns] = a.RlockSet
-	}
+	a.updateLockMap(goID, theIns)
 	if len(a.chanBufMap) > 0 {
 		a.chanMap[theIns] = []string{}
 		for aChan, sSends := range a.chanBufMap {
@@ -547,4 +556,28 @@ func (a *analysis) insSelect(examIns *ssa.Select, goID int, theIns ssa.Instructi
 		}
 	}
 	return caseStatus, readyChans
+}
+
+func (a *analysis) updateLockMap(goID int, theIns ssa.Instruction) {
+	if goID == 0 { // main goroutine
+		if len(a.lockSet) > 0 && !a.mapFreeze {
+			a.lockMap[theIns] = append(a.lockMap[theIns], a.lockSet...)
+		}
+	} else { // worker goroutine
+		if len(a.goLockset[goID]) > 0 && !a.mapFreeze {
+			a.lockMap[theIns] = append(a.lockMap[theIns], a.goLockset[goID]...)
+		}
+	}
+}
+
+func (a *analysis) updateRLockMap(goID int, theIns ssa.Instruction) {
+	if goID == 0 { // main goroutine
+		if len(a.RlockSet) > 0 {
+			a.lockMap[theIns] = append(a.lockMap[theIns], a.RlockSet...)
+		}
+	} else { // worker goroutine
+		if len(a.goLockset[goID]) > 0 {
+			a.lockMap[theIns] = append(a.lockMap[theIns], a.goRLockset[goID]...)
+		}
+	}
 }

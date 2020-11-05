@@ -108,6 +108,8 @@ func staticAnalysis(args []string) error {
 		levels:       make(map[int]int),
 		lockMap:      make(map[ssa.Instruction][]ssa.Value),
 		RlockMap:     make(map[ssa.Instruction][]ssa.Value),
+		goLockset:    make(map[int][]ssa.Value),
+		goRLockset:   make(map[int][]ssa.Value),
 		mapFreeze:    false,
 		goCaller:     make(map[int]int),
 		goNames:      make(map[int]string),
@@ -359,9 +361,45 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 						}
 					} else if deferIns.Call.StaticCallee().Name() == "Unlock" {
 						lockLoc := deferIns.Call.Args[0]
-						if k := a.lockSetContainsAt(a.lockSet, lockLoc); k >= 0 {
-							log.Trace("Unlocking ", lockLoc.String(), "  (", a.lockSet[k].Pos(), ") removing index ", k, " from: ", lockSetVal(a.lockSet))
-							a.lockSet = a.deleteFromLockSet(a.lockSet, k)
+						if goID == 0 {
+							if k := a.lockSetContainsAt(a.lockSet, lockLoc); k >= 0 {
+								if deferIns.Block().Comment != "if.then" {
+									log.Trace("Unlocking ", lockLoc.String(), "  (", lockLoc.Pos(), ") removing index ", k, " from: ", lockSetVal(a.lockSet))
+									a.lockSet = a.deleteFromLockSet(a.lockSet, k)
+								} else {
+									a.mapFreeze = true
+								}
+							}
+						} else { // worker goroutine
+							if k := a.lockSetContainsAt(a.goLockset[goID], lockLoc); k >= 0 {
+								if deferIns.Block().Comment != "if.then" {
+									log.Trace("Unlocking ", lockLoc.String(), "  (", lockLoc.Pos(), ") removing index ", k, " from: ", lockSetVal(a.goLockset[goID]))
+									a.goLockset[goID] = a.deleteFromLockSet(a.goLockset[goID], k)
+								} else {
+									a.mapFreeze = true
+								}
+							}
+						}
+					} else if deferIns.Call.StaticCallee().Name() == "RUnlock" {
+						RlockLoc := deferIns.Call.Args[0]
+						if goID == 0 {
+							if k := a.lockSetContainsAt(a.RlockSet, RlockLoc); k >= 0 {
+								if deferIns.Block().Comment != "if.then" {
+									log.Trace("RUnlocking ", RlockLoc.String(), "  (", RlockLoc.Pos(), ") removing index ", k, " from: ", lockSetVal(a.RlockSet))
+									a.RlockSet = a.deleteFromLockSet(a.RlockSet, k)
+								} else {
+									a.mapFreeze = true
+								}
+							}
+						} else { // worker goroutine
+							if k := a.lockSetContainsAt(a.goRLockset[goID], RlockLoc); k >= 0 {
+								if deferIns.Block().Comment != "if.then" {
+									log.Trace("RUnlocking ", RlockLoc.String(), "  (", RlockLoc.Pos(), ") removing index ", k, " from: ", lockSetVal(a.goRLockset[goID]))
+									a.goRLockset[goID] = a.deleteFromLockSet(a.goRLockset[goID], k)
+								} else {
+									a.mapFreeze = true
+								}
+							}
 						}
 					} else if deferIns.Call.StaticCallee().Name() == "Done" {
 						a.RWIns[goID] = append(a.RWIns[goID], theIns)
