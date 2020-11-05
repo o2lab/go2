@@ -37,12 +37,10 @@ func (c *SafeCounter) Error() {
 func main() {
 	c := SafeCounter{v: make(map[string]int)}
 
-	go func() {
-		c.mu.Lock()
-		go c.Error()
-		c.mu.Unlock()
-	}()
+	go c.Error()
+	c.mu.Lock()
 	c.Inc("somekey")
+	c.mu.Unlock()
 
 	fmt.Println(c.Value("somekey"))
 }
