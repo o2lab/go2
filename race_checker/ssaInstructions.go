@@ -450,6 +450,7 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 			}
 		case "RLock":
 			RlockLoc := examIns.Call.Args[0]          // identifier for address of lock
+			a.ptaConfig.AddQuery(RlockLoc)
 			if goID == 0 {
 				if !sliceContains(a.RlockSet, RlockLoc) { // if lock is not already in active lock-set
 					a.RlockSet = append(a.RlockSet, RlockLoc)
@@ -463,14 +464,15 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 			}
 		case "RUnlock":
 			RlockLoc := examIns.Call.Args[0]
+			a.ptaConfig.AddQuery(RlockLoc)
 			if goID == 0 {
 				if p := a.lockSetContainsAt(a.RlockSet, RlockLoc); p >= 0 {
-					log.Trace("RUnlocking ", RlockLoc.String(), "  (", RlockLoc.Name(), ") removing index ", p, " from: ", lockSetVal(a.RlockSet))
+					log.Trace("RUnlocking ", RlockLoc.String(), "  (", RlockLoc.Pos(), ") removing index ", p, " from: ", lockSetVal(a.RlockSet))
 					a.RlockSet = a.deleteFromLockSet(a.RlockSet, p)
 				}
 			} else {
 				if p := a.lockSetContainsAt(a.goRLockset[goID], RlockLoc); p >= 0 {
-					log.Trace("RUnlocking ", RlockLoc.String(), "  (", RlockLoc.Name(), ") removing index ", p, " from: ", lockSetVal(a.goRLockset[goID]))
+					log.Trace("RUnlocking ", RlockLoc.String(), "  (", RlockLoc.Pos(), ") removing index ", p, " from: ", lockSetVal(a.goRLockset[goID]))
 					a.goRLockset[goID] = a.deleteFromLockSet(a.goRLockset[goID], p)
 				}
 			}
@@ -575,11 +577,11 @@ func (a *analysis) updateLockMap(goID int, theIns ssa.Instruction) {
 func (a *analysis) updateRLockMap(goID int, theIns ssa.Instruction) {
 	if goID == 0 { // main goroutine
 		if len(a.RlockSet) > 0 {
-			a.lockMap[theIns] = append(a.lockMap[theIns], a.RlockSet...)
+			a.RlockMap[theIns] = append(a.RlockMap[theIns], a.RlockSet...)
 		}
 	} else { // worker goroutine
-		if len(a.goLockset[goID]) > 0 {
-			a.lockMap[theIns] = append(a.lockMap[theIns], a.goRLockset[goID]...)
+		if len(a.goRLockset[goID]) > 0 {
+			a.RlockMap[theIns] = append(a.RlockMap[theIns], a.goRLockset[goID]...)
 		}
 	}
 }

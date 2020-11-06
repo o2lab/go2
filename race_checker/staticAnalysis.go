@@ -383,6 +383,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 						}
 					} else if deferIns.Call.StaticCallee().Name() == "RUnlock" {
 						RlockLoc := deferIns.Call.Args[0]
+						a.ptaConfig.AddQuery(RlockLoc)
 						if goID == 0 {
 							if k := a.lockSetContainsAt(a.RlockSet, RlockLoc); k >= 0 {
 								if deferIns.Block().Comment != "if.then" {

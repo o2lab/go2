@@ -148,9 +148,6 @@ func (a *analysis) lockSetsIntersect(insA ssa.Instruction, insB ssa.Instruction)
 					return true
 				}
 			}
-			if addrA.String() == addrB.String() { // WIP...
-				return true
-			}
 		}
 	}
 	return false
