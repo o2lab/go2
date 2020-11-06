@@ -120,6 +120,7 @@ func staticAnalysis(args []string) error {
 		selectDefault:make(map[*ssa.Select]ssa.Instruction), // map select statement to first instruction in its default block
 		afterSelect:  make(map[*ssa.Select]ssa.Instruction),
 		selectHB:	  make(map[ssa.Instruction]ssa.Instruction),
+		unlockCount:  0,
 	}
 
 	log.Info("Compiling stack trace for every Goroutine... ")

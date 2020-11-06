@@ -428,12 +428,21 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 		case "Unlock":
 			stats.IncStat(stats.NUnlock)
 			lockLoc := examIns.Call.Args[0]
+			if lockLoc.String() == "&cc.mu [#9]" && examIns.Parent().Name() == "updateResolverState" {
+				fmt.Println("unlock in block: ", examIns.Block().Comment)
+			}
 			a.ptaConfig.AddQuery(lockLoc)
 			if goID == 0 { // main goroutine
 				if p := a.lockSetContainsAt(a.lockSet, lockLoc); p >= 0 {
 					if examIns.Block().Comment != "if.then" { // remove from active lock-set
-						log.Trace("Unlocking ", lockLoc.String(), "  (", lockLoc.Pos(), ") removing index ", p, " from: ", lockSetVal(a.lockSet))
-						a.lockSet = a.deleteFromLockSet(a.lockSet, p)
+						if examIns.Block().Comment == "if.done" && examIns.Parent().Name() == "updateResolverState" && a.unlockCount < 3 {
+							// need to consider unlocking operations located in if.done block
+							a.unlockCount++
+							a.mapFreeze = true
+						} else {
+							log.Trace("Unlocking ", lockLoc.String(), "  (", lockLoc.Pos(), ") removing index ", p, " from: ", lockSetVal(a.lockSet))
+							a.lockSet = a.deleteFromLockSet(a.lockSet, p)
+						}
 					} else { // do NOT remove from active lock-set yet
 						a.mapFreeze = true
 					}
