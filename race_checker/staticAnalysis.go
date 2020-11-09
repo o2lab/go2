@@ -120,7 +120,6 @@ func staticAnalysis(args []string) error {
 		selectDefault:make(map[*ssa.Select]ssa.Instruction), // map select statement to first instruction in its default block
 		afterSelect:  make(map[*ssa.Select]ssa.Instruction),
 		selectHB:	  make(map[ssa.Instruction]ssa.Instruction),
-		unlockCount:  0,
 	}
 
 	log.Info("Compiling stack trace for every Goroutine... ")
@@ -292,6 +291,8 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 	var beforeSel ssa.Instruction // last instruction before encountering select
 	var toAppend []*ssa.BasicBlock
 	var toDefer []ssa.Instruction // stack storing deferred calls
+	var toUnlock []ssa.Value
+	var toRUnlock []ssa.Value
 	repeatSwitch := false         // triggered when encountering basic blocks for body of a forloop
 	for i := 0; i < len(fnBlocks); i++ {
 		var aBlock *ssa.BasicBlock
@@ -363,47 +364,11 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 					} else if deferIns.Call.StaticCallee().Name() == "Unlock" {
 						lockLoc := deferIns.Call.Args[0]
 						a.ptaConfig.AddQuery(lockLoc)
-						if goID == 0 {
-							if k := a.lockSetContainsAt(a.lockSet, lockLoc); k >= 0 {
-								if deferIns.Block().Comment != "if.then" {
-									log.Trace("Unlocking ", lockLoc.String(), "  (", lockLoc.Pos(), ") removing index ", k, " from: ", lockSetVal(a.lockSet))
-									a.lockSet = a.deleteFromLockSet(a.lockSet, k)
-								} else {
-									a.mapFreeze = true
-								}
-							}
-						} else { // worker goroutine
-							if k := a.lockSetContainsAt(a.goLockset[goID], lockLoc); k >= 0 {
-								if deferIns.Block().Comment != "if.then" {
-									log.Trace("Unlocking ", lockLoc.String(), "  (", lockLoc.Pos(), ") removing index ", k, " from: ", lockSetVal(a.goLockset[goID]))
-									a.goLockset[goID] = a.deleteFromLockSet(a.goLockset[goID], k)
-								} else {
-									a.mapFreeze = true
-								}
-							}
-						}
+						toUnlock = append(toUnlock, lockLoc)
 					} else if deferIns.Call.StaticCallee().Name() == "RUnlock" {
 						RlockLoc := deferIns.Call.Args[0]
 						a.ptaConfig.AddQuery(RlockLoc)
-						if goID == 0 {
-							if k := a.lockSetContainsAt(a.RlockSet, RlockLoc); k >= 0 {
-								if deferIns.Block().Comment != "if.then" {
-									log.Trace("RUnlocking ", RlockLoc.String(), "  (", RlockLoc.Pos(), ") removing index ", k, " from: ", lockSetVal(a.RlockSet))
-									a.RlockSet = a.deleteFromLockSet(a.RlockSet, k)
-								} else {
-									a.mapFreeze = true
-								}
-							}
-						} else { // worker goroutine
-							if k := a.lockSetContainsAt(a.goRLockset[goID], RlockLoc); k >= 0 {
-								if deferIns.Block().Comment != "if.then" {
-									log.Trace("RUnlocking ", RlockLoc.String(), "  (", RlockLoc.Pos(), ") removing index ", k, " from: ", lockSetVal(a.goRLockset[goID]))
-									a.goRLockset[goID] = a.deleteFromLockSet(a.goRLockset[goID], k)
-								} else {
-									a.mapFreeze = true
-								}
-							}
-						}
+						toRUnlock = append(toRUnlock, RlockLoc)
 					} else if deferIns.Call.StaticCallee().Name() == "Done" {
 						a.RWIns[goID] = append(a.RWIns[goID], theIns)
 					}
@@ -446,7 +411,9 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 			case *ssa.MakeInterface: // construct instance of interface type
 				a.insMakeInterface(examIns, goID, theIns)
 			case *ssa.Call:
-				a.insCall(examIns, goID, theIns)
+				unlockOps, runlockOps := a.insCall(examIns, goID, theIns)
+				toUnlock = append(toUnlock, unlockOps...)
+				toRUnlock = append(toRUnlock, runlockOps...)
 			case *ssa.Go: // for spawning of goroutines
 				a.insGo(examIns, goID, theIns)
 			case *ssa.Return:
@@ -472,11 +439,41 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 			case *ssa.Jump:
 				a.RWIns[goID] = append(a.RWIns[goID], theIns)
 			}
-			if k == len(aBlock.Instrs)-1 && a.mapFreeze {
-				a.mapFreeze = false // unfreeze lock maps so instructions in next block will be mapped to active lock-set
+			if k == len(aBlock.Instrs)-1 && a.mapFreeze { // TODO: this can happen too early
+				a.mapFreeze = false
 			}
 		}
+	}
+	if len(toUnlock) > 0 {
+		for _, loc := range toUnlock {
+			if goID == 0 {
+				if z := a.lockSetContainsAt(a.lockSet, loc); z >= 0 {
+					log.Trace("Unlocking ", loc.String(), "  (", a.lockSet[z].Pos(), ") removing index ", z, " from: ", lockSetVal(a.lockSet))
+					a.lockSet = a.deleteFromLockSet(a.lockSet, z)
+				}
+			} else {
+				if z := a.lockSetContainsAt(a.goLockset[goID], loc); z >= 0 {
+					log.Trace("Unlocking ", loc.String(), "  (", a.goLockset[goID][z].Pos(), ") removing index ", z, " from: ", lockSetVal(a.goLockset[goID]))
+					a.goLockset[goID] = a.deleteFromLockSet(a.goLockset[goID], z)
+				}
+			}
+		}
+	}
+	if len(toRUnlock) > 0 {
+		for _, rloc := range toRUnlock {
+			if goID == 0 { // main goroutine
+				if z := a.lockSetContainsAt(a.RlockSet, rloc); z >= 0 {
+					log.Trace("RUnlocking ", rloc.String(), "  (", a.RlockSet[z].Pos(), ") removing index ", z, " from: ", lockSetVal(a.RlockSet))
+					a.RlockSet = a.deleteFromLockSet(a.RlockSet, z)
+				}
+			} else { // worker goroutine
+				if z := a.lockSetContainsAt(a.goRLockset[goID], rloc); z >= 0 {
+					log.Trace("RUnlocking ", rloc.String(), "  (", a.goRLockset[goID][z].Pos(), ") removing index ", z, " from: ", lockSetVal(a.goRLockset[goID]))
+					a.goRLockset[goID] = a.deleteFromLockSet(a.goRLockset[goID], z)
 
+				}
+			}
+		}
 	}
 	// done with all instructions in function body, now pop the function
 	fnName := fn.Name()

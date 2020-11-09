@@ -150,8 +150,6 @@ func (a *analysis) lockSetsIntersect(insA ssa.Instruction, insB ssa.Instruction)
 			}
 		}
 	}
-	fmt.Println(setA)
-	fmt.Println(setB)
 	return false
 }
 

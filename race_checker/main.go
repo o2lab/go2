@@ -46,7 +46,6 @@ type analysis struct {
 	selectDefault map[*ssa.Select]ssa.Instruction // map select statement to first instruction in its default block
 	afterSelect	  map[*ssa.Select]ssa.Instruction // map select statement to first instruction after select is done
 	selectHB	  map[ssa.Instruction]ssa.Instruction // map edge LEAVING node to ENTERING node
-	unlockCount	  int // a temporary counter to locate final location of unlock
 }
 
 type fnInfo struct { // all fields must be comparable for fnInfo to be used as key to trieMap

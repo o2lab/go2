@@ -322,7 +322,7 @@ func (a *analysis) insMakeInterface(examIns *ssa.MakeInterface, goID int, theIns
 }
 
 // insCall analyzes method calls
-func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) {
+func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) (unlockOps []ssa.Value, runlockOps []ssa.Value) {
 	stats.IncStat(stats.NCall)
 	if examIns.Call.StaticCallee() == nil && examIns.Call.Method == nil {
 		if _, ok := examIns.Call.Value.(*ssa.Builtin); !ok {
@@ -406,11 +406,11 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 			stats.IncStat(stats.NLock)
 			lockLoc := examIns.Call.Args[0]         // identifier for address of lock
 			a.ptaConfig.AddQuery(lockLoc)
-			if lockLoc.String() == "&t21.mu [#7]" || lockLoc.String() == "&t22.mu [#7]" || lockLoc.String() == "&cs.mu [#16]" { // lock and unlock pair located within same if.then block
+			if lockLoc.String() == "&t22.mu [#7]" { // lock and unlock pair located within same if.then block
 				fmt.Println("need to catch this lock")
 			} else {
 				if goID == 0 { // main goroutine
-					if !sliceContains(a.lockSet, lockLoc) && !a.mapFreeze { // if lock is not already in active lockset
+					if !sliceContains(a.lockSet, lockLoc) { // if lock is not already in active lockset
 						if lockLoc.String() == "&t21.mu [#7]" {
 							fmt.Println(lockLoc.String(), " <-- this lock needs investigation")
 						} else {
@@ -419,7 +419,7 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 						}
 					}
 				} else { // worker goroutine
-					if !sliceContains(a.goLockset[goID], lockLoc) && !a.mapFreeze { // if lock is not already in active lockset
+					if !sliceContains(a.goLockset[goID], lockLoc) { // if lock is not already in active lockset
 						a.goLockset[goID] = append(a.goLockset[goID], lockLoc)
 						log.Trace("Locking   ", lockLoc.String(), "  (",  lockLoc.Pos(), ")  lockset now contains: ", lockSetVal(a.goLockset[goID]))
 					}
@@ -428,35 +428,9 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 		case "Unlock":
 			stats.IncStat(stats.NUnlock)
 			lockLoc := examIns.Call.Args[0]
-			if lockLoc.String() == "&cc.mu [#9]" && examIns.Parent().Name() == "updateResolverState" {
-				fmt.Println("unlock in block: ", examIns.Block().Comment)
-			}
 			a.ptaConfig.AddQuery(lockLoc)
-			if goID == 0 { // main goroutine
-				if p := a.lockSetContainsAt(a.lockSet, lockLoc); p >= 0 {
-					if examIns.Block().Comment != "if.then" { // remove from active lock-set
-						if examIns.Block().Comment == "if.done" && examIns.Parent().Name() == "updateResolverState" && a.unlockCount < 3 {
-							// need to consider unlocking operations located in if.done block
-							a.unlockCount++
-							a.mapFreeze = true
-						} else {
-							log.Trace("Unlocking ", lockLoc.String(), "  (", lockLoc.Pos(), ") removing index ", p, " from: ", lockSetVal(a.lockSet))
-							a.lockSet = a.deleteFromLockSet(a.lockSet, p)
-						}
-					} else { // do NOT remove from active lock-set yet
-						a.mapFreeze = true
-					}
-				}
-			} else { // worker goroutine
-				if p := a.lockSetContainsAt(a.goLockset[goID], lockLoc); p >= 0 {
-					if examIns.Block().Comment != "if.then" { // remove from active lock-set
-						log.Trace("Unlocking ", lockLoc.String(), "  (", lockLoc.Pos(), ") removing index ", p, " from: ", lockSetVal(a.goLockset[goID]))
-						a.goLockset[goID] = a.deleteFromLockSet(a.goLockset[goID], p)
-					} else { // do NOT remove from active lock-set yet
-						a.mapFreeze = true
-					}
-				}
-			}
+			unlockOps = append(unlockOps, lockLoc)
+			a.mapFreeze = true
 		case "RLock":
 			RlockLoc := examIns.Call.Args[0]          // identifier for address of lock
 			a.ptaConfig.AddQuery(RlockLoc)
@@ -466,7 +440,7 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 					log.Trace("RLocking   ", RlockLoc.String(), "  (",  RlockLoc.Pos(), ")  Rlockset now contains: ", lockSetVal(a.RlockSet))
 				}
 			} else {
-				if !sliceContains(a.RlockSet, RlockLoc) { // if lock is not already in active lock-set
+				if !sliceContains(a.goRLockset[goID], RlockLoc) { // if lock is not already in active lock-set
 					a.goRLockset[goID] = append(a.goRLockset[goID], RlockLoc)
 					log.Trace("RLocking   ", RlockLoc.String(), "  (",  RlockLoc.Pos(), ")  Rlockset now contains: ", lockSetVal(a.goRLockset[goID]))
 				}
@@ -474,17 +448,8 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 		case "RUnlock":
 			RlockLoc := examIns.Call.Args[0]
 			a.ptaConfig.AddQuery(RlockLoc)
-			if goID == 0 {
-				if p := a.lockSetContainsAt(a.RlockSet, RlockLoc); p >= 0 {
-					log.Trace("RUnlocking ", RlockLoc.String(), "  (", RlockLoc.Pos(), ") removing index ", p, " from: ", lockSetVal(a.RlockSet))
-					a.RlockSet = a.deleteFromLockSet(a.RlockSet, p)
-				}
-			} else {
-				if p := a.lockSetContainsAt(a.goRLockset[goID], RlockLoc); p >= 0 {
-					log.Trace("RUnlocking ", RlockLoc.String(), "  (", RlockLoc.Pos(), ") removing index ", p, " from: ", lockSetVal(a.goRLockset[goID]))
-					a.goRLockset[goID] = a.deleteFromLockSet(a.goRLockset[goID], p)
-				}
-			}
+			runlockOps = append(runlockOps, RlockLoc)
+			a.mapFreeze = true
 		case "Wait":
 			stats.IncStat(stats.NWaitGroupWait)
 			a.RWIns[goID] = append(a.RWIns[goID], theIns)
@@ -495,6 +460,7 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 	} else {
 		return
 	}
+	return unlockOps, runlockOps
 }
 
 // insGo analyzes go calls
@@ -575,10 +541,14 @@ func (a *analysis) updateLockMap(goID int, theIns ssa.Instruction) {
 	if goID == 0 { // main goroutine
 		if len(a.lockSet) > 0 && !a.mapFreeze {
 			a.lockMap[theIns] = append(a.lockMap[theIns], a.lockSet...)
+		} else if len(a.lockSet) > 0 && a.mapFreeze {
+			a.lockMap[theIns] = append(a.lockMap[theIns], a.lockSet[:len(a.lockSet)-1]...) // may not always be last lock
 		}
 	} else { // worker goroutine
 		if len(a.goLockset[goID]) > 0 && !a.mapFreeze {
 			a.lockMap[theIns] = append(a.lockMap[theIns], a.goLockset[goID]...)
+		} else if len(a.goLockset[goID]) > 0 && a.mapFreeze {
+			a.lockMap[theIns] = append(a.lockMap[theIns], a.goLockset[goID][:len(a.goLockset[goID])-1]...)
 		}
 	}
 }
