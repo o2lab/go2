@@ -33,6 +33,8 @@ var tests = []string{
 	"tests/lock.go",
 	"tests/lock_grpc_sync.go",
 	"tests/lock_multiple_deferred.go",
+	"tests/lock_twice.go",
+	//"tests/lock_diff_thread",
 	"tests/rwmutex_lock.go",
 	"tests/context1.go",
 	"tests/fields.go",
