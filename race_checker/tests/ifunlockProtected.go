@@ -38,8 +38,9 @@ func main() {
 		}
 		x=9
 		mu.Unlock()
-		x=9
 		return ret
 	}()
+	mu.Lock()
 	fmt.Println(x)
+	mu.Unlock()
 }
