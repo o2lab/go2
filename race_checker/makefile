@@ -38,6 +38,8 @@ runSelect2:
 	./main tests/select_nonblock.go
 runSelect3:
 	./main tests/single_case_select.go
+runG:
+	./main -lockOps tests/grpc-go-master/examples/helloworld/greeter_client/main.go
 runWait:
 	./main tests/waitgroup.go
 runCockroach:
