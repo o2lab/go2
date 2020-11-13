@@ -495,13 +495,13 @@ func (a *analysis) insGo(examIns *ssa.Go, goID int, theIns ssa.Instruction) {
 	a.goStack[newGoID] = append(a.goStack[newGoID], a.storeIns...)
 	a.workList = append(a.workList, info) // store encountered goroutines
 	log.Debug(strings.Repeat(" ", a.levels[goID]), "spawning Goroutine ----->  ", fnName)
-	if goID == 0 { // this is a child spawned by main goroutine and there are currently active locks
-		a.goLockset[newGoID] = append(a.goLockset[newGoID], a.lockSet...) // inherit active lockset from parent goroutine
-		a.goRLockset[newGoID] = append(a.goRLockset[newGoID], a.RlockSet...)
-	} else {
-		a.goLockset[newGoID] = append(a.goLockset[newGoID], a.goLockset[goID]...) // inherit from parent goroutine
-		a.goRLockset[newGoID] = append(a.goRLockset[newGoID], a.goRLockset[goID]...)
-	}
+	//if goID == 0 { // this is a child spawned by main goroutine and there are currently active locks
+	//	a.goLockset[newGoID] = append(a.goLockset[newGoID], a.lockSet...) // inherit active lockset from parent goroutine
+	//	a.goRLockset[newGoID] = append(a.goRLockset[newGoID], a.RlockSet...)
+	//} else {
+	//	a.goLockset[newGoID] = append(a.goLockset[newGoID], a.goLockset[goID]...) // inherit from parent goroutine
+	//	a.goRLockset[newGoID] = append(a.goRLockset[newGoID], a.goRLockset[goID]...)
+	//}
 }
 
 func (a *analysis) insMapUpdate(examIns *ssa.MapUpdate, goID int, theIns ssa.Instruction) {
