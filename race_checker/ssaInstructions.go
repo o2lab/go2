@@ -1,7 +1,7 @@
 package main
 
 import (
-	"fmt"
+	//"fmt"
 	"github.com/o2lab/race-checker/stats"
 	log "github.com/sirupsen/logrus"
 	"go/constant"
@@ -406,23 +406,15 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 			stats.IncStat(stats.NLock)
 			lockLoc := examIns.Call.Args[0]         // identifier for address of lock
 			a.ptaConfig.AddQuery(lockLoc)
-			if lockLoc.String() == "&t22.mu [#7]" { // lock and unlock pair located within same if.then block
-				fmt.Println("need to catch this lock")
-			} else {
-				if goID == 0 { // main goroutine
-					if !sliceContains(a.lockSet, lockLoc) { // if lock is not already in active lockset
-						if lockLoc.String() == "&t21.mu [#7]" {
-							fmt.Println(lockLoc.String(), " <-- this lock needs investigation")
-						} else {
-							a.lockSet = append(a.lockSet, lockLoc)
-							log.Trace("Locking   ", lockLoc.String(), "  (",  lockLoc.Pos(), ")  lockset now contains: ", lockSetVal(a.lockSet))
-						}
-					}
-				} else { // worker goroutine
-					if !sliceContains(a.goLockset[goID], lockLoc) { // if lock is not already in active lockset
-						a.goLockset[goID] = append(a.goLockset[goID], lockLoc)
-						log.Trace("Locking   ", lockLoc.String(), "  (",  lockLoc.Pos(), ")  lockset now contains: ", lockSetVal(a.goLockset[goID]))
-					}
+			if goID == 0 { // main goroutine
+				if !sliceContains(a.lockSet, lockLoc) { // if lock is not already in active lockset
+					a.lockSet = append(a.lockSet, lockLoc)
+					log.Trace("Locking   ", lockLoc.String(), "  (",  lockLoc.Pos(), ")  lockset now contains: ", lockSetVal(a.lockSet))
+				}
+			} else { // worker goroutine
+				if !sliceContains(a.goLockset[goID], lockLoc) { // if lock is not already in active lockset
+					a.goLockset[goID] = append(a.goLockset[goID], lockLoc)
+					log.Trace("Locking   ", lockLoc.String(), "  (",  lockLoc.Pos(), ")  lockset now contains: ", lockSetVal(a.goLockset[goID]))
 				}
 			}
 		case "Unlock":
@@ -495,13 +487,6 @@ func (a *analysis) insGo(examIns *ssa.Go, goID int, theIns ssa.Instruction) {
 	a.goStack[newGoID] = append(a.goStack[newGoID], a.storeIns...)
 	a.workList = append(a.workList, info) // store encountered goroutines
 	log.Debug(strings.Repeat(" ", a.levels[goID]), "spawning Goroutine ----->  ", fnName)
-	//if goID == 0 { // this is a child spawned by main goroutine and there are currently active locks
-	//	a.goLockset[newGoID] = append(a.goLockset[newGoID], a.lockSet...) // inherit active lockset from parent goroutine
-	//	a.goRLockset[newGoID] = append(a.goRLockset[newGoID], a.RlockSet...)
-	//} else {
-	//	a.goLockset[newGoID] = append(a.goLockset[newGoID], a.goLockset[goID]...) // inherit from parent goroutine
-	//	a.goRLockset[newGoID] = append(a.goRLockset[newGoID], a.goRLockset[goID]...)
-	//}
 }
 
 func (a *analysis) insMapUpdate(examIns *ssa.MapUpdate, goID int, theIns ssa.Instruction) {

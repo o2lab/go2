@@ -110,11 +110,7 @@ func (a *analysis) reachable(fromIns ssa.Instruction, fromGo int, toIns ssa.Inst
 	fromNode := a.RWinsMap[fromInsKey] // starting node
 	toNode := a.RWinsMap[toInsKey] // target node
 	nexts := a.HBgraph.Neighbors(fromNode) // store reachable nodes in a stack
-	counter := 0 // for managing performance only
 	for len(nexts) > 0 {
-		if counter == 10000 {
-			break
-		}
 		curr := nexts[len(nexts)-1] // get last node in stack
 		nexts = nexts[:len(nexts)-1] // pop last node in stack
 		if curr == toNode {
@@ -122,7 +118,6 @@ func (a *analysis) reachable(fromIns ssa.Instruction, fromGo int, toIns ssa.Inst
 		}
 		next := a.HBgraph.Neighbors(curr)
 		nexts = append(nexts, next...)
-		counter++
 	}
 	return false
 }

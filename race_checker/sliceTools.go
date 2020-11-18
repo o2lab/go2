@@ -103,7 +103,11 @@ func (a *analysis) lockSetContainsAt(s []ssa.Value, e ssa.Value) int {
 			aPos = aType.Pos()
 		case *ssa.FieldAddr:
 			if aType1, ok1 := aType.X.(*ssa.UnOp); ok1 {
-				aPos = aType1.X.Pos()
+				if aType2, ok2 := aType1.X.(*ssa.FieldAddr); ok2 {
+					aPos = aType2.X.Pos()
+				} else {
+					aPos = aType1.X.Pos()
+				}
 			} else {
 				aPos = aType.X.Pos()
 			}
@@ -113,7 +117,11 @@ func (a *analysis) lockSetContainsAt(s []ssa.Value, e ssa.Value) int {
 			bPos = eType.Pos()
 		case *ssa.FieldAddr:
 			if eType1, ok2 := eType.X.(*ssa.UnOp); ok2 {
-				bPos = eType1.X.Pos()
+				if eType2, ok3 := eType1.X.(*ssa.FieldAddr); ok3 {
+					bPos = eType2.X.Pos()
+				} else {
+					bPos = eType1.X.Pos()
+				}
 			} else {
 				bPos = eType.X.Pos()
 			}
