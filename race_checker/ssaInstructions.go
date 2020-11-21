@@ -472,6 +472,12 @@ func (a *analysis) insGo(examIns *ssa.Go, goID int, theIns ssa.Instruction) {
 			fnName = paramType.Fn.Name()
 		}
 	}
+	if fnName == "serverWorker" {
+		a.serverWorker+= 1
+		if a.serverWorker >= 5 {
+			return
+		}
+	}
 	newGoID := goID + 1 // increment goID for child goroutine
 	if len(a.workList) > 0 {
 		newGoID = a.workList[len(a.workList)-1].goID + 1
