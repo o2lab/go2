@@ -181,6 +181,8 @@ func (a *analysis) chanProtected(insA ssa.Instruction, insB ssa.Instruction) boo
 func (a *analysis) printRace(counter int, insPair []ssa.Instruction, addrPair []ssa.Value, goIDs []int, insInd []int) {
 	log.Printf("Data race #%d", counter)
 	log.Println(strings.Repeat("=", 100))
+	var writeLocks []ssa.Value
+	var readLocks []ssa.Value
 	for i, anIns := range insPair {
 		var errMsg string
 		var access string
@@ -191,16 +193,18 @@ func (a *analysis) printRace(counter int, insPair []ssa.Instruction, addrPair []
 			} else {
 				errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].String()), " in function ", aurora.BgBrightGreen(anIns.Parent().Name()), " at ", a.prog.Fset.Position(insPair[i].Pos()))
 			}
+			writeLocks = a.lockMap[anIns]
 		} else {
 			access = " Read of "
 			errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].String()), " in function ", aurora.BgBrightGreen(anIns.Parent().Name()), " at ", a.prog.Fset.Position(anIns.Pos()))
+			readLocks = append(a.lockMap[anIns], a.RlockMap[anIns]...)
 		}
 		if testMode {
 			colorOutput := regexp.MustCompile(`\x1b\[\d+m`)
 			a.racyStackTops = append(a.racyStackTops, colorOutput.ReplaceAllString(errMsg, ""))
 		}
 		log.Print(errMsg)
-		var printStack []string
+		var printStack []string // store functions in stack and pop terminated functions
 		var printPos []token.Pos
 		for p, everyIns := range a.RWIns[goIDs[i]] {
 			if p < insInd[i]-1 {
@@ -223,7 +227,11 @@ func (a *analysis) printRace(counter int, insPair []ssa.Instruction, addrPair []
 				log.Println("\t ", strings.Repeat(" ", p), toPrint, a.prog.Fset.Position(printPos[p]))
 			}
 		}
-		log.Println("\tin goroutine  ***", a.goNames[goIDs[i]], "[", goIDs[i], "] *** , with the following call stack: ")
+		if goIDs[i] > 0 { // show location where calling goroutine was spawned
+			log.Println("\tin goroutine  ***", a.goNames[goIDs[i]], "[", goIDs[i], "] *** , with the following call stack: ")
+		} else { // main goroutine
+			log.Println("\tin goroutine  ***", a.goNames[goIDs[i]], "[", goIDs[i], "] *** ")
+		}
 		var pathGo []int
 		j := goIDs[i]
 		for j > 0 {
@@ -242,5 +250,7 @@ func (a *analysis) printRace(counter int, insPair []ssa.Instruction, addrPair []
 			}
 		}
 	}
+	log.Println("Locks protecting Write access: ", writeLocks)
+	log.Println("Locks protecting Read  access: ", readLocks)
 	log.Println(strings.Repeat("=", 100))
 }
