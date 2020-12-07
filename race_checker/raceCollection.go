@@ -250,7 +250,7 @@ func (a *analysis) printRace(counter int, insPair []ssa.Instruction, addrPair []
 			}
 		}
 	}
-	log.Println("Locks protecting Write access: ", writeLocks)
-	log.Println("Locks protecting Read  access: ", readLocks)
+	log.Println("Locks acquired before Write access: ", writeLocks)
+	log.Println("Locks acquired before Read  access: ", readLocks)
 	log.Println(strings.Repeat("=", 100))
 }

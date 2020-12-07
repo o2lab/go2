@@ -220,8 +220,27 @@ func staticAnalysis(args []string) error {
 					case *ssa.FreeVar:
 						wgName = wg.Name()
 					}
-					if edgeTo, ok := waitingN[wgName]; ok {
+					if edgeTo, ok0 := waitingN[wgName]; ok0 {
 						err := Analysis.HBgraph.MakeEdge(prevN, edgeTo) // create edge from Done node to Wait node
+						if err != nil {
+							log.Fatal(err)
+						}
+					}
+				}
+			} else if dIns, ok1 := anIns.(*ssa.Defer); ok1 {
+				if dIns.Call.Value.Name() == "Done" {
+					var wgName string
+					switch wg := dIns.Call.Args[0].(type) {
+					case *ssa.Alloc:
+						wgName = wg.Comment
+					case *ssa.FreeVar:
+						wgName = wg.Name()
+					case *ssa.FieldAddr:
+						wgName = wg.X.(*ssa.UnOp).X.(*ssa.FreeVar).Name()
+					}
+					fmt.Println(wgName)
+					if edgeT, ok2 := waitingN["group"]; ok2 {
+						err := Analysis.HBgraph.MakeEdge(prevN, edgeT) // create edge from Done node to Wait node
 						if err != nil {
 							log.Fatal(err)
 						}
@@ -371,7 +390,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 						a.ptaConfig.AddQuery(RlockLoc)
 						toRUnlock = append(toRUnlock, RlockLoc)
 					} else if deferIns.Call.StaticCallee().Name() == "Done" {
-						a.RWIns[goID] = append(a.RWIns[goID], theIns)
+						a.RWIns[goID] = append(a.RWIns[goID], dIns)
 					}
 				}
 			}
