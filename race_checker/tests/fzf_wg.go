@@ -15,11 +15,11 @@ func main() {
 		x:  0,
 	}
 	group.Go()
-	group.Wait()
+	group.Waiting()
 	fmt.Println(group.x)
 }
 
-func (g *Group) Wait() {
+func (g *Group) Waiting() {
 	g.wg.Wait()
 	g.x = 2
 }

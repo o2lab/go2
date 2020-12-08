@@ -60,7 +60,7 @@ func (a *analysis) isReadIns(ins ssa.Instruction) bool {
 	case *ssa.Lookup:
 		return true
 	case *ssa.Call:
-		if len(insType.Call.Args) > 0 {
+		if len(insType.Call.Args) > 0 && insType.Call.Value.Name() != "Done" && insType.Call.Value.Name() != "Wait" {
 			for _, anArg := range insType.Call.Args {
 				if _, ok := anArg.(*ssa.FieldAddr); ok {
 					return true
@@ -445,9 +445,11 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 		case "Wait":
 			stats.IncStat(stats.NWaitGroupWait)
 			a.RWIns[goID] = append(a.RWIns[goID], theIns)
+			a.ptaConfig.AddQuery(examIns.Call.Args[0])
 		case "Done":
 			stats.IncStat(stats.NWaitGroupDone)
 			a.RWIns[goID] = append(a.RWIns[goID], theIns)
+			a.ptaConfig.AddQuery(examIns.Call.Args[0])
 		}
 	} else {
 		return

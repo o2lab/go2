@@ -136,13 +136,20 @@ func staticAnalysis(args []string) error {
 		log.Debug("race is not possible in one goroutine")
 		return nil
 	}
+
+	result, err := pointer.Analyze(Analysis.ptaConfig) // conduct pointer analysis
+	if err != nil {
+		log.Fatal(err)
+	}
+	Analysis.result = result
+
 	log.Info("Building Happens-Before graph... ")
 	Analysis.HBgraph = graph.New(graph.Directed)
 	var prevN graph.Node
 	var goCaller []graph.Node
 	var caseEnd []ssa.Instruction
 	var caseN []graph.Node
-	waitingN := make(map[string]graph.Node) // map WG name to graph node
+	waitingN := make(map[*ssa.Call]graph.Node)
 	chanRecvs := make(map[string]graph.Node) // map channel name to graph node
 	beforeSel := make(map[ssa.Instruction]graph.Node) // map ins before select straight to default clause
 	var selDefault []ssa.Instruction
@@ -193,45 +200,25 @@ func staticAnalysis(args []string) error {
 				Analysis.RWinsMap[insKey] = prevN
 			} else if callIns, ok := anIns.(*ssa.Call); ok { // taking care of WG operations. TODO: identify different WG instances
 				if callIns.Call.Value.Name() == "Wait" {
-					var wgName string
-					switch wg := callIns.Call.Args[0].(type) {
-					case *ssa.Alloc:
-						wgName = wg.Comment
-					case *ssa.FreeVar:
-						wgName = wg.Name()
-					}
-					waitingN[wgName] = prevN // store Wait node for later edge creation TO this node
+					waitingN[callIns] = prevN // store Wait node for later edge creation TO this node
 				} else if callIns.Call.Value.Name() == "Done" {
-					var wgName string
-					switch wg := callIns.Call.Args[0].(type) {
-					case *ssa.Alloc:
-						wgName = wg.Comment
-					case *ssa.FreeVar:
-						wgName = wg.Name()
-					}
-					if edgeTo, ok0 := waitingN[wgName]; ok0 {
-						err := Analysis.HBgraph.MakeEdge(prevN, edgeTo) // create edge from Done node to Wait node
-						if err != nil {
-							log.Fatal(err)
+					for wIns, wNode := range waitingN {
+						if Analysis.sameAddress(callIns.Call.Args[0], wIns.Call.Args[0]) {
+							err := Analysis.HBgraph.MakeEdge(prevN, wNode) // create edge from Done node to Wait node
+							if err != nil {
+								log.Fatal(err)
+							}
 						}
 					}
 				}
 			} else if dIns, ok1 := anIns.(*ssa.Defer); ok1 {
 				if dIns.Call.Value.Name() == "Done" {
-					var wgName string
-					switch wg := dIns.Call.Args[0].(type) {
-					case *ssa.Alloc:
-						wgName = wg.Comment
-					case *ssa.FreeVar:
-						wgName = wg.Name()
-					case *ssa.FieldAddr:
-						wgName = wg.X.(*ssa.UnOp).X.(*ssa.FreeVar).Name()
-					}
-					fmt.Println(wgName)
-					if edgeT, ok2 := waitingN["group"]; ok2 {
-						err := Analysis.HBgraph.MakeEdge(prevN, edgeT) // create edge from Done node to Wait node
-						if err != nil {
-							log.Fatal(err)
+					for wIns, wNode := range waitingN {
+						if Analysis.sameAddress(dIns.Call.Args[0], wIns.Call.Args[0]) {
+							err := Analysis.HBgraph.MakeEdge(prevN, wNode) // create edge from Done node to Wait node
+							if err != nil {
+								log.Fatal(err)
+							}
 						}
 					}
 				}
@@ -260,11 +247,7 @@ func staticAnalysis(args []string) error {
 		}
 	}
 	log.Info("Done  -- Happens-Before graph built ")
-	result, err := pointer.Analyze(Analysis.ptaConfig) // conduct pointer analysis
-	if err != nil {
-		log.Fatal(err)
-	}
-	Analysis.result = result
+
 	log.Info("Checking for data races... ")
 	Analysis.checkRacyPairs()
 	return nil
@@ -378,8 +361,9 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 						RlockLoc := deferIns.Call.Args[0]
 						a.ptaConfig.AddQuery(RlockLoc)
 						toRUnlock = append(toRUnlock, RlockLoc)
-					} else if deferIns.Call.StaticCallee().Name() == "Done" {
+					} else if deferIns.Call.Value.Name() == "Done" {
 						a.RWIns[goID] = append(a.RWIns[goID], dIns)
+						a.ptaConfig.AddQuery(deferIns.Call.Args[0])
 					}
 				}
 			}
