@@ -1,9 +1,9 @@
-# This Dockerfile sets up the build environment for traefic (github.com/traefik/traefik).
+# This Dockerfile sets up the build environment for traefik (github.com/traefik/traefik).
 # 
 # Usage:
 #   $ docker build -t o2lab/traefic-bench:latest .
 #   $ docker run -it traefuc-bench
-# Then we are ready to run our race checker on traefic:
+# Then we are ready to run our race checker on traefik:
 #   $ race-checker <options> .
 
 from golang:buster
