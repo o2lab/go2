@@ -1,6 +1,6 @@
 package main
 
-import (
+import   (
 	"fmt"
 	log "github.com/sirupsen/logrus"
 	"github.com/twmb/algoimpl/go/graph"
@@ -150,12 +150,9 @@ func staticAnalysis(args []string) error {
 		for i, anIns := range insSlice {
 			insKey := goIns{ins: anIns, goID: nGo}
 			if nGo == 0 && i == 0 { // main goroutine, first instruction
-				if _, ok := anIns.(*ssa.Go); !ok {
-					prevN = Analysis.HBgraph.MakeNode() // initiate for future nodes
-					*prevN.Value = insKey
-				} else {
-					prevN = Analysis.HBgraph.MakeNode() // initiate for future nodes
-					*prevN.Value = insKey
+				prevN = Analysis.HBgraph.MakeNode() // initiate for future nodes
+				*prevN.Value = insKey
+				if _, ok := anIns.(*ssa.Go); ok {
 					goCaller = append(goCaller, prevN) // sequentially store go calls in the same goroutine
 				}
 			} else {
@@ -164,16 +161,8 @@ func staticAnalysis(args []string) error {
 				if nGo != 0 && i == 0 { // worker goroutine, first instruction
 					prevN = goCaller[0]
 					goCaller = goCaller[1:] // pop from stack
-					err := Analysis.HBgraph.MakeEdge(prevN, currN)
-					if err != nil {
-						log.Fatal(err)
-					}
 				} else if _, ok := anIns.(*ssa.Go); ok {
 					goCaller = append(goCaller, currN) // sequentially store go calls in the same goroutine
-					err := Analysis.HBgraph.MakeEdge(prevN, currN)
-					if err != nil {
-						log.Fatal(err)
-					}
 				//} else if sliceContainsInsAt(selDefault, anIns) > -1 {
 				//	for from, to := range Analysis.selectHB {
 				//		if to == anIns {
@@ -187,13 +176,13 @@ func staticAnalysis(args []string) error {
 				//		break
 				//	}
 				} else {
-					err := Analysis.HBgraph.MakeEdge(prevN, currN)
-					if err != nil {
-						log.Fatal(err)
-					}
 					if sliceContainsInsAt(caseEnd, anIns) > -1 { // last instruction in clause
 						caseN = append(caseN, currN)
 					}
+				}
+				err := Analysis.HBgraph.MakeEdge(prevN, currN)
+				if err != nil {
+					log.Fatal(err)
 				}
 				prevN = currN
 			}
