@@ -3,7 +3,7 @@ package main
 import "fmt"
 
 func main() {
-	for i := 0; i < 100; i++ {
+	for i := 0; i < 2; i++ { // modified for simplification
 		mayRace()
 	}
 	showBB(1)
