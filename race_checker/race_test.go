@@ -31,12 +31,11 @@ var tests = []string{
 	"tests/waitgroup.go",
 	"tests/wrong_waitgroup.go",
 	"tests/multiple_waitgroups.go",
-	"tests/fzf_wg.go",
 	"tests/lock.go",
 	"tests/lock_grpc_sync.go",
 	"tests/lock_multiple_deferred.go",
 	"tests/lock_twice.go",
-	//"tests/lock_diff_thread",
+	//"tests/lock_diff_thread", // not considered at the moment
 	"tests/rwmutex_lock.go",
 	"tests/context1.go",
 	"tests/fields.go",

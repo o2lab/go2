@@ -23,7 +23,10 @@ func fromPkgsOfInterest(fn *ssa.Function) bool {
 			return false
 		}
 	}
-	return allPkg
+	if !strings.HasPrefix(fn.Pkg.Pkg.Path(), fromPath) { // path is dependent on tested program
+		return false
+	}
+	return true
 }
 
 // isLocalAddr returns whether location is a local address or not
