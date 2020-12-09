@@ -85,6 +85,12 @@ var (
 
 const trieLimit = 2      // set as user config option later, an integer that dictates how many times a function can be called under identical context
 const efficiency = false // configuration setting to avoid recursion in tested program
+const fromPath = "" // interested packages are those located at this path
+// sample paths:
+// gRPC - google.golang.org/grpc
+// traefik - github.com/traefik
+// docker -
+// kubernetes -
 
 func init() {
 	excludedPkgs = []string{
@@ -109,25 +115,9 @@ func init() {
 		"reflect",
 		"internal",
 		"impl",
-		"json", // added for testing gRPC
-		"context", // added for testing gRPC
-		"channelz", // added for testing gRPC
-		"backoff", // added for testing gRPC
-		"url", // added for testing gRPC
-		"binarylog",
-		"net",
-		"test",
-		"hpack",
-		"dns2host",
-		"ndp",
-		"protoregistry",
-		"statsd_test",
-		"protoreflect",
-		"transport",
-		"grpctest",
-		"status",
-		"proto",
-		"spf",
+		"transport", // grpc
+		//"version",
+		//"sort",
 	}
 }
 
