@@ -18,8 +18,10 @@ _Work in Progress:_
 
 [3] need to consider how Go handles communication and synchronization more precisely. 
 
+***Testing (google sheet): https://docs.google.com/spreadsheets/d/1XQznzDadxw9Tp6SVOCBndSTy3J65N1CscJUBRZwrcTU/edit?usp=sharing
 
-## Combining Channels with Select
+
+## Communication Ops with Select
 
 Channel operations are an elegant feature of Go in allowing communication among goroutines. By combining them with select, a goroutine is able to wait on multiple communication operations. 
 
