@@ -46,6 +46,7 @@ type analysis struct {
 	selectDefault map[*ssa.Select]ssa.Instruction // map select statement to first instruction in its default block
 	afterSelect	  map[ssa.Instruction]ssa.Instruction // map select statement to first instruction after select is done
 	selectHB	  map[ssa.Instruction]ssa.Instruction // map edge LEAVING node to ENTERING node
+	selectafterHB	  map[ssa.Instruction]ssa.Instruction
 	serverWorker   int
 }
 

@@ -123,6 +123,7 @@ func staticAnalysis(args []string) error {
 		selectDefault:make(map[*ssa.Select]ssa.Instruction), // map select statement to first instruction in its default block
 		afterSelect:  make(map[ssa.Instruction]ssa.Instruction),
 		selectHB:	  make(map[ssa.Instruction]ssa.Instruction),
+		selectafterHB:	  make(map[ssa.Instruction]ssa.Instruction),
 		serverWorker:     0,
 	}
 
@@ -195,10 +196,18 @@ func staticAnalysis(args []string) error {
 					if err != nil {
 						log.Fatal(err)
 					}
+				}else{
+					err := Analysis.HBgraph.MakeEdge(beforeSel[Analysis.afterSelect[anIns]], currN)
+					if err != nil {
+						log.Fatal(err)
+					}
 				}
 				prevN = currN
 			}
 			if _, ok := Analysis.selectHB[anIns]; ok { // last instruction before encountering select
+				beforeSel[anIns] = prevN
+			}
+			if _, ok := Analysis.selectafterHB[anIns]; ok { // last instruction before encountering select
 				beforeSel[anIns] = prevN
 			}
 			if Analysis.isReadIns(anIns) || isWriteIns(anIns) {
@@ -311,6 +320,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 			a.afterSelect[aBlock.Instrs[0]] = beforeSel // map select to first ins after select
 		}else{
 			if aBlock.Comment == "select.done"{ // blocking select
+				a.selectafterHB[beforeSel] = aBlock.Instrs[0]
 				a.afterSelect[aBlock.Instrs[0]] = beforeSel // map select to first ins after select
 			}
 		}
