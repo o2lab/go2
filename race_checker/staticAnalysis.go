@@ -23,6 +23,9 @@ func fromPkgsOfInterest(fn *ssa.Function) bool {
 			return false
 		}
 	}
+	if fn.Pkg.Pkg.Name() == "main" || fn.Pkg.Pkg.Name() == "cli"  {
+		return true
+	}
 	if !strings.HasPrefix(fn.Pkg.Pkg.Path(), fromPath) { // path is dependent on tested program
 		return false
 	}
@@ -99,7 +102,7 @@ func staticAnalysis(args []string) error {
 	// Configure pointer analysis to build call-graph
 	config := &pointer.Config{
 		Mains:          mains,
-		BuildCallGraph: true,
+		BuildCallGraph: false,
 	}
 	Analysis = &analysis{
 		prog:         prog,
@@ -260,10 +263,8 @@ func staticAnalysis(args []string) error {
 func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 	a.analysisStat.nGoroutine = goID + 1 // keep count of goroutine quantity
 	if !isSynthetic(fn) {                // if function is NOT synthetic
-		for _, excluded := range excludedPkgs { // TODO: need revision
-			if fn.Pkg.Pkg.Name() == excluded {
-				return
-			}
+		if !fromPkgsOfInterest(fn) {
+			return
 		}
 		if fn.Name() == "main" {
 			a.levels[goID] = 0 // initialize level count at main entry
