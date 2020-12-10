@@ -79,17 +79,18 @@ type trie struct {
 
 var (
 	Analysis     *analysis
-	allPkg       = true
 	excludedPkgs []string
 	testMode     = false // Used by race_test.go for collecting output.
 )
 
 const trieLimit = 2      // set as user config option later, an integer that dictates how many times a function can be called under identical context
 const efficiency = false // configuration setting to avoid recursion in tested program
-const fromPath = "" // interested packages are those located at this path
+const fromPath = "" 	 // interested packages are those located at this path
 // sample paths:
 // gRPC - google.golang.org/grpc
 // traefik - github.com/traefik
+// gogs - gogs.io/gogs
+// istio - istio.io/istio
 // docker -
 // kubernetes -
 
@@ -117,8 +118,9 @@ func init() {
 		"internal",
 		"impl",
 		"transport", // grpc
-		//"version",
-		//"sort",
+		"version",
+		"sort",
+		"filepath",
 	}
 }
 
