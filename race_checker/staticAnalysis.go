@@ -124,8 +124,9 @@ func staticAnalysis(args []string) error {
 		chanMap:      make(map[ssa.Instruction][]string), // map each read/write access to a list of channels with value(s) already sent to it
 		selectedChans:make(map[string]ssa.Instruction),
 		selectDefault:make(map[*ssa.Select]ssa.Instruction), // map select statement to first instruction in its default block
-		afterSelect:  make(map[*ssa.Select]ssa.Instruction),
+		afterSelect:  make(map[ssa.Instruction]ssa.Instruction),
 		selectHB:	  make(map[ssa.Instruction]ssa.Instruction),
+		selectafterHB:	  make(map[ssa.Instruction]ssa.Instruction),
 		serverWorker:     0,
 	}
 
@@ -193,13 +194,23 @@ func staticAnalysis(args []string) error {
 						caseN = append(caseN, currN)
 					}
 				}
-				err := Analysis.HBgraph.MakeEdge(prevN, currN)
-				if err != nil {
-					log.Fatal(err)
+				if _, ok := Analysis.afterSelect[anIns]; len(Analysis.selectedChans)<=1||!ok { // first instruction after encountering select
+					err := Analysis.HBgraph.MakeEdge(prevN, currN)
+					if err != nil {
+						log.Fatal(err)
+					}
+				}else{
+					err := Analysis.HBgraph.MakeEdge(beforeSel[Analysis.afterSelect[anIns]], currN)
+					if err != nil {
+						log.Fatal(err)
+					}
 				}
 				prevN = currN
 			}
 			if _, ok := Analysis.selectHB[anIns]; ok { // last instruction before encountering select
+				beforeSel[anIns] = prevN
+			}
+			if _, ok := Analysis.selectafterHB[anIns]; ok { // last instruction before encountering select
 				beforeSel[anIns] = prevN
 			}
 			if Analysis.isReadIns(anIns) || isWriteIns(anIns) {
@@ -307,7 +318,12 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 			}
 			a.selectDefault[selectIns] = aBlock.Preds[k].Instrs[0] // map select ins. to first ins. in its default clause
 			a.selectHB[beforeSel] = a.selectDefault[selectIns] // map last ins before select to first ins in default
-			a.afterSelect[selectIns] = aBlock.Instrs[0] // map select to first ins after select
+			a.afterSelect[aBlock.Instrs[0]] = beforeSel // map select to first ins after select
+		}else{
+			if aBlock.Comment == "select.done"{ // blocking select
+				a.selectafterHB[beforeSel] = aBlock.Instrs[0]
+				a.afterSelect[aBlock.Instrs[0]] = beforeSel // map select to first ins after select
+			}
 		}
 		if aBlock.Comment == "select.body" && len(caseStatus) > 0 {
 			skipBBInd = append(skipBBInd, aBlock.Index) // skipBBInd correlates with caseStatus
@@ -420,6 +436,15 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 			case *ssa.Select:
 				if examIns.Blocking { // only analyze channels with available values
 					caseStatus, readyChans = a.insSelect(examIns, goID, theIns)
+					skipIns := 1
+					for _, val := range caseStatus { // skip channel receive instructions to obtain last instruction encountered prior to encountering select
+						if val == 1 {
+							skipIns++
+						}
+					}
+					if k-skipIns >= 0 {
+						beforeSel = aBlock.Instrs[k - skipIns]
+					}
 				} else { // select contains default case, which becomes race-prone (non-blocking channel ops)
 					selectIns = examIns
 					caseStatus, _ = a.insSelect(examIns, goID, theIns)
