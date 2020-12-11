@@ -110,20 +110,26 @@ func (a *analysis) reachable(fromIns ssa.Instruction, fromGo int, toIns ssa.Inst
 	toInsKey := goIns{ins: toIns, goID: toGo}
 	fromNode := a.RWinsMap[fromInsKey] // starting node
 	toNode := a.RWinsMap[toInsKey] // target node
-	nexts := a.HBgraph.Neighbors(fromNode) // store reachable nodes in a stack
+
+	// use breadth-first-search to traverse the Happens-Before Graph
 	var visited []graph.Node
-	for len(nexts) > 0 {
-		curr := nexts[len(nexts)-1] // get last node in stack
-		if sliceContainsNode(visited, curr) {
-			break
+	q := &queue{}
+	q.enQueue(fromNode)
+	for !q.isEmpty() {
+		size := q.size()
+		for; size>0; size-- {
+			node := q.deQueue()
+			if node == toNode {
+				return true
+			}
+			for _, neighbor := range a.HBgraph.Neighbors(node) {
+				if sliceContainsNode(visited, neighbor) {
+					continue
+				}
+				q.enQueue(neighbor)
+				visited = append(visited, neighbor)
+			}
 		}
-		visited = append(visited, curr)
-		nexts = nexts[:len(nexts)-1] // pop last node in stack
-		if curr == toNode {
-			return true
-		}
-		next := a.HBgraph.Neighbors(curr)
-		nexts = append(nexts, next...)
 	}
 	return false
 }
