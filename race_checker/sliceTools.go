@@ -2,6 +2,7 @@ package main
 
 //import "C"
 import (
+	"github.com/twmb/algoimpl/go/graph"
 	"go/token"
 	"golang.org/x/tools/go/ssa"
 	"sort"
@@ -149,4 +150,33 @@ func lockSetVal (s []ssa.Value) []token.Pos {
 		res[i] = val.Pos()
 	}
 	return res
+}
+
+func sliceContainsNode(slice []graph.Node, node graph.Node) bool {
+	for i:= 0; i < len(slice); i++ {
+		if slice[i] == node {
+			return true
+		}
+	}
+	return false
+}
+
+// self-defined queue for traversing Happens-Before Graph
+type queue struct {
+	data []graph.Node
+}
+
+func (q *queue) enQueue(v graph.Node) {
+	q.data = append(q.data, v)
+}
+func (q *queue) deQueue() graph.Node {
+	v := q.data[0]
+	q.data = q.data[1:]
+	return v
+}
+func (q *queue) isEmpty() bool {
+	return len(q.data) == 0
+}
+func (q *queue) size() int {
+	return len(q.data)
 }
