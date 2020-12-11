@@ -2,6 +2,7 @@ package main
 
 //import "C"
 import (
+	"github.com/twmb/algoimpl/go/graph"
 	"go/token"
 	"golang.org/x/tools/go/ssa"
 	"sort"
@@ -149,4 +150,13 @@ func lockSetVal (s []ssa.Value) []token.Pos {
 		res[i] = val.Pos()
 	}
 	return res
+}
+
+func sliceContainsNode(slice []graph.Node, node graph.Node) bool {
+	for i:= 0; i < len(slice); i++ {
+		if slice[i] == node {
+			return true
+		}
+	}
+	return false
 }

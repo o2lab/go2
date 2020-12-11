@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/logrusorgru/aurora"
 	log "github.com/sirupsen/logrus"
+	"github.com/twmb/algoimpl/go/graph"
 	"go/token"
 	"golang.org/x/tools/go/ssa"
 	"regexp"
@@ -110,14 +111,24 @@ func (a *analysis) reachable(fromIns ssa.Instruction, fromGo int, toIns ssa.Inst
 	fromNode := a.RWinsMap[fromInsKey] // starting node
 	toNode := a.RWinsMap[toInsKey] // target node
 	nexts := a.HBgraph.Neighbors(fromNode) // store reachable nodes in a stack
+	var visited []graph.Node
+	count := 0
 	for len(nexts) > 0 {
+		if count >10000 {
+			break
+		}
 		curr := nexts[len(nexts)-1] // get last node in stack
+		//if sliceContainsNode(visited, curr) {
+		//	break
+		//}
+		visited = append(visited, curr)
 		nexts = nexts[:len(nexts)-1] // pop last node in stack
 		if curr == toNode {
 			return true
 		}
 		next := a.HBgraph.Neighbors(curr)
 		nexts = append(nexts, next...)
+		count++
 	}
 	return false
 }
