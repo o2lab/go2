@@ -47,8 +47,8 @@ func (a *analysis) isReadIns(ins ssa.Instruction) bool {
 	switch insType := ins.(type) {
 	case *ssa.UnOp:
 		if ins, ok := insType.X.(*ssa.Alloc); ok {
-			if _, ok1 := a.selectedChans[ins.Comment]; ok1{
-				return false // a channel receive, handled differently than typical read ins
+			if _, ok1 := a.chanBufMap[ins.Comment]; ok1{
+				return false // a channel op, handled differently than typical read ins
 			} else {
 				return true
 			}
@@ -518,16 +518,40 @@ func (a *analysis) insMapUpdate(examIns *ssa.MapUpdate, goID int, theIns ssa.Ins
 
 func (a *analysis) insSelect(examIns *ssa.Select, goID int, theIns ssa.Instruction) ([]int, []string) {
 	a.RWIns[goID] = append(a.RWIns[goID], theIns)
-	caseStatus := make([]int, len(examIns.States))
-	readyChans := []string{}
-	for i, states := range examIns.States {
-		if rcv, ok := states.Chan.(*ssa.UnOp); ok { // value available in channel receive
-			if recv, ok := rcv.X.(*ssa.Alloc); ok {
-				a.selectedChans[recv.Comment] = theIns // space holder for map value, will be replaced with last instruction in clause
-				readyChans = append(readyChans, recv.Comment)
-			}
+	defaultCase := 0
+	if !examIns.Blocking { defaultCase++ } // non-blocking select
+	caseStatus := make([]int, len(examIns.States) + defaultCase) // ready - 1, not ready - 0
+	readyChans := []string{} // name of ready channels
+	for i, state := range examIns.States { // check readiness of each case
+		switch ch := state.Chan.(type) {
+		case *ssa.UnOp: // channel is ready
 			caseStatus[i] = 1
+			switch chName := ch.X.(type) {
+			case *ssa.Alloc:
+				readyChans = append(readyChans, chName.Comment)
+			case *ssa.FreeVar:
+				readyChans = append(readyChans, chName.Name())
+			case *ssa.FieldAddr:
+				readyChans = append(readyChans, chName.X.(*ssa.Parameter).Name())
+			default:
+				log.Debug("need to consider this case for channel name collection")
+			}
+			// TODO: consider when multiple cases correspond to the same channel
+		case *ssa.Parameter:
+			// TODO: need to identify channel readiness when passed in as input parameter
+		case *ssa.TypeAssert:
+
+		case *ssa.Call: // timeOut
+			caseStatus[i] = 1
+			readyChans = append(readyChans, "timeOut")
+		case *ssa.MakeChan: // channel NOT ready
+		default: // may need to consider other cases as well
+			log.Debug("need to consider this case for channel readiness")
 		}
+	}
+	if defaultCase > 0 { // default case is always ready
+		caseStatus[len(caseStatus)-1] = 1
+		readyChans = append(readyChans, "defaultCase")
 	}
 	return caseStatus, readyChans
 }

@@ -32,7 +32,7 @@ type analysis struct {
 	RlockMap      map[ssa.Instruction][]ssa.Value // map each read/write access to a snapshot of actively maintained lockset
 	RlockSet      []ssa.Value                     // active lockset, to be maintained along instruction traversal
 	goLockset     map[int][]ssa.Value             // map each goroutine to its initial lockset
-	goRLockset	  map[int][]ssa.Value			  // map each goroutine to its initial set of read locks
+	goRLockset    map[int][]ssa.Value			  // map each goroutine to its initial set of read locks
 	mapFreeze     bool
 	paramFunc     ssa.Value
 	goStack       [][]string
@@ -42,12 +42,13 @@ type analysis struct {
 	insertIndMap  map[string]int
 	chanMap       map[ssa.Instruction][]string // map each read/write access to a list of channels with value(s) already sent to it
 	chanName      string
-	selectedChans map[string]ssa.Instruction // map selected channel name to last instruction in its clause
-	selectDefault map[*ssa.Select]ssa.Instruction // map select statement to first instruction in its default block
-	afterSelect	  map[ssa.Instruction]ssa.Instruction // map select statement to first instruction after select is done
-	selectHB	  map[ssa.Instruction]ssa.Instruction // map edge LEAVING node to ENTERING node
-	selectafterHB	  map[ssa.Instruction]ssa.Instruction
-	serverWorker   int
+	selectCaseBegin map[ssa.Instruction]string        // map first instruction in clause to channel name
+	selectCaseEnd map[ssa.Instruction]string          // map last instruction in clause to channel name
+	selectDefault map[*ssa.Select]ssa.Instruction     // map select statement to first instruction in its default block
+	selectDone    map[ssa.Instruction]ssa.Instruction // map select statement to first instruction after select is done
+	selectHB      map[ssa.Instruction]ssa.Instruction // map edge LEAVING node to ENTERING node
+	selectafterHB map[ssa.Instruction]ssa.Instruction
+	serverWorker  int
 }
 
 type fnInfo struct { // all fields must be comparable for fnInfo to be used as key to trieMap

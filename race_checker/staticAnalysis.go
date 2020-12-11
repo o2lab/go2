@@ -112,22 +112,23 @@ func staticAnalysis(args []string) error {
 		RWinsMap:     make(map[goIns]graph.Node),
 		insDRA:       0,
 		levels:       make(map[int]int),
-		lockMap:      make(map[ssa.Instruction][]ssa.Value),
-		RlockMap:     make(map[ssa.Instruction][]ssa.Value),
-		goLockset:    make(map[int][]ssa.Value),
-		goRLockset:   make(map[int][]ssa.Value),
-		mapFreeze:    false,
-		goCaller:     make(map[int]int),
-		goNames:      make(map[int]string),
-		chanBufMap:   make(map[string][]*ssa.Send),
-		insertIndMap: make(map[string]int),
-		chanMap:      make(map[ssa.Instruction][]string), // map each read/write access to a list of channels with value(s) already sent to it
-		selectedChans:make(map[string]ssa.Instruction),
-		selectDefault:make(map[*ssa.Select]ssa.Instruction), // map select statement to first instruction in its default block
-		afterSelect:  make(map[ssa.Instruction]ssa.Instruction),
-		selectHB:	  make(map[ssa.Instruction]ssa.Instruction),
-		selectafterHB:	  make(map[ssa.Instruction]ssa.Instruction),
-		serverWorker:     0,
+		lockMap:       make(map[ssa.Instruction][]ssa.Value),
+		RlockMap:      make(map[ssa.Instruction][]ssa.Value),
+		goLockset:     make(map[int][]ssa.Value),
+		goRLockset:    make(map[int][]ssa.Value),
+		mapFreeze:     false,
+		goCaller:      make(map[int]int),
+		goNames:       make(map[int]string),
+		chanBufMap:    make(map[string][]*ssa.Send),
+		insertIndMap:  make(map[string]int),
+		chanMap:       make(map[ssa.Instruction][]string), // map each read/write access to a list of channels with value(s) already sent to it
+		selectCaseBegin: make(map[ssa.Instruction]string),
+		selectCaseEnd: make(map[ssa.Instruction]string),
+		selectDefault: make(map[*ssa.Select]ssa.Instruction), // map select statement to first instruction in its default block
+		selectDone:    make(map[ssa.Instruction]ssa.Instruction),
+		selectHB:      make(map[ssa.Instruction]ssa.Instruction),
+		selectafterHB: make(map[ssa.Instruction]ssa.Instruction),
+		serverWorker:  0,
 	}
 
 	log.Info("Compiling stack trace for every Goroutine... ")
@@ -154,12 +155,14 @@ func staticAnalysis(args []string) error {
 	Analysis.HBgraph = graph.New(graph.Directed)
 	var prevN graph.Node
 	var goCaller []graph.Node
-	var caseEnd []ssa.Instruction
-	var caseN []graph.Node
+	var selectN []graph.Node
+	var selIns *ssa.Select
+	var readyCh []string
+	var caseEndN []graph.Node
 	waitingN := make(map[*ssa.Call]graph.Node)
 	chanRecvs := make(map[string]graph.Node) // map channel name to graph node
-	beforeSel := make(map[ssa.Instruction]graph.Node) // map ins before select straight to default clause
-	var selDefault []ssa.Instruction
+	//beforeSel := make(map[ssa.Instruction]graph.Node) // map ins before select straight to default clause
+	//var selDefault []ssa.Instruction
 	for nGo, insSlice := range Analysis.RWIns {
 		for i, anIns := range insSlice {
 			insKey := goIns{ins: anIns, goID: nGo}
@@ -173,46 +176,47 @@ func staticAnalysis(args []string) error {
 				currN := Analysis.HBgraph.MakeNode()
 				*currN.Value = insKey
 				if nGo != 0 && i == 0 { // worker goroutine, first instruction
-					prevN = goCaller[0]
-					goCaller = goCaller[1:] // pop from stack
+					prevN = goCaller[0] // first node in subroutine
+					goCaller = goCaller[1:]
 				} else if _, ok := anIns.(*ssa.Go); ok {
 					goCaller = append(goCaller, currN) // sequentially store go calls in the same goroutine
-				//} else if sliceContainsInsAt(selDefault, anIns) > -1 {
-				//	for from, to := range Analysis.selectHB {
-				//		if to == anIns {
-				//			prevN = beforeSel[from]
-				//			err := Analysis.HBgraph.MakeEdge(prevN, currN)
-				//			if err != nil {
-				//				fmt.Println(len(beforeSel))
-				//				log.Fatal(err)
-				//			}
-				//		}
-				//		break
-				//	}
-				} else {
-					if sliceContainsInsAt(caseEnd, anIns) > -1 { // last instruction in clause
-						caseN = append(caseN, currN)
-					}
+				} else if _, ok1 := anIns.(*ssa.Select); ok1 {
+					selectN = append(selectN, currN) // select node
+					selIns = anIns.(*ssa.Select)
+					_, readyCh = Analysis.insSelect(selIns, nGo, anIns)
+				} else if _, ok2 := Analysis.selectCaseEnd[anIns]; ok2 {
+					caseEndN = append(caseEndN, currN) // end of clause for a ready select case
 				}
-				if _, ok := Analysis.afterSelect[anIns]; len(Analysis.selectedChans)<=1||!ok { // first instruction after encountering select
-					err := Analysis.HBgraph.MakeEdge(prevN, currN)
+				if ch, ok := Analysis.selectCaseBegin[anIns]; ok && sliceContainsStr(readyCh, ch) {
+					err := Analysis.HBgraph.MakeEdge(selectN[0], currN) // select node to ready case
 					if err != nil {
 						log.Fatal(err)
 					}
-				}else{
-					err := Analysis.HBgraph.MakeEdge(beforeSel[Analysis.afterSelect[anIns]], currN)
+					if len(readyCh) == 1 { // only one case is ready, certainty of traversal here
+						chanRecvs[ch] = currN
+					}
+				} else if sIns, ok1 := Analysis.selectDone[anIns]; ok1 && selIns == sIns {
+					for _, endN := range caseEndN {
+						err := Analysis.HBgraph.MakeEdge(endN, currN) // ready case to select done
+						if err != nil {
+							log.Fatal(err)
+						}
+					}
+				} else {
+					err := Analysis.HBgraph.MakeEdge(prevN, currN)
 					if err != nil {
 						log.Fatal(err)
 					}
 				}
 				prevN = currN
 			}
-			if _, ok := Analysis.selectHB[anIns]; ok { // last instruction before encountering select
-				beforeSel[anIns] = prevN
-			}
-			if _, ok := Analysis.selectafterHB[anIns]; ok { // last instruction before encountering select
-				beforeSel[anIns] = prevN
-			}
+			//if _, ok := Analysis.selectHB[anIns]; ok { // last instruction before encountering select
+			//	beforeSel[anIns] = prevN
+			//}
+			//if _, ok := Analysis.selectafterHB[anIns]; ok { // last instruction before encountering select
+			//	beforeSel[anIns] = prevN
+			//}
+			// Create additional edges:
 			if Analysis.isReadIns(anIns) || isWriteIns(anIns) {
 				Analysis.RWinsMap[insKey] = prevN
 			} else if callIns, ok := anIns.(*ssa.Call); ok { // taking care of WG operations. TODO: identify different WG instances
@@ -239,24 +243,23 @@ func staticAnalysis(args []string) error {
 						}
 					}
 				}
-			} else if selectIns, ok := anIns.(*ssa.Select); ok && !selectIns.Blocking {
-				selDefault = append(selDefault, Analysis.selectDefault[selectIns])
+			//} else if selectIns, ok := anIns.(*ssa.Select); ok && !selectIns.Blocking {
+			//	selDefault = append(selDefault, Analysis.selectDefault[selectIns])
 			}
-			if recvIns, ok := anIns.(*ssa.UnOp); ok { // detect (blocking) channel receive operation
-				if rcvIns, ok1 := recvIns.X.(*ssa.Alloc); ok1 {
-					if _, ok2 := Analysis.selectedChans[rcvIns.Comment]; ok2 {
-						chanRecvs[rcvIns.Comment] = prevN
-						caseEnd = append(caseEnd, Analysis.selectedChans[rcvIns.Comment])
-					}
-				}
-			} else if sendIns, ok := anIns.(*ssa.Send); ok { // detect matching channel send operations
-				if sndIns, ok0 := sendIns.Chan.(*ssa.UnOp); ok0 {
-					if _, ok1 := Analysis.selectedChans[sndIns.X.Name()]; ok1 {
-						if edgeTo, ok2 := chanRecvs[sndIns.X.Name()]; ok2 {
-							err := Analysis.HBgraph.MakeEdge(prevN, edgeTo) // create edge from Send node to Receive node
-							if err != nil {
-								log.Fatal(err)
-							}
+			//if recvIns, ok := anIns.(*ssa.UnOp); ok { // detect (blocking) channel receive operation
+				//if rcvIns, ok1 := recvIns.X.(*ssa.Alloc); ok1 {
+					//if _, ok2 := Analysis.selectCaseEnd[rcvIns.Comment]; ok2 {
+					//	chanRecvs[rcvIns.Comment] = prevN
+					//	caseEnd = append(caseEnd, Analysis.selectCaseEnd[rcvIns.Comment])
+					//}
+				//}
+			//} else
+			if sendIns, ok := anIns.(*ssa.Send); ok { // detect matching channel send operations
+				if matchingRcv, ok1 := sendIns.Chan.(*ssa.UnOp); ok1 {
+					if edgeTo, ok2 := chanRecvs[matchingRcv.X.Name()]; ok2 {
+						err := Analysis.HBgraph.MakeEdge(prevN, edgeTo) // create edge from Send node to Receive node
+						if err != nil {
+							log.Fatal(err)
 						}
 					}
 				}
@@ -293,61 +296,43 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 	fnBlocks := fn.Blocks
 	var caseStatus []int
 	var readyChans []string       // may be better to use maps instead
-	var skipBBInd []int           // these basic blocks and their successor blocks shall be omitted
 	var selectIns *ssa.Select
-	var beforeSel ssa.Instruction // last instruction before encountering select
-	var toAppend []*ssa.BasicBlock
+	var selCount int              // index of select.done block
 	var toDefer []ssa.Instruction // stack storing deferred calls
 	var toUnlock []ssa.Value
 	var toRUnlock []ssa.Value
 	repeatSwitch := false         // triggered when encountering basic blocks for body of a forloop
-	for i := 0; i < len(fnBlocks); i++ {
-		var aBlock *ssa.BasicBlock
-		if i < len(fnBlocks) {
-			aBlock = fnBlocks[i]
-		} else {
-			aBlock = toAppend[i-len(fnBlocks)]
-		}
+	for i, aBlock := range fnBlocks {
 		if aBlock.Comment == "recover" {
 			continue
 		}
-		if selectIns != nil && aBlock.Comment == "select.done" && !selectIns.Blocking { // non-blocking select
-			k := len(aBlock.Preds)-1 // get index of basic block corresponding to default clause
-			for aBlock.Preds[k].Comment != "select.next" && k > 0 {
-				k--
-			}
-			a.selectDefault[selectIns] = aBlock.Preds[k].Instrs[0] // map select ins. to first ins. in its default clause
-			a.selectHB[beforeSel] = a.selectDefault[selectIns] // map last ins before select to first ins in default
-			a.afterSelect[aBlock.Instrs[0]] = beforeSel // map select to first ins after select
-		}else{
-			if aBlock.Comment == "select.done"{ // blocking select
-				a.selectafterHB[beforeSel] = aBlock.Instrs[0]
-				a.afterSelect[aBlock.Instrs[0]] = beforeSel // map select to first ins after select
-			}
+		if aBlock.Comment == "select.done" /*&& !selectIns.Blocking*/ {
+			selCount = aBlock.Index
+			a.selectDone[aBlock.Instrs[0]] = selectIns // map first ins in select.done to select instruction
 		}
-		if aBlock.Comment == "select.body" && len(caseStatus) > 0 {
-			skipBBInd = append(skipBBInd, aBlock.Index) // skipBBInd correlates with caseStatus
-			if len(skipBBInd) <= len(caseStatus) && caseStatus[len(skipBBInd)-1] == 0 { // channel has no value (skip)
+		if aBlock.Comment == "select.body" /*&& len(caseStatus) > 0*/ { // caseStatus must have been compiled at this time
+			if selCount == 0 { // start counting
+				selCount = aBlock.Index
+			}
+			caseNo := (aBlock.Index - selCount)/2
+			if caseStatus[caseNo] == 0 { // channel not ready (skip)
 				continue
-			} else { // active channel
-				if len(readyChans) > 0 {
-					a.selectedChans[readyChans[0]] = aBlock.Instrs[len(aBlock.Instrs)-1] // map to last instruction
-					readyChans = readyChans[1:]
-				}
+			} else { // get beginning of clause
+				a.selectCaseBegin[aBlock.Instrs[0]] = readyChans[caseNo] // map to first instruction
 			}
-			if len(skipBBInd) > len(caseStatus) && sliceContainsInt(skipBBInd, aBlock.Preds[0].Index) {
-				skipBBInd = append(skipBBInd, aBlock.Index)
+		}
+		if aBlock.Comment == "select.next" /*&& sliceContainsInt(skipBBInd, aBlock.Preds[0].Index)*/ {
+			caseNo := (aBlock.Index -1 - selCount)/2
+			if caseStatus[caseNo] == 0 { // channel not ready
 				continue
+			} else { // get end of clause
+				a.selectCaseEnd[aBlock.Instrs[len(aBlock.Instrs)-1]] = readyChans[caseNo] // map to last instruction
 			}
 		}
-		if aBlock.Comment == "select.next" && sliceContainsInt(skipBBInd, aBlock.Preds[0].Index) {
-			skipBBInd = append(skipBBInd, aBlock.Index)
-			continue
-		}
-		if strings.HasSuffix(aBlock.Comment, ".done") && i < len(fnBlocks)-1 && sliceContainsBloc(toAppend, aBlock) { // ignore return block if it doesn't have largest index
-			toAppend = append(toAppend, aBlock)
-			continue
-		}
+		//if strings.HasSuffix(aBlock.Comment, ".done") && i < len(fnBlocks)-1 && sliceContainsBloc(toAppend, aBlock) { // ignore return block if it doesn't have largest index
+		//	toAppend = append(toAppend, aBlock)
+		//	continue
+		//}
 		if aBlock.Comment == "for.body" || aBlock.Comment == "rangeindex.body" { // repeat unrolling of forloop
 			if repeatSwitch == false {
 				i--
@@ -432,30 +417,30 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 			case *ssa.MapUpdate:
 				a.insMapUpdate(examIns, goID, theIns)
 			case *ssa.Select:
-				if examIns.Blocking { // only analyze channels with available values
-					caseStatus, readyChans = a.insSelect(examIns, goID, theIns)
-					skipIns := 1
-					for _, val := range caseStatus { // skip channel receive instructions to obtain last instruction encountered prior to encountering select
-						if val == 1 {
-							skipIns++
-						}
-					}
-					if k-skipIns >= 0 {
-						beforeSel = aBlock.Instrs[k - skipIns]
-					}
-				} else { // select contains default case, which becomes race-prone (non-blocking channel ops)
-					selectIns = examIns
-					caseStatus, _ = a.insSelect(examIns, goID, theIns)
-					skipIns := 1
-					for _, val := range caseStatus { // skip channel receive instructions to obtain last instruction encountered prior to encountering select
-						if val == 1 {
-							skipIns++
-						}
-					}
-					if k-skipIns >= 0 {
-						beforeSel = aBlock.Instrs[k - skipIns]
-					}
-				}
+				caseStatus, readyChans = a.insSelect(examIns, goID, theIns)
+				//if examIns.Blocking { // only analyze channels with available values
+				//	skipIns := 1
+				//	for _, val := range caseStatus { // skip channel receive instructions to obtain last instruction encountered prior to encountering select
+				//		if val == 1 {
+				//			skipIns++
+				//		}
+				//	}
+				//	if k-skipIns >= 0 {
+				//		beforeSel = aBlock.Instrs[k - skipIns]
+				//	}
+				//} else { // select contains default case, which becomes race-prone (non-blocking channel ops)
+				//	selectIns = examIns
+				//	//caseStatus, _ = a.insSelect(examIns, goID, theIns)
+				//	skipIns := 1
+				//	for _, val := range caseStatus { // skip channel receive instructions to obtain last instruction encountered prior to encountering select
+				//		if val == 1 {
+				//			skipIns++
+				//		}
+				//	}
+				//	if k-skipIns >= 0 {
+				//		beforeSel = aBlock.Instrs[k - skipIns]
+				//	}
+				//}
 			case *ssa.Jump:
 				a.RWIns[goID] = append(a.RWIns[goID], theIns)
 			}
