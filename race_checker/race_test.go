@@ -39,7 +39,7 @@ var tests = []string{
 	"tests/rwmutex_lock.go",
 	"tests/context1.go",
 	"tests/fields.go",
-	//"tests/k8s_issue80269.go",
+	"tests/k8s_issue80269.go",
 	"tests/global_ownership.go",
 	"tests/map_race.go",
 	"tests/select.go",
