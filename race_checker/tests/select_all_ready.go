@@ -1,5 +1,7 @@
 package main
 
+import "fmt"
+
 func main() {
 	ch1 := make(chan int)
 	ch2 := make(chan int)
@@ -19,4 +21,5 @@ func main() {
 	case a := <-ch2:
 		x /* RACE Write */ = a + 100
 	}
+	fmt.Println(x, y)
 }
