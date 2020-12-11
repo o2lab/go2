@@ -398,15 +398,13 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 			case *ssa.Send: // channel send op
 				a.insSend(examIns, goID, theIns)
 			case *ssa.Store: // write op
-				if k > 0 { // check if previous instruction is *ssa.Alloc
-					if _, ok := aBlock.Instrs[k-1].(*ssa.Extract); ok && k > 1 { // tuple assignment
-						if assign, ok := aBlock.Instrs[k-2].(*ssa.Alloc); !ok || assign != examIns.Addr {
-							a.insStore(examIns, goID, theIns)
-						}
-					}else{
-						if assign, ok := aBlock.Instrs[k-1].(*ssa.Alloc); !ok || assign != examIns.Addr {//make sure it isn't an initial assignment
-							a.insStore(examIns, goID, theIns)
-						}
+				if _, ok := examIns.Addr.(*ssa.Alloc); ok && k > 0 { // variable initialization
+					switch aBlock.Instrs[k-1].(type) {
+					case *ssa.Alloc:
+					case *ssa.MakeChan: // channel object
+					case *ssa.Extract: // tuple index
+					default:
+						a.insStore(examIns, goID, theIns)
 					}
 				} else {
 					a.insStore(examIns, goID, theIns)
