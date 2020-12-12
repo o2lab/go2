@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	//"fmt"
 	"github.com/o2lab/race-checker/stats"
 	log "github.com/sirupsen/logrus"
@@ -47,7 +48,8 @@ func (a *analysis) isReadIns(ins ssa.Instruction) bool {
 	switch insType := ins.(type) {
 	case *ssa.UnOp:
 		if ins, ok := insType.X.(*ssa.Alloc); ok {
-			if _, ok1 := a.chanBufMap[ins.Comment]; ok1{
+			if _, ok1 := a.chanBufMap[ins.Comment]; ok1 {
+				fmt.Println("e")
 				return false // a channel op, handled differently than typical read ins
 			} else {
 				return true
@@ -474,12 +476,7 @@ func (a *analysis) insGo(examIns *ssa.Go, goID int, theIns ssa.Instruction) {
 			fnName = paramType.Fn.Name()
 		}
 	}
-	if fnName == "serverWorker" {
-		a.serverWorker+= 1
-		if a.serverWorker >= 5 {
-			return
-		}
-	}
+
 	newGoID := goID + 1 // increment goID for child goroutine
 	if len(a.workList) > 0 {
 		newGoID = a.workList[len(a.workList)-1].goID + 1
@@ -516,23 +513,26 @@ func (a *analysis) insMapUpdate(examIns *ssa.MapUpdate, goID int, theIns ssa.Ins
 	}
 }
 
-func (a *analysis) insSelect(examIns *ssa.Select, goID int, theIns ssa.Instruction) ([]int, []string) {
+func (a *analysis) insSelect(examIns *ssa.Select, goID int, theIns ssa.Instruction) []string {
 	a.RWIns[goID] = append(a.RWIns[goID], theIns)
 	defaultCase := 0
 	if !examIns.Blocking { defaultCase++ } // non-blocking select
-	caseStatus := make([]int, len(examIns.States) + defaultCase) // ready - 1, not ready - 0
-	readyChans := []string{} // name of ready channels
+	readyChans := make([]string, len(examIns.States) + defaultCase) // name of ready channels
 	for i, state := range examIns.States { // check readiness of each case
 		switch ch := state.Chan.(type) {
 		case *ssa.UnOp: // channel is ready
-			caseStatus[i] = 1
 			switch chName := ch.X.(type) {
 			case *ssa.Alloc:
-				readyChans = append(readyChans, chName.Comment)
+				readyChans[i] = chName.Comment
 			case *ssa.FreeVar:
-				readyChans = append(readyChans, chName.Name())
+				readyChans[i] = chName.Name()
 			case *ssa.FieldAddr:
-				readyChans = append(readyChans, chName.X.(*ssa.Parameter).Name())
+				switch chName.X.(type) {
+				case *ssa.Parameter:
+					readyChans[i] = chName.X.(*ssa.Parameter).Name()
+				case *ssa.FieldAddr:
+					readyChans[i] = chName.X.(*ssa.FieldAddr).Name()
+				}
 			default:
 				log.Debug("need to consider this case for channel name collection")
 			}
@@ -542,18 +542,16 @@ func (a *analysis) insSelect(examIns *ssa.Select, goID int, theIns ssa.Instructi
 		case *ssa.TypeAssert:
 
 		case *ssa.Call: // timeOut
-			caseStatus[i] = 1
-			readyChans = append(readyChans, "timeOut")
+			readyChans[i] = "timeOut"
 		case *ssa.MakeChan: // channel NOT ready
 		default: // may need to consider other cases as well
 			log.Debug("need to consider this case for channel readiness")
 		}
 	}
 	if defaultCase > 0 { // default case is always ready
-		caseStatus[len(caseStatus)-1] = 1
-		readyChans = append(readyChans, "defaultCase")
+		readyChans[len(readyChans)-1] = "defaultCase"
 	}
-	return caseStatus, readyChans
+	return readyChans
 }
 
 func (a *analysis) updateLockMap(goID int, theIns ssa.Instruction) {

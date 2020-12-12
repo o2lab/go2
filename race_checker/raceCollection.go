@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/logrusorgru/aurora"
 	log "github.com/sirupsen/logrus"
-	"github.com/twmb/algoimpl/go/graph"
 	"go/token"
 	"golang.org/x/tools/go/ssa"
 	"regexp"
@@ -111,8 +110,7 @@ func (a *analysis) reachable(fromIns ssa.Instruction, fromGo int, toIns ssa.Inst
 	fromNode := a.RWinsMap[fromInsKey] // starting node
 	toNode := a.RWinsMap[toInsKey] // target node
 
-	// use breadth-first-search to traverse the Happens-Before Graph
-	var visited []graph.Node
+	//use breadth-first-search to traverse the Happens-Before Graph
 	q := &queue{}
 	q.enQueue(fromNode)
 	for !q.isEmpty() {
@@ -123,11 +121,7 @@ func (a *analysis) reachable(fromIns ssa.Instruction, fromGo int, toIns ssa.Inst
 				return true
 			}
 			for _, neighbor := range a.HBgraph.Neighbors(node) {
-				if sliceContainsNode(visited, neighbor) {
-					continue
-				}
 				q.enQueue(neighbor)
-				visited = append(visited, neighbor)
 			}
 		}
 	}

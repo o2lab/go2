@@ -1,6 +1,5 @@
 package main
 
-//import "C"
 import (
 	"github.com/twmb/algoimpl/go/graph"
 	"go/token"
@@ -134,16 +133,6 @@ func (a *analysis) lockSetContainsAt(s []ssa.Value, e ssa.Value) int {
 	return -1
 }
 
-
-func sliceContainsInt (s []int, e int) bool {
-	for _, n := range s {
-		if n == e {
-			return true
-		}
-	}
-	return false
-}
-
 func lockSetVal (s []ssa.Value) []token.Pos {
 	res := make([]token.Pos, len(s))
 	for i, val := range s {
@@ -152,13 +141,16 @@ func lockSetVal (s []ssa.Value) []token.Pos {
 	return res
 }
 
-func sliceContainsNode(slice []graph.Node, node graph.Node) bool {
-	for i:= 0; i < len(slice); i++ {
-		if slice[i] == node {
-			return true
+func chReady(readyChs []string) (int, int) {
+	num := 0
+	ind := 0
+	for i, chStr := range readyChs {
+		if chStr != "" {
+			num++
+			ind = i
 		}
 	}
-	return false
+	return num, ind
 }
 
 // self-defined queue for traversing Happens-Before Graph
