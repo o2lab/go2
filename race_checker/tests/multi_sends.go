@@ -21,6 +21,6 @@ func main() {
 		x = a + 1
 	default:
 		x = 20
-		fmt.Println(x)
 	}
+	fmt.Println(x)
 }
