@@ -33,8 +33,7 @@ func (a *analysis) checkRacyPairs() {
 							!sliceContains(a.reportedAddr, addressPair[0]) &&
 							!a.reachable(goI, i, goJ, j) &&
 							!a.reachable(goJ, j, goI, i) &&
-							!a.lockSetsIntersect(insSlice[0], insSlice[1]) &&
-							!a.chanProtected(insSlice[0], insSlice[1]) {
+							!a.lockSetsIntersect(insSlice[0], insSlice[1]){
 							a.reportedAddr = append(a.reportedAddr, addressPair[0])
 							a.printRace(len(a.reportedAddr), insSlice, addressPair, []int{i, j}, []int{ii, jj})
 						}
@@ -175,19 +174,6 @@ func getSrcPos(address ssa.Value) token.Pos {
 	return position
 }
 
-// chanProtected
-func (a *analysis) chanProtected(insA ssa.Instruction, insB ssa.Instruction) bool {
-	setA := a.chanMap[insA] // channelSet of instruction-A
-	setB := a.chanMap[insB] // channelSet of instruction-B
-	for _, chanA := range setA {
-		for _, chanB := range setB {
-			if chanA == chanB {
-				return true
-			}
-		}
-	}
-	return false
-}
 
 // printRace will print the details of a data race such as the write/read of a variable and other helpful information
 func (a *analysis) printRace(counter int, insPair []ssa.Instruction, addrPair []ssa.Value, goIDs []int, insInd []int) {
