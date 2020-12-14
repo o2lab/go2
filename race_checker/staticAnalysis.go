@@ -191,6 +191,8 @@ func staticAnalysis(args []string) error {
 					if num, ind := chReady(readyCh); num == 1 && selIns.Blocking { // exactly one ready channel
 						chanRecvs[readyCh[ind]] = currN // certainty of traversal here
 					}
+				} else if ins, ok2 := anIns.(*ssa.UnOp); ok2 && ins.Op == token.ARROW {
+
 				}
 				if ch, ok0 := Analysis.selectCaseEnd[anIns]; ok0 && sliceContainsStr(readyCh, ch) {
 					selCaseEndN = append(selCaseEndN, currN)
@@ -262,6 +264,7 @@ func staticAnalysis(args []string) error {
 			}
 			if sendIns, ok := anIns.(*ssa.Send); ok { // detect matching channel send operations
 				if matchingRcv, ok1 := sendIns.Chan.(*ssa.UnOp); ok1 {
+					fmt.Println(sendIns.Chan.Name())
 					if edgeTo, ok2 := chanRecvs[matchingRcv.X.Name()]; ok2 {
 						err := Analysis.HBgraph.MakeEdge(prevN, edgeTo) // create edge from Send node to Receive node
 						if err != nil {
