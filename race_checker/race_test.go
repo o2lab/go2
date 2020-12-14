@@ -25,32 +25,44 @@ var (
 )
 
 var tests = []string{
+	//"tests/atomics.go",//false positive
+	"tests/cfg.go",
 	"tests/cg.go",
-	"tests/test1.go",
-	"tests/fzf_wg.go",
-	"tests/waitgroup.go",
-	"tests/wrong_waitgroup.go",
-	"tests/multiple_waitgroups.go",
-	"tests/lock.go",
-	"tests/lock_grpc_sync.go",
-	"tests/lock_multiple_deferred.go",
-	"tests/lock_twice.go",
-	"tests/rwmutex_lock.go",
 	"tests/context1.go",
 	"tests/fields.go",
-	"tests/k8s_issue80269.go",
+	"tests/fzf_wg.go",
 	"tests/global_ownership.go",
+	"tests/ifunlockProtected.go",
+	//"tests/ifunlockUnprotected.go",//issue in edge creation
+	"tests/k8s_issue80269.go",
+	"tests/lock.go",
+	"tests/lock_grpc_sync.go",
+	//"tests/lock_mixed.go",//false positive
+	"tests/lock_multiple_deferred.go",
+	"tests/lock_twice.go",
 	"tests/map_race.go",
-	"tests/select.go", // need to work on nested select
-	"tests/select_nonblock.go",
-	"tests/select_rpc.go",
-	"tests/select_sends.go",
-	"tests/select_timeout.go",
-	"tests/test_neo.go",
+	//"tests/multi_sends.go",//false positive
+	"tests/multiple_waitgroups.go",
+	"tests/ownership1.go",
 	"tests/race_cfg.go",
 	"tests/race_example1.go",
 	"tests/race_example2.go",
 	"tests/race_example3.go",
+	"tests/rwmutex_lock.go",
+	"tests/select.go", // need to work on nested select
+	"tests/select_all_ready.go",
+	//"tests/select_multiple.go",//false positive and negative
+	"tests/select_nonblock.go",
+	//"tests/select_nonblock_fp.go",//false positive and negative
+	"tests/select_rpc.go",
+	"tests/select_sends.go",
+	"tests/select_timeout.go",
+	"tests/send_after_select.go",
+	//"tests/single_case_select.go",//false positive
+	"tests/test1.go",
+	"tests/test_neo.go",
+	"tests/waitgroup.go",
+	"tests/wrong_waitgroup.go",
 	"tests/GoBench/Cockroach/27659/main.go",
 	"tests/GoBench/Cockroach/35501/main.go",
 	"tests/GoBench/Etcd/4876/main.go",
@@ -69,6 +81,8 @@ var tests = []string{
 	"tests/GoBench/Kubernetes/81148/main.go",
 	"tests/GoBench/Kubernetes/88331/main.go",
 	"tests/GoBench/Serving/3148/main.go",
+	"tests/GoBench/Serving/4908/main.go",
+	"tests/GoBench/Serving/6171/main.go",
 	"tests/godel2/ch-as-lock-race/main.go",
 	"tests/godel2/deposit-race/main.go",
 	//"tests/godel2/prod-cons-race/main.go",

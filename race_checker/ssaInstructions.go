@@ -51,12 +51,9 @@ func (a *analysis) isReadIns(ins ssa.Instruction) bool {
 			if _, ok1 := a.chanBufMap[ins.Comment]; ok1 {
 				fmt.Println("e")
 				return false // a channel op, handled differently than typical read ins
-			} else {
-				return true
 			}
-		} else {
-			return true
 		}
+		return true
 	case *ssa.FieldAddr:
 		return true
 	case *ssa.Lookup:
