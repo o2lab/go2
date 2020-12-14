@@ -528,8 +528,6 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 		nextGoInfo := a.workList[0] // get the goroutine info at head of workList
 		a.workList = a.workList[1:] // pop goroutine info from head of workList
 		a.newGoroutine(nextGoInfo)
-	} else {
-		return
 	}
 }
 
@@ -565,11 +563,9 @@ func (a *analysis) exploredFunction(fn *ssa.Function, goID int, theIns ssa.Instr
 	if efficiency && sliceContainsStr(a.storeIns, fn.Name()) { // for temporary debugging purposes only
 		return true
 	}
-	var visitedIns []ssa.Instruction
+	visitedIns:= []ssa.Instruction{}
 	if len(a.RWIns) > 0 {
 		visitedIns = a.RWIns[goID]
-	} else {
-		visitedIns = []ssa.Instruction{}
 	}
 	csSlice, csStr := insToCallStack(visitedIns)
 	if sliceContainsStrCtr(csSlice, fn.Name()) > trieLimit {

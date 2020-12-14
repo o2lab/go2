@@ -155,20 +155,11 @@ func (a *analysis) insStore(examIns *ssa.Store, goID int, theIns ssa.Instruction
 		}
 		a.RWIns[goID] = append(a.RWIns[goID], theIns)
 		a.updateLockMap(goID, theIns)
-		if len(a.chanBufMap) > 0 {
-			a.chanMap[theIns] = []string{}
-			for aChan, sSends := range a.chanBufMap {
-				if sSends[0] != nil && len(sSends) == 1 { // exactly one instance of channel send up to now
-					a.chanMap[theIns] = append(a.chanMap[theIns], aChan) // unbuffered channels create HB among multiple channel sends
-				}
-			}
-		}
 		a.ptaConfig.AddQuery(examIns.Addr)
 	}
 	if theFunc, storeFn := examIns.Val.(*ssa.Function); storeFn {
-		fnName := theFunc.Name()
 		if !a.exploredFunction(theFunc, goID, theIns) {
-			a.updateRecords(fnName, goID, "PUSH ")
+			a.updateRecords(theFunc.Name(), goID, "PUSH ")
 			a.RWIns[goID] = append(a.RWIns[goID], theIns)
 			a.visitAllInstructions(theFunc, goID)
 		}
@@ -182,14 +173,6 @@ func (a *analysis) insUnOp(examIns *ssa.UnOp, goID int, theIns ssa.Instruction) 
 		a.RWIns[goID] = append(a.RWIns[goID], theIns)
 		a.updateLockMap(goID, theIns)
 		a.updateRLockMap(goID, theIns)
-		if len(a.chanBufMap) > 0 {
-			a.chanMap[theIns] = []string{}
-			for aChan, sSends := range a.chanBufMap {
-				if sSends[0] != nil && len(sSends) == 1 { // slice of channel sends contains exactly one value
-					a.chanMap[theIns] = append(a.chanMap[theIns], aChan)
-				}
-			}
-		}
 		a.ptaConfig.AddQuery(examIns.X)
 	} else if examIns.Op == token.ARROW { // channel receive op
 		stats.IncStat(stats.NChanRecv)
@@ -219,14 +202,6 @@ func (a *analysis) insFieldAddr(examIns *ssa.FieldAddr, goID int, theIns ssa.Ins
 		a.RWIns[goID] = append(a.RWIns[goID], theIns)
 		a.updateLockMap(goID, theIns)
 		a.updateRLockMap(goID, theIns)
-		if len(a.chanBufMap) > 0 {
-			a.chanMap[theIns] = []string{}
-			for aChan, sSends := range a.chanBufMap {
-				if sSends[0] != nil && len(sSends) == 1 { // slice of channel sends contains exactly one value
-					a.chanMap[theIns] = append(a.chanMap[theIns], aChan)
-				}
-			}
-		}
 		a.ptaConfig.AddQuery(examIns.X)
 	}
 }
@@ -240,14 +215,6 @@ func (a *analysis) insLookUp(examIns *ssa.Lookup, goID int, theIns ssa.Instructi
 			a.RWIns[goID] = append(a.RWIns[goID], theIns)
 			a.updateLockMap(goID, theIns)
 			a.updateRLockMap(goID, theIns)
-			if len(a.chanBufMap) > 0 {
-				a.chanMap[theIns] = []string{}
-				for aChan, sSends := range a.chanBufMap {
-					if sSends[0] != nil && len(sSends) == 1 { // slice of channel sends contains exactly one value
-						a.chanMap[theIns] = append(a.chanMap[theIns], aChan)
-					}
-				}
-			}
 			a.ptaConfig.AddQuery(readIns.X)
 		}
 	case *ssa.Parameter:
@@ -255,14 +222,6 @@ func (a *analysis) insLookUp(examIns *ssa.Lookup, goID int, theIns ssa.Instructi
 			a.RWIns[goID] = append(a.RWIns[goID], theIns)
 			a.updateLockMap(goID, theIns)
 			a.updateRLockMap(goID, theIns)
-			if len(a.chanBufMap) > 0 {
-				a.chanMap[theIns] = []string{}
-				for aChan, sSends := range a.chanBufMap {
-					if sSends[0] != nil && len(sSends) == 1 { // slice of channel sends contains exactly one value
-						a.chanMap[theIns] = append(a.chanMap[theIns], aChan)
-					}
-				}
-			}
 			a.ptaConfig.AddQuery(readIns)
 		}
 	}
@@ -281,14 +240,6 @@ func (a *analysis) insChangeType(examIns *ssa.ChangeType, goID int, theIns ssa.I
 				a.RWIns[goID] = append(a.RWIns[goID], theIns)
 				a.updateLockMap(goID, theIns)
 				a.updateRLockMap(goID, theIns)
-				if len(a.chanBufMap) > 0 {
-					a.chanMap[theIns] = []string{}
-					for aChan, sSends := range a.chanBufMap {
-						if sSends[0] != nil && len(sSends) == 1 { // slice of channel sends contains exactly one value
-							a.chanMap[theIns] = append(a.chanMap[theIns], aChan)
-						}
-					}
-				}
 				a.ptaConfig.AddQuery(examIns.X)
 				a.visitAllInstructions(theFn, goID)
 			}
