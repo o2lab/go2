@@ -42,13 +42,13 @@ type analysis struct {
 	insertIndMap  map[string]int
 	chanMap       map[ssa.Instruction][]string // map each read/write access to a list of channels with value(s) already sent to it
 	chanName      string
+	selectBloc	  map[int]*ssa.Select // index of block where select statement was encountered
+	selReady	  map[*ssa.Select][]string // store name of ready channels for each select statement
+	selCaseCnt	  map[*ssa.Select]int // select case count
 	selectCaseBegin map[ssa.Instruction]string        // map first instruction in clause to channel name
 	selectCaseEnd map[ssa.Instruction]string          // map last instruction in clause to channel name
-	selectDefault map[*ssa.Select]ssa.Instruction     // map select statement to first instruction in its default block
 	selectDone    map[ssa.Instruction]ssa.Instruction // map select statement to first instruction after select is done
-	selectHB      map[ssa.Instruction]ssa.Instruction // map edge LEAVING node to ENTERING node
-	selectafterHB map[ssa.Instruction]ssa.Instruction
-	serverWorker  int
+	ifElseExclude []*ssa.BasicBlock
 }
 
 type fnInfo struct { // all fields must be comparable for fnInfo to be used as key to trieMap

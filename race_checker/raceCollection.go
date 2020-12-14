@@ -15,10 +15,16 @@ func (a *analysis) checkRacyPairs() {
 	for i := 0; i < len(a.RWIns); i++ {
 		for j := i + 1; j < len(a.RWIns); j++ { // must be in different goroutines, j always greater than i
 			for ii, goI := range a.RWIns[i] {
+				if sliceContainsBloc(a.ifElseExclude, goI.Block()) {
+					continue
+				}
 				if i == 0 && ii < a.insDRA {
 					continue // do not check race-free instructions in main goroutine
 				}
 				for jj, goJ := range a.RWIns[j] {
+					if sliceContainsBloc(a.ifElseExclude, goJ.Block()) {
+						continue
+					}
 					if (isWriteIns(goI) && isWriteIns(goJ)) || (isWriteIns(goI) && a.isReadIns(goJ)) || (a.isReadIns(goI) && isWriteIns(goJ)) { // only read and write instructions
 						insSlice := []ssa.Instruction{goI, goJ}
 						addressPair := a.insAddress(insSlice) // one instruction from each goroutine

@@ -41,7 +41,7 @@ var tests = []string{
 	"tests/k8s_issue80269.go",
 	"tests/global_ownership.go",
 	"tests/map_race.go",
-	//"tests/select.go", // need to work on nested select
+	"tests/select.go", // need to work on nested select
 	"tests/select_nonblock.go",
 	"tests/select_rpc.go",
 	"tests/select_sends.go",
@@ -54,7 +54,7 @@ var tests = []string{
 	"tests/GoBench/Cockroach/27659/main.go",
 	"tests/GoBench/Cockroach/35501/main.go",
 	"tests/GoBench/Etcd/4876/main.go",
-	//"tests/GoBench/Etcd/8149/main.go", // need to work on multiple select handling
+	"tests/GoBench/Etcd/8149/main.go", // need to work on multiple select handling
 	"tests/GoBench/Etcd/9446/main.go",
 	"tests/GoBench/Grpc/1748/main.go",
 	"tests/GoBench/Grpc/1862/main.go",
@@ -71,7 +71,7 @@ var tests = []string{
 	"tests/GoBench/Serving/3148/main.go",
 	"tests/godel2/ch-as-lock-race/main.go",
 	"tests/godel2/deposit-race/main.go",
-	"tests/godel2/prod-cons-race/main.go",
+	//"tests/godel2/prod-cons-race/main.go",
 	"tests/godel2/simple-race/main.go",
 	//"tests/godel2/dine3-chan-race/main.go", // multiple nested selects
 	//"tests/godel2/dine5-chan-race/main.go",

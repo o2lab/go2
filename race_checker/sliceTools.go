@@ -4,7 +4,6 @@ import (
 	"github.com/twmb/algoimpl/go/graph"
 	"go/token"
 	"golang.org/x/tools/go/ssa"
-	"sort"
 	"strings"
 )
 
@@ -35,25 +34,22 @@ func sliceContains(s []ssa.Value, e ssa.Value) bool {
 
 // sliceContainsBloc determines if BasicBlock e is in s
 func sliceContainsBloc(s []*ssa.BasicBlock, e *ssa.BasicBlock) bool {
-	for _, a := range s {
-		if a.Comment == e.Comment {
+	for _, b := range s {
+		if b == e {
 			return true
 		}
 	}
 	return false
 }
 
-// sliceContainsDup determines if slice s has duplicate values
-func sliceContainsDup(s []string) bool {
-	sort.Strings(s)
-	for i, n := range s {
-		if i > 0 {
-			if n == s[i-1] {
-				return true
-			}
+
+func sliceContainsIntAt(s []int, e int) int {
+	for i, a := range s {
+		if a == e {
+			return i
 		}
 	}
-	return false
+	return -1
 }
 
 // sliceContainsStr will determine if slice s has an element e of type string
