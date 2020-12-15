@@ -38,17 +38,17 @@ type analysis struct {
 	goStack       [][]string
 	goCaller      map[int]int
 	goNames       map[int]string
-	chanBufMap    map[string][]*ssa.Send // map each channel name to every send instruction
-	insertIndMap  map[string]int
-	chanMap       map[ssa.Instruction][]string // map each read/write access to a list of channels with value(s) already sent to it
-	chanName      string
-	selectBloc	  map[int]*ssa.Select // index of block where select statement was encountered
-	selReady	  map[*ssa.Select][]string // store name of ready channels for each select statement
-	selCaseCnt	  map[*ssa.Select]int // select case count
+	chanBuf	  	  map[string]int			  	  // map each channel to its buffer length
+	chanRcvs	  map[string][]*ssa.UnOp		  // map each channel to receive instructions
+	chanSnds	  map[string][]*ssa.Send		  // map each channel to send instructions
+	chanName 	  string
+	selectBloc	  map[int]*ssa.Select 				  // index of block where select statement was encountered
+	selReady	  map[*ssa.Select][]string 			  // store name of ready channels for each select statement
+	selCaseCnt	  map[*ssa.Select]int 				  // select case count
 	selectCaseBegin map[ssa.Instruction]string        // map first instruction in clause to channel name
 	selectCaseEnd map[ssa.Instruction]string          // map last instruction in clause to channel name
 	selectDone    map[ssa.Instruction]ssa.Instruction // map select statement to first instruction after select is done
-	ifElseExclude []*ssa.BasicBlock
+	ifElseExclude []*ssa.BasicBlock //
 }
 
 type fnInfo struct { // all fields must be comparable for fnInfo to be used as key to trieMap

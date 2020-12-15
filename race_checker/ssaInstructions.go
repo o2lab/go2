@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	//"fmt"
 	"github.com/o2lab/race-checker/stats"
 	log "github.com/sirupsen/logrus"
@@ -48,8 +47,7 @@ func (a *analysis) isReadIns(ins ssa.Instruction) bool {
 	switch insType := ins.(type) {
 	case *ssa.UnOp:
 		if ins, ok := insType.X.(*ssa.Alloc); ok {
-			if _, ok1 := a.chanBufMap[ins.Comment]; ok1 {
-				fmt.Println("e")
+			if _, ok1 := a.chanRcvs[ins.Comment]; ok1 {
 				return false // a channel op, handled differently than typical read ins
 			}
 		}
@@ -113,34 +111,21 @@ func (a *analysis) insMakeChan(examIns *ssa.MakeChan) {
 		bufferLen = 10 // TODO: assuming channel can buffer up to 10 values could result in false positives
 	}
 	if bufferLen < 2 { // unbuffered channel
-		a.chanBufMap[examIns.Name()] = make([]*ssa.Send, 1)
+		a.chanBuf[examIns.Name()] = 1
 	} else { // buffered channel
-		a.chanBufMap[examIns.Name()] = make([]*ssa.Send, bufferLen)
+		a.chanBuf[examIns.Name()] = int(bufferLen)
 	}
-	a.insertIndMap[examIns.Name()] = 0 // initialize index
 }
 
 // insSend ???
 func (a *analysis) insSend(examIns *ssa.Send, goID int, theIns ssa.Instruction) {
 	stats.IncStat(stats.NSend)
 	a.RWIns[goID] = append(a.RWIns[goID], theIns)
-	var chName string
-	if _, ok := a.chanBufMap[examIns.Chan.Name()]; !ok { // if channel name can't be identified
+	if _, ok := a.chanBuf[examIns.Chan.Name()]; !ok { // if channel name can't be identified
 		a.pointerAnalysis(examIns.Chan, goID, theIns) // identifiable name will be returned by pointer analysis via variable chanName
-		chName = a.chanName
+		a.chanSnds[a.chanName] = append(a.chanSnds[a.chanName], examIns)
 	} else {
-		chName = examIns.Chan.Name()
-	}
-	if len(a.chanBufMap[chName]) > 0 {
-		for a.insertIndMap[chName] < len(a.chanBufMap[chName]) && a.chanBufMap[chName][a.insertIndMap[chName]] != nil {
-			a.insertIndMap[chName]++ // iterate until reaching an index with nil send value stored
-		}
-		if a.insertIndMap[chName] == len(a.chanBufMap[chName])-1 && a.chanBufMap[chName][a.insertIndMap[chName]] != nil {
-			// buffer length reached, channel will block
-			// TODO: use HB graph to handle blocked channel?
-		} else if a.insertIndMap[chName] < len(a.chanBufMap[chName]) {
-			a.chanBufMap[chName][a.insertIndMap[chName]] = examIns
-		}
+		a.chanSnds[examIns.Chan.Name()] = append(a.chanSnds[examIns.Chan.Name()], examIns)
 	}
 }
 
@@ -176,21 +161,11 @@ func (a *analysis) insUnOp(examIns *ssa.UnOp, goID int, theIns ssa.Instruction) 
 		a.ptaConfig.AddQuery(examIns.X)
 	} else if examIns.Op == token.ARROW { // channel receive op
 		stats.IncStat(stats.NChanRecv)
-		var chName string
-		if _, ok := a.chanBufMap[examIns.X.Name()]; !ok { // if channel name can't be identified
+		if _, ok := a.chanBuf[examIns.X.Name()]; !ok { // if channel name can't be identified
 			a.pointerAnalysis(examIns.X, goID, theIns)
-			chName = a.chanName
+			a.chanRcvs[a.chanName] = append(a.chanRcvs[a.chanName], examIns)
 		} else {
-			chName = examIns.X.Name()
-		}
-		for i, aVal := range a.chanBufMap[chName] {
-			if aVal != nil { // channel is not empty
-				if len(a.chanBufMap[chName]) > i+1 {
-					a.chanBufMap[chName][i] = a.chanBufMap[chName][i+1] // move buffered values one place over
-				} else {
-					a.chanBufMap[chName][i] = nil // empty channel upon channel recv
-				}
-			}
+			a.chanRcvs[examIns.X.Name()] = append(a.chanRcvs[examIns.X.Name()], examIns)
 		}
 	}
 }
@@ -283,14 +258,6 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 					a.RWIns[goID] = append(a.RWIns[goID], theIns)
 					a.updateLockMap(goID, theIns)
 					a.updateRLockMap(goID, theIns)
-					if len(a.chanBufMap) > 0 {
-						a.chanMap[theIns] = []string{}
-						for aChan, sSends := range a.chanBufMap {
-							if sSends[0] != nil && len(sSends) == 1 { // slice of channel sends contains exactly one value
-								a.chanMap[theIns] = append(a.chanMap[theIns], aChan)
-							}
-						}
-					}
 					a.ptaConfig.AddQuery(theVal.X)
 				}
 			}
@@ -319,14 +286,6 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 					a.RWIns[goID] = append(a.RWIns[goID], theIns)
 					a.updateLockMap(goID, theIns)
 					a.updateRLockMap(goID, theIns)
-					if len(a.chanBufMap) > 0 {
-						a.chanMap[theIns] = []string{}
-						for aChan, sSends := range a.chanBufMap {
-							if sSends[0] != nil && len(sSends) == 1 { // slice of channel sends contains exactly one value
-								a.chanMap[theIns] = append(a.chanMap[theIns], aChan)
-							}
-						}
-					}
 					a.ptaConfig.AddQuery(access.X)
 				}
 			default:
@@ -446,14 +405,6 @@ func (a *analysis) insMapUpdate(examIns *ssa.MapUpdate, goID int, theIns ssa.Ins
 	stats.IncStat(stats.NStore)
 	a.RWIns[goID] = append(a.RWIns[goID], theIns)
 	a.updateLockMap(goID, theIns)
-	if len(a.chanBufMap) > 0 {
-		a.chanMap[theIns] = []string{}
-		for aChan, sSends := range a.chanBufMap {
-			if sSends[0] != nil && len(sSends) == 1 { // slice of channel sends contains exactly one value
-				a.chanMap[theIns] = append(a.chanMap[theIns], aChan)
-			}
-		}
-	}
 	switch ptType := examIns.Map.(type) {
 	case *ssa.UnOp:
 		a.ptaConfig.AddQuery(ptType.X)

@@ -105,29 +105,29 @@ func staticAnalysis(args []string) error {
 		BuildCallGraph: false,
 	}
 	Analysis = &analysis{
-		prog:         prog,
-		pkgs:         pkgs,
-		mains:        mains,
-		ptaConfig:    config,
-		RWinsMap:     make(map[goIns]graph.Node),
-		insDRA:       0,
-		levels:       make(map[int]int),
-		lockMap:       make(map[ssa.Instruction][]ssa.Value),
-		RlockMap:      make(map[ssa.Instruction][]ssa.Value),
-		goLockset:     make(map[int][]ssa.Value),
-		goRLockset:    make(map[int][]ssa.Value),
-		mapFreeze:     false,
-		goCaller:      make(map[int]int),
-		goNames:       make(map[int]string),
-		chanBufMap:    make(map[string][]*ssa.Send),
-		insertIndMap:  make(map[string]int),
-		chanMap:       make(map[ssa.Instruction][]string), // map each read/write access to a list of channels with value(s) already sent to it
-		selectBloc:	   make(map[int]*ssa.Select),
-		selReady:	   make(map[*ssa.Select][]string),
-		selCaseCnt:	   make(map[*ssa.Select]int),
-		selectCaseBegin: make(map[ssa.Instruction]string),
-		selectCaseEnd: make(map[ssa.Instruction]string),
-		selectDone:    make(map[ssa.Instruction]ssa.Instruction),
+		prog:           prog,
+		pkgs:           pkgs,
+		mains:          mains,
+		ptaConfig:      config,
+		RWinsMap:       make(map[goIns]graph.Node),
+		insDRA:         0,
+		levels:         make(map[int]int),
+		lockMap:        make(map[ssa.Instruction][]ssa.Value),
+		RlockMap:       make(map[ssa.Instruction][]ssa.Value),
+		goLockset:      make(map[int][]ssa.Value),
+		goRLockset:     make(map[int][]ssa.Value),
+		mapFreeze:      false,
+		goCaller:       make(map[int]int),
+		goNames:        make(map[int]string),
+		chanBuf:		make(map[string]int),
+		chanRcvs: 		make(map[string][]*ssa.UnOp),
+		chanSnds: 	 	make(map[string][]*ssa.Send),
+		selectBloc:	   	make(map[int]*ssa.Select),
+		selReady:	   	make(map[*ssa.Select][]string),
+		selCaseCnt:	    make(map[*ssa.Select]int),
+		selectCaseBegin:make(map[ssa.Instruction]string),
+		selectCaseEnd:  make(map[ssa.Instruction]string),
+		selectDone:     make(map[ssa.Instruction]ssa.Instruction),
 	}
 
 	log.Info("Compiling stack trace for every Goroutine... ")
@@ -264,7 +264,6 @@ func staticAnalysis(args []string) error {
 			}
 			if sendIns, ok := anIns.(*ssa.Send); ok { // detect matching channel send operations
 				if matchingRcv, ok1 := sendIns.Chan.(*ssa.UnOp); ok1 {
-					fmt.Println(sendIns.Chan.Name())
 					if edgeTo, ok2 := chanRecvs[matchingRcv.X.Name()]; ok2 {
 						err := Analysis.HBgraph.MakeEdge(prevN, edgeTo) // create edge from Send node to Receive node
 						if err != nil {
