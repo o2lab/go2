@@ -191,8 +191,15 @@ func staticAnalysis(args []string) error {
 					if num, ind := chReady(readyCh); num == 1 && selIns.Blocking { // exactly one ready channel
 						chanRecvs[readyCh[ind]] = currN // certainty of traversal here
 					}
-				} else if ins, ok2 := anIns.(*ssa.UnOp); ok2 && ins.Op == token.ARROW {
-
+				} else if ins, ok := anIns.(*ssa.UnOp); ok && ins.Op == token.ARROW { // handling regular channel receive operation
+					var chName string
+					if _, ok := Analysis.chanRcvs[ins.X.Name()]; !ok { // if channel name can't be identified
+						Analysis.pointerAnalysis(ins.X, nGo, ins)
+						chName = Analysis.chanName
+					} else {
+						chName = ins.X.Name()
+					}
+					chanRecvs[chName] = currN
 				}
 				if ch, ok0 := Analysis.selectCaseEnd[anIns]; ok0 && sliceContainsStr(readyCh, ch) {
 					selCaseEndN = append(selCaseEndN, currN)
@@ -264,7 +271,21 @@ func staticAnalysis(args []string) error {
 			}
 			if sendIns, ok := anIns.(*ssa.Send); ok { // detect matching channel send operations
 				if matchingRcv, ok1 := sendIns.Chan.(*ssa.UnOp); ok1 {
-					if edgeTo, ok2 := chanRecvs[matchingRcv.X.Name()]; ok2 {
+					// used for regular channel receive
+					var chName string
+					Analysis.pointerAnalysis(matchingRcv.X, nGo, matchingRcv)
+					chName = Analysis.chanName
+
+					// for select statement && channel receive
+					if edgeTo, ok2 := chanRecvs[matchingRcv.X.Name()]; ok2 { // for select statement
+						err := Analysis.HBgraph.MakeEdge(prevN, edgeTo) // create edge from Send node to Receive node
+						if err != nil {
+							log.Fatal(err)
+						}
+						if anIns.Block().Comment == "if.then" {
+							commIfThen = true
+						}
+					} else if edgeTo, ok2 := chanRecvs[chName]; ok2 { // for regular channel receive
 						err := Analysis.HBgraph.MakeEdge(prevN, edgeTo) // create edge from Send node to Receive node
 						if err != nil {
 							log.Fatal(err)
