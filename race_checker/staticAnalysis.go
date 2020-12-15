@@ -161,6 +161,7 @@ func staticAnalysis(args []string) error {
 	var beforeIfN graph.Node
 	var afterIfN graph.Node
 	var commIfThen bool
+	var prevIns ssa.Instruction
 	waitingN := make(map[*ssa.Call]graph.Node)
 	chanRecvs := make(map[string]graph.Node) // map channel name to graph node
 	for nGo, insSlice := range Analysis.RWIns {
@@ -204,7 +205,7 @@ func staticAnalysis(args []string) error {
 				if ch, ok0 := Analysis.selectCaseEnd[anIns]; ok0 && sliceContainsStr(readyCh, ch) {
 					selCaseEndN = append(selCaseEndN, currN)
 				}
-				if anIns.Block().Comment == "if.then" && anIns == anIns.Block().Instrs[0] {
+				if anIns.Block().Comment == "if.then" && prevIns.Block().Comment != "if.then"{
 					beforeIfN = prevN
 				}
 				if anIns.Block().Comment == "if.then" && anIns == anIns.Block().Instrs[len(anIns.Block().Instrs)-1] {
@@ -240,6 +241,8 @@ func staticAnalysis(args []string) error {
 					}
 				}
 				prevN = currN
+				prevIns = anIns
+
 			}
 			// Create additional edges:
 			if Analysis.isReadIns(anIns) || isWriteIns(anIns) {

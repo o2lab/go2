@@ -34,7 +34,7 @@ var tests = []string{
 	"tests/fzf_wg.go",
 	"tests/global_ownership.go",
 	"tests/ifunlockProtected.go",
-	//"tests/ifunlockUnprotected.go",//issue in edge creation
+	"tests/ifunlockUnprotected.go",//issue in edge creation
 	"tests/k8s_issue80269.go",
 	"tests/lock.go",
 	"tests/lock_grpc_sync.go",
