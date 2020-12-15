@@ -28,6 +28,7 @@ var tests = []string{
 	//"tests/atomics.go",//false positive
 	"tests/cfg.go",
 	"tests/cg.go",
+	"tests/chan_receive.go",
 	"tests/context1.go",
 	"tests/fields.go",
 	"tests/fzf_wg.go",

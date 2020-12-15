@@ -169,8 +169,8 @@ func (a *analysis) insStore(examIns *ssa.Store, goID int, theIns ssa.Instruction
 // insUnOp ???
 func (a *analysis) insUnOp(examIns *ssa.UnOp, goID int, theIns ssa.Instruction) {
 	stats.IncStat(stats.NUnOp)
+	a.RWIns[goID] = append(a.RWIns[goID], theIns)
 	if examIns.Op == token.MUL && !isLocalAddr(examIns.X) { // read op
-		a.RWIns[goID] = append(a.RWIns[goID], theIns)
 		a.updateLockMap(goID, theIns)
 		a.updateRLockMap(goID, theIns)
 		a.ptaConfig.AddQuery(examIns.X)
