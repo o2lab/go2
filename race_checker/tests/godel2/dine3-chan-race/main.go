@@ -4,12 +4,11 @@ package main
 
 import (
 	"fmt"
-	"time"
 )
 
 func Fork(fork *int, ch chan int) {
 	for {
-		* /* RACE Write */ /* RACE Write */ fork = 1
+		* /* RACE Write */ /* RACE Write */ /* RACE Write */ fork = 1
 		<-ch
 		ch <- 0
 	}
@@ -20,7 +19,7 @@ func phil(fork1, fork2 *int, ch1, ch2 chan int, id int) {
 		select {
 		case ch1 <- * /* RACE Read */ fork1:
 			select {
-			case ch2 <- *fork2:
+			case ch2 <- * /* RACE Read */ fork2:
 				fmt.Printf("phil %d got both fork\n", id)
 				<-ch1
 				<-ch2
@@ -51,5 +50,5 @@ func main() {
 	go Fork(&fork1, ch1)
 	go Fork(&fork2, ch2)
 	go Fork(&fork3, ch3)
-	time.Sleep(10 * time.Second)
+	time.Sleep(1 * time.Second)
 }
