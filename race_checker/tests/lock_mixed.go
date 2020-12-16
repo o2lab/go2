@@ -9,8 +9,8 @@ func main() {
 	ch1 := make(chan int)
 	mumu := sync.RWMutex{}
 	x := 0
-	mumu.RLock()
 	go func() {
+		mumu.RLock()
 		ch1 <- x
 		mumu.RUnlock()
 	}()

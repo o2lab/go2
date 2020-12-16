@@ -25,7 +25,7 @@ var (
 )
 
 var tests = []string{
-	//"tests/atomics.go",//false positive
+	//"tests/atomics.go", // race condition - no shared memory
 	"tests/cfg.go",
 	"tests/cg.go",
 	"tests/chan_receive.go",
@@ -34,15 +34,15 @@ var tests = []string{
 	"tests/fzf_wg.go",
 	"tests/global_ownership.go",
 	"tests/ifunlockProtected.go",
-	"tests/ifunlockUnprotected.go",//issue in edge creation
+	"tests/ifunlockUnprotected.go",
 	"tests/k8s_issue80269.go",
 	"tests/lock.go",
 	"tests/lock_grpc_sync.go",
-	//"tests/lock_mixed.go",//false positive
+	"tests/lock_mixed.go",
 	"tests/lock_multiple_deferred.go",
 	"tests/lock_twice.go",
 	"tests/map_race.go",
-	//"tests/multi_sends.go",//false positive
+	"tests/multi_sends.go",
 	"tests/multiple_waitgroups.go",
 	"tests/ownership1.go",
 	"tests/race_cfg.go",
@@ -52,7 +52,7 @@ var tests = []string{
 	"tests/rwmutex_lock.go",
 	"tests/select.go", // need to work on nested select
 	"tests/select_all_ready.go",
-	//"tests/select_multiple.go",//false positive and negative
+	//"tests/select_multiple.go",
 	"tests/select_nonblock.go",
 	"tests/select_nonblock_fp.go",
 	"tests/select_rpc.go",

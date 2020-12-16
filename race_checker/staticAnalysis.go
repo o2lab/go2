@@ -223,6 +223,7 @@ func staticAnalysis(args []string) error {
 					} else {
 						err := Analysis.HBgraph.MakeEdge(chanRecvs[ch], currN) // receive Op to ready case
 						if err != nil {
+							fmt.Println(ch)
 							fmt.Println("2.5")
 							log.Fatal(err)
 						}
@@ -290,8 +291,8 @@ func staticAnalysis(args []string) error {
 			}
 			if sendIns, ok := anIns.(*ssa.Send); ok { // detect matching channel send operations
 				for ch, sIns := range Analysis.chanSnds {
-					if sliceContainsSnd(sIns, sendIns) {
-						err := Analysis.HBgraph.MakeEdge(prevN, chanRecvs[ch]) // create edge from Send node to Receive node
+					if rcvN, matching := chanRecvs[ch]; matching && sliceContainsSnd(sIns, sendIns) {
+						err := Analysis.HBgraph.MakeEdge(prevN, rcvN) // create edge from Send node to Receive node
 						if err != nil {
 							fmt.Println("8")
 							log.Fatal(err)
@@ -478,6 +479,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				a.insMapUpdate(examIns, goID, theIns)
 			case *ssa.Select:
 				readyChans = a.insSelect(examIns, goID, theIns)
+				selCount = 0
 				selIns = examIns
 				a.selectBloc[bVisit[bInd]] = examIns
 			default:
@@ -486,7 +488,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 			if ii == len(aBlock.Instrs)-1 && a.mapFreeze { // TODO: this can happen too early
 				a.mapFreeze = false
 			}
-			if activeCase {
+			if activeCase && readyChans[selCount] != "defaultCase" && readyChans[selCount] != "timeOut" {
 				if ii == 0 {
 					a.selectCaseBegin[theIns] = readyChans[selCount] // map first instruction in case to channel name
 					if a.RWIns[goID][len(a.RWIns[goID])-1] != theIns {
@@ -513,7 +515,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				repeatSwitch = false
 			}
 		}
-		if activeCase { selCount++ } // increment case count
+		if activeCase && readyChans[selCount] != "defaultCase" && readyChans[selCount] != "timeOut" { selCount++ } // increment case count
 	}
 	if len(toUnlock) > 0 {
 		for _, loc := range toUnlock {
