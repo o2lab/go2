@@ -1,6 +1,6 @@
 package main
 
-import   (
+import (
 	"fmt"
 	log "github.com/sirupsen/logrus"
 	"github.com/twmb/algoimpl/go/graph"
@@ -127,7 +127,7 @@ func staticAnalysis(args []string) error {
 		selCaseCnt:	    make(map[*ssa.Select]int),
 		selectCaseBegin:make(map[ssa.Instruction]string),
 		selectCaseEnd:  make(map[ssa.Instruction]string),
-		selectDone:     make(map[ssa.Instruction]ssa.Instruction),
+		selectDone:     make(map[ssa.Instruction]*ssa.Select),
 	}
 
 	log.Info("Compiling stack trace for every Goroutine... ")
@@ -155,7 +155,6 @@ func staticAnalysis(args []string) error {
 	var prevN graph.Node
 	var goCaller []graph.Node
 	var selectN []graph.Node
-	var selIns *ssa.Select
 	var readyCh []string
 	var selCaseEndN []graph.Node
 	var beforeIfN graph.Node
@@ -169,6 +168,7 @@ func staticAnalysis(args []string) error {
 				Analysis.ifElseExclude = append(Analysis.ifElseExclude, anIns.Block())
 				continue
 			}
+			disjoin := false // detach select case statement from subsequent instruction
 			insKey := goIns{ins: anIns, goID: nGo}
 			if nGo == 0 && i == 0 { // main goroutine, first instruction
 				prevN = Analysis.HBgraph.MakeNode() // initiate for future nodes
@@ -184,22 +184,16 @@ func staticAnalysis(args []string) error {
 					goCaller = goCaller[1:]
 				} else if _, ok := anIns.(*ssa.Go); ok {
 					goCaller = append(goCaller, currN) // sequentially store go calls in the same goroutine
-				} else if _, ok1 := anIns.(*ssa.Select); ok1 {
+				} else if selIns, ok1 := anIns.(*ssa.Select); ok1 {
 					selectN = append(selectN, currN) // select node
-					selIns = anIns.(*ssa.Select)
 					readyCh = Analysis.insSelect(selIns, nGo, anIns)
-					if num, ind := chReady(readyCh); num == 1 && selIns.Blocking { // exactly one ready channel
-						chanRecvs[readyCh[ind]] = currN // certainty of traversal here
+				} else if ins, chR := anIns.(*ssa.UnOp); chR {
+					if ch := Analysis.getRcvChan(ins); ch != "" { // a channel receive Op
+						chanRecvs[Analysis.getRcvChan(ins)] = currN
+						if Analysis.isReadySel(ch) {
+							disjoin = true
+						}
 					}
-				} else if ins, ok := anIns.(*ssa.UnOp); ok && ins.Op == token.ARROW { // handling regular channel receive operation
-					var chName string
-					if _, ok := Analysis.chanRcvs[ins.X.Name()]; !ok { // if channel name can't be identified
-						Analysis.pointerAnalysis(ins.X, nGo, ins)
-						chName = Analysis.chanName
-					} else {
-						chName = ins.X.Name()
-					}
-					chanRecvs[chName] = currN
 				}
 				if ch, ok0 := Analysis.selectCaseEnd[anIns]; ok0 && sliceContainsStr(readyCh, ch) {
 					selCaseEndN = append(selCaseEndN, currN)
@@ -210,36 +204,57 @@ func staticAnalysis(args []string) error {
 				if anIns.Block().Comment == "if.then" && anIns == anIns.Block().Instrs[len(anIns.Block().Instrs)-1] {
 					afterIfN = currN
 				}
+				// edge manipulation:
 				if anIns.Block().Comment == "if.done" && anIns == anIns.Block().Instrs[0] && !commIfThen {
 					err := Analysis.HBgraph.MakeEdge(afterIfN, currN) // ready case to select done
 					if err != nil {
+						fmt.Println("1")
 						log.Fatal(err)
 					}
 				}
-				if ch, ok := Analysis.selectCaseBegin[anIns]; ok && sliceContainsStr(readyCh, ch) {
-					err := Analysis.HBgraph.MakeEdge(selectN[0], currN) // select node to ready case
-					if err != nil {
-						log.Fatal(err)
-					}
-				} else if _, ok1 := Analysis.selectDone[anIns]; ok1 {
-					for c, _ := range selCaseEndN {
-						err := Analysis.HBgraph.MakeEdge(selCaseEndN[c], currN) // ready case to select done
+				if ch, ok := Analysis.selectCaseBegin[anIns]; ok {
+					if ch == "defaultCase" {
+						err := Analysis.HBgraph.MakeEdge(selectN[0], currN) // select node to default case
 						if err != nil {
+							fmt.Println("2")
+							log.Fatal(err)
+						}
+					} else {
+						err := Analysis.HBgraph.MakeEdge(chanRecvs[ch], currN) // receive Op to ready case
+						if err != nil {
+							fmt.Println("2.5")
 							log.Fatal(err)
 						}
 					}
+				} else if _, ok1 := Analysis.selectDone[anIns]; ok1 {
+					if len(selCaseEndN) > 1 { // more than one portal
+						err := Analysis.HBgraph.MakeEdge(selectN[0], currN) // ready case to select done
+						if err != nil {
+							fmt.Println("3")
+							log.Fatal(err)
+						}
+					} else if len(selCaseEndN) > 0 {
+						err := Analysis.HBgraph.MakeEdge(selCaseEndN[0], currN) // ready case to select done
+						if err != nil {
+							fmt.Println("3")
+							log.Fatal(err)
+						}
+					}
+					if selectN != nil && len(selectN) > 1 { selectN = selectN[1:] } // completed analysis of one select statement
 				} else if anIns.Block().Comment == "if.else" && anIns == anIns.Block().Instrs[0] {
 					err := Analysis.HBgraph.MakeEdge(beforeIfN, currN)
 					if err != nil {
+						fmt.Println("4")
 						log.Fatal(err)
 					}
 				} else {
 					err := Analysis.HBgraph.MakeEdge(prevN, currN)
 					if err != nil {
+						fmt.Println("5")
 						log.Fatal(err)
 					}
 				}
-				prevN = currN
+				if !disjoin { prevN = currN }
 			}
 			// Create additional edges:
 			if Analysis.isReadIns(anIns) || isWriteIns(anIns) {
@@ -252,6 +267,7 @@ func staticAnalysis(args []string) error {
 						if Analysis.sameAddress(callIns.Call.Args[0], wIns.Call.Args[0]) {
 							err := Analysis.HBgraph.MakeEdge(prevN, wNode) // create edge from Done node to Wait node
 							if err != nil {
+								fmt.Println("6")
 								log.Fatal(err)
 							}
 						}
@@ -263,6 +279,7 @@ func staticAnalysis(args []string) error {
 						if Analysis.sameAddress(dIns.Call.Args[0], wIns.Call.Args[0]) {
 							err := Analysis.HBgraph.MakeEdge(prevN, wNode) // create edge from Done node to Wait node
 							if err != nil {
+								fmt.Println("7")
 								log.Fatal(err)
 							}
 						}
@@ -270,24 +287,11 @@ func staticAnalysis(args []string) error {
 				}
 			}
 			if sendIns, ok := anIns.(*ssa.Send); ok { // detect matching channel send operations
-				if matchingRcv, ok1 := sendIns.Chan.(*ssa.UnOp); ok1 {
-					// used for regular channel receive
-					var chName string
-					Analysis.pointerAnalysis(matchingRcv.X, nGo, matchingRcv)
-					chName = Analysis.chanName
-
-					// for select statement && channel receive
-					if edgeTo, ok2 := chanRecvs[matchingRcv.X.Name()]; ok2 { // for select statement
-						err := Analysis.HBgraph.MakeEdge(prevN, edgeTo) // create edge from Send node to Receive node
+				for ch, sIns := range Analysis.chanSnds {
+					if sliceContainsSnd(sIns, sendIns) {
+						err := Analysis.HBgraph.MakeEdge(prevN, chanRecvs[ch]) // create edge from Send node to Receive node
 						if err != nil {
-							log.Fatal(err)
-						}
-						if anIns.Block().Comment == "if.then" {
-							commIfThen = true
-						}
-					} else if edgeTo, ok2 := chanRecvs[chName]; ok2 { // for regular channel receive
-						err := Analysis.HBgraph.MakeEdge(prevN, edgeTo) // create edge from Send node to Receive node
-						if err != nil {
+							fmt.Println("8")
 							log.Fatal(err)
 						}
 						if anIns.Block().Comment == "if.then" {
@@ -371,22 +375,21 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 		if aBlock.Comment == "recover" {
 			continue
 		}
-		if aBlock.Comment == "select.done" || aBlock.Comment == "rangechan.done" {
+		if aBlock.Comment == "select.done" {
 			a.selectDone[aBlock.Instrs[0]] = selIns // map first ins in select.done to select instruction
 			selDone = true
 		}
 		if aBlock.Comment == "select.body" && selCount < len(readyChans) {
 			if readyChans[selCount] == "" {
+				selCount++
 				continue // skip unready case
 			} else {
 				activeCase = true
 			}
 		}
-		if aBlock.Comment == "select.next" && !selIns.Blocking {
-			if readyChans[selCount] == "defaultCase" {
-				a.selectCaseBegin[aBlock.Instrs[0]] = readyChans[selCount] // map first instruction in case to channel name
-				a.selectCaseEnd[aBlock.Instrs[len(aBlock.Instrs)-1]] = readyChans[selCount] // map last instruction in case to channel name
-			}
+		if aBlock.Comment == "select.next" && !selIns.Blocking && readyChans[selCount] == "defaultCase" {
+			a.selectCaseBegin[aBlock.Instrs[0]] = readyChans[selCount] // map first instruction in case to channel name
+			a.selectCaseEnd[aBlock.Instrs[len(aBlock.Instrs)-1]] = readyChans[selCount] // map last instruction in case to channel name
 		}
 		for ii, theIns := range aBlock.Instrs { // examine each instruction
 			if theIns.String() == "rundefers" { // execute deferred calls at this index
@@ -426,7 +429,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 			}
 			switch examIns := theIns.(type) {
 			case *ssa.MakeChan: // channel creation op
-				a.insMakeChan(examIns)
+				a.insMakeChan(examIns, ii)
 			case *ssa.Send: // channel send op
 				a.insSend(examIns, goID, theIns)
 			case *ssa.Store: // write op
@@ -474,7 +477,6 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 			case *ssa.Select:
 				readyChans = a.insSelect(examIns, goID, theIns)
 				selIns = examIns
-				selCount = 0
 				a.selectBloc[bVisit[bInd]] = examIns
 			default:
 				a.RWIns[goID] = append(a.RWIns[goID], theIns)
@@ -496,7 +498,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				}
 			}
 			if selDone && ii == 0 {
-				if a.RWIns[goID][len(a.RWIns[goID])-1] != theIns {
+				if sliceContainsInsAt(a.RWIns[goID], theIns) == -1 {
 					a.RWIns[goID] = append(a.RWIns[goID], theIns)
 				}
 			}
@@ -509,7 +511,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				repeatSwitch = false
 			}
 		}
-		if activeCase { selCount++ }
+		if activeCase { selCount++ } // increment case count
 	}
 	if len(toUnlock) > 0 {
 		for _, loc := range toUnlock {

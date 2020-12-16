@@ -1,7 +1,6 @@
 package main
 
 import (
-	//"fmt"
 	"github.com/o2lab/race-checker/stats"
 	log "github.com/sirupsen/logrus"
 	"go/constant"
@@ -101,7 +100,7 @@ func (a *analysis) updateRecords(fnName string, goID int, pushPop string) {
 }
 
 // insMakeChan takes make channel instructions and stores their name and buffer size
-func (a *analysis) insMakeChan(examIns *ssa.MakeChan) {
+func (a *analysis) insMakeChan(examIns *ssa.MakeChan, insInd int) {
 	stats.IncStat(stats.NMakeChan)
 	var bufferLen int64
 	if bufferInfo, ok := examIns.Size.(*ssa.Const); ok { // buffer length passed via constant
@@ -110,10 +109,12 @@ func (a *analysis) insMakeChan(examIns *ssa.MakeChan) {
 	} else if _, ok := examIns.Size.(*ssa.Parameter); ok { // buffer length passed via function parameter
 		bufferLen = 10 // TODO: assuming channel can buffer up to 10 values could result in false positives
 	}
-	if bufferLen < 2 { // unbuffered channel
-		a.chanBuf[examIns.Name()] = 1
-	} else { // buffered channel
-		a.chanBuf[examIns.Name()] = int(bufferLen)
+	instrs := examIns.Block().Instrs
+	if insInd > 0 {
+		switch ch := instrs[insInd-1].(type) {
+		case *ssa.Alloc:
+			a.chanBuf[ch.Comment] = int(bufferLen) // 0 length - unbuffered channel, otherwise - buffered channel
+		}
 	}
 }
 
@@ -121,11 +122,31 @@ func (a *analysis) insMakeChan(examIns *ssa.MakeChan) {
 func (a *analysis) insSend(examIns *ssa.Send, goID int, theIns ssa.Instruction) {
 	stats.IncStat(stats.NSend)
 	a.RWIns[goID] = append(a.RWIns[goID], theIns)
-	if _, ok := a.chanBuf[examIns.Chan.Name()]; !ok { // if channel name can't be identified
-		a.pointerAnalysis(examIns.Chan, goID, theIns) // identifiable name will be returned by pointer analysis via variable chanName
-		a.chanSnds[a.chanName] = append(a.chanSnds[a.chanName], examIns)
+	ch := examIns.Chan.Name()
+	if _, ok := a.chanBuf[ch]; !ok {
+		switch chN := examIns.Chan.(type) {
+		case *ssa.UnOp:
+			switch chName := chN.X.(type) {
+			case *ssa.Alloc:
+				ch = chName.Comment
+			case *ssa.FreeVar:
+				ch = chName.Name()
+			case *ssa.FieldAddr:
+				switch chName.X.(type) {
+				case *ssa.Parameter:
+					ch = chName.X.(*ssa.Parameter).Name()
+				case *ssa.FieldAddr:
+					ch = chName.X.(*ssa.FieldAddr).Name()
+				}
+			default:
+				log.Debug("need to consider this case for channel name collection")
+			}
+			a.chanSnds[ch] = append(a.chanSnds[ch], examIns)
+		default: // may need to consider other cases as well
+			log.Debug("need to consider this case for channel send")
+		}
 	} else {
-		a.chanSnds[examIns.Chan.Name()] = append(a.chanSnds[examIns.Chan.Name()], examIns)
+		a.chanSnds[ch] = append(a.chanSnds[ch], examIns)
 	}
 }
 
@@ -159,13 +180,33 @@ func (a *analysis) insUnOp(examIns *ssa.UnOp, goID int, theIns ssa.Instruction) 
 		a.updateLockMap(goID, theIns)
 		a.updateRLockMap(goID, theIns)
 		a.ptaConfig.AddQuery(examIns.X)
-	} else if examIns.Op == token.ARROW { // channel receive op
+	} else if examIns.Op == token.ARROW { // channel receive op (not waited on by select)
 		stats.IncStat(stats.NChanRecv)
-		if _, ok := a.chanBuf[examIns.X.Name()]; !ok { // if channel name can't be identified
-			a.pointerAnalysis(examIns.X, goID, theIns)
-			a.chanRcvs[a.chanName] = append(a.chanRcvs[a.chanName], examIns)
+		ch := examIns.X.Name()
+		if _, ok := a.chanBuf[ch]; !ok {
+			switch chN := examIns.X.(type) {
+			case *ssa.UnOp:
+				switch chName := chN.X.(type) {
+				case *ssa.Alloc:
+					ch = chName.Comment
+				case *ssa.FreeVar:
+					ch = chName.Name()
+				case *ssa.FieldAddr:
+					switch chName.X.(type) {
+					case *ssa.Parameter:
+						ch = chName.X.(*ssa.Parameter).Name()
+					case *ssa.FieldAddr:
+						ch = chName.X.(*ssa.FieldAddr).Name()
+					}
+				default:
+					log.Debug("need to consider this case for channel name collection")
+				}
+				a.chanRcvs[ch] = append(a.chanRcvs[ch], examIns)
+			default: // may need to consider other cases as well
+				log.Debug("need to consider this case for channel send")
+			}
 		} else {
-			a.chanRcvs[examIns.X.Name()] = append(a.chanRcvs[examIns.X.Name()], examIns)
+			a.chanRcvs[ch] = append(a.chanRcvs[ch], examIns)
 		}
 	}
 }
@@ -259,6 +300,21 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 					a.updateLockMap(goID, theIns)
 					a.updateRLockMap(goID, theIns)
 					a.ptaConfig.AddQuery(theVal.X)
+				}
+			}
+		} else if examIns.Call.Value.Name() == "close" { // closing a channel
+			for _, arg := range examIns.Call.Args {
+				switch ch := arg.(type) {
+				case *ssa.UnOp:
+					switch chN := ch.X.(type) {
+					case *ssa.Alloc:
+						if _, exCh := a.chanBuf[chN.Comment]; exCh {
+							delete(a.chanBuf, chN.Comment)
+							delete(a.chanSnds, chN.Comment)
+						}
+					case *ssa.FieldAddr:
+						// TODO: detect chan struct declaration
+					}
 				}
 			}
 		} else {
@@ -435,9 +491,21 @@ func (a *analysis) insSelect(examIns *ssa.Select, goID int, theIns ssa.Instructi
 			default:
 				log.Debug("need to consider this case for channel name collection")
 			}
-			// TODO: consider when multiple cases correspond to the same channel
+			if !sliceContainsRcv(a.chanRcvs[readyChans[i]], ch) {
+				a.chanRcvs[readyChans[i]] = append(a.chanRcvs[readyChans[i]], ch)
+			}
+			if !sliceContainsStr(a.selReady[examIns], readyChans[i]) {
+				a.selReady[examIns] = append(a.selReady[examIns], readyChans[i])
+			}
 		case *ssa.Parameter:
 			// TODO: need to identify channel readiness when passed in as input parameter
+			if state.Dir == 1 { // send Only
+
+			} else if state.Dir == 2 { // receive Only
+
+			} else { // state.Dir == 0, send receive
+
+			}
 		case *ssa.TypeAssert:
 
 		case *ssa.Call: // timeOut

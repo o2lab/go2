@@ -32,6 +32,24 @@ func sliceContains(s []ssa.Value, e ssa.Value) bool {
 	return false
 }
 
+func sliceContainsRcv(s []*ssa.UnOp, e *ssa.UnOp) bool {
+	for _, a := range s {
+		if a == e {
+			return true
+		}
+	}
+	return false
+}
+
+func sliceContainsSnd(s []*ssa.Send, e *ssa.Send) bool {
+	for _, a := range s {
+		if a == e {
+			return true
+		}
+	}
+	return false
+}
+
 // sliceContainsBloc determines if BasicBlock e is in s
 func sliceContainsBloc(s []*ssa.BasicBlock, e *ssa.BasicBlock) bool {
 	for _, b := range s {
@@ -129,24 +147,32 @@ func (a *analysis) lockSetContainsAt(s []ssa.Value, e ssa.Value) int {
 	return -1
 }
 
+// getRcvChan returns channel name of receive Op
+func (a *analysis) getRcvChan(ins *ssa.UnOp) string {
+	for ch, rIns := range Analysis.chanRcvs {
+		if sliceContainsRcv(rIns, ins) { // channel receive
+			return ch
+		}
+	}
+	return ""
+}
+
+// isReadySel returns whether or not the channel is awaited on (and ready) by a select statement
+func (a *analysis) isReadySel(ch string) bool {
+	for _, chStr := range a.selReady {
+		if sliceContainsStr(chStr, ch) {
+			return true
+		}
+	}
+	return false
+}
+
 func lockSetVal (s []ssa.Value) []token.Pos {
 	res := make([]token.Pos, len(s))
 	for i, val := range s {
 		res[i] = val.Pos()
 	}
 	return res
-}
-
-func chReady(readyChs []string) (int, int) {
-	num := 0
-	ind := 0
-	for i, chStr := range readyChs {
-		if chStr != "" {
-			num++
-			ind = i
-		}
-	}
-	return num, ind
 }
 
 // self-defined queue for traversing Happens-Before Graph

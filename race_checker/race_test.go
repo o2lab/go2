@@ -54,10 +54,10 @@ var tests = []string{
 	"tests/select_all_ready.go",
 	//"tests/select_multiple.go",//false positive and negative
 	"tests/select_nonblock.go",
-	//"tests/select_nonblock_fp.go",//false positive and negative
+	"tests/select_nonblock_fp.go",
 	"tests/select_rpc.go",
-	"tests/select_sends.go",
-	"tests/select_timeout.go",
+	"tests/select_sends.go", // WIP - determine readiness
+	//"tests/select_timeout.go", // WIP - handle timeout portal - perhaps same as default
 	"tests/send_after_select.go",
 	//"tests/single_case_select.go",//false positive
 	"tests/test1.go",
@@ -67,18 +67,18 @@ var tests = []string{
 	"tests/GoBench/Cockroach/27659/main.go",
 	"tests/GoBench/Cockroach/35501/main.go",
 	"tests/GoBench/Etcd/4876/main.go",
-	"tests/GoBench/Etcd/8149/main.go", // need to work on multiple select handling
+	"tests/GoBench/Etcd/8149/main.go", // multiple select handling
 	"tests/GoBench/Etcd/9446/main.go",
 	"tests/GoBench/Grpc/1748/main.go",
 	"tests/GoBench/Grpc/1862/main.go",
 	"tests/GoBench/Grpc/3090/main.go",
 	"tests/GoBench/Istio/8144/main.go",
 	"tests/GoBench/Istio/8214/main.go",
-	"tests/GoBench/Istio/8967/main.go",
+	"tests/GoBench/Istio/8967/main.go", // WIP - chan struct{}
 	"tests/GoBench/Istio/16742/main.go",
 	"tests/GoBench/Kubernetes/79631/main.go",
 	"tests/GoBench/Kubernetes/80284/main.go",
-	"tests/GoBench/Kubernetes/81091/main.go",
+	"tests/GoBench/Kubernetes/81091/main.go", // WIP - chan struct{}
 	"tests/GoBench/Kubernetes/81148/main.go",
 	"tests/GoBench/Kubernetes/88331/main.go",
 	"tests/GoBench/Serving/3148/main.go",

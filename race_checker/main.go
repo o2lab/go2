@@ -47,7 +47,7 @@ type analysis struct {
 	selCaseCnt	  map[*ssa.Select]int 				  // select case count
 	selectCaseBegin map[ssa.Instruction]string        // map first instruction in clause to channel name
 	selectCaseEnd map[ssa.Instruction]string          // map last instruction in clause to channel name
-	selectDone    map[ssa.Instruction]ssa.Instruction // map select statement to first instruction after select is done
+	selectDone    map[ssa.Instruction]*ssa.Select // map first instruction after select is done to select statement
 	ifElseExclude []*ssa.BasicBlock //
 }
 

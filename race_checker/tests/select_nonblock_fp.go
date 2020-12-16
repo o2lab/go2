@@ -17,9 +17,10 @@ func main() {
 	case a := <-ch1:
 		x = a
 	case a := <-ch2:
-		x = a + 1
-	default:
-		x /* RACE Write */= 20
+		x /* RACE Write */ = a + 1
 		fmt.Println(x)
+	default:
+		//x /* RACE Write */= 20
+		//fmt.Println(x)
 	}
 }
