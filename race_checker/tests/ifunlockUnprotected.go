@@ -15,7 +15,7 @@ func main() {
 		var ret bool
 		if err{
 			mu.Unlock()
-			x=3
+			x/* RACE Write */=3
 			return err
 		} else {
 			if x==5 {
@@ -39,5 +39,5 @@ func main() {
 		x=9
 		return ret
 	}()
-	fmt.Println(x)
+	fmt.Println(x/* RACE Read */)
 }
