@@ -157,18 +157,10 @@ func staticAnalysis(args []string) error {
 	var selectN []graph.Node
 	var readyCh []string
 	var selCaseEndN []graph.Node
-	var beforeIfN graph.Node
-	var afterIfN graph.Node
-	var commIfThen bool
-	var prevIns ssa.Instruction
 	waitingN := make(map[*ssa.Call]graph.Node)
 	chanRecvs := make(map[string]graph.Node) // map channel name to graph node
 	for nGo, insSlice := range Analysis.RWIns {
 		for i, anIns := range insSlice {
-			if anIns.Block().Comment == "if.else" && commIfThen {
-				Analysis.ifElseExclude = append(Analysis.ifElseExclude, anIns.Block())
-				continue
-			}
 			disjoin := false // detach select case statement from subsequent instruction
 			insKey := goIns{ins: anIns, goID: nGo}
 			if nGo == 0 && i == 0 { // main goroutine, first instruction
@@ -199,19 +191,8 @@ func staticAnalysis(args []string) error {
 				if ch, ok0 := Analysis.selectCaseEnd[anIns]; ok0 && sliceContainsStr(readyCh, ch) {
 					selCaseEndN = append(selCaseEndN, currN)
 				}
-				if anIns.Block().Comment == "if.then" && prevIns.Block().Comment != "if.then"{
-					beforeIfN = prevN
-				}
-				if anIns.Block().Comment == "if.then" && anIns == anIns.Block().Instrs[len(anIns.Block().Instrs)-1] {
-					afterIfN = currN
-				}
+
 				// edge manipulation:
-				if anIns.Block().Comment == "if.done" && anIns == anIns.Block().Instrs[0] && !commIfThen {
-					err := Analysis.HBgraph.MakeEdge(afterIfN, currN) // ready case to select done
-					if err != nil {
-						log.Fatal(err)
-					}
-				}
 				if ch, ok := Analysis.selectCaseBegin[anIns]; ok {
 					if ch == "defaultCase" {
 						err := Analysis.HBgraph.MakeEdge(selectN[0], currN) // select node to default case
@@ -237,11 +218,6 @@ func staticAnalysis(args []string) error {
 						}
 					}
 					if selectN != nil && len(selectN) > 1 { selectN = selectN[1:] } // completed analysis of one select statement
-				} else if anIns.Block().Comment == "if.else" && anIns == anIns.Block().Instrs[0] {
-					err := Analysis.HBgraph.MakeEdge(beforeIfN, currN)
-					if err != nil {
-						log.Fatal(err)
-					}
 				} else {
 					err := Analysis.HBgraph.MakeEdge(prevN, currN)
 					if err != nil {
@@ -249,7 +225,6 @@ func staticAnalysis(args []string) error {
 					}
 				}
 				if !disjoin { prevN = currN }
-				prevIns = anIns
 			}
 			// Create additional edges:
 			if Analysis.isReadIns(anIns) || isWriteIns(anIns) {
@@ -285,9 +260,6 @@ func staticAnalysis(args []string) error {
 						err := Analysis.HBgraph.MakeEdge(prevN, rcvN) // create edge from Send node to Receive node
 						if err != nil {
 							log.Fatal(err)
-						}
-						if anIns.Block().Comment == "if.then" {
-							commIfThen = true
 						}
 					}
 				}

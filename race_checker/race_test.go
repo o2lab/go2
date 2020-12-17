@@ -45,7 +45,7 @@ var tests = []string{
 	"tests/multi_sends.go",
 	"tests/multiple_waitgroups.go",
 	"tests/ownership1.go",
-	"tests/race_cfg.go",
+	//"tests/race_cfg.go",
 	"tests/race_example1.go",
 	"tests/race_example2.go",
 	"tests/race_example3.go",
