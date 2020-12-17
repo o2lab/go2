@@ -7,40 +7,40 @@ import (
 
 func main() {
 	mu := sync.Mutex{}
-	x:=0
+	x2 :=0
 	go func() bool{
 		var err bool
 		err = false
 		mu.Lock()
-		x=1
+		x2 =1
 		var ret bool
 		if err{
-			x=3
+			x2 =3
 			mu.Unlock()
 			return err
 		} else {
-			if x==5 {
+			if x2 ==5 {
 				return err
 			} else {
 				ret = true
 				if err {
-					var err bool
-					if err {
-						err = false
+					var err1 bool
+					if err1 {
+						err1 = false
 					} else {
-						err = true
+						err1 = true
 					}
-					x=7
+					x2 =7
 					mu.Unlock()
 					return ret
 				}
 			}
 		}
-		x=9
+		x2 =9
 		mu.Unlock()
 		return ret
 	}()
 	mu.Lock()
-	fmt.Println(x)
+	fmt.Println(x2)
 	mu.Unlock()
 }
