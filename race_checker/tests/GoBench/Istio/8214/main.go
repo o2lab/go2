@@ -39,7 +39,7 @@ type lruCache struct {
 }
 
 func (c *lruCache) Stats() Stats {
-	return c.stats /* RACE Read */
+	return c.stats /* RACE Read */ /* RACE Read */
 }
 
 func (c *lruCache) Set() {
@@ -47,7 +47,7 @@ func (c *lruCache) Set() {
 }
 
 func (c *lruCache) SetWithExpiration() {
-	atomic.AddUint64(&c.stats /* RACE Write */ /* RACE Write */.Writes /* RACE Read */, 1)
+	atomic.AddUint64(&c.stats /* RACE Write */ /* RACE Write */ .Writes, 1)
 }
 
 type grpcServer struct {

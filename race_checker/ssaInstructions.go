@@ -45,20 +45,18 @@ func checkTokenNameDefer(fnName string, theIns *ssa.Defer) string {
 func (a *analysis) isReadIns(ins ssa.Instruction) bool {
 	switch insType := ins.(type) {
 	case *ssa.UnOp:
-		if ins, ok := insType.X.(*ssa.Alloc); ok {
-			if _, ok1 := a.chanRcvs[ins.Comment]; ok1 {
+		if rIns, ok := insType.X.(*ssa.Alloc); ok {
+			if _, ok1 := a.chanRcvs[rIns.Comment]; ok1 {
 				return false // a channel op, handled differently than typical read ins
 			}
 		}
-		return true
-	case *ssa.FieldAddr:
 		return true
 	case *ssa.Lookup:
 		return true
 	case *ssa.Call:
 		if len(insType.Call.Args) > 0 && insType.Call.Value.Name() != "Done" && insType.Call.Value.Name() != "Wait" {
 			for _, anArg := range insType.Call.Args {
-				if _, ok := anArg.(*ssa.FieldAddr); ok {
+				if _, ok := anArg.(*ssa.UnOp); ok {
 					return true
 				}
 			}
@@ -78,6 +76,7 @@ func isWriteIns(ins ssa.Instruction) bool {
 		if insType.Call.Value.Name() == "delete" {
 			return true
 		} else if strings.HasPrefix(insType.Call.Value.Name(), "Add") && insType.Call.StaticCallee().Pkg.Pkg.Name() == "atomic" {
+
 			return true
 		}
 	case *ssa.MapUpdate:
@@ -139,11 +138,11 @@ func (a *analysis) insSend(examIns *ssa.Send, goID int, theIns ssa.Instruction) 
 					ch = chName.X.(*ssa.FieldAddr).Name()
 				}
 			default:
-				log.Debug("need to consider this case for channel name collection")
+				log.Trace("need to consider this case for channel name collection")
 			}
 			a.chanSnds[ch] = append(a.chanSnds[ch], examIns)
 		default: // may need to consider other cases as well
-			log.Debug("need to consider this case for channel send")
+			log.Trace("need to consider this case for channel send")
 		}
 	} else {
 		a.chanSnds[ch] = append(a.chanSnds[ch], examIns)
@@ -199,11 +198,11 @@ func (a *analysis) insUnOp(examIns *ssa.UnOp, goID int, theIns ssa.Instruction) 
 						ch = chName.X.(*ssa.FieldAddr).Name()
 					}
 				default:
-					log.Debug("need to consider this case for channel name collection")
+					log.Trace("need to consider this case for channel name collection")
 				}
 				a.chanRcvs[ch] = append(a.chanRcvs[ch], examIns)
 			default: // may need to consider other cases as well
-				log.Debug("need to consider this case for channel send")
+				log.Trace("need to consider this case for channel send")
 			}
 		} else {
 			a.chanRcvs[ch] = append(a.chanRcvs[ch], examIns)
@@ -489,7 +488,7 @@ func (a *analysis) insSelect(examIns *ssa.Select, goID int, theIns ssa.Instructi
 					readyChans[i] = chName.X.(*ssa.FieldAddr).Name()
 				}
 			default:
-				log.Debug("need to consider this case for channel name collection")
+				log.Trace("need to consider this case for channel name collection")
 			}
 			if !sliceContainsRcv(a.chanRcvs[readyChans[i]], ch) {
 				a.chanRcvs[readyChans[i]] = append(a.chanRcvs[readyChans[i]], ch)
@@ -512,7 +511,7 @@ func (a *analysis) insSelect(examIns *ssa.Select, goID int, theIns ssa.Instructi
 			readyChans[i] = "timeOut"
 		case *ssa.MakeChan: // channel NOT ready
 		default: // may need to consider other cases as well
-			log.Debug("need to consider this case for channel readiness")
+			log.Trace("need to consider this case for channel readiness")
 		}
 	}
 	if defaultCase > 0 { // default case is always ready

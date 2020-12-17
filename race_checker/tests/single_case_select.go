@@ -8,7 +8,7 @@ func main() {
 	x := 0
 	go func() {
 		x = 2
-		//messages <- msg
+		messages <- msg
 	}()
 	select {
 	case a := <- messages:

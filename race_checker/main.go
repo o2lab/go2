@@ -86,6 +86,7 @@ var (
 
 const trieLimit = 2      // set as user config option later, an integer that dictates how many times a function can be called under identical context
 const efficiency = false // configuration setting to avoid recursion in tested program
+const channelComm = true // analyze channel communication
 const fromPath = "" 	 // interested packages are those located at this path
 // sample paths:
 // gRPC - google.golang.org/grpc

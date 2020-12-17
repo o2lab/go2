@@ -25,7 +25,7 @@ var (
 )
 
 var tests = []string{
-	//"tests/atomics.go", // race condition - no shared memory
+	"tests/atomics.go", // race condition - no shared memory
 	"tests/cfg.go",
 	"tests/cg.go",
 	"tests/chan_receive.go",
@@ -50,7 +50,7 @@ var tests = []string{
 	"tests/race_example2.go",
 	"tests/race_example3.go",
 	"tests/rwmutex_lock.go",
-	"tests/select.go", // need to work on nested select
+	"tests/select.go",
 	"tests/select_all_ready.go",
 	//"tests/select_multiple.go",
 	"tests/select_nonblock.go",
@@ -59,7 +59,7 @@ var tests = []string{
 	"tests/select_sends.go", // WIP - determine readiness
 	//"tests/select_timeout.go", // WIP - handle timeout portal - perhaps same as default
 	"tests/send_after_select.go",
-	//"tests/single_case_select.go",//false positive
+	"tests/single_case_select.go",
 	"tests/test1.go",
 	"tests/test_neo.go",
 	"tests/waitgroup.go",

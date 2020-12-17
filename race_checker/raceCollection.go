@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/logrusorgru/aurora"
 	log "github.com/sirupsen/logrus"
+	"github.com/twmb/algoimpl/go/graph"
 	"go/token"
 	"golang.org/x/tools/go/ssa"
 	"regexp"
@@ -33,7 +34,8 @@ func (a *analysis) checkRacyPairs() {
 							!sliceContains(a.reportedAddr, addressPair[0]) &&
 							!a.reachable(goI, i, goJ, j) &&
 							!a.reachable(goJ, j, goI, i) &&
-							!a.lockSetsIntersect(insSlice[0], insSlice[1]){
+							!a.lockSetsIntersect(insSlice[0], insSlice[1]) &&
+							!a.bothAtomic(insSlice[0], insSlice[1]) {
 							a.reportedAddr = append(a.reportedAddr, addressPair[0])
 							a.printRace(len(a.reportedAddr), insSlice, addressPair, []int{i, j}, []int{ii, jj})
 						}
@@ -91,7 +93,7 @@ func (a *analysis) sameAddress(addr1 ssa.Value, addr2 ssa.Value) bool {
 		if global2, ok2 := addr2.(*ssa.Global); ok2 {
 			return global1.Pos() == global2.Pos() // compare position of identifiers
 		}
-	} else if freevar1, ok1 := addr1.(*ssa.FreeVar); ok1 {
+	} else if freevar1, ok := addr1.(*ssa.FreeVar); ok {
 		if freevar2, ok2 := addr2.(*ssa.FreeVar); ok2 {
 			return freevar1.Pos() == freevar2.Pos() // compare position of identifiers
 		}
@@ -116,18 +118,31 @@ func (a *analysis) reachable(fromIns ssa.Instruction, fromGo int, toIns ssa.Inst
 	toNode := a.RWinsMap[toInsKey] // target node
 
 	//use breadth-first-search to traverse the Happens-Before Graph
+	var visited []graph.Node
 	q := &queue{}
 	q.enQueue(fromNode)
 	for !q.isEmpty() {
-		size := q.size()
-		for; size>0; size-- {
+		for size := q.size(); size>0; size-- {
 			node := q.deQueue()
 			if node == toNode {
 				return true
 			}
 			for _, neighbor := range a.HBgraph.Neighbors(node) {
+				if sliceContainsNode(visited, neighbor) {
+					continue
+				}
+				visited = append(visited, neighbor)
 				q.enQueue(neighbor)
 			}
+		}
+	}
+	return false
+}
+
+func sliceContainsNode(slice []graph.Node, node graph.Node) bool {
+	for _, n := range slice {
+		if n.Value == node.Value {
+			return true
 		}
 	}
 	return false
@@ -153,6 +168,17 @@ func (a *analysis) lockSetsIntersect(insA ssa.Instruction, insB ssa.Instruction)
 				if posA == posB {
 					return true
 				}
+			}
+		}
+	}
+	return false
+}
+
+func (a *analysis) bothAtomic(insA ssa.Instruction, insB ssa.Instruction) bool {
+	if aCall, ok := insA.(*ssa.Call); ok {
+		if bCall, ok0 := insB.(*ssa.Call); ok0 {
+			if aCall.Call.StaticCallee().Pkg.Pkg.Name() == "atomic" && bCall.Call.StaticCallee().Pkg.Pkg.Name() == "atomic" {
+				return true
 			}
 		}
 	}

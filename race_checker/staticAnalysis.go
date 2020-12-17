@@ -209,7 +209,6 @@ func staticAnalysis(args []string) error {
 				if anIns.Block().Comment == "if.done" && anIns == anIns.Block().Instrs[0] && !commIfThen {
 					err := Analysis.HBgraph.MakeEdge(afterIfN, currN) // ready case to select done
 					if err != nil {
-						fmt.Println("1")
 						log.Fatal(err)
 					}
 				}
@@ -217,14 +216,11 @@ func staticAnalysis(args []string) error {
 					if ch == "defaultCase" {
 						err := Analysis.HBgraph.MakeEdge(selectN[0], currN) // select node to default case
 						if err != nil {
-							fmt.Println("2")
 							log.Fatal(err)
 						}
 					} else {
 						err := Analysis.HBgraph.MakeEdge(chanRecvs[ch], currN) // receive Op to ready case
 						if err != nil {
-							fmt.Println(ch)
-							fmt.Println("2.5")
 							log.Fatal(err)
 						}
 					}
@@ -232,13 +228,11 @@ func staticAnalysis(args []string) error {
 					if len(selCaseEndN) > 1 { // more than one portal
 						err := Analysis.HBgraph.MakeEdge(selectN[0], currN) // ready case to select done
 						if err != nil {
-							fmt.Println("3")
 							log.Fatal(err)
 						}
 					} else if len(selCaseEndN) > 0 {
 						err := Analysis.HBgraph.MakeEdge(selCaseEndN[0], currN) // ready case to select done
 						if err != nil {
-							fmt.Println("3")
 							log.Fatal(err)
 						}
 					}
@@ -246,13 +240,11 @@ func staticAnalysis(args []string) error {
 				} else if anIns.Block().Comment == "if.else" && anIns == anIns.Block().Instrs[0] {
 					err := Analysis.HBgraph.MakeEdge(beforeIfN, currN)
 					if err != nil {
-						fmt.Println("4")
 						log.Fatal(err)
 					}
 				} else {
 					err := Analysis.HBgraph.MakeEdge(prevN, currN)
 					if err != nil {
-						fmt.Println("5")
 						log.Fatal(err)
 					}
 				}
@@ -270,7 +262,6 @@ func staticAnalysis(args []string) error {
 						if Analysis.sameAddress(callIns.Call.Args[0], wIns.Call.Args[0]) {
 							err := Analysis.HBgraph.MakeEdge(prevN, wNode) // create edge from Done node to Wait node
 							if err != nil {
-								fmt.Println("6")
 								log.Fatal(err)
 							}
 						}
@@ -282,19 +273,17 @@ func staticAnalysis(args []string) error {
 						if Analysis.sameAddress(dIns.Call.Args[0], wIns.Call.Args[0]) {
 							err := Analysis.HBgraph.MakeEdge(prevN, wNode) // create edge from Done node to Wait node
 							if err != nil {
-								fmt.Println("7")
 								log.Fatal(err)
 							}
 						}
 					}
 				}
 			}
-			if sendIns, ok := anIns.(*ssa.Send); ok { // detect matching channel send operations
+			if sendIns, ok := anIns.(*ssa.Send); ok && channelComm { // detect matching channel send operations
 				for ch, sIns := range Analysis.chanSnds {
 					if rcvN, matching := chanRecvs[ch]; matching && sliceContainsSnd(sIns, sendIns) {
 						err := Analysis.HBgraph.MakeEdge(prevN, rcvN) // create edge from Send node to Receive node
 						if err != nil {
-							fmt.Println("8")
 							log.Fatal(err)
 						}
 						if anIns.Block().Comment == "if.then" {
@@ -366,7 +355,6 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 	var toUnlock []ssa.Value
 	var toRUnlock []ssa.Value
 	repeatSwitch := false         // triggered when encountering basic blocks for body of a forloop
-
 	var readyChans []string
 	var selIns *ssa.Select // current select statement
 	var selCount int // total cases in a select statement
@@ -390,7 +378,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				activeCase = true
 			}
 		}
-		if aBlock.Comment == "select.next" && !selIns.Blocking && readyChans[selCount] == "defaultCase" {
+		if selIns != nil && aBlock.Comment == "select.next" && !selIns.Blocking && readyChans[selCount] == "defaultCase" {
 			a.selectCaseBegin[aBlock.Instrs[0]] = readyChans[selCount] // map first instruction in case to channel name
 			a.selectCaseEnd[aBlock.Instrs[len(aBlock.Instrs)-1]] = readyChans[selCount] // map last instruction in case to channel name
 		}
