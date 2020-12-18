@@ -11,7 +11,7 @@ import (
 )
 
 func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Instruction) {
-	if a.debug {
+	if a.useNewPTA {
 		a.pointerAnalysis_new(location, goID, theIns)
 	}else{
 		panic("WRONG PATH !!! @ a.pointerAnalysis()")
@@ -104,7 +104,7 @@ func (a *analysis) pointerAnalysis_new(location ssa.Value, goID int, theIns ssa.
 
 	//TODO: bz: is this correct to use label??
 	ptss := a.result.PointsTo(location) //return type: []PointerWCtx
-	fmt.Println(" *** ssa.Value: " + location.Name() + "  goID: " + strconv.Itoa(goID) + "  size: " + strconv.Itoa(len(ptss)) + " *** ")  //bz: debug ...
+	fmt.Println(" *** ssa.Value: " + location.Name() + "  goID: " + strconv.Itoa(goID) + "  size: " + strconv.Itoa(len(ptss)) + " *** ")  //bz: useNewPTA ...
 	for _, pts := range ptss {
 		pts_labels := pts.Labels() // set of labels for locations that the pointer points to
 		var fnName string

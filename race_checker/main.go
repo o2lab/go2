@@ -12,17 +12,17 @@ import (
 )
 
 type analysis struct {
-	debug         bool  //debug the new pta
-	prog          *ssa.Program
-	pkgs          []*ssa.Package
-	mains         []*ssa.Package
-	result        *pointer.ResultWCtx //one time
-	ptaConfig     *pointer.Config
-	analysisStat  stat
-	HBgraph       *graph.Graph
-	RWinsMap      map[goIns]graph.Node
-	trieMap       map[fnInfo]*trie // map each function to a trie node
-	RWIns         [][]ssa.Instruction
+	useNewPTA    bool //useNewPTA the new pta
+	prog         *ssa.Program
+	pkgs         []*ssa.Package
+	mains        []*ssa.Package
+	result       *pointer.ResultWCtx //one time
+	ptaConfig    *pointer.Config
+	analysisStat stat
+	HBgraph      *graph.Graph
+	RWinsMap     map[goIns]graph.Node
+	trieMap      map[fnInfo]*trie // map each function to a trie node
+	RWIns        [][]ssa.Instruction
 	insDRA        int // index of instruction (in main goroutine) at which to begin data race analysis
 	storeIns      []string
 	workList      []goroutineInfo
@@ -131,7 +131,7 @@ func init() {
 
 // main sets up arguments and calls staticAnalysis function
 func main() {
-	debug := flag.Bool("debug", false, "Prints debug messages.")
+	debug := flag.Bool("useNewPTA", false, "Prints useNewPTA messages.")
 	lockOps := flag.Bool("lockOps", false, "Prints lock and unlock operations. ")
 	flag.BoolVar(&stats.CollectStats, "collectStats", false, "Collect analysis statistics.")
 	help := flag.Bool("help", false, "Show all command-line options.")

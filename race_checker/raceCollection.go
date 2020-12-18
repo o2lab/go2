@@ -94,12 +94,19 @@ func (a *analysis) sameAddress(addr1 ssa.Value, addr2 ssa.Value) bool {
 	}
 
 	// check points-to set to see if they can point to the same object
-	if a.debug { //return type: []PointerWCtx
+	if a.useNewPTA { //return type: []PointerWCtx
 		pts1 := a.result.PointsTo(addr1)
 		pts2 := a.result.PointsTo(addr2)
 
 		if len(pts1) > 1 || len(pts2) > 1 {
 			fmt.Println(" *** contexts > 1: *** ")
+			same := true
+			for _, _pts1 := range pts1 {
+				for _, _pts2 := range pts2 {
+					same = same && _pts1.MayAlias(_pts2)
+				}
+			}
+			return same //if any is different, return false -> not the same
 		}
 		if pts1 == nil || pts2 == nil {
 			fmt.Println(" *** contexts == nil: *** ")

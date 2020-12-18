@@ -116,33 +116,33 @@ func staticAnalysis(args []string) error {
 		DEBUG:      false, //bz: do all printed out info in console
 	}
 	Analysis = &analysis{
-		debug:          true,
-		prog:           prog,
-		pkgs:           pkgs,
-		mains:          mains,
-		ptaConfig:      config,
-		RWinsMap:       make(map[goIns]graph.Node),
-		insDRA:         0,
-		levels:         make(map[int]int),
-		lockMap:        make(map[ssa.Instruction][]ssa.Value),
-		RlockMap:       make(map[ssa.Instruction][]ssa.Value),
-		goLockset:      make(map[int][]ssa.Value),
+		useNewPTA:       true,
+		prog:            prog,
+		pkgs:            pkgs,
+		mains:           mains,
+		ptaConfig:       config,
+		RWinsMap:        make(map[goIns]graph.Node),
+		insDRA:          0,
+		levels:          make(map[int]int),
+		lockMap:         make(map[ssa.Instruction][]ssa.Value),
+		RlockMap:        make(map[ssa.Instruction][]ssa.Value),
+		goLockset:       make(map[int][]ssa.Value),
 		goRLockset:     make(map[int][]ssa.Value),
 		mapFreeze:      false,
 		goCaller:       make(map[int]int),
 		goNames:        make(map[int]string),
 		chanBuf:		make(map[string]int),
-		chanRcvs: 		make(map[string][]*ssa.UnOp),
-		chanSnds: 	 	make(map[string][]*ssa.Send),
-		selectBloc:	   	make(map[int]*ssa.Select),
-		selReady:	   	make(map[*ssa.Select][]string),
-		selCaseCnt:	    make(map[*ssa.Select]int),
-		selectCaseBegin:make(map[ssa.Instruction]string),
-		selectCaseEnd:  make(map[ssa.Instruction]string),
-		selectDone:     make(map[ssa.Instruction]*ssa.Select),
+		chanRcvs:        make(map[string][]*ssa.UnOp),
+		chanSnds:        make(map[string][]*ssa.Send),
+		selectBloc:      make(map[int]*ssa.Select),
+		selReady:        make(map[*ssa.Select][]string),
+		selCaseCnt:      make(map[*ssa.Select]int),
+		selectCaseBegin: make(map[ssa.Instruction]string),
+		selectCaseEnd:   make(map[ssa.Instruction]string),
+		selectDone:      make(map[ssa.Instruction]*ssa.Select),
 	}
 
-	if Analysis.debug {
+	if Analysis.useNewPTA {
 		start := time.Now()
 		result, err := pointer.AnalyzeWCtx(Analysis.ptaConfig) // conduct pointer analysis
 		if err != nil {
@@ -170,7 +170,7 @@ func staticAnalysis(args []string) error {
 		return nil
 	}
 
-	if !Analysis.debug { //original code
+	if !Analysis.useNewPTA { //original code
 		//result, err := pointer.Analyze(Analysis.ptaConfig) // conduct pointer analysis
 		//if err != nil {
 		//	log.Fatal(err)

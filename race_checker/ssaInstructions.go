@@ -298,7 +298,7 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 					a.RWIns[goID] = append(a.RWIns[goID], theIns)
 					a.updateLockMap(goID, theIns)
 					a.updateRLockMap(goID, theIns)
-					if !a.debug {
+					if !a.useNewPTA {
 						a.ptaConfig.AddQuery(theVal.X)
 					}
 				}
@@ -343,7 +343,7 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 					a.RWIns[goID] = append(a.RWIns[goID], theIns)
 					a.updateLockMap(goID, theIns)
 					a.updateRLockMap(goID, theIns)
-					if !a.debug {
+					if !a.useNewPTA {
 						a.ptaConfig.AddQuery(access.X)
 					}
 				}
@@ -373,7 +373,7 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 		case "Lock":
 			stats.IncStat(stats.NLock)
 			lockLoc := examIns.Call.Args[0]         // identifier for address of lock
-			if !a.debug {
+			if !a.useNewPTA {
 				a.ptaConfig.AddQuery(lockLoc)
 			}
 			if goID == 0 { // main goroutine
@@ -390,14 +390,14 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 		case "Unlock":
 			stats.IncStat(stats.NUnlock)
 			lockLoc := examIns.Call.Args[0]
-			if !a.debug {
+			if !a.useNewPTA {
 				a.ptaConfig.AddQuery(lockLoc)
 			}
 			unlockOps = append(unlockOps, lockLoc)
 			a.mapFreeze = true
 		case "RLock":
 			RlockLoc := examIns.Call.Args[0]          // identifier for address of lock
-			if !a.debug {
+			if !a.useNewPTA {
 				a.ptaConfig.AddQuery(RlockLoc)
 			}
 			if goID == 0 {
@@ -413,7 +413,7 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 			}
 		case "RUnlock":
 			RlockLoc := examIns.Call.Args[0]
-			if !a.debug {
+			if !a.useNewPTA {
 				a.ptaConfig.AddQuery(RlockLoc)
 			}
 			runlockOps = append(runlockOps, RlockLoc)
@@ -421,13 +421,13 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 		case "Wait":
 			stats.IncStat(stats.NWaitGroupWait)
 			a.RWIns[goID] = append(a.RWIns[goID], theIns)
-			if !a.debug {
+			if !a.useNewPTA {
 				a.ptaConfig.AddQuery(examIns.Call.Args[0])
 			}
 		case "Done":
 			stats.IncStat(stats.NWaitGroupDone)
 			a.RWIns[goID] = append(a.RWIns[goID], theIns)
-			if !a.debug {
+			if !a.useNewPTA {
 				a.ptaConfig.AddQuery(examIns.Call.Args[0])
 			}
 		}
@@ -478,7 +478,7 @@ func (a *analysis) insMapUpdate(examIns *ssa.MapUpdate, goID int, theIns ssa.Ins
 	a.updateLockMap(goID, theIns)
 	switch ptType := examIns.Map.(type) {
 	case *ssa.UnOp:
-		if !a.debug {
+		if !a.useNewPTA {
 			a.ptaConfig.AddQuery(ptType.X)
 		}
 	default:
