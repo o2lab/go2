@@ -88,10 +88,10 @@ var (
 	testMode     = false // Used by race_test.go for collecting output.
 )
 
-const trieLimit = 2      // set as user config option later, an integer that dictates how many times a function can be called under identical context
-const efficiency = false // configuration setting to avoid recursion in tested program
-const channelComm = true // analyze channel communication
-const fromPath = "" 	 // interested packages are those located at this path
+var trieLimit = 2      // set as user config option later, an integer that dictates how many times a function can be called under identical context
+var efficiency = false // configuration setting to avoid recursion in tested program
+var channelComm = true // analyze channel communication
+var fromPath = "" 	 // interested packages are those located at this path
 // sample paths:
 // gRPC - google.golang.org/grpc
 // traefik - github.com/traefik
@@ -136,6 +136,8 @@ func main() {
 	lockOps := flag.Bool("lockOps", false, "Prints lock and unlock operations. ")
 	flag.BoolVar(&stats.CollectStats, "collectStats", false, "Collect analysis statistics.")
 	help := flag.Bool("help", false, "Show all command-line options.")
+	withoutComm := flag.Bool("withoutComm", false, "Show analysis results without communication consideration.")
+	withComm := flag.Bool("withComm", false, "Show analysis results with communication consideration.")
 	flag.Parse()
 	if *help {
 		flag.PrintDefaults()
@@ -146,6 +148,18 @@ func main() {
 	}
 	if *lockOps {
 		log.SetLevel(log.TraceLevel)
+	}
+	if *withoutComm {
+		trieLimit = 1
+		efficiency = true
+		channelComm = false
+		fromPath = "google.golang.org/grpc"
+	}
+	if *withComm {
+		trieLimit = 1
+		efficiency = true
+		channelComm = true
+		fromPath = "google.golang.org/grpc"
 	}
 
 	log.SetFormatter(&log.TextFormatter{
