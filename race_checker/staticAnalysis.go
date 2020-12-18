@@ -230,10 +230,21 @@ func staticAnalysis(args []string) error {
 					if selectN != nil && len(selectN) > 1 {
 						selectN = selectN[1:]
 					} // completed analysis of one select statement
-				} else if _, ok2 := Analysis.ifSuccBegin[anIns]; ok2 {
-					err := Analysis.HBgraph.MakeEdge(ifN[0], currN)
-					if err != nil {
-						log.Fatal(err)
+				} else if ifInstr, ok2 := Analysis.ifSuccBegin[anIns]; ok2 {
+					skipSucc := false
+					for beginIns, ifIns := range Analysis.ifSuccBegin {
+						if ifIns == ifInstr && beginIns != anIns && sliceContainsInsAt(Analysis.commIfSucc, beginIns) != -1 && channelComm { // other succ contains channel communication
+							if (anIns.Block().Comment == "if.then" && beginIns.Block().Comment == "if.else") || (anIns.Block().Comment == "if.else" && beginIns.Block().Comment == "if.then") {
+								skipSucc = true
+								Analysis.omitComm = append(Analysis.omitComm, anIns.Block())
+							}
+						}
+					}
+					if !skipSucc {
+						err := Analysis.HBgraph.MakeEdge(ifN[0], currN)
+						if err != nil {
+							log.Fatal(err)
+						}
 					}
 				} else {
 					err := Analysis.HBgraph.MakeEdge(prevN, currN)
@@ -284,8 +295,8 @@ func staticAnalysis(args []string) error {
 			if reIns, isReturn := anIns.(*ssa.Return); isReturn {
 				if Analysis.ifFnReturn[reIns.Parent()] == reIns { // this is final return
 					for r, ifEndN := range ifSuccEndN {
-						if r != len(ifSuccEndN)-1 { // last node is current node (prevN)
-							err := Analysis.HBgraph.MakeEdge(ifEndN, prevN) // create edge from Send node to Receive node
+						if r != len(ifSuccEndN)-1 {
+							err := Analysis.HBgraph.MakeEdge(ifEndN, prevN)
 							if err != nil {
 								log.Fatal(err)
 							}
@@ -433,9 +444,16 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				a.insMakeChan(examIns, ii)
 			case *ssa.Send: // channel send op
 				chNm := a.insSend(examIns, goID, theIns)
-				if sliceContainsStr(readyChans, chNm) && (examIns.Block().Comment == "if.then" || examIns.Block().Comment == "if.else" || examIns.Block().Comment == "if.done") {
+				isAwait := false // is the channel send being awaited on by select?
+				for _, chs := range a.selReady {
+					if sliceContainsStr(chs, chNm) {
+						isAwait = true
+						break
+					}
+				}
+				if isAwait && (examIns.Block().Comment == "if.then" || examIns.Block().Comment == "if.else" || examIns.Block().Comment == "if.done") {
 					// send awaited on by select, other if successor will not be traversed
-
+					a.commIfSucc = append(a.commIfSucc, examIns.Block().Instrs[0])
 				}
 			case *ssa.Store: // write op
 				if _, ok := examIns.Addr.(*ssa.Alloc); ok && ii > 0 { // variable initialization

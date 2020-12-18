@@ -51,6 +51,8 @@ type analysis struct {
 	ifSuccBegin	  map[ssa.Instruction]*ssa.If		  // map beginning of succ block to if statement
 	ifFnReturn	  map[*ssa.Function]*ssa.Return		  // map "if-containing" function to its final return
 	ifSuccEnd	  map[ssa.Instruction]*ssa.Return	  // map ending of successor block to final return statement
+	commIfSucc    []ssa.Instruction					  // store first ins of succ block that contains channel communication
+	omitComm	  []*ssa.BasicBlock					  // omit these blocks as they are race-free due to channel communication
 }
 
 type fnInfo struct { // all fields must be comparable for fnInfo to be used as key to trieMap
