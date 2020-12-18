@@ -118,7 +118,7 @@ func (a *analysis) insMakeChan(examIns *ssa.MakeChan, insInd int) {
 }
 
 // insSend ???
-func (a *analysis) insSend(examIns *ssa.Send, goID int, theIns ssa.Instruction) {
+func (a *analysis) insSend(examIns *ssa.Send, goID int, theIns ssa.Instruction) string {
 	stats.IncStat(stats.NSend)
 	a.RWIns[goID] = append(a.RWIns[goID], theIns)
 	ch := examIns.Chan.Name()
@@ -147,6 +147,7 @@ func (a *analysis) insSend(examIns *ssa.Send, goID int, theIns ssa.Instruction) 
 	} else {
 		a.chanSnds[ch] = append(a.chanSnds[ch], examIns)
 	}
+	return ch
 }
 
 // insStore  ???

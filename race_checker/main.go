@@ -48,8 +48,9 @@ type analysis struct {
 	selectCaseBegin map[ssa.Instruction]string        // map first instruction in clause to channel name
 	selectCaseEnd map[ssa.Instruction]string          // map last instruction in clause to channel name
 	selectDone    map[ssa.Instruction]*ssa.Select	  // map first instruction after select is done to select statement
-	ifSuccBegin	  map[ssa.Instruction]*ssa.If		  // map begining of succ block to if statement
-	ifFnReturn	  map[*ssa.Function]*ssa.Return		  // map "if-containing" function to its last return
+	ifSuccBegin	  map[ssa.Instruction]*ssa.If		  // map beginning of succ block to if statement
+	ifFnReturn	  map[*ssa.Function]*ssa.Return		  // map "if-containing" function to its final return
+	ifSuccEnd	  map[ssa.Instruction]*ssa.Return	  // map ending of successor block to final return statement
 }
 
 type fnInfo struct { // all fields must be comparable for fnInfo to be used as key to trieMap
