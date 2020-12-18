@@ -113,7 +113,7 @@ func staticAnalysis(args []string) error {
 		//shared config
 		K:          2,
 		LimitScope: true, //bz: only consider app methods now
-		DEBUG:      true, //bz: rm all printed out info in console
+		DEBUG:      false, //bz: do all printed out info in console
 	}
 	Analysis = &analysis{
 		debug:          true,
@@ -168,6 +168,14 @@ func staticAnalysis(args []string) error {
 	if len(Analysis.RWIns) < 2 {
 		log.Debug("race is not possible in one goroutine")
 		return nil
+	}
+
+	if !Analysis.debug { //original code
+		//result, err := pointer.Analyze(Analysis.ptaConfig) // conduct pointer analysis
+		//if err != nil {
+		//	log.Fatal(err)
+		//}
+		//Analysis.result = result
 	}
 
 	log.Info("Building Happens-Before graph... ")
