@@ -5,8 +5,8 @@ import (
 	"github.com/logrusorgru/aurora"
 	log "github.com/sirupsen/logrus"
 	"github.com/twmb/algoimpl/go/graph"
+	"github.tamu.edu/April1989/go_tools/go/ssa"
 	"go/token"
-	"golang.org/x/tools/go/ssa"
 	"regexp"
 	"strings"
 )
@@ -94,8 +94,23 @@ func (a *analysis) sameAddress(addr1 ssa.Value, addr2 ssa.Value) bool {
 	}
 
 	// check points-to set to see if they can point to the same object
-	ptset := a.result.Queries
-	return ptset[addr1].PointsTo().Intersects(ptset[addr2].PointsTo())
+	if a.debug { //return type: []PointerWCtx
+		pts1 := a.result.PointsTo(addr1)
+		pts2 := a.result.PointsTo(addr2)
+
+		if len(pts1) > 1 || len(pts2) > 1 {
+			fmt.Println(" *** contexts > 1: *** ")
+		}
+		if pts1 == nil || pts2 == nil {
+			fmt.Println(" *** contexts == nil: *** ")
+			return false
+		}
+		return pts1[0].MayAlias(pts2[0])
+	}else{
+		panic("WRONG PATH !!! @ a.sameAddress()")
+		//ptset := a.result.Queries
+		//return ptset[addr1].PointsTo().Intersects(ptset[addr2].PointsTo())
+	}
 }
 
 // reachable determines if 2 input instructions are connected in the Happens-Before Graph

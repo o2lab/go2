@@ -4,13 +4,14 @@ import (
 	"fmt"
 	log "github.com/sirupsen/logrus"
 	"github.com/twmb/algoimpl/go/graph"
+	"github.tamu.edu/April1989/go_tools/go/packages"
+	"github.tamu.edu/April1989/go_tools/go/pointer"
+	"github.tamu.edu/April1989/go_tools/go/ssa"
+	"github.tamu.edu/April1989/go_tools/go/ssa/ssautil"
 	"go/token"
 	"go/types"
-	"golang.org/x/tools/go/packages"
-	"golang.org/x/tools/go/pointer"
-	"golang.org/x/tools/go/ssa"
-	"golang.org/x/tools/go/ssa/ssautil"
 	"strings"
+	"time"
 )
 
 // fromPkgsOfInterest determines if a function is from a package of interest
@@ -101,10 +102,21 @@ func staticAnalysis(args []string) error {
 
 	// Configure pointer analysis to build call-graph
 	config := &pointer.Config{
-		Mains:          mains,
-		BuildCallGraph: false,
+		Mains:          mains, //bz: NOW assume only one main
+		Reflection:     false,
+		BuildCallGraph: true,
+		Log:            nil,
+		//kcfa
+		//CallSiteSensitive: true,
+		//origin
+		Origin: true,
+		//shared config
+		K:          2,
+		LimitScope: true, //bz: only consider app methods now
+		DEBUG:      true, //bz: rm all printed out info in console
 	}
 	Analysis = &analysis{
+		debug:          true,
 		prog:           prog,
 		pkgs:           pkgs,
 		mains:          mains,
@@ -130,6 +142,20 @@ func staticAnalysis(args []string) error {
 		selectDone:     make(map[ssa.Instruction]*ssa.Select),
 	}
 
+	if Analysis.debug {
+		start := time.Now()
+		result, err := pointer.AnalyzeWCtx(Analysis.ptaConfig) // conduct pointer analysis
+		if err != nil {
+			log.Fatal(err)
+		}
+		t := time.Now()
+		elapsed := t.Sub(start)
+		log.Info("Done -- PTA/CG Build; Using " + elapsed.String() + ". Go check gologfile for detail. ")
+		//result.DumpAll()
+
+		Analysis.result = result
+	}
+
 	log.Info("Compiling stack trace for every Goroutine... ")
 	log.Debug(strings.Repeat("-", 35), "Stack trace begins", strings.Repeat("-", 35))
 	Analysis.visitAllInstructions(mains[0].Func("main"), 0)
@@ -143,12 +169,6 @@ func staticAnalysis(args []string) error {
 		log.Debug("race is not possible in one goroutine")
 		return nil
 	}
-
-	result, err := pointer.Analyze(Analysis.ptaConfig) // conduct pointer analysis
-	if err != nil {
-		log.Fatal(err)
-	}
-	Analysis.result = result
 
 	log.Info("Building Happens-Before graph... ")
 	Analysis.HBgraph = graph.New(graph.Directed)

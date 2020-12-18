@@ -6,15 +6,17 @@ import (
 	"github.com/o2lab/race-checker/stats"
 	log "github.com/sirupsen/logrus"
 	"github.com/twmb/algoimpl/go/graph"
-	"golang.org/x/tools/go/pointer"
-	"golang.org/x/tools/go/ssa"
+	"github.tamu.edu/April1989/go_tools/go/pointer"
+	//"golang.org/x/tools/go/pointer"
+	"github.tamu.edu/April1989/go_tools/go/ssa"
 )
 
 type analysis struct {
+	debug         bool  //debug the new pta
 	prog          *ssa.Program
 	pkgs          []*ssa.Package
 	mains         []*ssa.Package
-	result        *pointer.Result
+	result        *pointer.ResultWCtx //one time
 	ptaConfig     *pointer.Config
 	analysisStat  stat
 	HBgraph       *graph.Graph

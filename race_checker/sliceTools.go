@@ -2,8 +2,8 @@ package main
 
 import (
 	"github.com/twmb/algoimpl/go/graph"
+	"github.tamu.edu/April1989/go_tools/go/ssa"
 	"go/token"
-	"golang.org/x/tools/go/ssa"
 	"strings"
 )
 

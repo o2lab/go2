@@ -3,10 +3,10 @@ package main
 import (
 	"github.com/o2lab/race-checker/stats"
 	log "github.com/sirupsen/logrus"
+	"github.tamu.edu/April1989/go_tools/go/ssa"
 	"go/constant"
 	"go/token"
 	"go/types"
-	"golang.org/x/tools/go/ssa"
 	"strconv"
 	"strings"
 )
@@ -298,7 +298,9 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 					a.RWIns[goID] = append(a.RWIns[goID], theIns)
 					a.updateLockMap(goID, theIns)
 					a.updateRLockMap(goID, theIns)
-					a.ptaConfig.AddQuery(theVal.X)
+					if !a.debug {
+						a.ptaConfig.AddQuery(theVal.X)
+					}
 				}
 			}
 		} else if examIns.Call.Value.Name() == "close" { // closing a channel
@@ -341,7 +343,9 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 					a.RWIns[goID] = append(a.RWIns[goID], theIns)
 					a.updateLockMap(goID, theIns)
 					a.updateRLockMap(goID, theIns)
-					a.ptaConfig.AddQuery(access.X)
+					if !a.debug {
+						a.ptaConfig.AddQuery(access.X)
+					}
 				}
 			default:
 				continue
@@ -369,7 +373,9 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 		case "Lock":
 			stats.IncStat(stats.NLock)
 			lockLoc := examIns.Call.Args[0]         // identifier for address of lock
-			a.ptaConfig.AddQuery(lockLoc)
+			if !a.debug {
+				a.ptaConfig.AddQuery(lockLoc)
+			}
 			if goID == 0 { // main goroutine
 				if !sliceContains(a.lockSet, lockLoc) { // if lock is not already in active lockset
 					a.lockSet = append(a.lockSet, lockLoc)
@@ -384,12 +390,16 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 		case "Unlock":
 			stats.IncStat(stats.NUnlock)
 			lockLoc := examIns.Call.Args[0]
-			a.ptaConfig.AddQuery(lockLoc)
+			if !a.debug {
+				a.ptaConfig.AddQuery(lockLoc)
+			}
 			unlockOps = append(unlockOps, lockLoc)
 			a.mapFreeze = true
 		case "RLock":
 			RlockLoc := examIns.Call.Args[0]          // identifier for address of lock
-			a.ptaConfig.AddQuery(RlockLoc)
+			if !a.debug {
+				a.ptaConfig.AddQuery(RlockLoc)
+			}
 			if goID == 0 {
 				if !sliceContains(a.RlockSet, RlockLoc) { // if lock is not already in active lock-set
 					a.RlockSet = append(a.RlockSet, RlockLoc)
@@ -403,17 +413,23 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 			}
 		case "RUnlock":
 			RlockLoc := examIns.Call.Args[0]
-			a.ptaConfig.AddQuery(RlockLoc)
+			if !a.debug {
+				a.ptaConfig.AddQuery(RlockLoc)
+			}
 			runlockOps = append(runlockOps, RlockLoc)
 			a.mapFreeze = true
 		case "Wait":
 			stats.IncStat(stats.NWaitGroupWait)
 			a.RWIns[goID] = append(a.RWIns[goID], theIns)
-			a.ptaConfig.AddQuery(examIns.Call.Args[0])
+			if !a.debug {
+				a.ptaConfig.AddQuery(examIns.Call.Args[0])
+			}
 		case "Done":
 			stats.IncStat(stats.NWaitGroupDone)
 			a.RWIns[goID] = append(a.RWIns[goID], theIns)
-			a.ptaConfig.AddQuery(examIns.Call.Args[0])
+			if !a.debug {
+				a.ptaConfig.AddQuery(examIns.Call.Args[0])
+			}
 		}
 	} else {
 		return
@@ -462,7 +478,9 @@ func (a *analysis) insMapUpdate(examIns *ssa.MapUpdate, goID int, theIns ssa.Ins
 	a.updateLockMap(goID, theIns)
 	switch ptType := examIns.Map.(type) {
 	case *ssa.UnOp:
-		a.ptaConfig.AddQuery(ptType.X)
+		if !a.debug {
+			a.ptaConfig.AddQuery(ptType.X)
+		}
 	default:
 	}
 }
