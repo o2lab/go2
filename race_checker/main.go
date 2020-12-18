@@ -18,6 +18,7 @@ type analysis struct {
 	mains        []*ssa.Package
 	result       *pointer.ResultWCtx //one time
 	ptaConfig    *pointer.Config
+	goID2info    map[int]goroutineInfo //goID -> goroutinInfo
 	analysisStat stat
 	HBgraph      *graph.Graph
 	RWinsMap     map[goIns]graph.Node

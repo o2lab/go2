@@ -121,6 +121,7 @@ func staticAnalysis(args []string) error {
 		pkgs:            pkgs,
 		mains:           mains,
 		ptaConfig:       config,
+		goID2info:       make(map[int]goroutineInfo),
 		RWinsMap:        make(map[goIns]graph.Node),
 		insDRA:          0,
 		levels:          make(map[int]int),
@@ -151,7 +152,7 @@ func staticAnalysis(args []string) error {
 		t := time.Now()
 		elapsed := t.Sub(start)
 		log.Info("Done -- PTA/CG Build; Using " + elapsed.String() + ". Go check gologfile for detail. ")
-		//result.DumpAll()
+		result.DumpAll()
 
 		Analysis.result = result
 	}

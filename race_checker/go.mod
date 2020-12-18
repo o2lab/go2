@@ -15,7 +15,7 @@ require (
 	github.com/twmb/algoimpl v0.0.0-20170717182524-076353e90b94
 	github.tamu.edu/April1989/go_tools v0.0.0
 	golang.org/x/sys v0.0.0-20200803210538-64077c9b5642
-	golang.org/x/tools v0.0.0-20200806022845-90696ccdc692
+	//golang.org/x/tools v0.0.0-20200806022845-90696ccdc692 // bz: i can build with this comment off ...
 	google.golang.org/grpc v1.33.1 // indirect
 	google.golang.org/grpc/examples v0.0.0-20201104172819-c6fa12175f1c // indirect
 	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15 // indirect

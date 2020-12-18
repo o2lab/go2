@@ -98,7 +98,13 @@ func (a *analysis) sameAddress(addr1 ssa.Value, addr2 ssa.Value) bool {
 		pts1 := a.result.PointsTo(addr1)
 		pts2 := a.result.PointsTo(addr2)
 
+		if pts1 == nil || pts2 == nil {
+			fmt.Println(" *** contexts == nil: *** ")
+			return false
+		}
 		if len(pts1) > 1 || len(pts2) > 1 {
+			//TODO:bz: I cannot retrieve any context information here
+			//    hence, use aggressive way: if any pts1/pts2 is different, return false -> not the same
 			fmt.Println(" *** contexts > 1: *** ")
 			same := true
 			for _, _pts1 := range pts1 {
@@ -107,10 +113,6 @@ func (a *analysis) sameAddress(addr1 ssa.Value, addr2 ssa.Value) bool {
 				}
 			}
 			return same //if any is different, return false -> not the same
-		}
-		if pts1 == nil || pts2 == nil {
-			fmt.Println(" *** contexts == nil: *** ")
-			return false
 		}
 		return pts1[0].MayAlias(pts2[0])
 	}else{

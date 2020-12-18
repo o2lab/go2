@@ -465,6 +465,7 @@ func (a *analysis) insGo(examIns *ssa.Go, goID int, theIns ssa.Instruction) {
 	}
 
 	var info = goroutineInfo{examIns, fnName, newGoID}
+	a.goID2info[newGoID] = info //record
 	a.goStack = append(a.goStack, []string{}) // initialize interior slice
 	a.goCaller[newGoID] = goID                // map caller goroutine
 	a.goStack[newGoID] = append(a.goStack[newGoID], a.storeIns...)

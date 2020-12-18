@@ -102,56 +102,59 @@ func (a *analysis) pointerAnalysis_new(location ssa.Value, goID int, theIns ssa.
 		}
 	}
 
-	//TODO: bz: is this correct to use label??
-	ptss := a.result.PointsTo(location) //return type: []PointerWCtx
-	fmt.Println(" *** ssa.Value: " + location.Name() + "  goID: " + strconv.Itoa(goID) + "  size: " + strconv.Itoa(len(ptss)) + " *** ")  //bz: useNewPTA ...
-	for _, pts := range ptss {
-		pts_labels := pts.Labels() // set of labels for locations that the pointer points to
-		var fnName string
-		rightLoc := 0            // initialize index for the right points-to location
-		if len(pts_labels) > 1 { // multiple targets returned by pointer analysis
-			//log.Trace("***Pointer Analysis revealed ", len(pts_labels), " targets for location - ", a.prog.Fset.Position(location.Pos()))
-			var fns []string
-			for ind, eachTarget := range pts_labels { // check each target
-				if eachTarget.Value().Parent() != nil {
-					fns = append(fns, eachTarget.Value().Parent().Name())
-					//log.Trace("*****target No.", ind+1, " - ", eachTarget.Value().Name(), " from function ", eachTarget.Value().Parent().Name())
-					if sliceContainsStr(a.storeIns, eachTarget.Value().Parent().Name()) { // calling function is in current goroutine
-						rightLoc = ind
-						break
-					}
-				} else {
-					continue
+	//TODO: bz: needs to match with goID
+	goInstr := a.goID2info[goID].goIns
+	pts := a.result.PointsToByGo(location, goInstr) //return type: PointerWCtx
+	if pts.IsNil() {
+		return
+	}
+
+	fmt.Println(" *** ssa.Value: " + location.Name() + "  goID: " + strconv.Itoa(goID) + " *** ")  //bz: useNewPTA ...
+	pts_labels := pts.Labels() // set of labels for locations that the pointer points to
+	var fnName string
+	rightLoc := 0            // initialize index for the right points-to location
+	if len(pts_labels) > 1 { // multiple targets returned by pointer analysis
+		//log.Trace("***Pointer Analysis revealed ", len(pts_labels), " targets for location - ", a.prog.Fset.Position(location.Pos()))
+		var fns []string
+		for ind, eachTarget := range pts_labels { // check each target
+			if eachTarget.Value().Parent() != nil {
+				fns = append(fns, eachTarget.Value().Parent().Name())
+				//log.Trace("*****target No.", ind+1, " - ", eachTarget.Value().Name(), " from function ", eachTarget.Value().Parent().Name())
+				if sliceContainsStr(a.storeIns, eachTarget.Value().Parent().Name()) { // calling function is in current goroutine
+					rightLoc = ind
+					break
 				}
+			} else {
+				continue
 			}
-			//log.Trace("***Executing target No.", rightLoc+1)
-		} else if len(pts_labels) == 0 {
-			return
 		}
-		switch theFunc := pts_labels[rightLoc].Value().(type) {
-		case *ssa.Function:
-			fnName = theFunc.Name()
-			if !a.exploredFunction(theFunc, goID, theIns) {
-				a.updateRecords(fnName, goID, "PUSH ")
-				a.RWIns[goID] = append(a.RWIns[goID], theIns)
-				a.visitAllInstructions(theFunc, goID)
-			}
-		case *ssa.MakeInterface:
-			methodName := theIns.(*ssa.Call).Call.Method.Name()                                                      //ctx ??
-			if a.prog.MethodSets.MethodSet(pts.DynamicTypes().Keys()[0]).Lookup(a.mains[0].Pkg, methodName) == nil { // ignore abstract methods
-				break
-			}
-			check := a.prog.LookupMethod(pts.DynamicTypes().Keys()[0], a.mains[0].Pkg, methodName)
-			fnName = check.Name()
-			if !a.exploredFunction(check, goID, theIns) {
-				a.updateRecords(fnName, goID, "PUSH ")
-				a.RWIns[goID] = append(a.RWIns[goID], theIns)
-				a.visitAllInstructions(check, goID)
-			}
-		case *ssa.MakeChan:
-			a.chanName = theFunc.Name()
-		default:
+		//log.Trace("***Executing target No.", rightLoc+1)
+	} else if len(pts_labels) == 0 {
+		return
+	}
+	switch theFunc := pts_labels[rightLoc].Value().(type) {
+	case *ssa.Function:
+		fnName = theFunc.Name()
+		if !a.exploredFunction(theFunc, goID, theIns) {
+			a.updateRecords(fnName, goID, "PUSH ")
+			a.RWIns[goID] = append(a.RWIns[goID], theIns)
+			a.visitAllInstructions(theFunc, goID)
+		}
+	case *ssa.MakeInterface:
+		methodName := theIns.(*ssa.Call).Call.Method.Name()                                                      //ctx ??
+		if a.prog.MethodSets.MethodSet(pts.DynamicTypes().Keys()[0]).Lookup(a.mains[0].Pkg, methodName) == nil { // ignore abstract methods
 			break
 		}
+		check := a.prog.LookupMethod(pts.DynamicTypes().Keys()[0], a.mains[0].Pkg, methodName)
+		fnName = check.Name()
+		if !a.exploredFunction(check, goID, theIns) {
+			a.updateRecords(fnName, goID, "PUSH ")
+			a.RWIns[goID] = append(a.RWIns[goID], theIns)
+			a.visitAllInstructions(check, goID)
+		}
+	case *ssa.MakeChan:
+		a.chanName = theFunc.Name()
+	default:
+		break
 	}
 }
