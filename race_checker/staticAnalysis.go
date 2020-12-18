@@ -133,14 +133,17 @@ func staticAnalysis(args []string) error {
 		goCaller:       make(map[int]int),
 		goNames:        make(map[int]string),
 		chanBuf:		make(map[string]int),
-		chanRcvs:        make(map[string][]*ssa.UnOp),
-		chanSnds:        make(map[string][]*ssa.Send),
-		selectBloc:      make(map[int]*ssa.Select),
-		selReady:        make(map[*ssa.Select][]string),
-		selCaseCnt:      make(map[*ssa.Select]int),
-		selectCaseBegin: make(map[ssa.Instruction]string),
-		selectCaseEnd:   make(map[ssa.Instruction]string),
-		selectDone:      make(map[ssa.Instruction]*ssa.Select),
+		chanRcvs: 		make(map[string][]*ssa.UnOp),
+		chanSnds: 	 	make(map[string][]*ssa.Send),
+		selectBloc:	   	make(map[int]*ssa.Select),
+		selReady:	   	make(map[*ssa.Select][]string),
+		selCaseCnt:	    make(map[*ssa.Select]int),
+		selectCaseBegin:make(map[ssa.Instruction]string),
+		selectCaseEnd:  make(map[ssa.Instruction]string),
+		selectDone:     make(map[ssa.Instruction]*ssa.Select),
+		ifSuccBegin:  	make(map[ssa.Instruction]*ssa.If),
+		ifFnReturn:	  	make(map[*ssa.Function]*ssa.Return),
+		ifSuccEnd:		make(map[ssa.Instruction]*ssa.Return),
 	}
 
 	if Analysis.useNewPTA {
@@ -186,6 +189,8 @@ func staticAnalysis(args []string) error {
 	var selectN []graph.Node
 	var readyCh []string
 	var selCaseEndN []graph.Node
+	var ifN []graph.Node
+	var ifSuccEndN []graph.Node
 	waitingN := make(map[*ssa.Call]graph.Node)
 	chanRecvs := make(map[string]graph.Node) // map channel name to graph node
 	for nGo, insSlice := range Analysis.RWIns {
@@ -209,6 +214,7 @@ func staticAnalysis(args []string) error {
 				} else if selIns, ok1 := anIns.(*ssa.Select); ok1 {
 					selectN = append(selectN, currN) // select node
 					readyCh = Analysis.insSelect(selIns, nGo, anIns)
+					selCaseEndN = []graph.Node{} // reset slice of nodes when encountering multiple select statements
 				} else if ins, chR := anIns.(*ssa.UnOp); chR {
 					if ch := Analysis.getRcvChan(ins); ch != "" { // a channel receive Op
 						chanRecvs[Analysis.getRcvChan(ins)] = currN
@@ -216,11 +222,15 @@ func staticAnalysis(args []string) error {
 							disjoin = true
 						}
 					}
+				} else if _, isIf := anIns.(*ssa.If); isIf {
+					ifN = append([]graph.Node{currN}, ifN...) // store if statements
 				}
 				if ch, ok0 := Analysis.selectCaseEnd[anIns]; ok0 && sliceContainsStr(readyCh, ch) {
 					selCaseEndN = append(selCaseEndN, currN)
 				}
-
+				if _, isSuccEnd := Analysis.ifSuccEnd[anIns]; isSuccEnd {
+					ifSuccEndN = append(ifSuccEndN, currN)
+				}
 				// edge manipulation:
 				if ch, ok := Analysis.selectCaseBegin[anIns]; ok {
 					if ch == "defaultCase" {
@@ -246,7 +256,25 @@ func staticAnalysis(args []string) error {
 							log.Fatal(err)
 						}
 					}
-					if selectN != nil && len(selectN) > 1 { selectN = selectN[1:] } // completed analysis of one select statement
+					if selectN != nil && len(selectN) > 1 {
+						selectN = selectN[1:]
+					} // completed analysis of one select statement
+				} else if ifInstr, ok2 := Analysis.ifSuccBegin[anIns]; ok2 {
+					skipSucc := false
+					for beginIns, ifIns := range Analysis.ifSuccBegin {
+						if ifIns == ifInstr && beginIns != anIns && sliceContainsInsAt(Analysis.commIfSucc, beginIns) != -1 && channelComm { // other succ contains channel communication
+							if (anIns.Block().Comment == "if.then" && beginIns.Block().Comment == "if.else") || (anIns.Block().Comment == "if.else" && beginIns.Block().Comment == "if.then") {
+								skipSucc = true
+								Analysis.omitComm = append(Analysis.omitComm, anIns.Block())
+							}
+						}
+					}
+					if !skipSucc {
+						err := Analysis.HBgraph.MakeEdge(ifN[0], currN)
+						if err != nil {
+							log.Fatal(err)
+						}
+					}
 				} else {
 					err := Analysis.HBgraph.MakeEdge(prevN, currN)
 					if err != nil {
@@ -291,6 +319,19 @@ func staticAnalysis(args []string) error {
 							log.Fatal(err)
 						}
 					}
+				}
+			}
+			if reIns, isReturn := anIns.(*ssa.Return); isReturn {
+				if Analysis.ifFnReturn[reIns.Parent()] == reIns { // this is final return
+					for r, ifEndN := range ifSuccEndN {
+						if r != len(ifSuccEndN)-1 {
+							err := Analysis.HBgraph.MakeEdge(ifEndN, prevN)
+							if err != nil {
+								log.Fatal(err)
+							}
+						}
+					}
+					ifSuccEndN = []graph.Node{} // reset slice containing last ins of each succ block preceeding final return
 				}
 			}
 		}
@@ -361,6 +402,8 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 	var selCount int // total cases in a select statement
 	var activeCase bool
 	var selDone bool
+	var ifIns *ssa.If
+	var ifEnds []ssa.Instruction
 	for bInd := 0; bInd < len(bVisit); bInd++ {
 		activeCase, selDone = false, false
 		aBlock := fnBlocks[bVisit[bInd]]
@@ -382,6 +425,12 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 		if selIns != nil && aBlock.Comment == "select.next" && !selIns.Blocking && readyChans[selCount] == "defaultCase" {
 			a.selectCaseBegin[aBlock.Instrs[0]] = readyChans[selCount] // map first instruction in case to channel name
 			a.selectCaseEnd[aBlock.Instrs[len(aBlock.Instrs)-1]] = readyChans[selCount] // map last instruction in case to channel name
+		}
+		if ifIns != nil && (aBlock.Comment == "if.then" || aBlock.Comment == "if.else" || aBlock.Comment == "if.done") {
+			a.ifSuccBegin[aBlock.Instrs[0]] = ifIns
+			if len(aBlock.Succs) == 0 {
+				ifEnds = append(ifEnds, aBlock.Instrs[len(aBlock.Instrs)-1])
+			}
 		}
 		for ii, theIns := range aBlock.Instrs { // examine each instruction
 			if theIns.String() == "rundefers" { // execute deferred calls at this index
@@ -423,7 +472,18 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 			case *ssa.MakeChan: // channel creation op
 				a.insMakeChan(examIns, ii)
 			case *ssa.Send: // channel send op
-				a.insSend(examIns, goID, theIns)
+				chNm := a.insSend(examIns, goID, theIns)
+				isAwait := false // is the channel send being awaited on by select?
+				for _, chs := range a.selReady {
+					if sliceContainsStr(chs, chNm) {
+						isAwait = true
+						break
+					}
+				}
+				if isAwait && (examIns.Block().Comment == "if.then" || examIns.Block().Comment == "if.else" || examIns.Block().Comment == "if.done") {
+					// send awaited on by select, other if successor will not be traversed
+					a.commIfSucc = append(a.commIfSucc, examIns.Block().Instrs[0])
+				}
 			case *ssa.Store: // write op
 				if _, ok := examIns.Addr.(*ssa.Alloc); ok && ii > 0 { // variable initialization
 					switch aBlock.Instrs[ii-1].(type) {
@@ -464,6 +524,9 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				a.insGo(examIns, goID, theIns)
 			case *ssa.Return:
 				a.RWIns[goID] = append(a.RWIns[goID], theIns)
+				if examIns.Block().Comment == "if.then" || examIns.Block().Comment == "if.else" || examIns.Block().Comment == "if.done" {
+					a.ifFnReturn[fn] = examIns // will be revised iteratively to eventually contain final return instruction
+				}
 			case *ssa.MapUpdate:
 				a.insMapUpdate(examIns, goID, theIns)
 			case *ssa.Select:
@@ -471,8 +534,11 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				selCount = 0
 				selIns = examIns
 				a.selectBloc[bVisit[bInd]] = examIns
-			default:
+			case *ssa.If:
 				a.RWIns[goID] = append(a.RWIns[goID], theIns)
+				ifIns = examIns
+			default:
+				a.RWIns[goID] = append(a.RWIns[goID], theIns) // TODO: consolidate
 			}
 			if ii == len(aBlock.Instrs)-1 && a.mapFreeze { // TODO: this can happen too early
 				a.mapFreeze = false
@@ -505,6 +571,11 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 			}
 		}
 		if activeCase && readyChans[selCount] != "defaultCase" && readyChans[selCount] != "timeOut" { selCount++ } // increment case count
+		if bInd == len(bVisit)-1 && len(ifEnds) > 0  {
+			for _, e := range ifEnds {
+				a.ifSuccEnd[e] = a.ifFnReturn[fn]
+			}
+		}
 	}
 	if len(toUnlock) > 0 {
 		for _, loc := range toUnlock {
