@@ -42,10 +42,19 @@ race-checker -help
 
 ### Running tests
 
+To run all the end-to-end tests (file list in `race_test.go`),
+```
+go test
+``` 
+
+The above command runs the tests concurrently. 
+The number of workers equals to the number of cores available by default.
+To set the number of cores to use explicitly, use the `-cpu` option.
+
 Run `go test` in `race_checker` folder to run all tests.
 To run individual end-to-end tests,
 ```
-go test -run TestRun -files <test_file>
+go test -files <test_file>
 ```
 
 ### Example

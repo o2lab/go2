@@ -60,7 +60,6 @@ func sliceContainsBloc(s []*ssa.BasicBlock, e *ssa.BasicBlock) bool {
 	return false
 }
 
-
 func sliceContainsIntAt(s []int, e int) int {
 	for i, a := range s {
 		if a == e {
@@ -149,7 +148,7 @@ func (a *analysis) lockSetContainsAt(s []ssa.Value, e ssa.Value) int {
 
 // getRcvChan returns channel name of receive Op
 func (a *analysis) getRcvChan(ins *ssa.UnOp) string {
-	for ch, rIns := range Analysis.chanRcvs {
+	for ch, rIns := range a.chanRcvs {
 		if sliceContainsRcv(rIns, ins) { // channel receive
 			return ch
 		}
@@ -167,7 +166,7 @@ func (a *analysis) isReadySel(ch string) bool {
 	return false
 }
 
-func lockSetVal (s []ssa.Value) []token.Pos {
+func lockSetVal(s []ssa.Value) []token.Pos {
 	res := make([]token.Pos, len(s))
 	for i, val := range s {
 		res[i] = val.Pos()

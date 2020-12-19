@@ -26,7 +26,7 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 	if err != nil {
 		log.Fatal(err)
 	}
-	Analysis.result = result
+	a.result = result
 	ptrSet := a.result.Queries                    // set of pointers from result of pointer analysis
 	PTSet := ptrSet[location].PointsTo().Labels() // set of labels for locations that the pointer points to
 	if indir {

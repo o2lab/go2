@@ -23,7 +23,7 @@ func fromPkgsOfInterest(fn *ssa.Function) bool {
 			return false
 		}
 	}
-	if fn.Pkg.Pkg.Name() == "main" || fn.Pkg.Pkg.Name() == "cli"  {
+	if fn.Pkg.Pkg.Name() == "main" || fn.Pkg.Pkg.Name() == "cli" {
 		return true
 	}
 	if !strings.HasPrefix(fn.Pkg.Pkg.Path(), fromPath) { // path is dependent on tested program
@@ -62,8 +62,8 @@ func isSynthetic(fn *ssa.Function) bool { // ignore functions that are NOT true 
 	return fn.Synthetic != "" || fn.Pkg == nil
 }
 
-// staticAnalysis builds a Happens-Before Graph and calls other functions like visitAllInstructions to drive the program further
-func staticAnalysis(args []string) error {
+// Run builds a Happens-Before Graph and calls other functions like visitAllInstructions to drive the program further
+func (runner *AnalysisRunner) Run(args []string) error {
 	cfg := &packages.Config{
 		Mode:  packages.LoadAllSyntax, // the level of information returned for each package
 		Dir:   "",                     // directory in which to run the build system's query tool
@@ -104,57 +104,57 @@ func staticAnalysis(args []string) error {
 		Mains:          mains,
 		BuildCallGraph: false,
 	}
-	Analysis = &analysis{
-		prog:           prog,
-		pkgs:           pkgs,
-		mains:          mains,
-		ptaConfig:      config,
-		RWinsMap:       make(map[goIns]graph.Node),
-		insDRA:         0,
-		levels:         make(map[int]int),
-		lockMap:        make(map[ssa.Instruction][]ssa.Value),
-		RlockMap:       make(map[ssa.Instruction][]ssa.Value),
-		goLockset:      make(map[int][]ssa.Value),
-		goRLockset:     make(map[int][]ssa.Value),
-		mapFreeze:      false,
-		goCaller:       make(map[int]int),
-		goNames:        make(map[int]string),
-		chanBuf:		make(map[string]int),
-		chanRcvs: 		make(map[string][]*ssa.UnOp),
-		chanSnds: 	 	make(map[string][]*ssa.Send),
-		selectBloc:	   	make(map[int]*ssa.Select),
-		selReady:	   	make(map[*ssa.Select][]string),
-		selCaseCnt:	    make(map[*ssa.Select]int),
-		selectCaseBegin:make(map[ssa.Instruction]string),
-		selectCaseEnd:  make(map[ssa.Instruction]string),
-		selectDone:     make(map[ssa.Instruction]*ssa.Select),
-		ifSuccBegin:  	make(map[ssa.Instruction]*ssa.If),
-		ifFnReturn:	  	make(map[*ssa.Function]*ssa.Return),
-		ifSuccEnd:		make(map[ssa.Instruction]*ssa.Return),
+	runner.Analysis = &analysis{
+		prog:            prog,
+		pkgs:            pkgs,
+		mains:           mains,
+		ptaConfig:       config,
+		RWinsMap:        make(map[goIns]graph.Node),
+		insDRA:          0,
+		levels:          make(map[int]int),
+		lockMap:         make(map[ssa.Instruction][]ssa.Value),
+		RlockMap:        make(map[ssa.Instruction][]ssa.Value),
+		goLockset:       make(map[int][]ssa.Value),
+		goRLockset:      make(map[int][]ssa.Value),
+		mapFreeze:       false,
+		goCaller:        make(map[int]int),
+		goNames:         make(map[int]string),
+		chanBuf:         make(map[string]int),
+		chanRcvs:        make(map[string][]*ssa.UnOp),
+		chanSnds:        make(map[string][]*ssa.Send),
+		selectBloc:      make(map[int]*ssa.Select),
+		selReady:        make(map[*ssa.Select][]string),
+		selCaseCnt:      make(map[*ssa.Select]int),
+		selectCaseBegin: make(map[ssa.Instruction]string),
+		selectCaseEnd:   make(map[ssa.Instruction]string),
+		selectDone:      make(map[ssa.Instruction]*ssa.Select),
+		ifSuccBegin:     make(map[ssa.Instruction]*ssa.If),
+		ifFnReturn:      make(map[*ssa.Function]*ssa.Return),
+		ifSuccEnd:       make(map[ssa.Instruction]*ssa.Return),
 	}
 
 	log.Info("Compiling stack trace for every Goroutine... ")
 	log.Debug(strings.Repeat("-", 35), "Stack trace begins", strings.Repeat("-", 35))
-	Analysis.visitAllInstructions(mains[0].Func("main"), 0)
+	runner.Analysis.visitAllInstructions(mains[0].Func("main"), 0)
 	log.Debug(strings.Repeat("-", 35), "Stack trace ends", strings.Repeat("-", 35))
 	totalIns := 0
-	for g, _ := range Analysis.RWIns {
-		totalIns += len(Analysis.RWIns[g])
+	for g, _ := range runner.Analysis.RWIns {
+		totalIns += len(runner.Analysis.RWIns[g])
 	}
-	log.Info("Done  -- ", len(Analysis.RWIns), " goroutines analyzed! ", totalIns, " instructions of interest detected! ")
-	if len(Analysis.RWIns) < 2 {
+	log.Info("Done  -- ", len(runner.Analysis.RWIns), " goroutines analyzed! ", totalIns, " instructions of interest detected! ")
+	if len(runner.Analysis.RWIns) < 2 {
 		log.Debug("race is not possible in one goroutine")
 		return nil
 	}
 
-	result, err := pointer.Analyze(Analysis.ptaConfig) // conduct pointer analysis
+	result, err := pointer.Analyze(runner.Analysis.ptaConfig) // conduct pointer analysis
 	if err != nil {
 		log.Fatal(err)
 	}
-	Analysis.result = result
+	runner.Analysis.result = result
 
 	log.Info("Building Happens-Before graph... ")
-	Analysis.HBgraph = graph.New(graph.Directed)
+	runner.Analysis.HBgraph = graph.New(graph.Directed)
 	var prevN graph.Node
 	var goCaller []graph.Node
 	var selectN []graph.Node
@@ -164,18 +164,18 @@ func staticAnalysis(args []string) error {
 	var ifSuccEndN []graph.Node
 	waitingN := make(map[*ssa.Call]graph.Node)
 	chanRecvs := make(map[string]graph.Node) // map channel name to graph node
-	for nGo, insSlice := range Analysis.RWIns {
+	for nGo, insSlice := range runner.Analysis.RWIns {
 		for i, anIns := range insSlice {
 			disjoin := false // detach select case statement from subsequent instruction
 			insKey := goIns{ins: anIns, goID: nGo}
 			if nGo == 0 && i == 0 { // main goroutine, first instruction
-				prevN = Analysis.HBgraph.MakeNode() // initiate for future nodes
+				prevN = runner.Analysis.HBgraph.MakeNode() // initiate for future nodes
 				*prevN.Value = insKey
 				if _, ok := anIns.(*ssa.Go); ok {
 					goCaller = append(goCaller, prevN) // sequentially store go calls in the same goroutine
 				}
 			} else {
-				currN := Analysis.HBgraph.MakeNode()
+				currN := runner.Analysis.HBgraph.MakeNode()
 				*currN.Value = insKey
 				if nGo != 0 && i == 0 { // worker goroutine, first instruction
 					prevN = goCaller[0] // first node in subroutine
@@ -184,45 +184,45 @@ func staticAnalysis(args []string) error {
 					goCaller = append(goCaller, currN) // sequentially store go calls in the same goroutine
 				} else if selIns, ok1 := anIns.(*ssa.Select); ok1 {
 					selectN = append(selectN, currN) // select node
-					readyCh = Analysis.insSelect(selIns, nGo, anIns)
+					readyCh = runner.Analysis.insSelect(selIns, nGo, anIns)
 					selCaseEndN = []graph.Node{} // reset slice of nodes when encountering multiple select statements
 				} else if ins, chR := anIns.(*ssa.UnOp); chR {
-					if ch := Analysis.getRcvChan(ins); ch != "" { // a channel receive Op
-						chanRecvs[Analysis.getRcvChan(ins)] = currN
-						if Analysis.isReadySel(ch) {
+					if ch := runner.Analysis.getRcvChan(ins); ch != "" { // a channel receive Op
+						chanRecvs[runner.Analysis.getRcvChan(ins)] = currN
+						if runner.Analysis.isReadySel(ch) {
 							disjoin = true
 						}
 					}
 				} else if _, isIf := anIns.(*ssa.If); isIf {
 					ifN = append([]graph.Node{currN}, ifN...) // store if statements
 				}
-				if ch, ok0 := Analysis.selectCaseEnd[anIns]; ok0 && sliceContainsStr(readyCh, ch) {
+				if ch, ok0 := runner.Analysis.selectCaseEnd[anIns]; ok0 && sliceContainsStr(readyCh, ch) {
 					selCaseEndN = append(selCaseEndN, currN)
 				}
-				if _, isSuccEnd := Analysis.ifSuccEnd[anIns]; isSuccEnd {
+				if _, isSuccEnd := runner.Analysis.ifSuccEnd[anIns]; isSuccEnd {
 					ifSuccEndN = append(ifSuccEndN, currN)
 				}
 				// edge manipulation:
-				if ch, ok := Analysis.selectCaseBegin[anIns]; ok {
+				if ch, ok := runner.Analysis.selectCaseBegin[anIns]; ok {
 					if ch == "defaultCase" {
-						err := Analysis.HBgraph.MakeEdge(selectN[0], currN) // select node to default case
+						err := runner.Analysis.HBgraph.MakeEdge(selectN[0], currN) // select node to default case
 						if err != nil {
 							log.Fatal(err)
 						}
 					} else {
-						err := Analysis.HBgraph.MakeEdge(chanRecvs[ch], currN) // receive Op to ready case
+						err := runner.Analysis.HBgraph.MakeEdge(chanRecvs[ch], currN) // receive Op to ready case
 						if err != nil {
 							log.Fatal(err)
 						}
 					}
-				} else if _, ok1 := Analysis.selectDone[anIns]; ok1 {
+				} else if _, ok1 := runner.Analysis.selectDone[anIns]; ok1 {
 					if len(selCaseEndN) > 1 { // more than one portal
-						err := Analysis.HBgraph.MakeEdge(selectN[0], currN) // ready case to select done
+						err := runner.Analysis.HBgraph.MakeEdge(selectN[0], currN) // ready case to select done
 						if err != nil {
 							log.Fatal(err)
 						}
 					} else if len(selCaseEndN) > 0 {
-						err := Analysis.HBgraph.MakeEdge(selCaseEndN[0], currN) // ready case to select done
+						err := runner.Analysis.HBgraph.MakeEdge(selCaseEndN[0], currN) // ready case to select done
 						if err != nil {
 							log.Fatal(err)
 						}
@@ -230,40 +230,42 @@ func staticAnalysis(args []string) error {
 					if selectN != nil && len(selectN) > 1 {
 						selectN = selectN[1:]
 					} // completed analysis of one select statement
-				} else if ifInstr, ok2 := Analysis.ifSuccBegin[anIns]; ok2 {
+				} else if ifInstr, ok2 := runner.Analysis.ifSuccBegin[anIns]; ok2 {
 					skipSucc := false
-					for beginIns, ifIns := range Analysis.ifSuccBegin {
-						if ifIns == ifInstr && beginIns != anIns && sliceContainsInsAt(Analysis.commIfSucc, beginIns) != -1 && channelComm { // other succ contains channel communication
+					for beginIns, ifIns := range runner.Analysis.ifSuccBegin {
+						if ifIns == ifInstr && beginIns != anIns && sliceContainsInsAt(runner.Analysis.commIfSucc, beginIns) != -1 && channelComm { // other succ contains channel communication
 							if (anIns.Block().Comment == "if.then" && beginIns.Block().Comment == "if.else") || (anIns.Block().Comment == "if.else" && beginIns.Block().Comment == "if.then") {
 								skipSucc = true
-								Analysis.omitComm = append(Analysis.omitComm, anIns.Block())
+								runner.Analysis.omitComm = append(runner.Analysis.omitComm, anIns.Block())
 							}
 						}
 					}
 					if !skipSucc {
-						err := Analysis.HBgraph.MakeEdge(ifN[0], currN)
+						err := runner.Analysis.HBgraph.MakeEdge(ifN[0], currN)
 						if err != nil {
 							log.Fatal(err)
 						}
 					}
 				} else {
-					err := Analysis.HBgraph.MakeEdge(prevN, currN)
+					err := runner.Analysis.HBgraph.MakeEdge(prevN, currN)
 					if err != nil {
 						log.Fatal(err)
 					}
 				}
-				if !disjoin { prevN = currN }
+				if !disjoin {
+					prevN = currN
+				}
 			}
 			// Create additional edges:
-			if Analysis.isReadIns(anIns) || isWriteIns(anIns) {
-				Analysis.RWinsMap[insKey] = prevN
+			if runner.Analysis.isReadIns(anIns) || isWriteIns(anIns) {
+				runner.Analysis.RWinsMap[insKey] = prevN
 			} else if callIns, ok := anIns.(*ssa.Call); ok { // taking care of WG operations. TODO: identify different WG instances
 				if callIns.Call.Value.Name() == "Wait" {
 					waitingN[callIns] = prevN // store Wait node for later edge creation TO this node
 				} else if callIns.Call.Value.Name() == "Done" {
 					for wIns, wNode := range waitingN {
-						if Analysis.sameAddress(callIns.Call.Args[0], wIns.Call.Args[0]) {
-							err := Analysis.HBgraph.MakeEdge(prevN, wNode) // create edge from Done node to Wait node
+						if runner.Analysis.sameAddress(callIns.Call.Args[0], wIns.Call.Args[0]) {
+							err := runner.Analysis.HBgraph.MakeEdge(prevN, wNode) // create edge from Done node to Wait node
 							if err != nil {
 								log.Fatal(err)
 							}
@@ -273,8 +275,8 @@ func staticAnalysis(args []string) error {
 			} else if dIns, ok1 := anIns.(*ssa.Defer); ok1 {
 				if dIns.Call.Value.Name() == "Done" {
 					for wIns, wNode := range waitingN {
-						if Analysis.sameAddress(dIns.Call.Args[0], wIns.Call.Args[0]) {
-							err := Analysis.HBgraph.MakeEdge(prevN, wNode) // create edge from Done node to Wait node
+						if runner.Analysis.sameAddress(dIns.Call.Args[0], wIns.Call.Args[0]) {
+							err := runner.Analysis.HBgraph.MakeEdge(prevN, wNode) // create edge from Done node to Wait node
 							if err != nil {
 								log.Fatal(err)
 							}
@@ -283,9 +285,9 @@ func staticAnalysis(args []string) error {
 				}
 			}
 			if sendIns, ok := anIns.(*ssa.Send); ok && channelComm { // detect matching channel send operations
-				for ch, sIns := range Analysis.chanSnds {
+				for ch, sIns := range runner.Analysis.chanSnds {
 					if rcvN, matching := chanRecvs[ch]; matching && sliceContainsSnd(sIns, sendIns) {
-						err := Analysis.HBgraph.MakeEdge(prevN, rcvN) // create edge from Send node to Receive node
+						err := runner.Analysis.HBgraph.MakeEdge(prevN, rcvN) // create edge from Send node to Receive node
 						if err != nil {
 							log.Fatal(err)
 						}
@@ -293,10 +295,10 @@ func staticAnalysis(args []string) error {
 				}
 			}
 			if reIns, isReturn := anIns.(*ssa.Return); isReturn {
-				if Analysis.ifFnReturn[reIns.Parent()] == reIns { // this is final return
+				if runner.Analysis.ifFnReturn[reIns.Parent()] == reIns { // this is final return
 					for r, ifEndN := range ifSuccEndN {
 						if r != len(ifSuccEndN)-1 {
-							err := Analysis.HBgraph.MakeEdge(ifEndN, prevN)
+							err := runner.Analysis.HBgraph.MakeEdge(ifEndN, prevN)
 							if err != nil {
 								log.Fatal(err)
 							}
@@ -310,7 +312,7 @@ func staticAnalysis(args []string) error {
 	log.Info("Done  -- Happens-Before graph built ")
 
 	log.Info("Checking for data races... ")
-	Analysis.checkRacyPairs()
+	runner.Analysis.checkRacyPairs()
 	return nil
 }
 
@@ -367,10 +369,10 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 	var toDefer []ssa.Instruction // stack storing deferred calls
 	var toUnlock []ssa.Value
 	var toRUnlock []ssa.Value
-	repeatSwitch := false         // triggered when encountering basic blocks for body of a forloop
+	repeatSwitch := false // triggered when encountering basic blocks for body of a forloop
 	var readyChans []string
 	var selIns *ssa.Select // current select statement
-	var selCount int // total cases in a select statement
+	var selCount int       // total cases in a select statement
 	var activeCase bool
 	var selDone bool
 	var ifIns *ssa.If
@@ -394,7 +396,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 			}
 		}
 		if selIns != nil && aBlock.Comment == "select.next" && !selIns.Blocking && readyChans[selCount] == "defaultCase" {
-			a.selectCaseBegin[aBlock.Instrs[0]] = readyChans[selCount] // map first instruction in case to channel name
+			a.selectCaseBegin[aBlock.Instrs[0]] = readyChans[selCount]                  // map first instruction in case to channel name
 			a.selectCaseEnd[aBlock.Instrs[len(aBlock.Instrs)-1]] = readyChans[selCount] // map last instruction in case to channel name
 		}
 		if ifIns != nil && (aBlock.Comment == "if.then" || aBlock.Comment == "if.else" || aBlock.Comment == "if.done") {
@@ -541,8 +543,10 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				repeatSwitch = false
 			}
 		}
-		if activeCase && readyChans[selCount] != "defaultCase" && readyChans[selCount] != "timeOut" { selCount++ } // increment case count
-		if bInd == len(bVisit)-1 && len(ifEnds) > 0  {
+		if activeCase && readyChans[selCount] != "defaultCase" && readyChans[selCount] != "timeOut" {
+			selCount++
+		} // increment case count
+		if bInd == len(bVisit)-1 && len(ifEnds) > 0 {
 			for _, e := range ifEnds {
 				a.ifSuccEnd[e] = a.ifFnReturn[fn]
 			}
@@ -623,7 +627,7 @@ func (a *analysis) exploredFunction(fn *ssa.Function, goID int, theIns ssa.Instr
 	if efficiency && sliceContainsStr(a.storeIns, fn.Name()) { // for temporary debugging purposes only
 		return true
 	}
-	visitedIns:= []ssa.Instruction{}
+	visitedIns := []ssa.Instruction{}
 	if len(a.RWIns) > 0 {
 		visitedIns = a.RWIns[goID]
 	}
