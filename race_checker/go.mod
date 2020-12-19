@@ -10,6 +10,7 @@ require (
 	github.com/sirupsen/logrus v1.4.2
 	github.com/stretchr/testify v1.4.0 // indirect
 	github.com/twmb/algoimpl v0.0.0-20170717182524-076353e90b94
+	golang.org/x/sync v0.0.0-20201207232520-09787c993a3a
 	golang.org/x/sys v0.0.0-20200803210538-64077c9b5642
 	golang.org/x/tools v0.0.0-20200806022845-90696ccdc692
 	google.golang.org/grpc v1.33.1 // indirect
