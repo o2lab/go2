@@ -19,12 +19,12 @@ type analysis struct {
 	analysisStat    stat
 	HBgraph         *graph.Graph
 	RWinsMap        map[goIns]graph.Node
-	trieMap         map[fnInfo]*trie // map each function to a trie node
+	trieMap         map[fnInfo]*trie 				// map each function to a trie node
 	RWIns           [][]ssa.Instruction
-	insDRA          int // index of instruction (in main goroutine) at which to begin data race analysis
+	insDRA          int 							// index of instruction (in main goroutine) at which to begin data race analysis
 	storeIns        []string
 	workList        []goroutineInfo
-	reportedAddr    []ssa.Value // stores already reported addresses
+	reportedAddr    []ssa.Value 					// stores already reported addresses
 	racyStackTops   []string
 	levels          map[int]int
 	lockMap         map[ssa.Instruction][]ssa.Value // map each read/write access to a snapshot of actively maintained lockset
@@ -38,15 +38,15 @@ type analysis struct {
 	goStack         [][]string
 	goCaller        map[int]int
 	goNames         map[int]string
-	chanBuf         map[string]int         // map each channel to its buffer length
-	chanRcvs        map[string][]*ssa.UnOp // map each channel to receive instructions
-	chanSnds        map[string][]*ssa.Send // map each channel to send instructions
+	chanBuf         map[string]int         			// map each channel to its buffer length
+	chanRcvs        map[string][]*ssa.UnOp 			// map each channel to receive instructions
+	chanSnds        map[string][]*ssa.Send 			// map each channel to send instructions
 	chanName        string
 	selectBloc      map[int]*ssa.Select             // index of block where select statement was encountered
 	selReady        map[*ssa.Select][]string        // store name of ready channels for each select statement
-	selCaseCnt      map[*ssa.Select]int             // select case count
 	selectCaseBegin map[ssa.Instruction]string      // map first instruction in clause to channel name
 	selectCaseEnd   map[ssa.Instruction]string      // map last instruction in clause to channel name
+	selectCaseBody	map[ssa.Instruction]*ssa.Select		// map instructions to select instruction
 	selectDone      map[ssa.Instruction]*ssa.Select // map first instruction after select is done to select statement
 	ifSuccBegin     map[ssa.Instruction]*ssa.If     // map beginning of succ block to if statement
 	ifFnReturn      map[*ssa.Function]*ssa.Return   // map "if-containing" function to its final return

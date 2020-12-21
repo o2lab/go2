@@ -28,7 +28,8 @@ func (a *analysis) checkRacyPairs() {
 							!a.reachable(goI, i, goJ, j) &&
 							!a.reachable(goJ, j, goI, i) &&
 							!a.lockSetsIntersect(insSlice[0], insSlice[1]) &&
-							!a.bothAtomic(insSlice[0], insSlice[1]) {
+							!a.bothAtomic(insSlice[0], insSlice[1]) &&
+							!a.selectMutEx(insSlice[0], insSlice[1]) {
 							a.reportedAddr = append(a.reportedAddr, addressPair[0])
 							a.printRace(len(a.reportedAddr), insSlice, addressPair, []int{i, j}, []int{ii, jj})
 						}
@@ -173,6 +174,15 @@ func (a *analysis) bothAtomic(insA ssa.Instruction, insB ssa.Instruction) bool {
 			if aCall.Call.StaticCallee().Pkg.Pkg.Name() == "atomic" && bCall.Call.StaticCallee().Pkg.Pkg.Name() == "atomic" {
 				return true
 			}
+		}
+	}
+	return false
+}
+
+func (a *analysis) selectMutEx(insA ssa.Instruction, insB ssa.Instruction) bool {
+	if selA, ok1 := a.selectCaseBody[insA]; ok1 {
+		if selB, ok2 := a.selectCaseBody[insB]; ok2 {
+			return selA == selB
 		}
 	}
 	return false

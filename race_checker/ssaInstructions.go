@@ -498,11 +498,11 @@ func (a *analysis) insSelect(examIns *ssa.Select, goID int, theIns ssa.Instructi
 				a.selReady[examIns] = append(a.selReady[examIns], readyChans[i])
 			}
 		case *ssa.Parameter:
-			// TODO: need to identify channel readiness when passed in as input parameter
+			// Assume readiness, then adopt mutual exclusion among cases
 			if state.Dir == 1 { // send Only
-
+				//readyChans[i] = ch.Name()
 			} else if state.Dir == 2 { // receive Only
-
+				//readyChans[i] = ch.Name()
 			} else { // state.Dir == 0, send receive
 
 			}

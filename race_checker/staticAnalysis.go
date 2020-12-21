@@ -124,9 +124,9 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		chanSnds:        make(map[string][]*ssa.Send),
 		selectBloc:      make(map[int]*ssa.Select),
 		selReady:        make(map[*ssa.Select][]string),
-		selCaseCnt:      make(map[*ssa.Select]int),
 		selectCaseBegin: make(map[ssa.Instruction]string),
 		selectCaseEnd:   make(map[ssa.Instruction]string),
+		selectCaseBody:  make(map[ssa.Instruction]*ssa.Select),
 		selectDone:      make(map[ssa.Instruction]*ssa.Select),
 		ifSuccBegin:     make(map[ssa.Instruction]*ssa.If),
 		ifFnReturn:      make(map[*ssa.Function]*ssa.Return),
@@ -374,6 +374,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 	var selIns *ssa.Select // current select statement
 	var selCount int       // total cases in a select statement
 	var activeCase bool
+	var defCase bool
 	var selDone bool
 	var ifIns *ssa.If
 	var ifEnds []ssa.Instruction
@@ -398,6 +399,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 		if selIns != nil && aBlock.Comment == "select.next" && !selIns.Blocking && readyChans[selCount] == "defaultCase" {
 			a.selectCaseBegin[aBlock.Instrs[0]] = readyChans[selCount]                  // map first instruction in case to channel name
 			a.selectCaseEnd[aBlock.Instrs[len(aBlock.Instrs)-1]] = readyChans[selCount] // map last instruction in case to channel name
+			defCase = true
 		}
 		if ifIns != nil && (aBlock.Comment == "if.then" || aBlock.Comment == "if.else" || aBlock.Comment == "if.done") {
 			a.ifSuccBegin[aBlock.Instrs[0]] = ifIns
@@ -522,13 +524,18 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 					if a.RWIns[goID][len(a.RWIns[goID])-1] != theIns {
 						a.RWIns[goID] = append(a.RWIns[goID], theIns)
 					}
+					a.selectCaseBody[theIns] = selIns
 				} else if ii == len(aBlock.Instrs)-1 {
 					a.selectCaseEnd[theIns] = readyChans[selCount] // map last instruction in case to channel name
 					if a.RWIns[goID][len(a.RWIns[goID])-1] != theIns {
 						a.RWIns[goID] = append(a.RWIns[goID], theIns)
 					}
+					a.selectCaseBody[theIns] = selIns
+				} else {
+					a.selectCaseBody[theIns] = selIns
 				}
 			}
+			if defCase {a.selectCaseBody[theIns] = selIns}
 			if selDone && ii == 0 {
 				if sliceContainsInsAt(a.RWIns[goID], theIns) == -1 {
 					a.RWIns[goID] = append(a.RWIns[goID], theIns)
