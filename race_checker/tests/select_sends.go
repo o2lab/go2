@@ -1,6 +1,11 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"time"
+)
+
+var shared = 0
 
 func main() {
 	ch1 := make(chan string)
@@ -8,6 +13,8 @@ func main() {
 	ch3 := make(chan string) // unbuffered channel
 	x := 10
 	go func() {
+		time.Sleep(3*time.Second)
+		shared = 1
 		msg := <-ch2 // corresponding channel receive
 		fmt.Println("received ", msg)
 		x = 2
@@ -24,8 +31,10 @@ func worker(ch1 chan string, chx chan string, ch3 chan string) {
 	case ch1 <- snd1:
 		fmt.Println("received ", snd1)
 	case chx <- snd2:
+		shared = 2
 		fmt.Println("sent", snd2)
 	case msg := <- ch3:
 		fmt.Println("received ", msg)
 	}
+	fmt.Println(shared)
 }
