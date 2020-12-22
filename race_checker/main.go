@@ -38,6 +38,7 @@ type analysis struct {
 	goStack         [][]string
 	goCaller        map[int]int
 	goNames         map[int]string
+	chanToken		map[string]string				// map token number to channel name
 	chanBuf         map[string]int         			// map each channel to its buffer length
 	chanRcvs        map[string][]*ssa.UnOp 			// map each channel to receive instructions
 	chanSnds        map[string][]*ssa.Send 			// map each channel to send instructions

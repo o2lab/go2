@@ -105,7 +105,7 @@ func (a *analysis) insMakeChan(examIns *ssa.MakeChan, insInd int) {
 	if bufferInfo, ok := examIns.Size.(*ssa.Const); ok { // buffer length passed via constant
 		temp, _ := constant.Int64Val(constant.ToInt(bufferInfo.Value))
 		bufferLen = temp
-	} else if _, ok := examIns.Size.(*ssa.Parameter); ok { // buffer length passed via function parameter
+	} else if _, ok1 := examIns.Size.(*ssa.Parameter); ok1 { // buffer length passed via function parameter
 		bufferLen = 10 // TODO: assuming channel can buffer up to 10 values could result in false positives
 	}
 	instrs := examIns.Block().Instrs
@@ -113,6 +113,9 @@ func (a *analysis) insMakeChan(examIns *ssa.MakeChan, insInd int) {
 		switch ch := instrs[insInd-1].(type) {
 		case *ssa.Alloc:
 			a.chanBuf[ch.Comment] = int(bufferLen) // 0 length - unbuffered channel, otherwise - buffered channel
+			a.chanToken[examIns.Name()] = ch.Comment
+		default:
+			a.chanToken[examIns.Name()] = ""
 		}
 	}
 }
@@ -498,17 +501,16 @@ func (a *analysis) insSelect(examIns *ssa.Select, goID int, theIns ssa.Instructi
 				a.selReady[examIns] = append(a.selReady[examIns], readyChans[i])
 			}
 		case *ssa.Parameter:
-			readyChans[i] = ch.Name()
-			if !sliceContainsStr(a.selReady[examIns], readyChans[i]) {
-				a.selReady[examIns] = append(a.selReady[examIns], readyChans[i])
-			}
+			a.pointerAnalysis(ch, goID, theIns)
+			readyChans[i] = a.chanToken[a.chanName]
+			a.selReady[examIns] = append(a.selReady[examIns], readyChans[i])
 			if _, ex := a.selUnknown[examIns]; !ex {
 				a.selUnknown[examIns] = make([]string, len(examIns.States) + defaultCase)
 			}
 			if state.Dir == 1 { // send Only
-				a.selUnknown[examIns][i] = ch.Name()
+				a.selUnknown[examIns][i] = a.chanName
 			} else if state.Dir == 2 { // receive Only
-				a.selUnknown[examIns][i] = ch.Name()
+				a.selUnknown[examIns][i] = a.chanName
 			} else { // state.Dir == 0, send receive
 
 			}

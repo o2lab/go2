@@ -119,6 +119,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		mapFreeze:       false,
 		goCaller:        make(map[int]int),
 		goNames:         make(map[int]string),
+		chanToken:       make(map[string]string),
 		chanBuf:         make(map[string]int),
 		chanRcvs:        make(map[string][]*ssa.UnOp),
 		chanSnds:        make(map[string][]*ssa.Send),
@@ -160,7 +161,9 @@ func (runner *AnalysisRunner) Run(args []string) error {
 			for i, ch := range chs {
 				if _, ready := runner.Analysis.chanSnds[ch]; !ready && ch != "" {
 					if _, ready0 := runner.Analysis.chanRcvs[ch]; !ready0 {
-						runner.Analysis.selReady[sel][i] = ""
+						if _, ready1 := runner.Analysis.chanBuf[runner.Analysis.chanToken[ch]]; !ready1 {
+							runner.Analysis.selReady[sel][i] = ""
+						}
 					}
 				}
 			}
@@ -202,15 +205,14 @@ func (runner *AnalysisRunner) Run(args []string) error {
 					readyCh = runner.Analysis.selReady[selIns]
 					selCaseEndN = []graph.Node{} // reset slice of nodes when encountering multiple select statements
 					readys := 0
-					for _, ch := range readyCh {
-						if ch != "" {
+					for ith, ch := range readyCh {
+						if ch != "" && selIns.States[ith].Dir == 1 {
 							readys++
 							if _, ok0 := runner.Analysis.selUnknown[selIns]; ok0 && readys == 1 {
 								chanSends[ch] = currN
 							}
 						}
 					}
-
 				} else if ins, chR := anIns.(*ssa.UnOp); chR {
 					if ch := runner.Analysis.getRcvChan(ins); ch != "" { // a channel receive Op
 						chanRecvs[runner.Analysis.getRcvChan(ins)] = currN
@@ -327,7 +329,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 						}
 					}
 				}
-			} else if rcvIns, chR := anIns.(*ssa.UnOp); chR {
+			} else if rcvIns, chR := anIns.(*ssa.UnOp); chR && channelComm {
 				if ch := runner.Analysis.getRcvChan(rcvIns); ch != "" {
 					if sndN, matching := chanSends[ch]; matching {
 						err := runner.Analysis.HBgraph.MakeEdge(sndN, prevN) // create edge from Send node to Receive node
