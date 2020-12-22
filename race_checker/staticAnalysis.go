@@ -10,7 +10,7 @@ import (
 	"github.tamu.edu/April1989/go_tools/go/ssa/ssautil"
 	"go/token"
 	"go/types"
-	"os"
+	//"os"
 	"strings"
 	"time"
 )
@@ -101,7 +101,7 @@ func staticAnalysis(args []string) error {
 		return err
 	}
 
-	//logfile, err := os.Create("go_pta_log") //bz: for me ...
+	//logfile, err := os.Create("grpc_go_pta_log") //bz: for me ...
 	//log.SetFormatter(&log.TextFormatter{
 	//	FullTimestamp: true,
 	//})
@@ -114,12 +114,11 @@ func staticAnalysis(args []string) error {
 		Log:            nil,
 		//kcfa
 		//CallSiteSensitive: true,
-		//origin
-		Origin: true,
+		Origin: true,  //origin
 		//shared config
 		K:          1,
 		LimitScope: true, //bz: only consider app methods now
-		DEBUG:      false, //bz: do all printed out info in console
+		DEBUG:      false, //bz: do all printed out info in console --> turn off to avoid internal nil reference panic
 	}
 	Analysis = &analysis{
 		useNewPTA:       true,
