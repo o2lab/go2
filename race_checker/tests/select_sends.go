@@ -17,15 +17,15 @@ func main() {
 
 }
 
-func worker(ch1 chan string, ch2 chan string, chx chan string) {
+func worker(ch1 chan string, chx chan string, ch3 chan string) {
 	snd1 := "1st msg"
 	snd2 := "2nd msg"
 	select {
 	case ch1 <- snd1:
 		fmt.Println("received ", snd1)
-	case ch2 <- snd2:
+	case chx <- snd2:
 		fmt.Println("sent", snd2)
-	case msg := <- chx:
+	case msg := <- ch3:
 		fmt.Println("received ", msg)
 	}
 }
