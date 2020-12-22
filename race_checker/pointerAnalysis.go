@@ -102,8 +102,16 @@ func (a *analysis) pointerAnalysis_new(location ssa.Value, goID int, theIns ssa.
 		}
 	}
 
-	//TODO: bz: needs to match with goID
-	goInstr := a.goID2info[goID].goIns
+	//TODO: bz: needs to match with goID, currently a rough match
+	var goInstr *ssa.Go
+	if goID == 0 {
+		goInstr = nil
+	}else{
+		goInstr = a.goID2info[goID].goIns
+		if goInstr == nil {
+			panic("Not recorded go instruction in a.goID2info @ goID" + strconv.Itoa(goID))
+		}
+	}
 	pts := a.result.PointsToByGo(location, goInstr) //return type: PointerWCtx
 	if pts.IsNil() {
 		return

@@ -98,7 +98,6 @@ func (a *analysis) sameAddress(addr1 ssa.Value, addr2 ssa.Value) bool {
 		pts2 := a.result.PointsTo(addr2)
 
 		if pts1 == nil || pts2 == nil {
-			fmt.Println(" *** contexts == nil: *** ")
 			return false
 		}
 		if len(pts1) > 1 || len(pts2) > 1 {

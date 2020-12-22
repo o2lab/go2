@@ -10,6 +10,7 @@ import (
 	"github.tamu.edu/April1989/go_tools/go/ssa/ssautil"
 	"go/token"
 	"go/types"
+	"os"
 	"strings"
 	"time"
 )
@@ -100,18 +101,23 @@ func staticAnalysis(args []string) error {
 		return err
 	}
 
+	logfile, err := os.Create("go_pta_log") //bz: i do not want messed up log, create/overwrite one each time
+	log.SetFormatter(&log.TextFormatter{
+		FullTimestamp: true,
+	})
+
 	// Configure pointer analysis to build call-graph
 	config := &pointer.Config{
 		Mains:          mains, //bz: NOW assume only one main
 		Reflection:     false,
 		BuildCallGraph: true,
-		Log:            nil,
+		Log:            logfile,
 		//kcfa
 		//CallSiteSensitive: true,
 		//origin
 		Origin: true,
 		//shared config
-		K:          2,
+		K:          1,
 		LimitScope: true, //bz: only consider app methods now
 		DEBUG:      false, //bz: do all printed out info in console
 	}
