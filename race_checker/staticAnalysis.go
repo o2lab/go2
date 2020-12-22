@@ -327,6 +327,10 @@ func (runner *AnalysisRunner) Run(args []string) error {
 						if err != nil {
 							log.Fatal(err)
 						}
+						err1 := runner.Analysis.HBgraph.MakeEdge(rcvN, prevN) // create edge from Send node to Receive node
+						if err1 != nil {
+							log.Fatal(err1)
+						}
 					}
 				}
 			} else if rcvIns, chR := anIns.(*ssa.UnOp); chR && channelComm {
@@ -335,6 +339,10 @@ func (runner *AnalysisRunner) Run(args []string) error {
 						err := runner.Analysis.HBgraph.MakeEdge(sndN, prevN) // create edge from Send node to Receive node
 						if err != nil {
 							log.Fatal(err)
+						}
+						err1 := runner.Analysis.HBgraph.MakeEdge(prevN, sndN) // create edge from Send node to Receive node
+						if err1 != nil {
+							log.Fatal(err1)
 						}
 					}
 				}
