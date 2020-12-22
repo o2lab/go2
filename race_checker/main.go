@@ -44,6 +44,7 @@ type analysis struct {
 	chanName        string
 	selectBloc      map[int]*ssa.Select             // index of block where select statement was encountered
 	selReady        map[*ssa.Select][]string        // store name of ready channels for each select statement
+	selUnknown		map[*ssa.Select][]string		// channels are passed in as parameters
 	selectCaseBegin map[ssa.Instruction]string      // map first instruction in clause to channel name
 	selectCaseEnd   map[ssa.Instruction]string      // map last instruction in clause to channel name
 	selectCaseBody	map[ssa.Instruction]*ssa.Select		// map instructions to select instruction

@@ -124,6 +124,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		chanSnds:        make(map[string][]*ssa.Send),
 		selectBloc:      make(map[int]*ssa.Select),
 		selReady:        make(map[*ssa.Select][]string),
+		selUnknown:		 make(map[*ssa.Select][]string),
 		selectCaseBegin: make(map[ssa.Instruction]string),
 		selectCaseEnd:   make(map[ssa.Instruction]string),
 		selectCaseBody:  make(map[ssa.Instruction]*ssa.Select),
@@ -153,6 +154,19 @@ func (runner *AnalysisRunner) Run(args []string) error {
 	}
 	runner.Analysis.result = result
 
+	// confirm channel readiness for unknown select cases:
+	if len(runner.Analysis.selUnknown) > 0 {
+		for sel, chs := range runner.Analysis.selUnknown {
+			for i, ch := range chs {
+				if _, ready := runner.Analysis.chanSnds[ch]; !ready && ch != "" {
+					if _, ready0 := runner.Analysis.chanRcvs[ch]; !ready0 {
+						runner.Analysis.selReady[sel][i] = ""
+					}
+				}
+			}
+		}
+	}
+
 	log.Info("Building Happens-Before graph... ")
 	runner.Analysis.HBgraph = graph.New(graph.Directed)
 	var prevN graph.Node
@@ -164,6 +178,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 	var ifSuccEndN []graph.Node
 	waitingN := make(map[*ssa.Call]graph.Node)
 	chanRecvs := make(map[string]graph.Node) // map channel name to graph node
+	chanSends := make(map[string]graph.Node) // map channel name to graph node
 	for nGo, insSlice := range runner.Analysis.RWIns {
 		for i, anIns := range insSlice {
 			disjoin := false // detach select case statement from subsequent instruction
@@ -184,15 +199,27 @@ func (runner *AnalysisRunner) Run(args []string) error {
 					goCaller = append(goCaller, currN) // sequentially store go calls in the same goroutine
 				} else if selIns, ok1 := anIns.(*ssa.Select); ok1 {
 					selectN = append(selectN, currN) // select node
-					readyCh = runner.Analysis.insSelect(selIns, nGo, anIns)
+					readyCh = runner.Analysis.selReady[selIns]
 					selCaseEndN = []graph.Node{} // reset slice of nodes when encountering multiple select statements
+					readys := 0
+					for _, ch := range readyCh {
+						if ch != "" {
+							readys++
+							if _, ok0 := runner.Analysis.selUnknown[selIns]; ok0 && readys == 1 {
+								chanSends[ch] = currN
+							}
+						}
+					}
+
 				} else if ins, chR := anIns.(*ssa.UnOp); chR {
 					if ch := runner.Analysis.getRcvChan(ins); ch != "" { // a channel receive Op
 						chanRecvs[runner.Analysis.getRcvChan(ins)] = currN
-						if runner.Analysis.isReadySel(ch) {
-							disjoin = true
+						if runner.Analysis.isReadySel(ch) { // channel waited on by select
+							disjoin = true // no edge between current node and node of succeeding instruction
 						}
 					}
+				} else if insS, chS := anIns.(*ssa.Send); chS {
+					chanSends[runner.Analysis.getSndChan(insS)] = currN
 				} else if _, isIf := anIns.(*ssa.If); isIf {
 					ifN = append([]graph.Node{currN}, ifN...) // store if statements
 				}
@@ -204,20 +231,27 @@ func (runner *AnalysisRunner) Run(args []string) error {
 				}
 				// edge manipulation:
 				if ch, ok := runner.Analysis.selectCaseBegin[anIns]; ok {
-					if ch == "defaultCase" {
+					if ch == "defaultCase" || ch == "timeOut" {
 						err := runner.Analysis.HBgraph.MakeEdge(selectN[0], currN) // select node to default case
 						if err != nil {
 							log.Fatal(err)
 						}
 					} else {
-						err := runner.Analysis.HBgraph.MakeEdge(chanRecvs[ch], currN) // receive Op to ready case
-						if err != nil {
-							log.Fatal(err)
+						if _, ok1 := chanRecvs[ch]; ok1 {
+							err := runner.Analysis.HBgraph.MakeEdge(chanRecvs[ch], currN) // receive Op to ready case
+							if err != nil {
+								log.Fatal(err)
+							}
+						} else if sliceContainsStr(readyCh, ch) {
+							err := runner.Analysis.HBgraph.MakeEdge(selectN[0], currN) // select node to assumed ready cases
+							if err != nil {
+								log.Fatal(err)
+							}
 						}
 					}
 				} else if _, ok1 := runner.Analysis.selectDone[anIns]; ok1 {
-					if len(selCaseEndN) > 1 { // more than one portal
-						err := runner.Analysis.HBgraph.MakeEdge(selectN[0], currN) // ready case to select done
+					if len(selCaseEndN) > 1 { // more than one portal is ready
+						err := runner.Analysis.HBgraph.MakeEdge(selectN[0], currN) // select statement to select done
 						if err != nil {
 							log.Fatal(err)
 						}
@@ -288,6 +322,15 @@ func (runner *AnalysisRunner) Run(args []string) error {
 				for ch, sIns := range runner.Analysis.chanSnds {
 					if rcvN, matching := chanRecvs[ch]; matching && sliceContainsSnd(sIns, sendIns) {
 						err := runner.Analysis.HBgraph.MakeEdge(prevN, rcvN) // create edge from Send node to Receive node
+						if err != nil {
+							log.Fatal(err)
+						}
+					}
+				}
+			} else if rcvIns, chR := anIns.(*ssa.UnOp); chR {
+				if ch := runner.Analysis.getRcvChan(rcvIns); ch != "" {
+					if sndN, matching := chanSends[ch]; matching {
+						err := runner.Analysis.HBgraph.MakeEdge(sndN, prevN) // create edge from Send node to Receive node
 						if err != nil {
 							log.Fatal(err)
 						}

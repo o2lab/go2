@@ -498,11 +498,17 @@ func (a *analysis) insSelect(examIns *ssa.Select, goID int, theIns ssa.Instructi
 				a.selReady[examIns] = append(a.selReady[examIns], readyChans[i])
 			}
 		case *ssa.Parameter:
-			// Assume readiness, then adopt mutual exclusion among cases
+			readyChans[i] = ch.Name()
+			if !sliceContainsStr(a.selReady[examIns], readyChans[i]) {
+				a.selReady[examIns] = append(a.selReady[examIns], readyChans[i])
+			}
+			if _, ex := a.selUnknown[examIns]; !ex {
+				a.selUnknown[examIns] = make([]string, len(examIns.States) + defaultCase)
+			}
 			if state.Dir == 1 { // send Only
-				//readyChans[i] = ch.Name()
+				a.selUnknown[examIns][i] = ch.Name()
 			} else if state.Dir == 2 { // receive Only
-				//readyChans[i] = ch.Name()
+				a.selUnknown[examIns][i] = ch.Name()
 			} else { // state.Dir == 0, send receive
 
 			}

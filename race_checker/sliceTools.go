@@ -156,6 +156,15 @@ func (a *analysis) getRcvChan(ins *ssa.UnOp) string {
 	return ""
 }
 
+func (a *analysis) getSndChan(ins *ssa.Send) string {
+	for ch, sIns := range a.chanSnds {
+		if sliceContainsSnd(sIns, ins) { // channel receive
+			return ch
+		}
+	}
+	return ""
+}
+
 // isReadySel returns whether or not the channel is awaited on (and ready) by a select statement
 func (a *analysis) isReadySel(ch string) bool {
 	for _, chStr := range a.selReady {
