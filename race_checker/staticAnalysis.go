@@ -101,17 +101,17 @@ func staticAnalysis(args []string) error {
 		return err
 	}
 
-	logfile, err := os.Create("go_pta_log") //bz: i do not want messed up log, create/overwrite one each time
-	log.SetFormatter(&log.TextFormatter{
-		FullTimestamp: true,
-	})
+	//logfile, err := os.Create("go_pta_log") //bz: for me ...
+	//log.SetFormatter(&log.TextFormatter{
+	//	FullTimestamp: true,
+	//})
 
 	// Configure pointer analysis to build call-graph
 	config := &pointer.Config{
 		Mains:          mains, //bz: NOW assume only one main
 		Reflection:     false,
 		BuildCallGraph: true,
-		Log:            logfile,
+		Log:            nil,
 		//kcfa
 		//CallSiteSensitive: true,
 		//origin
