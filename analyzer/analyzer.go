@@ -119,7 +119,7 @@ func (a *AnalyzerConfig) Run() {
 		}
 
 		log.Debugf("%s --> %s", edge.Caller.Func, edge.Callee.Func)
-		pass.PrintStack(stack)
+		//pass.PrintStack(stack)
 		fnPass, ok := a.passes[callee]
 		if !ok {
 			fnPass = pass.NewFnPass(a.ptaResult, a.sharedPtrSet, a.accessesByAllocSite, domains[callee], a.fnSummaries[callee], funcAcquiredValues, stack)
