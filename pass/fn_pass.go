@@ -2,6 +2,7 @@ package pass
 
 import (
 	"fmt"
+	"github.com/o2lab/go2/summary"
 	log "github.com/sirupsen/logrus"
 	"go/token"
 	"golang.org/x/tools/go/pointer"
@@ -16,11 +17,14 @@ type BlockState struct {
 }
 
 type FnPass struct {
-	blockStates  map[int]*BlockState
-	ptaResult    *pointer.Result
-	sharedPtrSet map[pointer.Pointer]bool
-	accesses     map[pointer.Pointer][]*Access
-	thread       ThreadDomain
+	BlockStates        map[int]*BlockState
+	ptaResult          *pointer.Result
+	sharedPtrSet       map[pointer.Pointer]bool
+	Accesses           map[pointer.Pointer][]*Access
+	thread             ThreadDomain
+	summary            summary.FnSummary
+	funcAcquiredValues map[*ssa.Function][]ssa.Value
+	stack              CallStack
 }
 
 type Access struct {
@@ -29,6 +33,7 @@ type Access struct {
 	Addr           ssa.Value
 	AcquiredValues []ssa.Value
 	Thread         ThreadDomain
+	Stack          CallStack
 }
 
 type RefState int
@@ -39,21 +44,30 @@ const (
 	Inherent
 )
 
-type ThreadDomain int
+type ThreadDomain struct {
+	ID        int
+	Reflexive bool
+}
 
-const (
-	MainThreadOnly ThreadDomain = iota
-	Parallel
-)
+func (d ThreadDomain) String() string {
+	if d.Reflexive {
+		return fmt.Sprintf("%d#", d.ID)
+	}
+	return fmt.Sprintf("%d", d.ID)
+}
 
 func NewFnPass(ptaResult *pointer.Result, sharedPtrSet map[pointer.Pointer]bool,
-	access map[pointer.Pointer][]*Access, domain ThreadDomain) *FnPass {
+	access map[pointer.Pointer][]*Access, domain ThreadDomain, summary summary.FnSummary,
+	funcAcq map[*ssa.Function][]ssa.Value, stack CallStack) *FnPass {
 	return &FnPass{
-		blockStates:  make(map[int]*BlockState),
-		ptaResult:    ptaResult,
-		sharedPtrSet: sharedPtrSet,
-		accesses:     access,
-		thread:       domain,
+		BlockStates:        make(map[int]*BlockState),
+		ptaResult:          ptaResult,
+		sharedPtrSet:       sharedPtrSet,
+		Accesses:           access,
+		thread:             domain,
+		summary:            summary,
+		funcAcquiredValues: funcAcq,
+		stack:              stack,
 	}
 }
 
@@ -76,16 +90,11 @@ func (bs *BlockState) GetRefState(value ssa.Value) (RefState, bool) {
 	return Owned, false
 }
 
-func (pass *FnPass) LiftThreadDomain() {
-	pass.thread = Parallel
-}
-
 func (pass *FnPass) ThreadDomain() ThreadDomain {
 	return pass.thread
 }
 
 func (pass *FnPass) Visit(function *ssa.Function) {
-	//seen := make(map[int]bool)
 	stack := []int{0}
 	entryState := NewBlockState(pass)
 	for _, param := range function.Params {
@@ -96,16 +105,16 @@ func (pass *FnPass) Visit(function *ssa.Function) {
 		ptr := pass.GetPointer(freevar)
 		entryState.refSet[ptr] = Inherent
 	}
-	pass.blockStates[0] = entryState
+	pass.BlockStates[0] = entryState
 	for len(stack) > 0 {
 		index := stack[len(stack)-1]
 		block := function.Blocks[index]
 		stack = stack[:len(stack)-1]
 		log.Debugf("Block %d: %s", block.Index, block.Comment)
-		blockState, ok := pass.blockStates[index]
+		blockState, ok := pass.BlockStates[index]
 		if !ok {
 			blockState = NewBlockState(pass)
-			pass.blockStates[index] = blockState
+			pass.BlockStates[index] = blockState
 		}
 
 		for _, ins := range block.Instrs {
@@ -117,20 +126,32 @@ func (pass *FnPass) Visit(function *ssa.Function) {
 			// Inherent the state from parent.
 			// TODO: how to deal with releaseOps?
 			childState := blockState.copy()
-			pass.blockStates[dominee.Index] = childState
+			pass.BlockStates[dominee.Index] = childState
 		}
+	}
+}
+
+func (bs *BlockState) acquireSyncOnFunc(function *ssa.Function) {
+	for value, _ := range bs.acquireOps {
+		bs.pass.funcAcquiredValues[function] = append(bs.pass.funcAcquiredValues[function], value)
 	}
 }
 
 func (bs *BlockState) Visit(instruction ssa.Instruction) {
 	switch instr := instruction.(type) {
 	case *ssa.Call:
-		if mutex := GetLockedMutex(instr.Common()); mutex != nil {
+		if mutex := summary.GetLockedMutex(instr.Common()); mutex != nil {
 			log.Debugf("Lock on %s", mutex)
 			bs.acquireOps[mutex] = true
-		} else if mutex := GetUnlockedMutex(instr.Common()); mutex != nil {
+		} else if mutex := summary.GetUnlockedMutex(instr.Common()); mutex != nil {
 			log.Debugf("Unlock on %s", mutex)
 			delete(bs.acquireOps, mutex)
+		} else {
+			if fun := instr.Common().StaticCallee(); fun != nil {
+				bs.acquireSyncOnFunc(fun)
+			} else if method, ok := instr.Common().Value.(*ssa.Function); ok {
+				bs.acquireSyncOnFunc(method)
+			}
 		}
 	case *ssa.Alloc:
 		if instr.Heap {
@@ -165,6 +186,14 @@ func (bs *BlockState) setRefState(value ssa.Value, state RefState) {
 		}
 	}
 	bs.pass.sharedPtrSet[ptr0] = true
+	//for addr, _ := range bs.pass.summary.AccessSet {
+	//	if fieldX, ok := addr.(*ssa.FieldAddr); ok {
+	//		log.Infof("access of %s at %s", fieldX, fieldX.Pos())
+	//		if bs.GetPointer(fieldX.X).MayAlias(ptr0) {
+	//			bs.setRefState(fieldX.X, state)
+	//		}
+	//	}
+	//}
 }
 
 func NewBlockState(pass *FnPass) *BlockState {
@@ -197,9 +226,10 @@ func (bs *BlockState) makeAccess(instruction ssa.Instruction, addr ssa.Value, wr
 		Addr:           addr,
 		AcquiredValues: acquired,
 		Thread:         bs.pass.thread,
+		Stack:          bs.pass.stack,
 	}
 	ptr := bs.GetPointer(addr)
-	bs.pass.accesses[ptr] = append(bs.pass.accesses[ptr], access)
+	bs.pass.Accesses[ptr] = append(bs.pass.Accesses[ptr], access)
 }
 
 func captureEscapedVariables(goCall *ssa.Go) []ssa.Value {
@@ -236,56 +266,38 @@ func (a *Access) MutualExclusive(b *Access, queries map[ssa.Value]pointer.Pointe
 }
 
 func (a *Access) WriteAndThreadConflictsWith(b *Access) bool {
-	return (a.Write || b.Write) && (a.Thread == Parallel || b.Thread == Parallel)
+	return (a.Write || b.Write) && (a.Thread.ID != b.Thread.ID)
+}
+
+func (a *Access) MayAlias(b *Access, q map[ssa.Value]pointer.Pointer) bool {
+	return q[a.Addr].MayAlias(q[b.Addr])
 }
 
 func (a *Access) String() string {
 	if a.Write {
-		return fmt.Sprintf("Write of %s from %s @T%d", a.Addr, a.Instr, a.Thread)
+		return fmt.Sprintf("Write of %s from %s @T%s", a.Addr, a.Instr, a.Thread)
 	}
-	return fmt.Sprintf("Read of %s from %s @T%d", a.Addr, a.Instr, a.Thread)
+	return fmt.Sprintf("Read of %s from %s @T%s", a.Addr, a.Instr, a.Thread)
 }
 
 func (a *Access) StringWithPos(fset *token.FileSet) string {
 	if a.Write {
-		return fmt.Sprintf("Write of %s at %s @T%d", a.Addr, fset.Position(a.Instr.Pos()), a.Thread)
+		return fmt.Sprintf("Write of %s by T%s, Acquired: %+q, %s", a.Addr, a.Thread, a.AcquiredValues, fset.Position(a.Instr.Pos()))
 	}
-	return fmt.Sprintf("Read of %s at %s @T%d", a.Addr, fset.Position(a.Instr.Pos()), a.Thread)
+	return fmt.Sprintf("Read of %s by T%s, Acquired: %+q, %s", a.Addr, a.Thread, a.AcquiredValues, fset.Position(a.Instr.Pos()))
 }
 
-func IsSyncFunc(function *ssa.Function, name string) bool {
-	if function.Pkg != nil && function.Pkg.Pkg.Path() == "sync" {
-		return function.Name() == name
+func PrintStack(stack CallStack) {
+	for i := len(stack) - 1; i >= 0; i-- {
+		e := stack[i]
+		f := e.Callee.Func
+		var pos token.Pos
+		if e.Site != nil {
+			pos = e.Site.Pos()
+		} else {
+			pos = f.Pos()
+		}
+		signature := fmt.Sprintf("%s", f.Name())
+		log.Infof("    %-14s %v", signature, f.Prog.Fset.Position(pos))
 	}
-	return false
-}
-
-func IsMutexLockFunc(function *ssa.Function) bool {
-	return IsSyncFunc(function, "Lock")
-}
-
-func IsMutexUnlockFunc(function *ssa.Function) bool {
-	return IsSyncFunc(function, "Unlock")
-}
-
-func GetLockedMutex(call *ssa.CallCommon) ssa.Value {
-	calleeFn := call.StaticCallee()
-	if calleeFn == nil {
-		return nil
-	}
-	if IsMutexLockFunc(calleeFn) {
-		return call.Args[0]
-	}
-	return nil
-}
-
-func GetUnlockedMutex(call *ssa.CallCommon) ssa.Value {
-	calleeFn := call.StaticCallee()
-	if calleeFn == nil {
-		return nil
-	}
-	if IsMutexUnlockFunc(calleeFn) {
-		return call.Args[0]
-	}
-	return nil
 }

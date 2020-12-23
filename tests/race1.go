@@ -1,5 +1,7 @@
 package main
 
+import "sync"
+
 type S struct {
 	i int
 }
@@ -25,12 +27,19 @@ func (s *S) write(i int) {
 	}
 }
 
+var m sync.Mutex
+
 func main() {
 	s := &S{
 		i: 1,
 	}
+	x := 1
 	go func() {
 		s.write(12)
+		x = 2
 	}()
+	_ = x
+	m.Lock()
 	s.read()
+	m.Unlock()
 }

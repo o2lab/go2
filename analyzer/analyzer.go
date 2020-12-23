@@ -2,6 +2,7 @@ package analyzer
 
 import (
 	"github.com/o2lab/go2/pass"
+	"github.com/o2lab/go2/summary"
 	log "github.com/sirupsen/logrus"
 	"go/token"
 	"go/types"
@@ -20,13 +21,13 @@ type AnalyzerConfig struct {
 	program             *ssa.Program
 	ptaResult           *pointer.Result
 	sharedPtrSet        map[pointer.Pointer]bool
+	fnSummaries         map[*ssa.Function]summary.FnSummary
 	passes              map[*ssa.Function]*pass.FnPass
 	accessesByAllocSite map[pointer.Pointer][]*pass.Access
 	accessesMerged      map[pointer.Pointer][]*pass.Access
 }
 
 type Preprocessor struct {
-	fnSummaries map[*ssa.Function]fnSummary
 	program     *ssa.Program
 	ptaConfig   *pointer.Config
 	excludedPkg map[string]bool
@@ -39,6 +40,7 @@ func NewAnalyzerConfig(paths []string, excluded []string) *AnalyzerConfig {
 		program:             nil,
 		packages:            nil,
 		sharedPtrSet:        make(map[pointer.Pointer]bool),
+		fnSummaries:         make(map[*ssa.Function]summary.FnSummary),
 		passes:              make(map[*ssa.Function]*pass.FnPass),
 		accessesByAllocSite: make(map[pointer.Pointer][]*pass.Access),
 	}
@@ -46,9 +48,8 @@ func NewAnalyzerConfig(paths []string, excluded []string) *AnalyzerConfig {
 
 func NewPreprocessor(prog *ssa.Program, ptaConfig *pointer.Config) *Preprocessor {
 	return &Preprocessor{
-		fnSummaries: make(map[*ssa.Function]fnSummary),
-		program:     prog,
-		ptaConfig:   ptaConfig,
+		program:   prog,
+		ptaConfig: ptaConfig,
 	}
 }
 
@@ -63,7 +64,7 @@ func (a *AnalyzerConfig) Run() {
 		BuildFlags: nil,
 		Fset:       nil,
 		ParseFile:  nil,
-		Tests:      false,
+		Tests:      true,
 		Overlay:    nil,
 	}, a.Paths...)
 	if err != nil {
@@ -99,7 +100,7 @@ func (a *AnalyzerConfig) Run() {
 		excludedPackages[pkgName] = true
 	}
 	preprocessor := NewPreprocessor(a.program, ptaConfig)
-	preprocessor.Run(a.packages, excludedPackages)
+	a.fnSummaries = preprocessor.Run(a.packages, excludedPackages)
 
 	log.Infoln("PTA")
 	a.ptaResult, err = pointer.Analyze(ptaConfig)
@@ -108,33 +109,20 @@ func (a *AnalyzerConfig) Run() {
 		log.Fatalln(err)
 	}
 
-	err = GraphVisitEdgesFilteredPreorder(a.ptaResult.CallGraph, excludedPackages, 3, func(edge *callgraph.Edge, threadDomain pass.ThreadDomain) error {
-		callee := edge.Callee.Func
-		// External function.
-		if callee.Blocks == nil {
-			return nil
-		}
-		fnPass, ok := a.passes[callee]
-		if !ok {
-			fnPass = pass.NewFnPass(a.ptaResult, a.sharedPtrSet, a.accessesByAllocSite, threadDomain)
-			a.passes[callee] = fnPass
-		} else if threadDomain == pass.Parallel {
-			fnPass.LiftThreadDomain()
-		}
-		return nil
-	})
-
-	err = GraphVisitEdgesFiltered(a.ptaResult.CallGraph, excludedPackages, func(edge *callgraph.Edge) error {
+	domains := ComputeThreadDomains(a.ptaResult.CallGraph, excludedPackages, 3)
+	funcAcquiredValues := make(map[*ssa.Function][]ssa.Value)
+	err = GraphVisitEdgesFiltered(a.ptaResult.CallGraph, excludedPackages, func(edge *callgraph.Edge, stack pass.CallStack) error {
 		callee := edge.Callee.Func
 		// External function.
 		if callee.Blocks == nil {
 			return nil
 		}
 
-		log.Infof("%s --> %s", edge.Caller.Func, edge.Callee.Func)
+		log.Debugf("%s --> %s", edge.Caller.Func, edge.Callee.Func)
+		pass.PrintStack(stack)
 		fnPass, ok := a.passes[callee]
 		if !ok {
-			fnPass = pass.NewFnPass(a.ptaResult, a.sharedPtrSet, a.accessesByAllocSite, pass.MainThreadOnly)
+			fnPass = pass.NewFnPass(a.ptaResult, a.sharedPtrSet, a.accessesByAllocSite, domains[callee], a.fnSummaries[callee], funcAcquiredValues, stack)
 			a.passes[callee] = fnPass
 		}
 		fnPass.Visit(callee)
@@ -145,25 +133,46 @@ func (a *AnalyzerConfig) Run() {
 		log.Fatalln(err)
 	}
 
+	for fun, acquiredValues := range funcAcquiredValues {
+		if pass, ok := a.passes[fun]; ok {
+			log.Debugf("Fun %s Acquires %+q", fun, acquiredValues)
+			for _, accesses := range pass.Accesses {
+				for _, acc := range accesses {
+					acc.AcquiredValues = append(acc.AcquiredValues, acquiredValues...)
+				}
+			}
+		}
+	}
+
+	if err != nil {
+		log.Fatalln(err)
+	}
+
 	races := a.checkRaces()
 	for _, race := range races {
 		a.ReportRace(race)
 	}
+	log.Infof("Found %d race(s)", len(races))
 }
 
 func (a *AnalyzerConfig) ReportRace(race RacePair) {
 	log.Println("========== DATA RACE ==========")
-	log.Printf("    %s", race.First.StringWithPos(a.program.Fset))
-	log.Printf("    %s", race.Second.StringWithPos(a.program.Fset))
+	log.Printf("  %s", race.First.StringWithPos(a.program.Fset))
+	log.Println("  Call stack:")
+	pass.PrintStack(race.First.Stack)
+	log.Printf("  %s", race.Second.StringWithPos(a.program.Fset))
+	log.Println("  Call stack:")
+	pass.PrintStack(race.Second.Stack)
 	log.Println("===============================")
 }
 
 // GraphVisitEdgesFiltered visits all reachable nodes from the root of g in post order. Nodes that belong to any package
 // in excluded are not visited.
-func GraphVisitEdgesFiltered(g *callgraph.Graph, excluded map[string]bool, edge func(*callgraph.Edge) error) error {
+func GraphVisitEdgesFiltered(g *callgraph.Graph, excluded map[string]bool, edge func(*callgraph.Edge, pass.CallStack) error) error {
 	seen := make(map[*callgraph.Node]bool)
-	var visit func(n *callgraph.Node) error
-	visit = func(n *callgraph.Node) error {
+	var visit func(n *callgraph.Node, stack pass.CallStack) error
+	var stack pass.CallStack
+	visit = func(n *callgraph.Node, stack pass.CallStack) error {
 		if !seen[n] {
 			seen[n] = true
 			for _, e := range n.Out {
@@ -173,56 +182,59 @@ func GraphVisitEdgesFiltered(g *callgraph.Graph, excluded map[string]bool, edge 
 						return nil
 					}
 				}
-				if err := visit(callee); err != nil {
+				newStack := append(stack, e)
+				if err := visit(callee, newStack); err != nil {
 					return err
 				}
-				if err := edge(e); err != nil {
+				if err := edge(e, newStack); err != nil {
 					return err
 				}
 			}
 		}
 		return nil
 	}
-	if err := visit(g.Root); err != nil {
+	if err := visit(g.Root, stack); err != nil {
 		return err
 	}
 	return nil
 }
 
-func GraphVisitEdgesFilteredPreorder(g *callgraph.Graph, excluded map[string]bool, times int, edge func(*callgraph.Edge, pass.ThreadDomain) error) error {
+func ComputeThreadDomains(g *callgraph.Graph, excluded map[string]bool, times int) map[*ssa.Function]pass.ThreadDomain {
 	seen := make(map[*callgraph.Node]int)
-	var visit func(n *callgraph.Node, domain pass.ThreadDomain) error
-	visit = func(n *callgraph.Node, callerThread pass.ThreadDomain) error {
-		if seen[n] < times {
-			seen[n] = seen[n] + 1
-			for _, e := range n.Out {
-				callee := e.Callee
-				if callee.Func.Pkg != nil {
-					if pathRoot := strings.Split(callee.Func.Pkg.Pkg.Path(), "/")[0]; excluded[pathRoot] {
-						return nil
-					}
-				}
-				if callee.Func.Blocks == nil {
-					return nil
-				}
-				calleeThread := callerThread
-				if _, ok := e.Site.(*ssa.Go); ok {
-					calleeThread = pass.Parallel
-				}
-				if err := edge(e, calleeThread); err != nil {
-					return err
-				}
-				if err := visit(callee, calleeThread); err != nil {
-					return err
-				}
+	var visit func(n *callgraph.Node, callerTid int)
+	globalID := 0
+	domains := make(map[*ssa.Function]pass.ThreadDomain)
+	visit = func(n *callgraph.Node, callerTid int) {
+		caller := n.Func
+		if caller.Pkg != nil {
+			if pathRoot := strings.Split(caller.Pkg.Pkg.Path(), "/")[0]; excluded[pathRoot] {
+				return
 			}
 		}
-		return nil
+
+		if seen[n] < times {
+			seen[n] = seen[n] + 1
+			if dom, ok := domains[caller]; ok {
+				if callerTid != dom.ID {
+					dom.Reflexive = true
+				}
+			} else {
+				domains[caller] = pass.ThreadDomain{ID: callerTid}
+			}
+			for _, e := range n.Out {
+				if e.Callee.Func.Blocks == nil {
+					continue
+				}
+				if _, ok := e.Site.(*ssa.Go); ok {
+					globalID++
+				}
+				visit(e.Callee, globalID)
+			}
+		}
+		return
 	}
-	if err := visit(g.Root, pass.MainThreadOnly); err != nil {
-		return err
-	}
-	return nil
+	visit(g.Root, globalID)
+	return domains
 }
 
 type RacePair struct {
@@ -230,36 +242,25 @@ type RacePair struct {
 }
 
 func (a *AnalyzerConfig) checkRaces() (races []RacePair) {
-	log.Infoln("Check races")
-	//a.accessesMerged = a.filterAccesses()
-	ptrSet := make([]pointer.Pointer, len(a.accessesByAllocSite))
-	mergedAccesses := make(map[pointer.Pointer][]*pass.Access)
-	merged := make(map[pointer.Pointer]bool, len(a.accessesByAllocSite))
-	i := 0
-	for k := range a.accessesByAllocSite {
-		ptrSet[i] = k
-		i++
-	}
-	for j := 0; j < len(ptrSet); j++ {
-		for k := j + 1; k < len(ptrSet); k++ {
-			p1, p2 := ptrSet[j], ptrSet[k]
-			if merged[p1] {
-				continue
-			}
-			if p1.MayAlias(p2) {
-				mergedAccesses[p1] = append(mergedAccesses[p1], a.accessesByAllocSite[p1]...)
-				mergedAccesses[p1] = append(mergedAccesses[p1], a.accessesByAllocSite[p2]...)
-				merged[p2] = true
+	//mergedAccesses := a.filterAccesses()
+	var reads, writes, allAcc []*pass.Access
+	for _, accesses := range a.accessesByAllocSite {
+		for _, acc := range accesses {
+			if acc.Write {
+				writes = append(writes, acc)
+			} else {
+				reads = append(reads, acc)
 			}
 		}
 	}
-	for _, accesses := range mergedAccesses {
-		for i := 0; i < len(accesses); i++ {
-			for j := i; j < len(accesses); j++ {
-				log.Infof("Check %s <> %s", accesses[i], accesses[j])
-				if a.checkRace(accesses[i], accesses[j]) {
-					races = append(races, RacePair{accesses[i], accesses[j]})
-				}
+	allAcc = append(allAcc, writes...)
+	allAcc = append(allAcc, reads...)
+	log.Infof("Check races for %d reads, %d writes", len(reads), len(writes))
+	for i := 0; i < len(writes); i++ {
+		for j := i + 1; j < len(allAcc); j++ {
+			log.Debugf("Check %s <> %s", writes[i], allAcc[j])
+			if a.checkRace(writes[i], allAcc[j]) {
+				races = append(races, RacePair{writes[i], allAcc[j]})
 			}
 		}
 	}
@@ -267,7 +268,9 @@ func (a *AnalyzerConfig) checkRaces() (races []RacePair) {
 }
 
 func (a *AnalyzerConfig) checkRace(acc1, acc2 *pass.Access) bool {
-	if !acc1.WriteAndThreadConflictsWith(acc2) || acc1.MutualExclusive(acc2, a.ptaResult.Queries) {
+	if !acc1.WriteAndThreadConflictsWith(acc2) ||
+		acc1.MutualExclusive(acc2, a.ptaResult.Queries) ||
+		!acc1.MayAlias(acc2, a.ptaResult.Queries) {
 		return false
 	}
 	return true
@@ -279,9 +282,6 @@ func (a *AnalyzerConfig) MayAlias(x, y ssa.Value) bool {
 
 func (a *AnalyzerConfig) filterAccesses() map[pointer.Pointer][]*pass.Access {
 	result := make(map[pointer.Pointer][]*pass.Access)
-	//for ptr, _ := range a.accessesByAllocSite {
-	//
-	//}
 	for ptr1, _ := range a.sharedPtrSet {
 		for ptr2, accesses := range a.accessesByAllocSite {
 			if ptr1.MayAlias(ptr2) {
@@ -305,9 +305,10 @@ func mainPackages(pkgs []*ssa.Package) []*ssa.Package {
 	return mains
 }
 
-func (p *Preprocessor) Run(packages []*ssa.Package, excludedPackages map[string]bool) {
+func (p *Preprocessor) Run(packages []*ssa.Package, excludedPackages map[string]bool) map[*ssa.Function]summary.FnSummary {
 	log.Debugln("Preprocessing...")
 	p.excludedPkg = excludedPackages
+	summaries := make(map[*ssa.Function]summary.FnSummary)
 	for _, pkg := range packages {
 		log.Infof("Preprocessing %s", pkg)
 		if p.excludedPkg[pkg.Pkg.Name()] {
@@ -316,14 +317,15 @@ func (p *Preprocessor) Run(packages []*ssa.Package, excludedPackages map[string]
 		}
 		for _, member := range pkg.Members {
 			if function, ok := member.(*ssa.Function); ok {
-				p.visitFunction(function)
+				summaries[function] = p.visitFunction(function)
 			} else if typ, ok := member.(*ssa.Type); ok {
 				// For a named struct, we visit all its functions.
 				goType := typ.Type()
 				if namedType, ok := goType.(*types.Named); ok {
 					for i := 0; i < namedType.NumMethods(); i++ {
 						method := namedType.Method(i)
-						p.visitFunction(p.program.FuncValue(method))
+						function := p.program.FuncValue(method)
+						summaries[function] = p.visitFunction(function)
 					}
 				}
 			} else if global, ok := member.(*ssa.Global); ok {
@@ -331,9 +333,10 @@ func (p *Preprocessor) Run(packages []*ssa.Package, excludedPackages map[string]
 			}
 		}
 	}
+	return summaries
 }
 
-func (p *Preprocessor) visitFunction(function *ssa.Function) {
+func (p *Preprocessor) visitFunction(function *ssa.Function) summary.FnSummary {
 	if p.excludedPkg[function.Pkg.Pkg.Name()] {
 		log.Debugln("Exclude", function)
 	}
@@ -341,26 +344,20 @@ func (p *Preprocessor) visitFunction(function *ssa.Function) {
 
 	// Skip external functions.
 	if function.Blocks == nil {
-		return
+		return summary.FnSummary{}
 	}
 
-	if _, ok := p.fnSummaries[function]; ok {
-		log.Fatalf("Already visited %s", function)
-	}
 	//for _, param := range function.Params {
 	//	p.lookupPos(int(param.Pos()))
 	//}
 
-	sum := fnSummary{
-		fset:      p.program.Fset,
-		accessSet: make(map[ssa.Value]IsWrite),
-		allocSet:  make(map[*ssa.Alloc]ssa.Instruction),
-	}
-	sum.summarize(function, p.ptaConfig)
+	sum := summary.NewFnSummary(p.program.Fset)
+	sum.Summarize(function, p.ptaConfig)
 
 	for _, anonFn := range function.AnonFuncs {
 		p.visitFunction(anonFn)
 	}
+	return *sum
 }
 
 func (p *Preprocessor) lookupPos(pos int) {
