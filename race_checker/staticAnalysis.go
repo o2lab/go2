@@ -10,6 +10,8 @@ import (
 	"github.tamu.edu/April1989/go_tools/go/ssa/ssautil"
 	"go/token"
 	"go/types"
+	"os"
+
 	//"os"
 	"strings"
 	"time"
@@ -101,10 +103,10 @@ func staticAnalysis(args []string) error {
 		return err
 	}
 
-	//logfile, err := os.Create("grpc_go_pta_log") //bz: for me ...
-	//log.SetFormatter(&log.TextFormatter{
-	//	FullTimestamp: true,
-	//})
+	logfile, err := os.Create("go_pta_log") //bz: for me ...
+	log.SetFormatter(&log.TextFormatter{
+		FullTimestamp: true,
+	})
 
 	var scope = []string {"google.golang.org/grpc"}
 	// Configure pointer analysis to build call-graph
@@ -112,7 +114,7 @@ func staticAnalysis(args []string) error {
 		Mains:          mains, //bz: NOW assume only one main
 		Reflection:     false,
 		BuildCallGraph: true,
-		Log:            nil,
+		Log:            logfile,//nil,
 		//kcfa
 		//CallSiteSensitive: true,
 		Origin: true,  //origin
