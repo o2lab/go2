@@ -106,6 +106,7 @@ func staticAnalysis(args []string) error {
 	//	FullTimestamp: true,
 	//})
 
+	var scope = []string {"google.golang.org/grpc"}
 	// Configure pointer analysis to build call-graph
 	config := &pointer.Config{
 		Mains:          mains, //bz: NOW assume only one main
@@ -119,7 +120,9 @@ func staticAnalysis(args []string) error {
 		K:          1,
 		LimitScope: true, //bz: only consider app methods now
 		DEBUG:      false, //bz: do all printed out info in console --> turn off to avoid internal nil reference panic
+		Scope:      scope, //bz: analyze scope, default is "command-line-arguments"
 	}
+
 	Analysis = &analysis{
 		useNewPTA:       true,
 		prog:            prog,
