@@ -514,10 +514,11 @@ func (a *analysis) insSelect(examIns *ssa.Select, goID int, theIns ssa.Instructi
 			} else { // state.Dir == 0, send receive
 
 			}
-		case *ssa.TypeAssert:
+		case *ssa.TypeAssert: // tests for asserted type
 
 		case *ssa.Call: // timeOut
 			readyChans[i] = "timeOut"
+			defaultCase-- // non-blocking due to time-out not default
 		case *ssa.MakeChan: // channel NOT ready
 		default: // may need to consider other cases as well
 			log.Trace("need to consider this case for channel readiness")

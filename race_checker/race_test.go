@@ -63,7 +63,7 @@ var tests = []string{
 	"tests/select_nonblock_fp.go",
 	"tests/select_rpc.go",
 	"tests/select_sends.go", // WIP - determine readiness
-	//"tests/select_timeout.go", // WIP - handle timeout portal - perhaps same as default
+	"tests/select_timeout.go", // WIP - handle timeout portal - perhaps same as default
 	"tests/send_after_select.go",
 	"tests/single_case_select.go",
 	"tests/test1.go",
