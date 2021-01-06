@@ -104,6 +104,7 @@ var fromPath = ""      // interested packages are those located at this path
 // istio - istio.io/istio
 // docker -
 // kubernetes -
+// tidb - github.com/pingcap/tidb
 
 func init() {
 	excludedPkgs = []string{
@@ -143,6 +144,7 @@ func main() {
 	help := flag.Bool("help", false, "Show all command-line options.")
 	withoutComm := flag.Bool("withoutComm", false, "Show analysis results without communication consideration.")
 	withComm := flag.Bool("withComm", false, "Show analysis results with communication consideration.")
+	projPath := flag.String("path", "foo", "Designated project filepath. ")
 	flag.Parse()
 	if *help {
 		flag.PrintDefaults()
@@ -158,14 +160,13 @@ func main() {
 		trieLimit = 1
 		efficiency = true
 		channelComm = false
-		fromPath = "google.golang.org/grpc"
 	}
 	if *withComm {
 		trieLimit = 1
 		efficiency = true
 		channelComm = true
-		fromPath = "google.golang.org/grpc"
 	}
+	fromPath = *projPath
 
 	log.SetFormatter(&log.TextFormatter{
 		FullTimestamp:   true,
