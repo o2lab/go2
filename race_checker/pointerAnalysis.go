@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"strconv"
-
 	//log "github.com/sirupsen/logrus"
 	//"github.tamu.edu/April1989/go_tools/go/pointer"
 	"github.tamu.edu/April1989/go_tools/go/ssa"
@@ -114,10 +113,11 @@ func (a *analysis) pointerAnalysis_new(location ssa.Value, goID int, theIns ssa.
 	}
 	pts := a.result.PointsToByGo(location, goInstr) //return type: PointerWCtx
 	if pts.IsNil() {
+		fmt.Println(" *** nil pts: " + location.Name() + "  goID: " + strconv.Itoa(goID) + " *** ")  //bz: useNewPTA ...
 		return
 	}
 
-	fmt.Println(" *** ssa.Value: " + location.Name() + "  goID: " + strconv.Itoa(goID) + " *** ")  //bz: useNewPTA ...
+	fmt.Println(" *** ssa.Value: " + location.Name() + "  goID: " + strconv.Itoa(goID) + " " + goInstr.String() + " *** ")  //bz: useNewPTA ...
 	pts_labels := pts.Labels() // set of labels for locations that the pointer points to
 	var fnName string
 	rightLoc := 0            // initialize index for the right points-to location
@@ -162,6 +162,18 @@ func (a *analysis) pointerAnalysis_new(location ssa.Value, goID int, theIns ssa.
 		}
 	case *ssa.MakeChan:
 		a.chanName = theFunc.Name()
+	case *ssa.Alloc: //bz: missing invoke callee target if func is wrapped as parameter, e.g., Kubernetes.88331
+	    //tmp solution: find it in call graph
+		if call, ok := theIns.(*ssa.Call); ok {
+			invokeFunc := a.result.GetFreeVarFunc(theFunc, call, goInstr)
+			//do the same as case *ssa.Function
+			fnName = invokeFunc.Name()
+			if !a.exploredFunction(invokeFunc, goID, theIns) {
+				a.updateRecords(fnName, goID, "PUSH ")
+				a.RWIns[goID] = append(a.RWIns[goID], theIns)
+				a.visitAllInstructions(invokeFunc, goID)
+			}
+		}
 	default:
 		break
 	}
