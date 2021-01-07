@@ -5,6 +5,7 @@ import (
 	"go/types"
 	"golang.org/x/tools/go/pointer"
 	"golang.org/x/tools/go/ssa"
+	"strings"
 )
 
 // pointerAnalysis conducts pointer analysis using various built in pointer tools
@@ -23,8 +24,7 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 		a.ptaConfig.AddIndirectQuery(location)
 	}
 	result, err := pointer.Analyze(a.ptaConfig) // conduct pointer analysis
-	if err != nil {
-		log.Debug(theIns.String())
+	if err != nil && strings.HasPrefix(err.Error(), "internal error") {
 		return
 	}
 	a.result = result
