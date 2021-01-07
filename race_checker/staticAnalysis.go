@@ -110,62 +110,37 @@ func (runner *AnalysisRunner) Run(args []string) error {
 
 	var scope []string
 	if channelComm {
-		scope = []string {"google.golang.org/grpc"}
+		scope = []string{"google.golang.org/grpc"}
 	}
 	// Configure pointer analysis to build call-graph
 	config := &pointer.Config{
 		Mains:          mains, //bz: NOW assume only one main
 		Reflection:     false,
 		BuildCallGraph: true,
-		Log:            logfile,//nil,
+		Log:            logfile, //nil,
 		//kcfa
 		//CallSiteSensitive: true,
-		Origin: true,  //origin
+		Origin: true, //origin
 		//shared config
 		K:          1,
-		LimitScope: true, //bz: only consider app methods now
+		LimitScope: true,  //bz: only consider app methods now
 		DEBUG:      false, //bz: do all printed out info in console --> turn off to avoid internal nil reference panic
 		Scope:      scope, //bz: analyze scope, default is "command-line-arguments"
 	}
-<<<<<<< HEAD
 
-	Analysis = &analysis{
-		useNewPTA:       true,
-=======
 	runner.Analysis = &analysis{
->>>>>>> 1d69257c597e6132112600c2e85970134f38ec14
+		useNewPTA:       true,
 		prog:            prog,
 		pkgs:            pkgs,
 		mains:           mains,
 		ptaConfig:       config,
-<<<<<<< HEAD
 		goID2info:       make(map[int]goroutineInfo),
-=======
->>>>>>> 1d69257c597e6132112600c2e85970134f38ec14
 		RWinsMap:        make(map[goIns]graph.Node),
 		insDRA:          0,
 		levels:          make(map[int]int),
 		lockMap:         make(map[ssa.Instruction][]ssa.Value),
 		RlockMap:        make(map[ssa.Instruction][]ssa.Value),
 		goLockset:       make(map[int][]ssa.Value),
-<<<<<<< HEAD
-		goRLockset:     make(map[int][]ssa.Value),
-		mapFreeze:      false,
-		goCaller:       make(map[int]int),
-		goNames:        make(map[int]string),
-		chanBuf:		make(map[string]int),
-		chanRcvs: 		make(map[string][]*ssa.UnOp),
-		chanSnds: 	 	make(map[string][]*ssa.Send),
-		selectBloc:	   	make(map[int]*ssa.Select),
-		selReady:	   	make(map[*ssa.Select][]string),
-		selCaseCnt:	    make(map[*ssa.Select]int),
-		selectCaseBegin:make(map[ssa.Instruction]string),
-		selectCaseEnd:  make(map[ssa.Instruction]string),
-		selectDone:     make(map[ssa.Instruction]*ssa.Select),
-		ifSuccBegin:  	make(map[ssa.Instruction]*ssa.If),
-		ifFnReturn:	  	make(map[*ssa.Function]*ssa.Return),
-		ifSuccEnd:		make(map[ssa.Instruction]*ssa.Return),
-=======
 		goRLockset:      make(map[int][]ssa.Value),
 		mapFreeze:       false,
 		goCaller:        make(map[int]int),
@@ -176,7 +151,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		chanSnds:        make(map[string][]*ssa.Send),
 		selectBloc:      make(map[int]*ssa.Select),
 		selReady:        make(map[*ssa.Select][]string),
-		selUnknown:		 make(map[*ssa.Select][]string),
+		selUnknown:      make(map[*ssa.Select][]string),
 		selectCaseBegin: make(map[ssa.Instruction]string),
 		selectCaseEnd:   make(map[ssa.Instruction]string),
 		selectCaseBody:  make(map[ssa.Instruction]*ssa.Select),
@@ -184,12 +159,11 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		ifSuccBegin:     make(map[ssa.Instruction]*ssa.If),
 		ifFnReturn:      make(map[*ssa.Function]*ssa.Return),
 		ifSuccEnd:       make(map[ssa.Instruction]*ssa.Return),
->>>>>>> 1d69257c597e6132112600c2e85970134f38ec14
 	}
 
-	if Analysis.useNewPTA {
+	if runner.Analysis.useNewPTA {
 		start := time.Now()
-		result, err := pointer.AnalyzeWCtx(Analysis.ptaConfig) // conduct pointer analysis
+		result, err := pointer.AnalyzeWCtx(runner.Analysis.ptaConfig) // conduct pointer analysis
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -198,7 +172,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		log.Info("Done -- PTA/CG Build; Using " + elapsed.String() + ". Go check gologfile for detail. ")
 		result.DumpAll()
 
-		Analysis.result = result
+		runner.Analysis.result = result
 	}
 
 	log.Info("Compiling stack trace for every Goroutine... ")
@@ -211,20 +185,13 @@ func (runner *AnalysisRunner) Run(args []string) error {
 	}
 	log.Info("Done  -- ", len(runner.Analysis.RWIns), " goroutines analyzed! ", totalIns, " instructions of interest detected! ")
 
-<<<<<<< HEAD
-	if !Analysis.useNewPTA { //original code
-		//result, err := pointer.Analyze(Analysis.ptaConfig) // conduct pointer analysis
-		//if err != nil {
-		//	log.Fatal(err)
-		//}
-		//Analysis.result = result
+	if !runner.Analysis.useNewPTA { //original code
+		result, err := pointer.Analyze(runner.Analysis.ptaConfig) // conduct pointer analysis
+		if err != nil {
+			log.Fatal(err)
+		}
+		runner.Analysis.result = result
 	}
-=======
-	result, err := pointer.Analyze(runner.Analysis.ptaConfig) // conduct pointer analysis
-	if err != nil {
-		log.Fatal(err)
-	}
-	runner.Analysis.result = result
 
 	// confirm channel readiness for unknown select cases:
 	if len(runner.Analysis.selUnknown) > 0 {
@@ -240,7 +207,6 @@ func (runner *AnalysisRunner) Run(args []string) error {
 			}
 		}
 	}
->>>>>>> 1d69257c597e6132112600c2e85970134f38ec14
 
 	log.Info("Building Happens-Before graph... ")
 	runner.Analysis.HBgraph = graph.New(graph.Directed)
