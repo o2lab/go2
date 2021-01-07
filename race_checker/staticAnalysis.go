@@ -144,10 +144,6 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		totalIns += len(runner.Analysis.RWIns[g])
 	}
 	log.Info("Done  -- ", len(runner.Analysis.RWIns), " goroutines analyzed! ", totalIns, " instructions of interest detected! ")
-	if len(runner.Analysis.RWIns) < 2 {
-		log.Debug("race is not possible in one goroutine")
-		return nil
-	}
 
 	result, err := pointer.Analyze(runner.Analysis.ptaConfig) // conduct pointer analysis
 	if err != nil {
@@ -407,7 +403,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 			if i < k {
 				if j == len(bVisit)-1 {
 					bVisit = append(bVisit, bNext.Index)
-				} else {
+				} else if j < len(bVisit)-1 {
 					bVisit = append(bVisit[:j+2], bVisit[j+1:]...)
 					bVisit[j+1] = bNext.Index
 				}
@@ -419,6 +415,13 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 		}
 		k++
 	}
+	//if fn.Name() == "main" {
+	//	fmt.Println(bVisit)
+	//	for _, ind := range bVisit {
+	//		fmt.Println(fnBlocks[ind].Comment)
+	//	}
+	//}
+
 	var toDefer []ssa.Instruction // stack storing deferred calls
 	var toUnlock []ssa.Value
 	var toRUnlock []ssa.Value

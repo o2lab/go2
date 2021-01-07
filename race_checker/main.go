@@ -133,6 +133,7 @@ func init() {
 		"version",
 		"sort",
 		"filepath",
+		"cli",
 	}
 }
 

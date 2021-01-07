@@ -24,7 +24,8 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 	}
 	result, err := pointer.Analyze(a.ptaConfig) // conduct pointer analysis
 	if err != nil {
-		log.Fatal(err)
+		log.Debug(theIns.String())
+		return
 	}
 	a.result = result
 	ptrSet := a.result.Queries                    // set of pointers from result of pointer analysis
