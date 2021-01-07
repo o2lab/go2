@@ -3,5 +3,6 @@
   <component name="VcsDirectoryMappings">
     <mapping directory="$PROJECT_DIR$" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/go_pointeranlaysis" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/grpc-go" vcs="Git" />
   </component>
 </project>
