@@ -3,10 +3,14 @@ package main
 import (
 	"fmt"
 	"strconv"
-	//log "github.com/sirupsen/logrus"
 	//"github.tamu.edu/April1989/go_tools/go/pointer"
 	"github.tamu.edu/April1989/go_tools/go/ssa"
 	//"go/types"
+	log "github.com/sirupsen/logrus"
+	"go/types"
+	"golang.org/x/tools/go/pointer"
+	"golang.org/x/tools/go/ssa"
+	"strings"
 )
 
 func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Instruction) {
@@ -100,7 +104,6 @@ func (a *analysis) pointerAnalysis_new(location ssa.Value, goID int, theIns ssa.
 			return
 		}
 	}
-
 	//TODO: bz: needs to match with goID, currently a rough match
 	var goInstr *ssa.Go
 	if goID == 0 {
