@@ -103,13 +103,14 @@ func (a *analysis) sameAddress(addr1 ssa.Value, addr2 ssa.Value) bool {
 		if len(pts1) > 1 || len(pts2) > 1 {
 			//TODO:bz: I cannot retrieve any context information here
 			//    hence, use aggressive way: if any pts1/pts2 is different, return false -> not the same
-			fmt.Println(" *** contexts > 1: *** ")
+			fmt.Println(" *** contexts > 1: *** (mostly due to loops)")
 			same := true
 			for _, _pts1 := range pts1 {
 				for _, _pts2 := range pts2 {
 					same = same && _pts1.MayAlias(_pts2)
 				}
 			}
+			//bz: TODO: this is probably too strict ...
 			return same //if any is different, return false -> not the same
 		}
 		return pts1[0].MayAlias(pts2[0])
