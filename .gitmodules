@@ -1,4 +1,4 @@
 [submodule "go_pointeranlaysis"]
 	path = go_pointeranlaysis
-	url = https://github.tamu.edu/April1989/go_pointeranlaysis.git
+	url = https://github.tamu.edu/April1989/go_tools.git
 	branch = master
