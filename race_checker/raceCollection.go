@@ -20,6 +20,9 @@ func (a *analysis) checkRacyPairs() {
 				for jj, goJ := range a.RWIns[j] {
 					if channelComm && sliceContainsBloc(a.omitComm, goJ.Block()) { continue }
 					if (isWriteIns(goI) && isWriteIns(goJ)) || (isWriteIns(goI) && a.isReadIns(goJ)) || (a.isReadIns(goI) && isWriteIns(goJ)) { // only read and write instructions
+
+						//fmt.Println(goI.String() + "\n" + goJ.String() + "\n ---------------------------")//bz: debug -> missing fn
+
 						insSlice := []ssa.Instruction{goI, goJ}
 						addressPair := a.insAddress(insSlice) // one instruction from each goroutine
 						if len(addressPair) > 1 &&
