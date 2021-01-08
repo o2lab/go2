@@ -17,7 +17,7 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 	if a.useNewPTA {
 		a.pointerAnalysis_new(location, goID, theIns)
 	}else{
-		panic("WRONG PATH !!! @ a.pointerAnalysis()")
+		panic("Use default pta: WRONG PATH !!! @ a.pointerAnalysis()")
 		//a.pointerAnalysis_original(location, goID, theIns)
 	}
 }
@@ -110,7 +110,7 @@ func (a *analysis) pointerAnalysis_new(location ssa.Value, goID int, theIns ssa.
 		goInstr = nil
 	}else{
 		goInstr = a.goID2info[goID].goIns
-		if goInstr == nil {
+		if goInstr == nil && a.useNewPTA {
 			panic("Not recorded go instruction in a.goID2info @ goID" + strconv.Itoa(goID))
 		}
 	}
@@ -130,8 +130,13 @@ func (a *analysis) pointerAnalysis_new(location ssa.Value, goID int, theIns ssa.
 		}
 		return
 	}
-
-	fmt.Println(" *** ssa.Value: " + location.Name() + "  goID: " + strconv.Itoa(goID) + " " + goInstr.String() + " *** ")  //bz: useNewPTA ...
+	if a.useNewPTA && a.ptaConfig.DEBUG {//bz: useNewPTA ...
+		if goInstr == nil {
+			fmt.Println(" *** ssa.Value: " + location.Name() + "  goID: " + strconv.Itoa(goID) + " main *** ")
+		}else {
+			fmt.Println(" *** ssa.Value: " + location.Name() + "  goID: " + strconv.Itoa(goID) + " " + goInstr.String() + " *** ")
+		}
+	}
 	pts_labels := pts.Labels() // set of labels for locations that the pointer points to
 	var fnName string
 	rightLoc := 0            // initialize index for the right points-to location

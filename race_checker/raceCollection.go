@@ -20,9 +20,9 @@ func (a *analysis) checkRacyPairs() {
 				for jj, goJ := range a.RWIns[j] {
 					if channelComm && sliceContainsBloc(a.omitComm, goJ.Block()) { continue }
 					if (isWriteIns(goI) && isWriteIns(goJ)) || (isWriteIns(goI) && a.isReadIns(goJ)) || (a.isReadIns(goI) && isWriteIns(goJ)) { // only read and write instructions
-
-						//fmt.Println(goI.String() + "\n" + goJ.String() + "\n ---------------------------")//bz: debug -> missing fn
-
+						//if a.useNewPTA && a.ptaConfig.DEBUG { //bz: useNewPTA ...
+						//	fmt.Println(goI.String() + "\n" + goJ.String() + "\n ---------------------------") //bz: debug -> missing fn
+						//}
 						insSlice := []ssa.Instruction{goI, goJ}
 						addressPair := a.insAddress(insSlice) // one instruction from each goroutine
 						if len(addressPair) > 1 &&
@@ -107,7 +107,9 @@ func (a *analysis) sameAddress(addr1 ssa.Value, addr2 ssa.Value) bool {
 		if len(pts1) > 1 || len(pts2) > 1 {
 			//TODO:bz: I cannot retrieve any context information here
 			//    hence, use aggressive way: if any pts1/pts2 is different, return false -> not the same
-			fmt.Println(" *** contexts > 1: *** (mostly due to loops)")
+			if a.useNewPTA && a.ptaConfig.DEBUG { //bz: useNewPTA ...
+				fmt.Println(" *** contexts > 1: *** (mostly due to loops)")
+			}
 			same := true
 			for _, _pts1 := range pts1 {
 				for _, _pts2 := range pts2 {
@@ -119,7 +121,7 @@ func (a *analysis) sameAddress(addr1 ssa.Value, addr2 ssa.Value) bool {
 		}
 		return pts1[0].MayAlias(pts2[0])
 	}else{
-		panic("WRONG PATH !!! @ a.sameAddress()")
+		panic("Use default pta: WRONG PATH !!! @ a.sameAddress()")
 		//ptset := a.result.Queries
 		//return ptset[addr1].PointsTo().Intersects(ptset[addr2].PointsTo())
 	}

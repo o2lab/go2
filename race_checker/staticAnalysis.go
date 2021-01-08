@@ -124,7 +124,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		//shared config
 		K:          1,
 		LimitScope: true,  //bz: only consider app methods now
-		DEBUG:      false, //bz: do all printed out info in console --> turn off to avoid internal nil reference panic
+		DEBUG:      true, //bz: do all printed out info in console --> turn off to avoid internal nil reference panic
 		Scope:      scope, //bz: analyze scope, default is "command-line-arguments"
 	}
 
@@ -409,9 +409,9 @@ func (runner *AnalysisRunner) Run(args []string) error {
 
 // visitAllInstructions visits each line and calls the corresponding helper function to drive the tool
 func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
-	//if a.useNewPTA {
-	//	fmt.Println(".... " + fn.String())
-	//}
+	if a.useNewPTA && a.ptaConfig.DEBUG {//bz: useNewPTA ...
+		fmt.Println(".... " + fn.String())
+	}
 	a.analysisStat.nGoroutine = goID + 1 // keep count of goroutine quantity
 	if !isSynthetic(fn) {                // if function is NOT synthetic
 		if !fromPkgsOfInterest(fn) {
