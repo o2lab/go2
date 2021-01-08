@@ -116,10 +116,18 @@ func (a *analysis) pointerAnalysis_new(location ssa.Value, goID int, theIns ssa.
 	}
 	pts := a.result.PointsToByGo(location, goInstr) //return type: PointerWCtx
 	if pts.IsNil() {
-		fmt.Println(" *** nil pts: " + location.Name() + "  goID: " + strconv.Itoa(goID) + " *** ")  //bz: useNewPTA ...
+		if a.useNewPTA && a.ptaConfig.DEBUG { //bz: useNewPTA ...
+			fmt.Println(" *** nil pts: " + location.Name() + "  goID: " + strconv.Itoa(goID) + " *** ")
+		}
 		//bz: the callee target is recorded in cg, not pta
 		if call, ok := theIns.(*ssa.Call); ok {
 			invokeFunc := a.result.GetFunc(location, call, goInstr)
+			if invokeFunc == nil {
+				if a.useNewPTA && a.ptaConfig.DEBUG {//bz: useNewPTA ...
+					fmt.Println(" *** nil invokeFunc: " + location.Name() + " call: " + call.String() + "  goID: " + strconv.Itoa(goID) + " *** ")
+				}
+				return
+			}
 			//do the same as case *ssa.Function
 			fnName := invokeFunc.Name()
 			if !a.exploredFunction(invokeFunc, goID, theIns) {

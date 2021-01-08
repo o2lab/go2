@@ -109,8 +109,8 @@ func (runner *AnalysisRunner) Run(args []string) error {
 	})
 
 	var scope []string
-	if channelComm {
-		scope = []string{"google.golang.org/grpc"}
+	if fromPath != "" {
+		scope = []string{fromPath}
 	}
 	// Configure pointer analysis to build call-graph
 	config := &pointer.Config{
@@ -124,7 +124,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		//shared config
 		K:          1,
 		LimitScope: true,  //bz: only consider app methods now
-		DEBUG:      true, //bz: do all printed out info in console --> turn off to avoid internal nil reference panic
+		DEBUG:      false, //bz: do all printed out info in console --> turn off to avoid internal nil reference panic
 		Scope:      scope, //bz: analyze scope, default is "command-line-arguments"
 	}
 
@@ -170,8 +170,9 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		t := time.Now()
 		elapsed := t.Sub(start)
 		log.Info("Done -- PTA/CG Build; Using " + elapsed.String() + ". Go check gologfile for detail. ")
-		result.DumpAll()
-
+		if config.DEBUG {
+			result.DumpAll()
+		}
 		runner.Analysis.result = result
 	}
 
