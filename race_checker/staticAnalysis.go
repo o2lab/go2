@@ -409,6 +409,9 @@ func (runner *AnalysisRunner) Run(args []string) error {
 
 // visitAllInstructions visits each line and calls the corresponding helper function to drive the tool
 func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
+	//if a.useNewPTA {
+	//	fmt.Println(".... " + fn.String())
+	//}
 	a.analysisStat.nGoroutine = goID + 1 // keep count of goroutine quantity
 	if !isSynthetic(fn) {                // if function is NOT synthetic
 		if !fromPkgsOfInterest(fn) {
