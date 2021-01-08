@@ -25,7 +25,8 @@ Supported options:
 - `-collectStats`: Show a report of analysis statistics.
 - `-debug`: Show debug information.
 - `-help`: Show all command-line options.
-- `-ptrAnalysis`: Show occasions of pointer analysis returning multiple targets. Used for debugging purposes only.
+- `-withComm` or `withoutComm`: Run the analysis with / without consideration of channel communication. To be used when running real programs. 
+- `-path=`: For specifying the path from which packages are to be analyzed. For example, `-path=github.com/pingcap/tidb` would consider packages from the TiDB repo. 
 
 
 ### Installation instructions
@@ -66,15 +67,6 @@ Try some test cases in adopted micro-benchmarks:
 ./race-checker godel2/ch-as-lock-race/main.go
 ```
 
-Or make use of the makefile:
-
-```
-make
-```
-then
-```
-make runGoBench
-```
 positive race result would be shown as follows, 
 ![Image of data race report](tests/screenshot.png)
 
