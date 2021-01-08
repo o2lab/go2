@@ -169,7 +169,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		}
 		t := time.Now()
 		elapsed := t.Sub(start)
-		log.Info("Done -- PTA/CG Build; Using " + elapsed.String() + ". Go check gologfile for detail. ")
+		log.Info("Done -- PTA/CG Build; Using " + elapsed.String() + ". Go check go_pta_log for detail. ")
 		if config.DEBUG {
 			result.DumpAll()
 		}
