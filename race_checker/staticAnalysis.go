@@ -85,7 +85,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 	for _, pkg := range initial {
 		log.Info(pkg.ID, pkg.GoFiles)
 	}
-	log.Infof("Done  -- packages loaded")
+	log.Info("Done  -- ", len(initial[0].GoFiles), " packages loaded")
 
 	// Create and build SSA-form program representation.
 	prog, pkgs := ssautil.AllPackages(initial, 0)
