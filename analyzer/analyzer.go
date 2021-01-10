@@ -2,11 +2,11 @@ package analyzer
 
 import (
 	"github.com/o2lab/go2/pass"
+	"github.com/o2lab/go2/pointer"
 	"github.com/o2lab/go2/preprocessor"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/tools/go/callgraph"
 	"golang.org/x/tools/go/packages"
-	"golang.org/x/tools/go/pointer"
 	"golang.org/x/tools/go/ssa"
 	"golang.org/x/tools/go/ssa/ssautil"
 	"strings"
@@ -23,7 +23,7 @@ type AnalyzerConfig struct {
 	passes              map[*ssa.Function]*pass.FnPass
 	accessesByAllocSite map[pointer.Pointer][]*pass.Access
 	accessesMerged      map[pointer.Pointer][]*pass.Access
-	FnNodeMap   map[*ssa.Function]*callgraph.Node
+	FnNodeMap           map[*ssa.Function]*callgraph.Node
 }
 
 func NewAnalyzerConfig(paths []string, excluded []string) *AnalyzerConfig {
@@ -36,7 +36,7 @@ func NewAnalyzerConfig(paths []string, excluded []string) *AnalyzerConfig {
 		fnSummaries:         make(map[*ssa.Function]preprocessor.FnSummary),
 		passes:              make(map[*ssa.Function]*pass.FnPass),
 		accessesByAllocSite: make(map[pointer.Pointer][]*pass.Access),
-		FnNodeMap: make(map[*ssa.Function]*callgraph.Node),
+		FnNodeMap:           make(map[*ssa.Function]*callgraph.Node),
 	}
 }
 
@@ -283,4 +283,3 @@ func mainPackages(pkgs []*ssa.Package) []*ssa.Package {
 	}
 	return mains
 }
-

@@ -1,10 +1,10 @@
 package pass
 
 import (
+	"github.com/o2lab/go2/pointer"
 	"github.com/o2lab/go2/preprocessor"
 	log "github.com/sirupsen/logrus"
 	"go/token"
-	"golang.org/x/tools/go/pointer"
 	"golang.org/x/tools/go/ssa"
 )
 
@@ -36,8 +36,12 @@ func (bs *BlockState) GetRefState(value ssa.Value) (RefState, bool) {
 	return Owned, false
 }
 
-func (bs *BlockState) mergeEscapedValues(function *ssa.Function) {
-	for _, value := range bs.pass.Visitor.passes[function].escapedValues {
+func (bs *BlockState) mergeAccesses(pass *FnPass) {
+
+}
+
+func (bs *BlockState) mergeEscapedValues(pass *FnPass) {
+	for _, value := range pass.escapedValues {
 		bs.setRefState(value, Shared)
 		bs.pass.escapedValues = append(bs.pass.escapedValues, value)
 	}
@@ -61,8 +65,9 @@ func (bs *BlockState) VisitInstruction(instruction ssa.Instruction) {
 		} else {
 			fun := GetFunctionFromCall(instr)
 			if fun != nil {
+				calleePass := bs.pass.Visitor.passes[fun]
 				bs.acquireSyncOnFunc(fun)
-				bs.mergeEscapedValues(fun)
+				bs.mergeEscapedValues(calleePass)
 			}
 		}
 	case *ssa.Alloc:
@@ -166,7 +171,7 @@ func (bs *BlockState) makeAccess(instruction ssa.Instruction, addr ssa.Value, wr
 	bs.addAccessBySite(ptr, access)
 }
 
-func (bs *BlockState) addAccessBySite(ptr pointer.Pointer, access *Access)  {
+func (bs *BlockState) addAccessBySite(ptr pointer.Pointer, access *Access) {
 	for _, site := range bs.pass.Visitor.escapeSites {
 		if ptr.MayAlias(site.ptr) {
 			if access.Write {
@@ -177,4 +182,3 @@ func (bs *BlockState) addAccessBySite(ptr pointer.Pointer, access *Access)  {
 		}
 	}
 }
-

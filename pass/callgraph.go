@@ -1,9 +1,9 @@
 package pass
 
 import (
+	"github.com/o2lab/go2/pointer"
 	"github.com/o2lab/go2/preprocessor"
 	"golang.org/x/tools/go/callgraph"
-	"golang.org/x/tools/go/pointer"
 	"golang.org/x/tools/go/ssa"
 	"strings"
 )
