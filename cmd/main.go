@@ -34,6 +34,7 @@ func main() {
 	help := flag.Bool("help", false, "Show all command-line options.")
 	flag.Parse()
 	if *help {
+		log.Println("Usage:")
 		flag.PrintDefaults()
 		return
 	}

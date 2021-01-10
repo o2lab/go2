@@ -1,7 +1,7 @@
 package pass
 
 import (
-	"github.com/o2lab/go2/summary"
+	"github.com/o2lab/go2/preprocessor"
 	"golang.org/x/tools/go/callgraph"
 	"golang.org/x/tools/go/pointer"
 	"golang.org/x/tools/go/ssa"
@@ -12,22 +12,28 @@ const ClosureBound = 3
 
 type CallStack []*callgraph.Edge
 
+func (cs CallStack) Copy() CallStack {
+	stack := make(CallStack, len(cs))
+	copy(stack, cs)
+	return stack
+}
+
 type GlobalContext struct {
-	threads map[int]ThreadContext
-	passes map[*ssa.Function]*FnPass
-	goStacks map[*ssa.Go]CallStack
+	threads     map[int]ThreadContext
+	passes      map[*ssa.Function]*FnPass
+	goStacks    map[*ssa.Go]CallStack
 	threadCount int
 
-	ptaResult *pointer.Result
-	sharedPtrSet        map[pointer.Pointer]bool
-	accesses map[pointer.Pointer][]*Access
-	summaries map[*ssa.Function]summary.FnSummary
+	ptaResult    *pointer.Result
+	sharedPtrSet map[pointer.Pointer]bool
+	accesses     map[pointer.Pointer][]*Access
+	summaries    map[*ssa.Function]preprocessor.FnSummary
 }
 
 type ThreadContext struct {
-	stack CallStack
+	stack              CallStack
 	funcAcquiredValues map[ssa.Value][]ssa.Value
-	refSet map[ssa.Value]RefState
+	refSet             map[ssa.Value]RefState
 }
 
 func (gc *GlobalContext) GraphVisitFiltered(g *callgraph.Graph, excluded map[string]bool) {
@@ -55,19 +61,17 @@ func (gc *GlobalContext) GraphVisitFiltered(g *callgraph.Graph, excluded map[str
 
 func NewGlobalContext(result *pointer.Result) *GlobalContext {
 	return &GlobalContext{
-		threads: make(map[int]ThreadContext),
-		passes:make(map[*ssa.Function]*FnPass),
-		ptaResult:result,
+		threads:   make(map[int]ThreadContext),
+		passes:    make(map[*ssa.Function]*FnPass),
+		ptaResult: result,
 	}
 }
 
 func (gc *GlobalContext) visitGo(goFunc *ssa.Function) {
 	gc.threadCount++
 	//gc.threads[gc.threadCount] = &ThreadContext{}
-
 }
 
 func (gc *ThreadContext) visitFun(function *ssa.Function) {
 
 }
-

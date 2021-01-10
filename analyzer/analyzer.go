@@ -2,10 +2,8 @@ package analyzer
 
 import (
 	"github.com/o2lab/go2/pass"
-	"github.com/o2lab/go2/summary"
+	"github.com/o2lab/go2/preprocessor"
 	log "github.com/sirupsen/logrus"
-	"go/token"
-	"go/types"
 	"golang.org/x/tools/go/callgraph"
 	"golang.org/x/tools/go/packages"
 	"golang.org/x/tools/go/pointer"
@@ -21,16 +19,11 @@ type AnalyzerConfig struct {
 	program             *ssa.Program
 	ptaResult           *pointer.Result
 	sharedPtrSet        map[pointer.Pointer]bool
-	fnSummaries         map[*ssa.Function]summary.FnSummary
+	fnSummaries         map[*ssa.Function]preprocessor.FnSummary
 	passes              map[*ssa.Function]*pass.FnPass
 	accessesByAllocSite map[pointer.Pointer][]*pass.Access
 	accessesMerged      map[pointer.Pointer][]*pass.Access
-}
-
-type Preprocessor struct {
-	program     *ssa.Program
-	ptaConfig   *pointer.Config
-	excludedPkg map[string]bool
+	FnNodeMap   map[*ssa.Function]*callgraph.Node
 }
 
 func NewAnalyzerConfig(paths []string, excluded []string) *AnalyzerConfig {
@@ -40,16 +33,10 @@ func NewAnalyzerConfig(paths []string, excluded []string) *AnalyzerConfig {
 		program:             nil,
 		packages:            nil,
 		sharedPtrSet:        make(map[pointer.Pointer]bool),
-		fnSummaries:         make(map[*ssa.Function]summary.FnSummary),
+		fnSummaries:         make(map[*ssa.Function]preprocessor.FnSummary),
 		passes:              make(map[*ssa.Function]*pass.FnPass),
 		accessesByAllocSite: make(map[pointer.Pointer][]*pass.Access),
-	}
-}
-
-func NewPreprocessor(prog *ssa.Program, ptaConfig *pointer.Config) *Preprocessor {
-	return &Preprocessor{
-		program:   prog,
-		ptaConfig: ptaConfig,
+		FnNodeMap: make(map[*ssa.Function]*callgraph.Node),
 	}
 }
 
@@ -95,12 +82,8 @@ func (a *AnalyzerConfig) Run() {
 		Log:             nil,
 	}
 
-	excludedPackages := make(map[string]bool)
-	for _, pkgName := range a.ExcludedPackages {
-		excludedPackages[pkgName] = true
-	}
-	preprocessor := NewPreprocessor(a.program, ptaConfig)
-	a.fnSummaries = preprocessor.Run(a.packages, excludedPackages)
+	preprocessor := preprocessor.NewPreprocessor(a.program, ptaConfig, a.ExcludedPackages)
+	a.fnSummaries = preprocessor.Run(a.packages)
 
 	log.Infoln("PTA")
 	a.ptaResult, err = pointer.Analyze(ptaConfig)
@@ -109,23 +92,19 @@ func (a *AnalyzerConfig) Run() {
 		log.Fatalln(err)
 	}
 
-	domains := ComputeThreadDomains(a.ptaResult.CallGraph, excludedPackages, 3)
-	funcAcquiredValues := make(map[*ssa.Function][]ssa.Value)
-	err = GraphVisitEdgesFiltered(a.ptaResult.CallGraph, excludedPackages, func(edge *callgraph.Edge, stack pass.CallStack) error {
+	domains := ComputeThreadDomains(a.ptaResult.CallGraph, preprocessor.ExcludedPkg, 3)
+	//funcAcquiredValues := make(map[*ssa.Function][]ssa.Value)
+	cfgVisitor := pass.NewCFGVisitorState(a.ptaResult, a.sharedPtrSet, domains, preprocessor.EscapedValues)
+	err = GraphVisitEdgesFiltered(a.ptaResult.CallGraph, preprocessor.ExcludedPkg, func(edge *callgraph.Edge, stack pass.CallStack) error {
 		callee := edge.Callee.Func
 		// External function.
 		if callee.Blocks == nil {
 			return nil
 		}
-
+		a.FnNodeMap[callee] = edge.Callee
 		log.Debugf("%s --> %s", edge.Caller.Func, edge.Callee.Func)
 		//pass.PrintStack(stack)
-		fnPass, ok := a.passes[callee]
-		if !ok {
-			fnPass = pass.NewFnPass(a.ptaResult, a.sharedPtrSet, a.accessesByAllocSite, domains[callee], a.fnSummaries[callee], funcAcquiredValues, stack)
-			a.passes[callee] = fnPass
-		}
-		fnPass.Visit(callee)
+		cfgVisitor.VisitFunction(callee, stack)
 		return nil
 	})
 
@@ -133,16 +112,16 @@ func (a *AnalyzerConfig) Run() {
 		log.Fatalln(err)
 	}
 
-	for fun, acquiredValues := range funcAcquiredValues {
-		if pass, ok := a.passes[fun]; ok {
-			log.Debugf("Fun %s Acquires %+q", fun, acquiredValues)
-			for _, accesses := range pass.Accesses {
-				for _, acc := range accesses {
-					acc.AcquiredValues = append(acc.AcquiredValues, acquiredValues...)
-				}
-			}
-		}
-	}
+	//for fun, acquiredValues := range funcAcquiredValues {
+	//	if pass, ok := a.passes[fun]; ok {
+	//		log.Debugf("Fun %s Acquires %+q", fun, acquiredValues)
+	//		for _, accesses := range pass.Visitor.Accesses {
+	//			for _, acc := range accesses {
+	//				acc.AcquiredValues = append(acc.AcquiredValues, acquiredValues...)
+	//			}
+	//		}
+	//	}
+	//}
 
 	if err != nil {
 		log.Fatalln(err)
@@ -305,61 +284,3 @@ func mainPackages(pkgs []*ssa.Package) []*ssa.Package {
 	return mains
 }
 
-func (p *Preprocessor) Run(packages []*ssa.Package, excludedPackages map[string]bool) map[*ssa.Function]summary.FnSummary {
-	log.Debugln("Preprocessing...")
-	p.excludedPkg = excludedPackages
-	summaries := make(map[*ssa.Function]summary.FnSummary)
-	for _, pkg := range packages {
-		log.Infof("Preprocessing %s", pkg)
-		if p.excludedPkg[pkg.Pkg.Name()] {
-			log.Debugf("Exclude pkg %s", pkg)
-			continue
-		}
-		for _, member := range pkg.Members {
-			if function, ok := member.(*ssa.Function); ok {
-				summaries[function] = p.visitFunction(function)
-			} else if typ, ok := member.(*ssa.Type); ok {
-				// For a named struct, we visit all its functions.
-				goType := typ.Type()
-				if namedType, ok := goType.(*types.Named); ok {
-					for i := 0; i < namedType.NumMethods(); i++ {
-						method := namedType.Method(i)
-						function := p.program.FuncValue(method)
-						summaries[function] = p.visitFunction(function)
-					}
-				}
-			} else if global, ok := member.(*ssa.Global); ok {
-				p.ptaConfig.AddQuery(global)
-			}
-		}
-	}
-	return summaries
-}
-
-func (p *Preprocessor) visitFunction(function *ssa.Function) summary.FnSummary {
-	if p.excludedPkg[function.Pkg.Pkg.Name()] {
-		log.Debugln("Exclude", function)
-	}
-	log.Debugf("visiting %s: %s", function, function.Type())
-
-	// Skip external functions.
-	if function.Blocks == nil {
-		return summary.FnSummary{}
-	}
-
-	//for _, param := range function.Params {
-	//	p.lookupPos(int(param.Pos()))
-	//}
-
-	sum := summary.NewFnSummary(p.program.Fset)
-	sum.Summarize(function, p.ptaConfig)
-
-	for _, anonFn := range function.AnonFuncs {
-		p.visitFunction(anonFn)
-	}
-	return *sum
-}
-
-func (p *Preprocessor) lookupPos(pos int) {
-	log.Infoln(p.program.Fset.Position(token.Pos(pos)))
-}

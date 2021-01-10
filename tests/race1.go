@@ -11,25 +11,25 @@ func (s *S) read() int {
 }
 
 func (s *S) write(i int) {
-	_ = s.i
-	if s.i == 1 {
-		return
-	}
-	if s.i == 1 {
-		s.i /* RACE Write */ = i
-	} else if s.i == 2 {
-		s.i = 2
-		if s == nil {
-			s.i = 3
-			return
-		}
-		s.i = 5
-	}
+	s.i /* RACE Write */ = i
+	//_ = s.i
+	//if s.i == 1 {
+	//	return
+	//}
+	//if s.i == 1 {
+	//} else if s.i == 2 {
+	//	s.i = 2
+	//	if s == nil {
+	//		s.i = 3
+	//		return
+	//	}
+	//	s.i = 5
+	//}
 }
 
-var m sync.Mutex
 
 func main() {
+	var m sync.Mutex
 	s := &S{
 		i: 1,
 	}
@@ -40,6 +40,6 @@ func main() {
 	}()
 	_ = x
 	m.Lock()
-	s.read()
+	//s.read()
 	m.Unlock()
 }

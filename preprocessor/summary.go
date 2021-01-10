@@ -1,4 +1,4 @@
-package summary
+package preprocessor
 
 import (
 	log "github.com/sirupsen/logrus"
@@ -9,6 +9,7 @@ import (
 
 type FnSummary struct {
 	fset      *token.FileSet
+	preprocessor *Preprocessor
 	AccessSet map[ssa.Value]IsWrite
 	AllocSet  map[*ssa.Alloc]ssa.Instruction
 	MutexSet  map[ssa.Value]bool
@@ -16,16 +17,17 @@ type FnSummary struct {
 
 type IsWrite bool
 
-func NewFnSummary(fset *token.FileSet) *FnSummary {
+func NewFnSummary(fset *token.FileSet, preprocessor *Preprocessor) *FnSummary {
 	return &FnSummary{
 		fset:      fset,
+		preprocessor:preprocessor,
 		AccessSet: make(map[ssa.Value]IsWrite),
 		AllocSet:  make(map[*ssa.Alloc]ssa.Instruction),
 		MutexSet:  make(map[ssa.Value]bool),
 	}
 }
 
-func (f *FnSummary) Summarize(function *ssa.Function, ptaConfig *pointer.Config) {
+func (f *FnSummary) Preprocess(function *ssa.Function, ptaConfig *pointer.Config) {
 	for _, block := range function.Blocks {
 		for _, instr := range block.Instrs {
 			log.Debugln(instr)
@@ -63,6 +65,11 @@ func (f *FnSummary) visitIns(instruction ssa.Instruction) {
 			f.MutexSet[o] = true
 		} else if o := GetUnlockedMutex(instr.Common()); o != nil {
 			f.MutexSet[o] = true
+		}
+	case *ssa.Go:
+		escaped := captureEscapedVariables(instr)
+		for _, value := range escaped {
+			f.preprocessor.EscapedValues[instr] = append(f.preprocessor.EscapedValues[instr], value)
 		}
 	}
 }
@@ -153,4 +160,26 @@ func GetUnlockedMutex(call *ssa.CallCommon) ssa.Value {
 		return call.Args[0]
 	}
 	return nil
+}
+
+func captureEscapedVariables(goCall *ssa.Go) []ssa.Value {
+	common := goCall.Common()
+	var escaped []ssa.Value
+	if makeClosureIns, ok := common.Value.(*ssa.MakeClosure); ok {
+		for _, value := range makeClosureIns.Bindings {
+			if pointer.CanPoint(value.Type()) {
+				escaped = append(escaped, value)
+			}
+		}
+	} else if common.Method != nil && pointer.CanPoint(common.Value.Type()) {
+		escaped = append(escaped, common.Value)
+	}
+
+	for _, arg := range common.Args {
+		if pointer.CanPoint(arg.Type()) {
+			escaped = append(escaped, arg)
+		}
+	}
+	log.Debugf("Escaped: %+q", escaped)
+	return escaped
 }
