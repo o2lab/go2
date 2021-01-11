@@ -1,0 +1,2 @@
+-- rFunc-rename --
+renaming "sFunc" to "rFunc" not possible because "github.tamu.edu/April1989/go_tools/internal/lsp/rename/bad" has errors
