@@ -104,16 +104,16 @@ func (runner *AnalysisRunner) Run(args []string) error {
 	}
 
 	logfile, err := os.Create("go_pta_log") //bz: for me ...
-	log.SetFormatter(&log.TextFormatter{
-		FullTimestamp: true,
-	})
+	//log.SetFormatter(&log.TextFormatter{
+	//	FullTimestamp: true,
+	//})
 
 	var scope []string
 	if fromPath != "" {
 		scope = []string{fromPath}
 	}
 	// Configure pointer analysis to build call-graph
-	config := &pointer.Config{
+	ptaconfig := &pointer.Config{
 		Mains:          mains, //bz: NOW assume only one main
 		Reflection:     false,
 		BuildCallGraph: true,
@@ -129,11 +129,11 @@ func (runner *AnalysisRunner) Run(args []string) error {
 	}
 
 	runner.Analysis = &analysis{
-		useNewPTA:       true,
+		useNewPTA:       useNewPTA,
 		prog:            prog,
 		pkgs:            pkgs,
 		mains:           mains,
-		ptaConfig:       config,
+		ptaConfig:       ptaconfig,
 		goID2info:       make(map[int]goroutineInfo),
 		RWinsMap:        make(map[goIns]graph.Node),
 		insDRA:          0,
@@ -170,7 +170,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		t := time.Now()
 		elapsed := t.Sub(start)
 		log.Info("Done -- PTA/CG Build; Using " + elapsed.String() + ". Go check go_pta_log for detail. ")
-		if config.DEBUG {
+		if runner.Analysis.ptaConfig.DEBUG {
 			result.DumpAll()
 		}
 		runner.Analysis.result = result
