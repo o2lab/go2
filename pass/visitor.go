@@ -7,6 +7,7 @@ import (
 )
 
 type CFGVisitor struct {
+	program *ssa.Program
 	ptaResult          *pointer.Result
 	sharedPtrSet       map[pointer.Pointer]bool
 	Accesses           map[pointer.Pointer][]*Access
@@ -22,7 +23,7 @@ type CFGVisitor struct {
 }
 
 func NewCFGVisitorState(ptaResult *pointer.Result, sharedPtrSet map[pointer.Pointer]bool,
-	domains map[*ssa.Function]ThreadDomain, escapedValues map[*ssa.Go][]ssa.Value) *CFGVisitor {
+	domains map[*ssa.Function]ThreadDomain, escapedValues map[*ssa.Go][]ssa.Value, program *ssa.Program) *CFGVisitor {
 	return &CFGVisitor{
 		ptaResult:          ptaResult,
 		sharedPtrSet:       sharedPtrSet,
@@ -31,6 +32,7 @@ func NewCFGVisitorState(ptaResult *pointer.Result, sharedPtrSet map[pointer.Poin
 		domains:            domains,
 		FuncAcquiredValues: make(map[*ssa.Function][]ssa.Value),
 		goStacks:           make(map[*ssa.Go]CallStack),
+		program:program,
 	}
 }
 

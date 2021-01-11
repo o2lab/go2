@@ -15,17 +15,20 @@ type FnPass struct {
 	summary            preprocessor.FnSummary
 	funcAcquiredValues map[*ssa.Function][]ssa.Value
 	stack              CallStack
-	escapedValues []ssa.Value
+	escapedValues      []ssa.Value
 	Visitor            *CFGVisitor
+	accessMeta         map[pointer.AccessPointId][]*Access
 }
 
 type Access struct {
 	Instr          ssa.Instruction
 	Write          bool
 	Addr           ssa.Value
+	AccessPoints   *pointer.AccessPointSet
 	AcquiredValues []ssa.Value
 	Thread         ThreadDomain
 	Stack          CallStack
+	CrossThread    bool
 }
 
 type RefState int
@@ -57,6 +60,7 @@ func NewFnPass(visitor *CFGVisitor, domain ThreadDomain, summary preprocessor.Fn
 		summary:            summary,
 		funcAcquiredValues: funcAcq,
 		stack:              stack.Copy(),
+		accessMeta:         make(map[pointer.AccessPointId][]*Access),
 	}
 }
 
@@ -114,6 +118,10 @@ func (a *Access) MutualExclusive(b *Access, queries map[ssa.Value]pointer.Pointe
 		}
 	}
 	return false
+}
+
+func (a *Access) WriteConflictsWith(b *Access) bool {
+	return a.Write || b.Write
 }
 
 func (a *Access) WriteAndThreadConflictsWith(b *Access) bool {

@@ -35,11 +35,13 @@ func main() {
 	}
 	x := 1
 	go func() {
+		m.Lock()
 		s.write(12)
+		m.Unlock()
 		x = 2
 	}()
 	_ = x
 	m.Lock()
-	//s.read()
+	s.read()
 	m.Unlock()
 }

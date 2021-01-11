@@ -94,7 +94,7 @@ func (a *AnalyzerConfig) Run() {
 
 	domains := ComputeThreadDomains(a.ptaResult.CallGraph, preprocessor.ExcludedPkg, 3)
 	//funcAcquiredValues := make(map[*ssa.Function][]ssa.Value)
-	cfgVisitor := pass.NewCFGVisitorState(a.ptaResult, a.sharedPtrSet, domains, preprocessor.EscapedValues)
+	cfgVisitor := pass.NewCFGVisitorState(a.ptaResult, a.sharedPtrSet, domains, preprocessor.EscapedValues, a.program)
 	err = GraphVisitEdgesFiltered(a.ptaResult.CallGraph, preprocessor.ExcludedPkg, func(edge *callgraph.Edge, stack pass.CallStack) error {
 		callee := edge.Callee.Func
 		// External function.
@@ -112,26 +112,11 @@ func (a *AnalyzerConfig) Run() {
 		log.Fatalln(err)
 	}
 
-	//for fun, acquiredValues := range funcAcquiredValues {
-	//	if pass, ok := a.passes[fun]; ok {
-	//		log.Debugf("Fun %s Acquires %+q", fun, acquiredValues)
-	//		for _, accesses := range pass.Visitor.Accesses {
-	//			for _, acc := range accesses {
-	//				acc.AcquiredValues = append(acc.AcquiredValues, acquiredValues...)
-	//			}
-	//		}
-	//	}
+	//races := a.checkRaces()
+	//for _, race := range races {
+	//	a.ReportRace(race)
 	//}
-
-	if err != nil {
-		log.Fatalln(err)
-	}
-
-	races := a.checkRaces()
-	for _, race := range races {
-		a.ReportRace(race)
-	}
-	log.Infof("Found %d race(s)", len(races))
+	//log.Infof("Found %d race(s)", len(races))
 }
 
 func (a *AnalyzerConfig) ReportRace(race RacePair) {

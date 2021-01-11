@@ -36,8 +36,17 @@ func (bs *BlockState) GetRefState(value ssa.Value) (RefState, bool) {
 	return Owned, false
 }
 
-func (bs *BlockState) mergeAccesses(pass *FnPass) {
-
+func (bs *BlockState) mergeAccesses(calleePass *FnPass, crossThread bool) {
+	for point, accesses := range calleePass.accessMeta {
+		for _, access := range accesses {
+			newAcc := *access
+			newAcc.CrossThread = newAcc.CrossThread || crossThread
+			// TODO: extend stack by the callsite
+			//newAcc.Stack = append(CallStack{callee}, newAcc.Stack)
+			bs.appendAcquiredValuesToAccess(&newAcc)
+			bs.checkAndStoreAccess(point, &newAcc)
+		}
+	}
 }
 
 func (bs *BlockState) mergeEscapedValues(pass *FnPass) {
@@ -63,11 +72,12 @@ func (bs *BlockState) VisitInstruction(instruction ssa.Instruction) {
 			log.Debugf("Unlock on %s", mutex)
 			delete(bs.acquireOps, mutex)
 		} else {
-			fun := GetFunctionFromCall(instr)
-			if fun != nil {
-				calleePass := bs.pass.Visitor.passes[fun]
-				bs.acquireSyncOnFunc(fun)
+			fun := GetFunctionFromCallCommon(instr.Common())
+			if calleePass, ok := bs.pass.Visitor.passes[fun]; ok && fun != nil {
+				// The order below is important.
+				bs.mergeAccesses(calleePass, false)
 				bs.mergeEscapedValues(calleePass)
+				bs.acquireSyncOnFunc(fun)
 			}
 		}
 	case *ssa.Alloc:
@@ -89,6 +99,11 @@ func (bs *BlockState) VisitInstruction(instruction ssa.Instruction) {
 		}
 	case *ssa.Go:
 		bs.pass.Visitor.goStacks[instr] = bs.pass.stack.Copy()
+		if fun := GetFunctionFromCallCommon(instr.Common()); fun != nil {
+			if calleePass, ok := bs.pass.Visitor.passes[fun]; ok {
+				bs.mergeAccesses(calleePass, true)
+			}
+		}
 		for _, value := range bs.pass.Visitor.escapedValues[instr] {
 			bs.setRefState(value, Shared)
 			bs.addEscapeSite(value)
@@ -126,10 +141,10 @@ func (bs *BlockState) setRefState(value ssa.Value, state RefState) {
 	//}
 }
 
-func GetFunctionFromCall(call *ssa.Call) *ssa.Function {
-	if fun := call.Common().StaticCallee(); fun != nil {
+func GetFunctionFromCallCommon(common *ssa.CallCommon) *ssa.Function {
+	if fun := common.StaticCallee(); fun != nil {
 		return fun
-	} else if method, ok := call.Common().Value.(*ssa.Function); ok {
+	} else if method, ok := common.Value.(*ssa.Function); ok {
 		return method
 	}
 	return nil
@@ -155,30 +170,65 @@ func (bs *BlockState) copy() *BlockState {
 }
 
 func (bs *BlockState) makeAccess(instruction ssa.Instruction, addr ssa.Value, write bool) {
-	var acquired []ssa.Value
-	for value := range bs.acquireOps {
-		acquired = append(acquired, value)
+	ptr := bs.GetPointer(addr)
+	aps := ptr.AccessPointSet()
+	if aps == nil {
+		return
 	}
+
 	access := &Access{
 		Instr:          instruction,
 		Write:          write,
 		Addr:           addr,
-		AcquiredValues: acquired,
+		AccessPoints:   aps,
 		Thread:         bs.pass.thread,
-		Stack:          bs.pass.stack,
+		Stack:          nil,
 	}
-	ptr := bs.GetPointer(addr)
-	bs.addAccessBySite(ptr, access)
+	bs.appendAcquiredValuesToAccess(access)
+	bs.storeAccessMetadata(aps, access)
 }
 
-func (bs *BlockState) addAccessBySite(ptr pointer.Pointer, access *Access) {
-	for _, site := range bs.pass.Visitor.escapeSites {
-		if ptr.MayAlias(site.ptr) {
-			if access.Write {
-				bs.pass.Visitor.writes[site] = append(bs.pass.Visitor.writes[site], access)
-			} else {
-				bs.pass.Visitor.reads[site] = append(bs.pass.Visitor.reads[site], access)
+func (bs *BlockState) appendAcquiredValuesToAccess(access *Access) {
+	for value := range bs.acquireOps {
+		access.AcquiredValues = append(access.AcquiredValues, value)
+	}
+}
+
+func (bs *BlockState) storeAccessMetadata(set *pointer.AccessPointSet, access *Access) {
+	for _, point := range set.ToSlice() {
+		bs.checkAndStoreAccess(point, access)
+	}
+}
+
+func (bs *BlockState) checkAndStoreAccess(point pointer.AccessPointId, access *Access) {
+	for _, acc := range bs.pass.accessMeta[point] {
+		if acc.CrossThread && !bs.MutualExclusive(access, acc) && access.WriteConflictsWith(acc) {
+			bs.ReportRace(access, acc)
+		}
+	}
+	bs.pass.accessMeta[point] = append(bs.pass.accessMeta[point], access)
+}
+
+func (bs *BlockState) MutualExclusive(a1, a2 *Access) bool {
+	queries := bs.pass.Visitor.ptaResult.Queries
+	for _, acq1 := range a1.AcquiredValues {
+		for _, acq2 := range a2.AcquiredValues {
+			if queries[acq1].MayAlias(queries[acq2]) {
+				return true
 			}
 		}
 	}
+	return false
+}
+
+func (bs *BlockState) ReportRace(a1, a2 *Access) {
+	fset := bs.pass.Visitor.program.Fset
+	log.Println("========== DATA RACE ==========")
+	log.Printf("  %s", a1.StringWithPos(fset))
+	log.Println("  Call stack:")
+	PrintStack(bs.pass.stack)
+	log.Printf("  %s", a2.StringWithPos(fset))
+	log.Println("  Call stack:")
+	PrintStack(a2.Stack)
+	log.Println("===============================")
 }

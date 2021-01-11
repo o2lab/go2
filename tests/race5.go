@@ -6,7 +6,7 @@ func main() {
 		x = 2
 	}
 	DoAsync(f)
-	x = 1
+	_ = x
 }
 
 func DoAsync(callback func()) {

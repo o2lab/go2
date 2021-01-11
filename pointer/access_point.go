@@ -12,10 +12,12 @@ func (p *Pointer) AccessPointSet() *AccessPointSet {
 
 func (a *AccessPointSet) ToSlice() []AccessPointId {
 	var space [50]int
+	// TODO: investigate how to avoid copying the slice. The second copy is used merely to
+	// convert the type of the slice.
 	s := a.Sparse.AppendTo(space[:0])
 	result := make([]AccessPointId, len(s))
-	for _, node := range s {
-		result = append(result, AccessPointId(node))
+	for i, node := range s {
+		result[i] = AccessPointId(node)
 	}
 	return result
 }
