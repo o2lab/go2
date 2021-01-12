@@ -370,6 +370,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 	a.analysisStat.nGoroutine = goID + 1 // keep count of goroutine quantity
 	if !isSynthetic(fn) {                // if function is NOT synthetic
 		if !fromPkgsOfInterest(fn) {
+			a.updateRecords(fn.Name(), goID, "POP  ")
 			return
 		}
 		if fn.Name() == "main" {
