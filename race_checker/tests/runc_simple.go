@@ -4,6 +4,7 @@ import (
 	"github.com/urfave/cli"
 )
 
+var x int
 
 var checkpointCommand = cli.Command{
 	Name:  "checkpoint",
@@ -24,8 +25,13 @@ checkpointed.`,
 		//}
 		//
 		//return container.Checkpoint(options)
-		return nil
+		return someFn()
 	},
+}
+
+func someFn() error {
+	x /* RACE Write */ = 3
+	return nil
 }
 
 func main() {
@@ -41,6 +47,7 @@ func main() {
 			Usage: "set the log file path where internal debug information is written",
 		},
 	}
+	go func() { x /* RACE Write */  = 2 }()
 	app.Commands = []cli.Command{
 		checkpointCommand,
 	}
