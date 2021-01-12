@@ -183,7 +183,18 @@ func (a *analysis) insUnOp(examIns *ssa.UnOp, goID int, theIns ssa.Instruction) 
 		a.updateLockMap(goID, theIns)
 		a.updateRLockMap(goID, theIns)
 		a.ptaConfig.AddQuery(examIns.X)
-		a.pointerAnalysis(examIns.X, goID, theIns)
+		if v, globVar := examIns.X.(*ssa.Global); globVar {
+			if strct, isStruct := v.Type().(*types.Pointer).Elem().Underlying().(*types.Struct); isStruct {
+				for i := 0; i < strct.NumFields(); i++ {
+					switch strct.Field(i).Type().String() { // requires further testing for when this can be involved in race
+					case "interface{}": // empty interface
+						//log.Debug("interface field")
+					default:
+						//log.Debug(strct.Field(i))
+					}
+				}
+			}
+		}
 	} else if examIns.Op == token.ARROW { // channel receive op (not waited on by select)
 		stats.IncStat(stats.NChanRecv)
 		ch := examIns.X.Name()
