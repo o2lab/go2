@@ -2,7 +2,7 @@ module github.com/o2lab/race-checker
 
 go 1.13
 
-replace github.tamu.edu/April1989/go_tools v0.0.0 => ../go_pointeranlaysis
+replace github.tamu.edu/April1989/go_tools v0.0.0 => ../go_tools
 
 require (
 	cloud.google.com/go v0.63.0 // indirect
@@ -13,6 +13,7 @@ require (
 	github.com/sirupsen/logrus v1.7.0
 	github.com/stretchr/objx v0.1.1 // indirect
 	github.com/twmb/algoimpl v0.0.0-20170717182524-076353e90b94
+	github.com/urfave/cli v1.22.5 // indirect
 	github.tamu.edu/April1989/go_tools v0.0.0
 	golang.org/x/sync v0.0.0-20201207232520-09787c993a3a
 	golang.org/x/sys v0.0.0-20201221093633-bc327ba9c2f0
