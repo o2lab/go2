@@ -187,10 +187,14 @@ func (a *analysis) insUnOp(examIns *ssa.UnOp, goID int, theIns ssa.Instruction) 
 			if strct, isStruct := v.Type().(*types.Pointer).Elem().Underlying().(*types.Struct); isStruct {
 				for i := 0; i < strct.NumFields(); i++ {
 					switch strct.Field(i).Type().String() { // requires further testing for when this can be involved in race
-					case "interface{}": // empty interface
-						//log.Debug("interface field")
 					default:
 						//log.Debug(strct.Field(i))
+					}
+				}
+				for fnKey, member := range v.Pkg.Members {
+					if memberFn, isFn := member.(*ssa.Function); isFn && fnKey != "main" && fnKey != "init" {
+						a.updateRecords(memberFn.Name(), goID, "PUSH ")
+						a.visitAllInstructions(memberFn, goID)
 					}
 				}
 			}
