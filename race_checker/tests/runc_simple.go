@@ -24,8 +24,12 @@ checkpointed.`,
 		//}
 		//
 		//return container.Checkpoint(options)
-		return nil
+		return someFn()
 	},
+}
+
+func someFn() error {
+	return nil
 }
 
 func main() {

@@ -183,7 +183,16 @@ func (a *analysis) insUnOp(examIns *ssa.UnOp, goID int, theIns ssa.Instruction) 
 		a.updateLockMap(goID, theIns)
 		a.updateRLockMap(goID, theIns)
 		a.ptaConfig.AddQuery(examIns.X)
-		a.pointerAnalysis(examIns.X, goID, theIns)
+		if v, globVar := examIns.X.(*ssa.Global); globVar {
+			if _, isStruct := v.Type().(*types.Pointer).Elem().Underlying().(*types.Struct); isStruct {
+				for fnKey, member := range v.Pkg.Members {
+					if memberFn, isFn := member.(*ssa.Function); isFn && fnKey != "main" && fnKey != "init" {
+						a.updateRecords(memberFn.Name(), goID, "PUSH ")
+						a.visitAllInstructions(memberFn, goID)
+					}
+				}
+			}
+		}
 	} else if examIns.Op == token.ARROW { // channel receive op (not waited on by select)
 		stats.IncStat(stats.NChanRecv)
 		ch := examIns.X.Name()
