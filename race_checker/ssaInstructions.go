@@ -164,7 +164,9 @@ func (a *analysis) insStore(examIns *ssa.Store, goID int, theIns ssa.Instruction
 		}
 		a.RWIns[goID] = append(a.RWIns[goID], theIns)
 		a.updateLockMap(goID, theIns)
-		a.ptaConfig.AddQuery(examIns.Addr)
+		if !a.useNewPTA {
+			a.ptaConfig.AddQuery(examIns.Addr)
+		}
 	}
 	if theFunc, storeFn := examIns.Val.(*ssa.Function); storeFn {
 		if !a.exploredFunction(theFunc, goID, theIns) {
@@ -182,7 +184,9 @@ func (a *analysis) insUnOp(examIns *ssa.UnOp, goID int, theIns ssa.Instruction) 
 	if examIns.Op == token.MUL && !isLocalAddr(examIns.X) { // read op
 		a.updateLockMap(goID, theIns)
 		a.updateRLockMap(goID, theIns)
-		a.ptaConfig.AddQuery(examIns.X)
+		if !a.useNewPTA {
+			a.ptaConfig.AddQuery(examIns.X)
+		}
 		if v, globVar := examIns.X.(*ssa.Global); globVar {
 			if _, isStruct := v.Type().(*types.Pointer).Elem().Underlying().(*types.Struct); isStruct {
 				for fnKey, member := range v.Pkg.Members {
@@ -231,7 +235,9 @@ func (a *analysis) insFieldAddr(examIns *ssa.FieldAddr, goID int, theIns ssa.Ins
 		a.RWIns[goID] = append(a.RWIns[goID], theIns)
 		a.updateLockMap(goID, theIns)
 		a.updateRLockMap(goID, theIns)
-		a.ptaConfig.AddQuery(examIns.X)
+		if !a.useNewPTA {
+			a.ptaConfig.AddQuery(examIns.X)
+		}
 	}
 }
 
@@ -244,14 +250,18 @@ func (a *analysis) insLookUp(examIns *ssa.Lookup, goID int, theIns ssa.Instructi
 			a.RWIns[goID] = append(a.RWIns[goID], theIns)
 			a.updateLockMap(goID, theIns)
 			a.updateRLockMap(goID, theIns)
-			a.ptaConfig.AddQuery(readIns.X)
+			if !a.useNewPTA {
+				a.ptaConfig.AddQuery(readIns.X)
+			}
 		}
 	case *ssa.Parameter:
 		if !isLocalAddr(readIns) {
 			a.RWIns[goID] = append(a.RWIns[goID], theIns)
 			a.updateLockMap(goID, theIns)
 			a.updateRLockMap(goID, theIns)
-			a.ptaConfig.AddQuery(readIns)
+			if !a.useNewPTA {
+				a.ptaConfig.AddQuery(readIns)
+			}
 		}
 	}
 }
@@ -269,7 +279,9 @@ func (a *analysis) insChangeType(examIns *ssa.ChangeType, goID int, theIns ssa.I
 				a.RWIns[goID] = append(a.RWIns[goID], theIns)
 				a.updateLockMap(goID, theIns)
 				a.updateRLockMap(goID, theIns)
-				a.ptaConfig.AddQuery(examIns.X)
+				if !a.useNewPTA {
+					a.ptaConfig.AddQuery(examIns.X)
+				}
 				a.visitAllInstructions(theFn, goID)
 			}
 		}

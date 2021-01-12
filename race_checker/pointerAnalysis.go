@@ -201,8 +201,6 @@ func (a *analysis) pointerAnalysis_new(location ssa.Value, goID int, theIns ssa.
 				a.visitAllInstructions(invokeFunc, goID)
 			}
 		}
-	case *ssa.Global: //bz: missing invoke callee target, e.g, /tests/runc_simple.go
-	    fmt.Print()
 	default:
 		break
 	}
