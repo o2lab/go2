@@ -108,31 +108,8 @@ var fromPath = ""      // interested packages are those located at this path
 
 func init() {
 	excludedPkgs = []string{
-		"runtime",
 		"fmt",
 		"reflect",
-		"encoding",
-		"errors",
-		"bytes",
-		"strconv",
-		"strings",
-		"bytealg",
-		"race",
-		"syscall",
-		"poll",
-		"trace",
-		"logging",
-		"os",
-		"builtin",
-		"pflag",
-		"log",
-		"reflect",
-		"internal",
-		"impl",
-		"transport",
-		"version",
-		"sort",
-		"filepath",
 	}
 }
 
