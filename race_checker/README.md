@@ -21,7 +21,9 @@ Usage:
 `<path>` must lead to main.go file in the main package.
 
 Supported options:
-- **`-useNewPTA`: Use the new pointer analysis in submodule (origin-sensitive).**
+- **`-useNewPTA`: Use the new pointer analysis in go_tools.**
+- **`-debugPTA`: Prints all PTA debug messages in console.**
+- **`-keepPTALog`: Create a log file for all details in PTA.**
 - `-collectStats`: Show a report of analysis statistics.
 - `-debug`: Show debug information.
 - `-help`: Show all command-line options.
