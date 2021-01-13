@@ -80,6 +80,7 @@ type Config struct {
 	LimitScope         bool  //only apply kcfa to app methods
 	DEBUG              bool //print out debug info
 	Scope              []string //analyzed scope -> packages, can be null
+	Exclusions         []string //excluded packages from this analysis -> from race_checker if any
 }
 
 type track uint32

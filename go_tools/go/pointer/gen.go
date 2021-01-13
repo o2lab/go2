@@ -2057,20 +2057,31 @@ func (a *analysis) generate() {
 
 	root := a.genRootCalls()
 
-	if a.config.BuildCallGraph {
+	if a.config.BuildCallGraph {//bz:
 		a.result.CallGraph = NewWCtx(root)
 	}
 
 	// Create nodes and constraints for all methods of all types
 	// that are dynamically accessible via reflection or interfaces.
 	for _, T := range a.prog.RuntimeTypes() {
-		if a.considerMyContext(T.String()) {
+		_type := T.String()
+		if a.considerMyContext(_type) {
 			//bz: we want to make function (called by interfaces) later for kcfa, here uses share contour
 			if a.config.DEBUG {
 				fmt.Println("SKIP genMethodsOf() offline for type: " + T.String())
 			}
 			continue
 		}
+
+		if containstring(a.config.Exclusions, _type) { //bz:
+			if a.config.DEBUG {
+				fmt.Println("EXCLUDE genMethodsOf() offline for type: " + T.String())
+			}
+			if a.log != nil {
+				fmt.Fprintf(a.log, "\nEXCLUDE genMethodsOf() offline for type: " + T.String() + "\n")
+			}
+		}
+
 		a.genMethodsOf(T)
 	}
 
@@ -2083,13 +2094,16 @@ func (a *analysis) generate() {
 		a.genFunc(cgn)
 	}
 
-	// The runtime magically allocates os.Args; so should we.  ----> bz: can we skip this ?
-	if os := a.prog.ImportedPackage("os"); os != nil {
-		// In effect:  os.Args = new([1]string)[:]
-		T := types.NewSlice(types.Typ[types.String])
-		obj := a.addNodes(sliceToArray(T), "<command-line args>")
-		a.endObject(obj, nil, "<command-line args>")
-		a.addressOf(T, a.objectNode(nil, os.Var("Args")), obj)
+	// The runtime magically allocates os.Args; so should we.
+	if !(containstring(a.config.Exclusions, "os") && containstring(a.config.Exclusions, "runtime")) {
+		//bz: we are trying to skip this iff "runtime" and "os" are both in exclusions
+		if os := a.prog.ImportedPackage("os"); os != nil {
+			// In effect:  os.Args = new([1]string)[:]
+			T := types.NewSlice(types.Typ[types.String])
+			obj := a.addNodes(sliceToArray(T), "<command-line args>")
+			a.endObject(obj, nil, "<command-line args>")
+			a.addressOf(T, a.objectNode(nil, os.Var("Args")), obj)
+		}
 	}
 
 	// Discard generation state, to avoid confusion after node renumbering.

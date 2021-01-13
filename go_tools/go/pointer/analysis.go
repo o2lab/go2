@@ -149,6 +149,8 @@ type analysis struct {
 	closures            map[*ssa.Function]*Ctx2nodeid //bz: solution for makeclosure
     result              *ResultWCtx                   //bz: our result, dump all
     closureWOGo         map[nodeid]nodeid                     //bz: solution@field actualCallerSite []*callsite of cgnode type
+
+	considerReflect     bool //bz: whether we have reflect in exclusions
 }
 
 // enclosingObj returns the first node of the addressable memory
@@ -481,28 +483,36 @@ func AnalyzeWCtx(config *Config) (result *ResultWCtx, err error) { //Result
 		}
 	}
 
-	if reflect := a.prog.ImportedPackage("reflect"); reflect != nil {
-		rV := reflect.Pkg.Scope().Lookup("Value")
-		a.reflectValueObj = rV
-		a.reflectValueCall = a.prog.LookupMethod(rV.Type(), nil, "Call")
-		a.reflectType = reflect.Pkg.Scope().Lookup("Type").Type().(*types.Named)
-		a.reflectRtypeObj = reflect.Pkg.Scope().Lookup("rtype")
-		a.reflectRtypePtr = types.NewPointer(a.reflectRtypeObj.Type())
+	if !containstring(a.config.Exclusions, "reflect") { //bz: only do if race checker considers
+		a.considerReflect = true //update
 
-		// Override flattening of reflect.Value, treating it like a basic type.
-		tReflectValue := a.reflectValueObj.Type()
-		a.flattenMemo[tReflectValue] = []*fieldInfo{{typ: tReflectValue}}
+		if reflect := a.prog.ImportedPackage("reflect"); reflect != nil {
+			rV := reflect.Pkg.Scope().Lookup("Value")
+			a.reflectValueObj = rV
+			a.reflectValueCall = a.prog.LookupMethod(rV.Type(), nil, "Call")
+			a.reflectType = reflect.Pkg.Scope().Lookup("Type").Type().(*types.Named)
+			a.reflectRtypeObj = reflect.Pkg.Scope().Lookup("rtype")
+			a.reflectRtypePtr = types.NewPointer(a.reflectRtypeObj.Type())
 
-		// Override shouldTrack of reflect.Value and *reflect.rtype.
-		// Always track pointers of these types.
-		a.trackTypes[tReflectValue] = true
-		a.trackTypes[a.reflectRtypePtr] = true
+			// Override flattening of reflect.Value, treating it like a basic type.
+			tReflectValue := a.reflectValueObj.Type()
+			a.flattenMemo[tReflectValue] = []*fieldInfo{{typ: tReflectValue}}
 
-		a.rtypes.SetHasher(a.hasher)
-		a.reflectZeros.SetHasher(a.hasher)
+			// Override shouldTrack of reflect.Value and *reflect.rtype.
+			// Always track pointers of these types.
+			a.trackTypes[tReflectValue] = true
+			a.trackTypes[a.reflectRtypePtr] = true
+
+			a.rtypes.SetHasher(a.hasher)
+			a.reflectZeros.SetHasher(a.hasher)
+		}
+	}else{
+		a.considerReflect = false //update
 	}
-	if runtime := a.prog.ImportedPackage("runtime"); runtime != nil {
-		a.runtimeSetFinalizer = runtime.Func("SetFinalizer")
+	if !containstring(a.config.Exclusions, "runtime") { //bz: only do if race checker considers
+		if runtime := a.prog.ImportedPackage("runtime"); runtime != nil {
+			a.runtimeSetFinalizer = runtime.Func("SetFinalizer")
+		}
 	}
 	a.computeTrackBits() //bz: use when there is input queries before running this analysis; we do not need this for now?
 
@@ -592,6 +602,16 @@ func AnalyzeWCtx(config *Config) (result *ResultWCtx, err error) { //Result
 	a.result.nodes = a.nodes //bz: just in case
 
 	return a.result, nil
+}
+
+//bz:
+func containstring(s []string, e string) bool {
+	for _, a := range s {
+		if a == e {
+			return true
+		}
+	}
+	return false
 }
 
 //bz: solution@field actualCallerSite []*callsite of cgnode type

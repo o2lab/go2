@@ -13,6 +13,34 @@ import (
 	"time"
 )
 
+var excludedPkgs = []string{
+	//"runtime",
+	//"fmt",
+	//"reflect",
+	//"encoding",
+	//"errors",
+	//"bytes",
+	//"strconv",
+	//"strings",
+	//"bytealg",
+	//"race",
+	//"syscall",
+	//"poll",
+	//"trace",
+	//"logging",
+	//"os",
+	//"builtin",
+	//"pflag",
+	//"log",
+	//"reflect",
+	//"internal",
+	//"impl",
+	//"transport", // grpc
+	//"version",
+	//"sort",
+	//"filepath",
+}
+
 // mainPackages returns the main packages to analyze.
 // Each resulting package is named "main" and has a main function.
 func findMainPackages(pkgs []*ssa.Package) ([]*ssa.Package, error) {
@@ -43,7 +71,7 @@ func findMainPackages(pkgs []*ssa.Package) ([]*ssa.Package, error) {
 
 //TODO: program counter ???
 func main() {
-	flag.Bool("ptrAnalysis", false, "Prints pointer analysis results. ")
+	projPath := flag.String("path", "", "Designated project filepath. ")
 	flag.Parse()
 	args := flag.Args()
 	cfg := &packages.Config{
@@ -89,17 +117,16 @@ func main() {
 		FullTimestamp: true,
 	})
 
-	var channelComm = false // analyze channel communication in grpc
 	var scope []string
-	if channelComm {
-		scope = []string {"google.golang.org/grpc"}
+	if projPath != nil {
+		scope = []string {*projPath}
 	}
 	// Configure pointer analysis to build call-graph
 	ptaConfig := &pointer.Config{
 		Mains:          mains, //bz: NOW assume only one main
 		Reflection:     false,
 		BuildCallGraph: true,
-		Log:            logfile,
+		Log:            nil,//logfile,
 		//kcfa
 		//CallSiteSensitive: true,
 		//origin
@@ -109,6 +136,7 @@ func main() {
 		LimitScope: true, //bz: only consider app methods now
 		DEBUG:      true, //bz: rm all printed out info in console
 		Scope:      scope, //bz: analyze scope
+		Exclusions: excludedPkgs,//bz: copied from race_checker
 	}
 
 	//*** compute pta here

@@ -203,6 +203,9 @@ func (c *rVBytesConstraint) solve(a *analysis, delta *nodeset) {
 }
 
 func ext۰reflect۰Value۰Bytes(a *analysis, cgn *cgnode) {
+	if !a.considerReflect {
+		return
+	}
 	a.addConstraint(&rVBytesConstraint{
 		v:      a.funcParams(cgn.obj),
 		result: a.funcResults(cgn.obj),
@@ -347,6 +350,9 @@ func reflectCall(a *analysis, cgn *cgnode, dotdotdot bool) {
 }
 
 func ext۰reflect۰Value۰Call(a *analysis, cgn *cgnode) {
+	if !a.considerReflect {
+		return
+	}
 	reflectCall(a, cgn, false)
 }
 
@@ -412,6 +418,9 @@ func (c *rVElemConstraint) solve(a *analysis, delta *nodeset) {
 }
 
 func ext۰reflect۰Value۰Elem(a *analysis, cgn *cgnode) {
+	if !a.considerReflect {
+		return
+	}
 	a.addConstraint(&rVElemConstraint{
 		cgn:    cgn,
 		v:      a.funcParams(cgn.obj),
@@ -482,6 +491,9 @@ func (c *rVIndexConstraint) solve(a *analysis, delta *nodeset) {
 }
 
 func ext۰reflect۰Value۰Index(a *analysis, cgn *cgnode) {
+	if !a.considerReflect {
+		return
+	}
 	a.addConstraint(&rVIndexConstraint{
 		cgn:    cgn,
 		v:      a.funcParams(cgn.obj),
@@ -537,6 +549,9 @@ func (c *rVInterfaceConstraint) solve(a *analysis, delta *nodeset) {
 }
 
 func ext۰reflect۰Value۰Interface(a *analysis, cgn *cgnode) {
+	if !a.considerReflect {
+		return
+	}
 	a.addConstraint(&rVInterfaceConstraint{
 		v:      a.funcParams(cgn.obj),
 		result: a.funcResults(cgn.obj),
@@ -592,6 +607,9 @@ func (c *rVMapIndexConstraint) solve(a *analysis, delta *nodeset) {
 }
 
 func ext۰reflect۰Value۰MapIndex(a *analysis, cgn *cgnode) {
+	if !a.considerReflect {
+		return
+	}
 	a.addConstraint(&rVMapIndexConstraint{
 		cgn:    cgn,
 		v:      a.funcParams(cgn.obj),
@@ -648,6 +666,9 @@ func (c *rVMapKeysConstraint) solve(a *analysis, delta *nodeset) {
 }
 
 func ext۰reflect۰Value۰MapKeys(a *analysis, cgn *cgnode) {
+	if !a.considerReflect {
+		return
+	}
 	// Allocate an array for the result.
 	obj := a.nextNode()
 	T := types.NewSlice(a.reflectValueObj.Type())
@@ -715,6 +736,9 @@ func (c *rVRecvConstraint) solve(a *analysis, delta *nodeset) {
 }
 
 func ext۰reflect۰Value۰Recv(a *analysis, cgn *cgnode) {
+	if !a.considerReflect {
+		return
+	}
 	a.addConstraint(&rVRecvConstraint{
 		cgn:    cgn,
 		v:      a.funcParams(cgn.obj),
@@ -765,6 +789,9 @@ func (c *rVSendConstraint) solve(a *analysis, delta *nodeset) {
 }
 
 func ext۰reflect۰Value۰Send(a *analysis, cgn *cgnode) {
+	if !a.considerReflect {
+		return
+	}
 	params := a.funcParams(cgn.obj)
 	a.addConstraint(&rVSendConstraint{
 		cgn: cgn,
@@ -815,6 +842,9 @@ func (c *rVSetBytesConstraint) solve(a *analysis, delta *nodeset) {
 }
 
 func ext۰reflect۰Value۰SetBytes(a *analysis, cgn *cgnode) {
+	if !a.considerReflect {
+		return
+	}
 	params := a.funcParams(cgn.obj)
 	a.addConstraint(&rVSetBytesConstraint{
 		cgn: cgn,
@@ -874,6 +904,9 @@ func (c *rVSetMapIndexConstraint) solve(a *analysis, delta *nodeset) {
 }
 
 func ext۰reflect۰Value۰SetMapIndex(a *analysis, cgn *cgnode) {
+	if !a.considerReflect {
+		return
+	}
 	params := a.funcParams(cgn.obj)
 	a.addConstraint(&rVSetMapIndexConstraint{
 		cgn: cgn,
@@ -952,6 +985,9 @@ func (c *rVSliceConstraint) solve(a *analysis, delta *nodeset) {
 }
 
 func ext۰reflect۰Value۰Slice(a *analysis, cgn *cgnode) {
+	if !a.considerReflect {
+		return
+	}
 	a.addConstraint(&rVSliceConstraint{
 		cgn:    cgn,
 		v:      a.funcParams(cgn.obj),
@@ -1018,6 +1054,9 @@ var dirMap = [...][]types.ChanDir{
 }
 
 func ext۰reflect۰ChanOf(a *analysis, cgn *cgnode) {
+	if !a.considerReflect {
+		return
+	}
 	// If we have access to the callsite,
 	// and the channel argument is a constant (as is usual),
 	// only generate the requested direction.
@@ -1087,6 +1126,9 @@ func (c *reflectIndirectConstraint) solve(a *analysis, delta *nodeset) {
 }
 
 func ext۰reflect۰Indirect(a *analysis, cgn *cgnode) {
+	if !a.considerReflect {
+		return
+	}
 	a.addConstraint(&reflectIndirectConstraint{
 		cgn:    cgn,
 		v:      a.funcParams(cgn.obj),
@@ -1145,6 +1187,9 @@ func (c *reflectMakeChanConstraint) solve(a *analysis, delta *nodeset) {
 }
 
 func ext۰reflect۰MakeChan(a *analysis, cgn *cgnode) {
+	if !a.considerReflect {
+		return
+	}
 	a.addConstraint(&reflectMakeChanConstraint{
 		cgn:    cgn,
 		typ:    a.funcParams(cgn.obj),
@@ -1206,6 +1251,9 @@ func (c *reflectMakeMapConstraint) solve(a *analysis, delta *nodeset) {
 }
 
 func ext۰reflect۰MakeMap(a *analysis, cgn *cgnode) {
+	if !a.considerReflect {
+		return
+	}
 	a.addConstraint(&reflectMakeMapConstraint{
 		cgn:    cgn,
 		typ:    a.funcParams(cgn.obj),
@@ -1263,6 +1311,9 @@ func (c *reflectMakeSliceConstraint) solve(a *analysis, delta *nodeset) {
 }
 
 func ext۰reflect۰MakeSlice(a *analysis, cgn *cgnode) {
+	if !a.considerReflect {
+		return
+	}
 	a.addConstraint(&reflectMakeSliceConstraint{
 		cgn:    cgn,
 		typ:    a.funcParams(cgn.obj),
@@ -1320,6 +1371,9 @@ func (c *reflectNewConstraint) solve(a *analysis, delta *nodeset) {
 }
 
 func ext۰reflect۰New(a *analysis, cgn *cgnode) {
+	if !a.considerReflect {
+		return
+	}
 	a.addConstraint(&reflectNewConstraint{
 		cgn:    cgn,
 		typ:    a.funcParams(cgn.obj),
@@ -1332,6 +1386,9 @@ func ext۰reflect۰NewAt(a *analysis, cgn *cgnode) {
 
 	// TODO(adonovan): also report dynamic calls to unsound intrinsics.
 	if site := cgn.callersite; site != nil {
+		if !a.considerReflect && site[0] == nil {
+			return
+		}
 		a.warnf(site[0].pos(), "unsound: %s contains a reflect.NewAt() call", site[0].instr.Parent()) //bz: adjust to kcfa
 	}
 }
@@ -1378,6 +1435,9 @@ func (c *reflectPtrToConstraint) solve(a *analysis, delta *nodeset) {
 }
 
 func ext۰reflect۰PtrTo(a *analysis, cgn *cgnode) {
+	if !a.considerReflect {
+		return
+	}
 	a.addConstraint(&reflectPtrToConstraint{
 		cgn:    cgn,
 		t:      a.funcParams(cgn.obj),
@@ -1429,6 +1489,9 @@ func (c *reflectSliceOfConstraint) solve(a *analysis, delta *nodeset) {
 }
 
 func ext۰reflect۰SliceOf(a *analysis, cgn *cgnode) {
+	if !a.considerReflect {
+		return
+	}
 	a.addConstraint(&reflectSliceOfConstraint{
 		cgn:    cgn,
 		t:      a.funcParams(cgn.obj),
@@ -1473,6 +1536,9 @@ func (c *reflectTypeOfConstraint) solve(a *analysis, delta *nodeset) {
 }
 
 func ext۰reflect۰TypeOf(a *analysis, cgn *cgnode) {
+	if !a.considerReflect {
+		return
+	}
 	a.addConstraint(&reflectTypeOfConstraint{
 		cgn:    cgn,
 		i:      a.funcParams(cgn.obj),
@@ -1483,6 +1549,9 @@ func ext۰reflect۰TypeOf(a *analysis, cgn *cgnode) {
 // ---------- func ValueOf(interface{}) Value ----------
 
 func ext۰reflect۰ValueOf(a *analysis, cgn *cgnode) {
+	if !a.considerReflect {
+		return
+	}
 	// TODO(adonovan): when we start creating indirect tagged
 	// objects, we'll need to handle them specially here since
 	// they must never appear in the PTS of an interface{}.
@@ -1542,6 +1611,9 @@ func (c *reflectZeroConstraint) solve(a *analysis, delta *nodeset) {
 }
 
 func ext۰reflect۰Zero(a *analysis, cgn *cgnode) {
+	if !a.considerReflect {
+		return
+	}
 	a.addConstraint(&reflectZeroConstraint{
 		cgn:    cgn,
 		typ:    a.funcParams(cgn.obj),
@@ -1594,6 +1666,9 @@ func (c *rtypeElemConstraint) solve(a *analysis, delta *nodeset) {
 }
 
 func ext۰reflect۰rtype۰Elem(a *analysis, cgn *cgnode) {
+	if !a.considerReflect {
+		return
+	}
 	a.addConstraint(&rtypeElemConstraint{
 		cgn:    cgn,
 		t:      a.funcParams(cgn.obj),
@@ -1662,6 +1737,9 @@ func (c *rtypeFieldByNameConstraint) solve(a *analysis, delta *nodeset) {
 }
 
 func ext۰reflect۰rtype۰FieldByName(a *analysis, cgn *cgnode) {
+	if !a.considerReflect {
+		return
+	}
 	// If we have access to the callsite,
 	// and the argument is a string constant,
 	// return only that field.
@@ -1681,6 +1759,9 @@ func ext۰reflect۰rtype۰FieldByName(a *analysis, cgn *cgnode) {
 }
 
 func ext۰reflect۰rtype۰Field(a *analysis, cgn *cgnode) {
+	if !a.considerReflect {
+		return
+	}
 	// No-one ever calls Field with a constant argument,
 	// so we don't specialize that case.
 	a.addConstraint(&rtypeFieldByNameConstraint{
@@ -1745,12 +1826,15 @@ func (c *rtypeInOutConstraint) solve(a *analysis, delta *nodeset) {
 }
 
 func ext۰reflect۰rtype۰InOut(a *analysis, cgn *cgnode, out bool) {
+	if !a.considerReflect {
+		return
+	}
 	// If we have access to the callsite,
 	// and the argument is an int constant,
 	// return only that parameter.
 	index := -1
 	if site := cgn.callersite; site != nil {
-		if c, ok := site[0].instr.Common().Args[0].(*ssa.Const); ok {//bz: adjust to kcfa
+		if c, ok := site[0].instr.Common().Args[0].(*ssa.Const); ok { //bz: adjust to kcfa
 			v, _ := constant.Int64Val(c.Value)
 			index = int(v)
 		}
@@ -1811,6 +1895,9 @@ func (c *rtypeKeyConstraint) solve(a *analysis, delta *nodeset) {
 }
 
 func ext۰reflect۰rtype۰Key(a *analysis, cgn *cgnode) {
+	if !a.considerReflect {
+		return
+	}
 	a.addConstraint(&rtypeKeyConstraint{
 		cgn:    cgn,
 		t:      a.funcParams(cgn.obj),
@@ -1904,6 +1991,9 @@ func (c *rtypeMethodByNameConstraint) solve(a *analysis, delta *nodeset) {
 }
 
 func ext۰reflect۰rtype۰MethodByName(a *analysis, cgn *cgnode) {
+	if !a.considerReflect {
+		return
+	}
 	// If we have access to the callsite,
 	// and the argument is a string constant,
 	// return only that method.
@@ -1923,6 +2013,9 @@ func ext۰reflect۰rtype۰MethodByName(a *analysis, cgn *cgnode) {
 }
 
 func ext۰reflect۰rtype۰Method(a *analysis, cgn *cgnode) {
+	if !a.considerReflect {
+		return
+	}
 	// No-one ever calls Method with a constant argument,
 	// so we don't specialize that case.
 	a.addConstraint(&rtypeMethodByNameConstraint{
