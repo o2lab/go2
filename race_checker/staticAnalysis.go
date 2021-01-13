@@ -82,8 +82,11 @@ func (runner *AnalysisRunner) Run(args []string) error {
 
 	// Print the names of the source files
 	// for each package listed on the command line.
-	for _, pkg := range initial {
+	for i, pkg := range initial {
 		log.Info(pkg.ID, pkg.GoFiles)
+		if i == 0 {
+			fromPath = pkg.ID
+		}
 	}
 	log.Info("Done  -- ", len(initial[0].GoFiles), " packages loaded")
 
@@ -93,6 +96,12 @@ func (runner *AnalysisRunner) Run(args []string) error {
 	log.Info("Building SSA code for entire program...")
 	prog.Build()
 	log.Info("Done  -- SSA code built")
+
+	//checkMains := ssautil.MainPackages(pkgs)
+	//log.Debug(len(checkMains))
+	//for _, m := range checkMains {
+	//	log.Debug(m.Pkg.Name())
+	//}
 
 	mains, err := mainPackages(pkgs)
 	if err != nil {

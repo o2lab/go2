@@ -129,7 +129,7 @@ func init() {
 		"reflect",
 		"internal",
 		"impl",
-		"transport", // grpc
+		"transport",
 		"version",
 		"sort",
 		"filepath",
@@ -144,7 +144,6 @@ func main() {
 	help := flag.Bool("help", false, "Show all command-line options.")
 	withoutComm := flag.Bool("withoutComm", false, "Show analysis results without communication consideration.")
 	withComm := flag.Bool("withComm", false, "Show analysis results with communication consideration.")
-	projPath := flag.String("path", "", "Designated project filepath. ")
 	flag.Parse()
 	if *help {
 		flag.PrintDefaults()
@@ -166,8 +165,6 @@ func main() {
 		efficiency = true
 		channelComm = true
 	}
-	fromPath = *projPath
-
 
 	log.SetFormatter(&log.TextFormatter{
 		FullTimestamp:   true,
