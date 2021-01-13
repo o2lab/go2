@@ -97,7 +97,10 @@ var (
 	testMode     = false // Used by race_test.go for collecting output.
 )
 
-var useNewPTA = true //bz: default value for this branch
+var useNewPTA = false //bz: default value for this branch
+var doDebugPTA = false //bz: default value for this branch
+var doPTALog = false //bz: default value for this branch
+
 var trieLimit = 2      // set as user config option later, an integer that dictates how many times a function can be called under identical context
 var efficiency = false // configuration setting to avoid recursion in tested program
 var channelComm = true // analyze channel communication
@@ -144,6 +147,8 @@ func init() {
 // main sets up arguments and calls staticAnalysis function
 func main() {
 	newPTA := flag.Bool("useNewPTA", true, "Prints useNewPTA messages.")
+	debugPTA := flag.Bool("debugPTA", false, "Prints all PTA debug messages in console.")
+	keepPTALog := flag.Bool("keepPTALog", false, "Create a log file for all details in PTA.")
 	debug := flag.Bool("debug", false, "Prints log.Debug messages.")
 	lockOps := flag.Bool("lockOps", false, "Prints lock and unlock operations. ")
 	flag.BoolVar(&stats.CollectStats, "collectStats", false, "Collect analysis statistics.")
@@ -158,6 +163,12 @@ func main() {
 	}
 	if *newPTA {
 		useNewPTA = true
+	}
+	if *debugPTA {
+		doDebugPTA = true
+	}
+	if *keepPTALog {
+		doPTALog = true
 	}
 	if *debug {
 		log.SetLevel(log.DebugLevel)

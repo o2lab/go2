@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	log "github.com/sirupsen/logrus"
 	"github.com/twmb/algoimpl/go/graph"
@@ -103,10 +104,11 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		return err
 	}
 
+
 	logfile, err := os.Create("go_pta_log") //bz: for me ...
-	//log.SetFormatter(&log.TextFormatter{
-	//	FullTimestamp: true,
-	//})
+	if !doPTALog {
+		logfile = nil
+	}
 
 	var scope []string
 	if fromPath != "" {
@@ -117,15 +119,16 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		Mains:          mains, //bz: NOW assume only one main
 		Reflection:     false,
 		BuildCallGraph: true,
-		Log:            logfile, //nil,
+		Log:            logfile,
 		//kcfa
 		//CallSiteSensitive: true,
 		Origin: true, //origin
 		//shared config
 		K:          1,
 		LimitScope: true,  //bz: only consider app methods now
-		DEBUG:      false, //bz: do all printed out info in console --> turn off to avoid internal nil reference panic
+		DEBUG:      doDebugPTA, //bz: do all printed out info in console --> turn off to avoid internal nil reference panic
 		Scope:      scope, //bz: analyze scope, default is "command-line-arguments"
+		Exclusions: excludedPkgs, //excludedPkgs here
 	}
 
 	runner.Analysis = &analysis{
