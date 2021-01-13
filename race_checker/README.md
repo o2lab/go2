@@ -30,6 +30,7 @@ Supported options:
 - `-withComm` or `withoutComm`: Run the analysis with / without consideration of channel communication. To be used when running real programs. 
 - `-path=`: For specifying the path from which packages are to be analyzed. For example, `-path=github.com/pingcap/tidb` would consider packages from the TiDB repo. 
 
+**!!!!!!** If you run ```./race-checker``` under another git repo benchmark directory, please specify the path `-path=`, otherwise origin-sensitive will not be triggered. Since our default analysis scope is ```command-line-arguments```, which is unavailable if using another directory.
 
 ### Installation instructions
 
