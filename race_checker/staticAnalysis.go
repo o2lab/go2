@@ -84,7 +84,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 	// for each package listed on the command line.
 	for i, pkg := range initial {
 		log.Info(pkg.ID, pkg.GoFiles)
-		if i == 0 {
+		if i == 0 && efficiency {
 			fromPath = pkg.ID
 		}
 	}
