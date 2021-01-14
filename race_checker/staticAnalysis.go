@@ -70,7 +70,7 @@ func isSynthetic(fn *ssa.Function) bool { // ignore functions that are NOT true 
 func findAllMainPkgs(total []*packages.Package) ([]*packages.Package, error) {
 	var mains []*packages.Package
 	for _, p := range total {
-		if p.Name == "main" { //&& p.Func("main") != nil
+		if p != nil && p.Name == "main" { //&& p.Func("main") != nil
 			mains = append(mains, p)
 		}
 	}
@@ -115,8 +115,9 @@ func (runner *AnalysisRunner) Run(args []string) error {
 	}
 
 	fmt.Println("SHOW ME OTHER PKGS: (exclude those in nonMainPkgs)")
-	for _, val := range total {
+	for idx, val := range total {
 		if pointer.ContainStringRelax(nonMainPkgs, val.String()) {
+			total[idx] = nil //set nil
 			continue
 		}
 		fmt.Println(" - " + val.String())
