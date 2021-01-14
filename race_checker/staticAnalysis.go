@@ -118,7 +118,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 	checkMains := ssautil.MainPackages(pkgs)
 	var mainInd int
 	var mains []*ssa.Package
-	if efficiency {
+	if efficiency && len(checkMains) > 1 {
 		// Provide entry-point options and retrieve user selection
 		fmt.Println(len(checkMains), " entry points identified: ")
 		for i, ep := range checkMains {
