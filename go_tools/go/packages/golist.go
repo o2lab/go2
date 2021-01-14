@@ -202,42 +202,41 @@ extractQueries:
 		}
 		response.addAll(dr)
 
-		if len(dr.Roots) == 0 && len(dr.Packages) == 0 { //bz: tmp condition filter to do the list all main entry points
-			cmd := exec.Command("find", ".", "-type", "d") //bz: list this subdir recursively until none
-			cmd.Dir = cfg.Dir //set cmd dir
-			var stdout, stderr bytes.Buffer
-			cmd.Stdout = &stdout
-			cmd.Stderr = &stderr
-			err := cmd.Run()
-			if err != nil {
-				fmt.Printf("!!! cmd.Run() failed with %s\n", err)
-				return nil, err
-			}
-			outStr, _ := string(stdout.Bytes()), string(stderr.Bytes())
-			//fmt.Printf("run ls cmd. out:\n%s\nerr:\n%s\n", outStr, errStr) //bz: for me to debug
-			subdirs := strings.Split(outStr, "\n")//bz: record the future dir we need to traverse
+	    //TODO: bz: tmp condition filter to do the list all main entry points
+		cmd := exec.Command("find", ".", "-type", "d") //bz: list this subdir recursively until none
+		cmd.Dir = cfg.Dir //set cmd dir
+		var stdout, stderr bytes.Buffer
+		cmd.Stdout = &stdout
+		cmd.Stderr = &stderr
+		cmderr := cmd.Run()
+		if err != nil {
+			fmt.Printf("!!! cmd.Run() failed with %s\n", cmderr)
+			return nil, err
+		}
+		outStr, errStr := string(stdout.Bytes()), string(stderr.Bytes())
+		fmt.Printf("run ls cmd. out:\n%s\nerr:\n%s\n", outStr, errStr) //bz: for me to debug
+		subdirs := strings.Split(outStr, "\n")//bz: record the future dir we need to traverse
 
-			for i := 1; i < len(subdirs) - 1; i++ { //bz: 1st element is ".", the last element is "", skip them
-				subdir := subdirs[i]
-				_cfg := &Config{
-					Mode:  LoadAllSyntax,
-					Context: cfg.Context,
-					Logf: cfg.Logf,
-					Dir:   cfg.Dir + subdir[1:], // bz: we update this. remove the "." in subdir
-					Env: cfg.Env,
-					Tests: false,
-				}
-				_state := &golistState{
-					cfg:        _cfg,
-					ctx:        ctx,
-					vendorDirs: map[string]bool{},
-				}
-				_dr, _err := _state.createDriverResponse(restPatterns...)
-				if _err != nil {
-					return nil, _err
-				}
-				response.addAll(_dr)
+		for i := 1; i < len(subdirs) - 1; i++ { //bz: 1st element is ".", the last element is "", skip them
+			subdir := subdirs[i]
+			_cfg := &Config{
+				Mode:  LoadAllSyntax,
+				Context: cfg.Context,
+				Logf: cfg.Logf,
+				Dir:   cfg.Dir + subdir[1:], // bz: we update this. remove the "." in subdir
+				Env: cfg.Env,
+				Tests: false,
 			}
+			_state := &golistState{
+				cfg:        _cfg,
+				ctx:        ctx,
+				vendorDirs: map[string]bool{},
+			}
+			_dr, _err := _state.createDriverResponse(restPatterns...)
+			if _err != nil {
+				return nil, _err
+			}
+			response.addAll(_dr)
 		}
 	}
 
