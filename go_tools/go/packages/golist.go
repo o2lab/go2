@@ -213,10 +213,12 @@ extractQueries:
 			fmt.Printf("!!! cmd.Run() failed with %s\n", cmderr)
 			return nil, err
 		}
-		outStr, errStr := string(stdout.Bytes()), string(stderr.Bytes())
-		fmt.Printf("run ls cmd. out:\n%s\nerr:\n%s\n", outStr, errStr) //bz: for me to debug
+		outStr, _ := string(stdout.Bytes()), string(stderr.Bytes())
+		//fmt.Printf("run ls cmd. out:\n%s\nerr:\n%s\n", outStr, errStr) //bz: for me to debug
 		subdirs := strings.Split(outStr, "\n")//bz: record the future dir we need to traverse
 
+		var _wg sync.WaitGroup
+		results := make([]*driverResponse, len(subdirs) - 2) //all results
 		for i := 1; i < len(subdirs) - 1; i++ { //bz: 1st element is ".", the last element is "", skip them
 			subdir := subdirs[i]
 			_cfg := &Config{
@@ -232,11 +234,22 @@ extractQueries:
 				ctx:        ctx,
 				vendorDirs: map[string]bool{},
 			}
-			_dr, _err := _state.createDriverResponse(restPatterns...)
-			if _err != nil {
-				return nil, _err
-			}
-			response.addAll(_dr)
+			_wg.Add(1)
+			go func(i int, _state *golistState, restPatterns []string) {
+				_dr, _err := _state.createDriverResponse(restPatterns...)
+				if _err != nil {
+					fmt.Println(_err)
+					results[i - 1] = nil
+				}else{
+					results[i - 1] = _dr
+				}
+				_wg.Done()
+			}(i, _state, restPatterns)
+		}
+		_wg.Wait()
+		//bz: sum
+		for _, ret := range results {
+			response.addAll(ret)
 		}
 	}
 
