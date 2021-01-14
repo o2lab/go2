@@ -74,7 +74,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		Tests: false,                  // setting Tests will include related test packages
 	}
 	log.Info("Loading input packages...")
-	initial, err := packages.Load(cfg, args...)
+	initial, total, err := packages.Load2(cfg, args...)
 	if err != nil {
 		return err
 	}
