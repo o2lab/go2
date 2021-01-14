@@ -105,14 +105,6 @@ var trieLimit = 2      // set as user config option later, an integer that dicta
 var efficiency = false // configuration setting to avoid recursion in tested program
 var channelComm = true // analyze channel communication
 var fromPath = ""      // interested packages are those located at this path
-// sample paths:
-// gRPC - google.golang.org/grpc
-// traefik - github.com/traefik
-// gogs - gogs.io/gogs
-// istio - istio.io/istio
-// docker -
-// kubernetes -
-// tidb - github.com/pingcap/tidb
 
 func init() {
 	excludedPkgs = []string{
@@ -121,54 +113,8 @@ func init() {
 	}
 
 	nonMainPkgs = []string{
-		"runtime",
 		"fmt",
 		"reflect",
-		"encoding",
-		"errors",
-		"bytes",
-		"strconv",
-		"strings",
-		"bytealg",
-		"race",
-		"syscall",
-		"poll",
-		"trace",
-		"logging",
-		"os",
-		"builtin",
-		"pflag",
-		"log",
-		"reflect",
-		"internal",
-		"impl",
-		"transport", // grpc
-		"version",
-		"sort",
-		"filepath",
-		"time",//bz: added
-		"sync",
-		"unsafe",
-		"unicode",
-		"math",
-		"io",
-		"context",
-		"flag",
-		"net",
-		"regexp",
-		"text",
-		"compress",
-		"crypto",
-		"mime",
-		"path",
-		"vendor",
-		"hash",
-		"go/",
-		"google.golang.org/protobuf/",//protobuf
-		"github.com/golang/protobuf/",
-		"golang.org/x/",
-		"html",
-		"container",
 	}
 }
 
