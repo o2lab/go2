@@ -39,10 +39,10 @@ func NewCFGVisitorState(ptaResult *pointer.Result, sharedPtrSet map[pointer.Poin
 func (v *CFGVisitor) VisitFunction(function *ssa.Function, stack CallStack) {
 	fnPass, ok := v.passes[function]
 	if !ok {
-		fnPass = NewFnPass(v, v.domains[function], v.summaries[function], v.FuncAcquiredValues, stack)
+		fnPass = NewFnPass(v, v.domains[function], v.summaries[function], stack)
 		v.passes[function] = fnPass
 	}
-	fnPass.Visit(function)
+	fnPass.dataflowAnalysis(function)
 }
 
 type EscapeSite struct {

@@ -13,6 +13,7 @@ type FnSummary struct {
 	AccessSet map[ssa.Value]IsWrite
 	AllocSet  map[*ssa.Alloc]ssa.Instruction
 	MutexSet  map[ssa.Value]bool
+	ExitBlocks []*ssa.BasicBlock
 }
 
 type IsWrite bool
@@ -32,6 +33,9 @@ func (f *FnSummary) Preprocess(function *ssa.Function, ptaConfig *pointer.Config
 		for _, instr := range block.Instrs {
 			log.Debugln(instr)
 			f.visitIns(instr)
+		}
+		if block.Succs == nil {
+			f.ExitBlocks = append(f.ExitBlocks, block)
 		}
 	}
 	for loc, _ := range f.AccessSet {

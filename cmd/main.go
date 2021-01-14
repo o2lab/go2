@@ -9,13 +9,14 @@ import (
 var excluded = []string{
 	//"sync",
 	//"fmt",
+	//"log",
+
 	"runtime",
 	"internal",
 	"race",
 	"unsafe",
 	"debug",
 	"os",
-	//"log",
 	"crypto",
 	"regexp",
 	"strconv",
