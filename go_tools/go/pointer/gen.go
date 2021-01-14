@@ -2073,7 +2073,7 @@ func (a *analysis) generate() {
 			continue
 		}
 
-		if containstring(a.config.Exclusions, _type) { //bz:
+		if ContainString(a.config.Exclusions, _type) { //bz:
 			if a.config.DEBUG {
 				fmt.Println("EXCLUDE genMethodsOf() offline for type: " + T.String())
 			}
@@ -2095,7 +2095,7 @@ func (a *analysis) generate() {
 	}
 
 	// The runtime magically allocates os.Args; so should we.
-	if !(containstring(a.config.Exclusions, "os") && containstring(a.config.Exclusions, "runtime")) {
+	if !(ContainString(a.config.Exclusions, "os") && ContainString(a.config.Exclusions, "runtime")) {
 		//bz: we are trying to skip this iff "runtime" and "os" are both in exclusions
 		if os := a.prog.ImportedPackage("os"); os != nil {
 			// In effect:  os.Args = new([1]string)[:]

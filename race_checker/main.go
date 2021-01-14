@@ -93,6 +93,7 @@ type trie struct {
 
 var (
 	excludedPkgs []string
+	nonMainPkgs  []string
 	testMode     = false // Used by race_test.go for collecting output.
 )
 
@@ -118,6 +119,57 @@ func init() {
 		"fmt",
 		"reflect",
 	}
+
+	nonMainPkgs = []string{
+		"runtime",
+		"fmt",
+		"reflect",
+		"encoding",
+		"errors",
+		"bytes",
+		"strconv",
+		"strings",
+		"bytealg",
+		"race",
+		"syscall",
+		"poll",
+		"trace",
+		"logging",
+		"os",
+		"builtin",
+		"pflag",
+		"log",
+		"reflect",
+		"internal",
+		"impl",
+		"transport", // grpc
+		"version",
+		"sort",
+		"filepath",
+		"time",//bz: added
+		"sync",
+		"unsafe",
+		"unicode",
+		"math",
+		"io",
+		"context",
+		"flag",
+		"net",
+		"regexp",
+		"text",
+		"compress",
+		"crypto",
+		"mime",
+		"path",
+		"vendor",
+		"hash",
+		"go/",
+		"google.golang.org/protobuf/",//protobuf
+		"github.com/golang/protobuf/",
+		"golang.org/x/",
+		"html",
+		"container",
+	}
 }
 
 // main sets up arguments and calls staticAnalysis function
@@ -125,6 +177,7 @@ func main() {
 	newPTA := flag.Bool("useNewPTA", true, "Use the new pointer analysis in go_tools.")
 	debugPTA := flag.Bool("debugPTA", false, "Prints all PTA debug messages in console.")
 	keepPTALog := flag.Bool("keepPTALog", false, "Create a log file for all details in PTA.")
+	projPath := flag.String("path", "", "Include path.")
 	debug := flag.Bool("debug", false, "Prints log.Debug messages.")
 	lockOps := flag.Bool("lockOps", false, "Prints lock and unlock operations. ")
 	flag.BoolVar(&stats.CollectStats, "collectStats", false, "Collect analysis statistics.")
@@ -161,6 +214,8 @@ func main() {
 		efficiency = true
 		channelComm = true
 	}
+
+	fromPath = *projPath
 
 	log.SetFormatter(&log.TextFormatter{
 		FullTimestamp:   true,

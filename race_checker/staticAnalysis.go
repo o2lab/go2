@@ -12,7 +12,7 @@ import (
 	"go/token"
 	"go/types"
 	"os"
-	"path/filepath"
+	//"path/filepath"
 	"strings"
 	"time"
 )
@@ -84,38 +84,46 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		return fmt.Errorf("package list empty")
 	}
 
-	if efficiency {
-		fromPath = initial[0].PkgPath
-
-		// Visit all subdirectories
-		os.Stderr = nil
-		numFiles := 0
-		err1 := filepath.Walk(".",
-			func(path string, info os.FileInfo, err error) error {
-				if err != nil {
-					return err
-				}
-				log.Debug(path)
-				if info.IsDir() { // subdirectory
-					pattern := fromPath + "/" + path
-					additional, pkgErr := packages.Load(cfg, pattern)
-					numFiles += len(additional[0].GoFiles)
-					if path != "." && pkgErr == nil && len(additional[0].GoFiles) > 0 && len(additional) > 0 {
-						if packages.PrintErrors(additional) == 0 {
-							initial = append(initial, additional...)
-						}
-					}
-				}
-				return nil
-			})
-		if err1 != nil {
-			log.Debug(err)
+	fmt.Println("SHOW ME TOTAL PKGS: (exclude those in nonMainPkgs)")
+	for _, val := range total {
+		if pointer.ContainStringRelax(nonMainPkgs, val.String()){
+			continue
 		}
-		log.Info("Done  -- ", len(initial), " packages loaded, ", numFiles, " Go files analyzed.")
+		fmt.Println(" - " + val.String())
 	}
 
+	//if efficiency {
+	//	fromPath = initial[0].PkgPath
+	//
+	//	// Visit all subdirectories
+	//	os.Stderr = nil
+	//	numFiles := 0
+	//	err1 := filepath.Walk(".",
+	//		func(path string, info os.FileInfo, err error) error {
+	//			if err != nil {
+	//				return err
+	//			}
+	//			log.Debug(path)
+	//			if info.IsDir() { // subdirectory
+	//				pattern := fromPath + "/" + path
+	//				additional, pkgErr := packages.Load(cfg, pattern)
+	//				numFiles += len(additional[0].GoFiles)
+	//				if path != "." && pkgErr == nil && len(additional[0].GoFiles) > 0 && len(additional) > 0 {
+	//					if packages.PrintErrors(additional) == 0 {
+	//						initial = append(initial, additional...)
+	//					}
+	//				}
+	//			}
+	//			return nil
+	//		})
+	//	if err1 != nil {
+	//		log.Debug(err)
+	//	}
+	//	log.Info("Done  -- ", len(initial), " packages loaded, ", numFiles, " Go files analyzed.")
+	//}
+
 	// Create and build SSA-form program representation.
-	prog, pkgs := ssautil.AllPackages(initial, 0)
+	prog, pkgs := ssautil.AllPackages(total, 0)
 
 	checkMains := ssautil.MainPackages(pkgs)
 	var mainInd int

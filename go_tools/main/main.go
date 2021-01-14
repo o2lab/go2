@@ -126,7 +126,7 @@ func main() {
 		Mains:          mains, //bz: NOW assume only one main
 		Reflection:     false,
 		BuildCallGraph: true,
-		Log:            nil,//logfile,
+		Log:            logfile,
 		//kcfa
 		//CallSiteSensitive: true,
 		//origin

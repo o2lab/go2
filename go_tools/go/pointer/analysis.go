@@ -17,6 +17,7 @@ import (
 	"runtime/debug"
 	"sort"
 	"strconv"
+	"strings"
 
 	"github.tamu.edu/April1989/go_tools/go/ssa"
 	"github.tamu.edu/April1989/go_tools/go/types/typeutil"
@@ -483,7 +484,7 @@ func AnalyzeWCtx(config *Config) (result *ResultWCtx, err error) { //Result
 		}
 	}
 
-	if !containstring(a.config.Exclusions, "reflect") { //bz: only do if race checker considers
+	if !ContainString(a.config.Exclusions, "reflect") { //bz: only do if race checker considers
 		a.considerReflect = true //update
 
 		if reflect := a.prog.ImportedPackage("reflect"); reflect != nil {
@@ -509,7 +510,7 @@ func AnalyzeWCtx(config *Config) (result *ResultWCtx, err error) { //Result
 	}else{
 		a.considerReflect = false //update
 	}
-	if !containstring(a.config.Exclusions, "runtime") { //bz: only do if race checker considers
+	if !ContainString(a.config.Exclusions, "runtime") { //bz: only do if race checker considers
 		if runtime := a.prog.ImportedPackage("runtime"); runtime != nil {
 			a.runtimeSetFinalizer = runtime.Func("SetFinalizer")
 		}
@@ -605,9 +606,19 @@ func AnalyzeWCtx(config *Config) (result *ResultWCtx, err error) { //Result
 }
 
 //bz:
-func containstring(s []string, e string) bool {
+func ContainString(s []string, e string) bool {
 	for _, a := range s {
 		if a == e {
+			return true
+		}
+	}
+	return false
+}
+
+//bz: used in race_checker
+func ContainStringRelax(s []string, e string) bool {
+	for _, a := range s {
+		if strings.Contains(e, a) {
 			return true
 		}
 	}
