@@ -70,17 +70,17 @@ func isSynthetic(fn *ssa.Function) bool { // ignore functions that are NOT true 
 func findAllMainPkgs(total []*packages.Package) ([]*packages.Package, error) {
 	var mains []*packages.Package
 	for _, p := range total {
-		if p != nil && p.Name == "main" { //&& p.Func("main") != nil
+		if p != nil && p.Name == "main" {
 			mains = append(mains, p)
 		}
 	}
 	if len(mains) == 0 {
-		return nil, fmt.Errorf("no main packages")
+		return nil, fmt.Errorf("no main packages in *packages.Package")
 	}
 	return mains, nil
 }
 
-// mainPackages returns the main packages to analyze.
+// bz: mainPackages returns the main packages to analyze.
 // Each resulting package is named "main" and has a main function.
 func mainSSAPackages(pkgs []*ssa.Package) ([]*ssa.Package, error) {
 	var mains []*ssa.Package
@@ -90,7 +90,7 @@ func mainSSAPackages(pkgs []*ssa.Package) ([]*ssa.Package, error) {
 		}
 	}
 	if len(mains) == 0 {
-		return nil, fmt.Errorf("no main packages")
+		return nil, fmt.Errorf("no main packages in *ssa.Package")
 	}
 	return mains, nil
 }
@@ -104,7 +104,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		Tests: false,                  // setting Tests will include related test packages
 	}
 	log.Info("Loading input packages...")
-	initial, total, err := packages.Load2(cfg, args...) //bz: total includes initial now
+	initial, err := packages.Load(cfg, args...) //bz: total includes initial now
 	if err != nil {
 		return err
 	}
@@ -114,18 +114,9 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		return fmt.Errorf("package list empty")
 	}
 
-	fmt.Println("SHOW ME OTHER PKGS: (exclude those in nonMainPkgs)")
-	for idx, val := range total {
-		if pointer.ContainStringRelax(nonMainPkgs, val.String()) {
-			total[idx] = nil //set nil
-			continue
-		}
-		fmt.Println(" - " + val.String())
-	}
+	log.Info("Done  -- ", len(initial), " packages loaded, ", "? Go files analyzed.")
 
-	log.Info("Done  -- ", len(initial), " packages loaded, ", len(total), " Go files analyzed.")
-
-	checkMains, err := findAllMainPkgs(total)
+	checkMains, err := findAllMainPkgs(initial)
 	if err != nil {
 		return err
 	}
