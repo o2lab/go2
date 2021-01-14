@@ -620,7 +620,7 @@ func (p PointerWCtx) IsNil() bool {
 //bz: whether goID is match with the contexts in this pointer
 //TODO: this does not match parent context if callsite.length > 1 (k > 1)
 func (p PointerWCtx) MatchMyContext(go_instr *ssa.Go) bool {
-	if p.cgn == nil {
+	if p.cgn == nil || p.cgn.callersite == nil || p.cgn.callersite[0] == nil {
 		return false
 	}
 	my_go_instr := p.cgn.callersite[0].goInstr

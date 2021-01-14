@@ -66,6 +66,36 @@ func isSynthetic(fn *ssa.Function) bool { // ignore functions that are NOT true 
 	return fn.Synthetic != "" || fn.Pkg == nil
 }
 
+//bz:
+func findAllMainPkgs(total []*packages.Package) ([]*packages.Package, error) {
+	var mains []*packages.Package
+	for _, p := range total {
+		if p.Name == "main" { //&& p.Func("main") != nil
+			mains = append(mains, p)
+		}
+	}
+	if len(mains) == 0 {
+		return nil, fmt.Errorf("no main packages")
+	}
+	return mains, nil
+}
+
+// mainPackages returns the main packages to analyze.
+// Each resulting package is named "main" and has a main function.
+func mainSSAPackages(pkgs []*ssa.Package) ([]*ssa.Package, error) {
+	var mains []*ssa.Package
+	for _, p := range pkgs {
+		if p != nil && p.Pkg.Name() == "main" && p.Func("main") != nil {
+			mains = append(mains, p)
+		}
+	}
+	if len(mains) == 0 {
+		return nil, fmt.Errorf("no main packages")
+	}
+	return mains, nil
+}
+
+
 // Run builds a Happens-Before Graph and calls other functions like visitAllInstructions to drive the program further
 func (runner *AnalysisRunner) Run(args []string) error {
 	cfg := &packages.Config{
@@ -94,28 +124,36 @@ func (runner *AnalysisRunner) Run(args []string) error {
 
 	log.Info("Done  -- ", len(initial), " packages loaded, ", len(total), " Go files analyzed.")
 
-	// Create and build SSA-form program representation.
-	prog, pkgs := ssautil.AllPackages(total, 0)
+	checkMains, err := findAllMainPkgs(total)
+	if err != nil {
+		return err
+	}
 
-	checkMains := ssautil.MainPackages(pkgs)
 	var mainInd int
-	var mains []*ssa.Package
+	var mainPkgs []*packages.Package
 	if efficiency && len(checkMains) > 1 {
 		// Provide entry-point options and retrieve user selection
 		fmt.Println(len(checkMains), " entry points identified: ")
 		for i, ep := range checkMains {
-			fmt.Println("Option", i+1, ": ", ep.Pkg.Path())
+			fmt.Println("Option", i+1, ": ", ep.String())
 		}
 		fmt.Print("Enter option number of choice: ")
 		fmt.Scan(&mainInd)
-		mains = append(mains, checkMains[mainInd-1])
+		mainPkgs = append(mainPkgs, checkMains[mainInd-1])
 	} else {
-		mains = checkMains
+		mainPkgs = checkMains
 	}
+
+	prog, pkgs := ssautil.AllPackages(mainPkgs, 0)
 
 	log.Info("Building SSA code for entire program...")
 	prog.Build()
 	log.Info("Done  -- SSA code built")
+
+	mains, err := mainSSAPackages(pkgs)
+	if err != nil {
+		return err
+	}
 
 	logfile, err := os.Create("go_pta_log") //bz: for me ...
 	if !doPTALog {
