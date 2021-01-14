@@ -75,6 +75,7 @@ race-checker -debug -withComm
 ### Entry-point selection
 
 After loading all relevant packages for the tested program, if multiple entry-points are detected, manual input will be required in selecting which one to begin analysis with. For example, 
+
 ![Image of manual selection required when analyzing runc](tests/screenshot1.png)
 
 
