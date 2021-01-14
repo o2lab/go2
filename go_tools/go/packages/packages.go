@@ -918,6 +918,7 @@ func (ld *loader) refine2(roots []string, list ...*Package) ([]*Package, []*Pack
 	result := make([]*Package, len(initial))
 	for i, lpkg := range initial {
 		result[i] = lpkg.Package
+		totalPkgs = append(totalPkgs, lpkg.Package)
 	}
 	for i := range ld.pkgs {
 		// Clear all unrequested fields, for extra de-Hyrum-ization.

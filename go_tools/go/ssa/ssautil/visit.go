@@ -71,7 +71,7 @@ func (visit *visitor) function(fn *ssa.Function) {
 func MainPackages(pkgs []*ssa.Package) []*ssa.Package {
 	var mains []*ssa.Package
 	for _, pkg := range pkgs {
-		if pkg.Pkg.Name() == "main" && pkg.Func("main") != nil {
+		if pkg != nil && pkg.Pkg.Name() == "main" && pkg.Func("main") != nil { //bz: used by race_checker, update to exclude nil pkg
 			mains = append(mains, pkg)
 		}
 	}

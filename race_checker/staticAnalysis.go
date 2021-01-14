@@ -74,7 +74,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		Tests: false,                  // setting Tests will include related test packages
 	}
 	log.Info("Loading input packages...")
-	initial, total, err := packages.Load2(cfg, args...)
+	initial, total, err := packages.Load2(cfg, args...) //bz: total includes initial now
 	if err != nil {
 		return err
 	}
@@ -84,43 +84,15 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		return fmt.Errorf("package list empty")
 	}
 
-	fmt.Println("SHOW ME TOTAL PKGS: (exclude those in nonMainPkgs)")
+	fmt.Println("SHOW ME OTHER PKGS: (exclude those in nonMainPkgs)")
 	for _, val := range total {
-		if pointer.ContainStringRelax(nonMainPkgs, val.String()){
+		if pointer.ContainStringRelax(nonMainPkgs, val.String()) {
 			continue
 		}
 		fmt.Println(" - " + val.String())
 	}
 
-	//if efficiency {
-	//	fromPath = initial[0].PkgPath
-	//
-	//	// Visit all subdirectories
-	//	os.Stderr = nil
-	//	numFiles := 0
-	//	err1 := filepath.Walk(".",
-	//		func(path string, info os.FileInfo, err error) error {
-	//			if err != nil {
-	//				return err
-	//			}
-	//			log.Debug(path)
-	//			if info.IsDir() { // subdirectory
-	//				pattern := fromPath + "/" + path
-	//				additional, pkgErr := packages.Load(cfg, pattern)
-	//				numFiles += len(additional[0].GoFiles)
-	//				if path != "." && pkgErr == nil && len(additional[0].GoFiles) > 0 && len(additional) > 0 {
-	//					if packages.PrintErrors(additional) == 0 {
-	//						initial = append(initial, additional...)
-	//					}
-	//				}
-	//			}
-	//			return nil
-	//		})
-	//	if err1 != nil {
-	//		log.Debug(err)
-	//	}
-	//	log.Info("Done  -- ", len(initial), " packages loaded, ", numFiles, " Go files analyzed.")
-	//}
+	log.Info("Done  -- ", len(initial), " packages loaded, ", len(total), " Go files analyzed.")
 
 	// Create and build SSA-form program representation.
 	prog, pkgs := ssautil.AllPackages(total, 0)
@@ -165,9 +137,9 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		Origin: true, //origin
 		//shared config
 		K:          1,
-		LimitScope: true,  //bz: only consider app methods now
-		DEBUG:      doDebugPTA, //bz: do all printed out info in console --> turn off to avoid internal nil reference panic
-		Scope:      scope, //bz: analyze scope, default is "command-line-arguments"
+		LimitScope: true,         //bz: only consider app methods now
+		DEBUG:      doDebugPTA,   //bz: do all printed out info in console --> turn off to avoid internal nil reference panic
+		Scope:      scope,        //bz: analyze scope, default is "command-line-arguments"
 		Exclusions: excludedPkgs, //excludedPkgs here
 	}
 
@@ -453,7 +425,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 
 // visitAllInstructions visits each line and calls the corresponding helper function to drive the tool
 func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
-	if a.useNewPTA && a.ptaConfig.DEBUG {//bz: useNewPTA ...
+	if a.useNewPTA && a.ptaConfig.DEBUG { //bz: useNewPTA ...
 		fmt.Println(".... " + fn.String())
 	}
 	a.analysisStat.nGoroutine = goID + 1 // keep count of goroutine quantity
@@ -687,7 +659,9 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 					a.selectCaseBody[theIns] = selIns
 				}
 			}
-			if defCase {a.selectCaseBody[theIns] = selIns}
+			if defCase {
+				a.selectCaseBody[theIns] = selIns
+			}
 			if selDone && ii == 0 {
 				if sliceContainsInsAt(a.RWIns[goID], theIns) == -1 {
 					a.RWIns[goID] = append(a.RWIns[goID], theIns)
