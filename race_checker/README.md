@@ -15,10 +15,8 @@ By default, the built artifact is named `race-checker`.
 Usage:
 
 ```
-./race-checker [options] <path>
+./race-checker <options>
 ```
-
-`<path>` must lead to main.go file in the main package.
 
 Supported options:
 - **`-useNewPTA`: Use the new pointer analysis in go_tools.**
@@ -28,13 +26,12 @@ Supported options:
 - `-debug`: Show debug information.
 - `-help`: Show all command-line options.
 - `-withComm` or `withoutComm`: Run the analysis with / without consideration of channel communication. To be used when running real programs. 
-- `-path=`: For specifying the path from which packages are to be analyzed. For example, `-path=github.com/pingcap/tidb` would consider packages from the TiDB repo. 
 
 **!!!!!!** If you run ```./race-checker``` under another git repo benchmark directory, please specify the path `-path=`, otherwise origin-sensitive will not be triggered. Since our default analysis scope is ```command-line-arguments```, which is unavailable if using another directory.
 
-### Installation instructions
+### Installation instructions (for use when running a real program)
 
-To install the race-checker in the PATH,
+To install the race-checker in GOPATH,
 ```
 go install
 ```
@@ -55,22 +52,39 @@ The above command runs the tests concurrently.
 The number of workers equals to the number of cores available by default.
 To set the number of cores to use explicitly, use the `-cpu` option.
 
-Run `go test` in `race_checker` folder to run all tests.
 To run individual end-to-end tests,
 ```
 go test -files <test_file>
 ```
 
-### Example
+### Running real programs
 
-Try some test cases in adopted micro-benchmarks:
+In root directory of tested repo, 
 
+Add $GOPATH/bin to $PATH if not already done so, 
 ```
-./race-checker GoBench/Kubernetes/81091/main.go
-./race-checker godel2/ch-as-lock-race/main.go
+export PATH=$PATH:$(go env GOPATH)/bin
 ```
 
-positive race result would be shown as follows, 
+Execute race-checker,
+```
+race-checker -debug -withoutComm
+```
+or
+```
+race-checker -debug -withComm
+```
+
+### Entry-point selection
+
+After loading all relevant packages for the tested program, if multiple entry-points are detected, manual input will be required in selecting which one to begin analysis with. For example, 
+
+![Image of manual selection required when analyzing runc](tests/screenshot1.png)
+
+
+### Sample Output
+
+Positive race result would be shown as follows, 
 ![Image of data race report](tests/screenshot.png)
 
 ### Real-world benchmarks

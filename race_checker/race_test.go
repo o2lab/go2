@@ -55,6 +55,7 @@ var tests = []string{
 	"tests/race_example1.go",
 	"tests/race_example2.go",
 	"tests/race_example3.go",
+	"tests/runc_simple.go",
 	"tests/rwmutex_lock.go",
 	"tests/select.go",
 	"tests/select_all_ready.go",

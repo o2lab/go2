@@ -12,8 +12,7 @@ import (
 	"go/token"
 	"go/types"
 	"os"
-
-	//"os"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -85,25 +84,58 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		return fmt.Errorf("package list empty")
 	}
 
-	// Print the names of the source files
-	// for each package listed on the command line.
-	for _, pkg := range initial {
-		log.Info(pkg.ID, pkg.GoFiles)
+	if efficiency {
+		fromPath = initial[0].PkgPath
+
+		// Visit all subdirectories
+		os.Stderr = nil
+		numFiles := 0
+		err1 := filepath.Walk(".",
+			func(path string, info os.FileInfo, err error) error {
+				if err != nil {
+					return err
+				}
+				log.Debug(path)
+				if info.IsDir() { // subdirectory
+					pattern := fromPath + "/" + path
+					additional, pkgErr := packages.Load(cfg, pattern)
+					numFiles += len(additional[0].GoFiles)
+					if path != "." && pkgErr == nil && len(additional[0].GoFiles) > 0 && len(additional) > 0 {
+						if packages.PrintErrors(additional) == 0 {
+							initial = append(initial, additional...)
+						}
+					}
+				}
+				return nil
+			})
+		if err1 != nil {
+			log.Debug(err)
+		}
+		log.Info("Done  -- ", len(initial), " packages loaded, ", numFiles, " Go files analyzed.")
 	}
-	log.Infof("Done  -- packages loaded")
 
 	// Create and build SSA-form program representation.
 	prog, pkgs := ssautil.AllPackages(initial, 0)
 
+	checkMains := ssautil.MainPackages(pkgs)
+	var mainInd int
+	var mains []*ssa.Package
+	if efficiency && len(checkMains) > 1 {
+		// Provide entry-point options and retrieve user selection
+		fmt.Println(len(checkMains), " entry points identified: ")
+		for i, ep := range checkMains {
+			fmt.Println("Option", i+1, ": ", ep.Pkg.Path())
+		}
+		fmt.Print("Enter option number of choice: ")
+		fmt.Scan(&mainInd)
+		mains = append(mains, checkMains[mainInd-1])
+	} else {
+		mains = checkMains
+	}
+
 	log.Info("Building SSA code for entire program...")
 	prog.Build()
 	log.Info("Done  -- SSA code built")
-
-	mains, err := mainPackages(pkgs)
-	if err != nil {
-		return err
-	}
-
 
 	logfile, err := os.Create("go_pta_log") //bz: for me ...
 	if !doPTALog {
