@@ -49,6 +49,7 @@ var tests = []string{
 	"tests/race_example1.go",
 	"tests/race_example2.go",
 	"tests/race_example3.go",
+	"tests/runc_simple.go",
 	"tests/rwmutex_lock.go",
 	"tests/select.go",
 	"tests/select_all_ready.go",
@@ -56,8 +57,8 @@ var tests = []string{
 	"tests/select_nonblock.go",
 	"tests/select_nonblock_fp.go",
 	"tests/select_rpc.go",
-	"tests/select_sends.go", // WIP - determine readiness
-	//"tests/select_timeout.go", // WIP - handle timeout portal - perhaps same as default
+	"tests/select_sends.go",
+	"tests/select_timeout.go",
 	"tests/send_after_select.go",
 	"tests/single_case_select.go",
 	"tests/test1.go",
