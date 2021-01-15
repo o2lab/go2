@@ -6,6 +6,8 @@ import (
 	"github.com/o2lab/go2/preprocessor"
 	log "github.com/sirupsen/logrus"
 	"go/token"
+	"go/types"
+	"golang.org/x/tools/go/callgraph"
 	"golang.org/x/tools/go/ssa"
 )
 
@@ -17,7 +19,7 @@ type FnPass struct {
 	escapedBorrowedPointSet   pointer.AccessPointSet
 	borrowedPointSet          pointer.AccessPointSet
 	accessPointSet            pointer.AccessPointSet
-	stack                     CallStack
+	fowardStack               CallStack
 	escapedValues             []ssa.Value
 	Visitor                   *CFGVisitor
 	accessMeta                map[int][]*Access
@@ -32,7 +34,7 @@ type Access struct {
 	Write            bool
 	Addr             ssa.Value
 	Pred             *Access
-	PredSite         ssa.Instruction
+	PredSite         *callgraph.Edge
 	AcquiredPointSet pointer.AccessPointSet
 
 	// TODO: remove these
@@ -69,7 +71,7 @@ func NewFnPass(visitor *CFGVisitor, domain ThreadDomain, summary preprocessor.Fn
 		Visitor:                   visitor,
 		thread:                    domain,
 		summary:                   summary,
-		stack:                     stack.Copy(),
+		fowardStack:               stack.Copy(),
 		seenAccessInstrs:          make(map[ssa.Instruction]bool),
 		accessInstrs:              make(map[ssa.Instruction]bool),
 		acquireMap:                make(map[ssa.Instruction]*pointer.AccessPointSet),
@@ -161,6 +163,7 @@ func (pass *FnPass) updateBlockState(block *ssa.BasicBlock, acqIn *pointer.Acces
 	escInOld.Copy(&escIn.Sparse)
 
 	for _, instruction := range block.Instrs {
+		log.Debugln(instruction)
 		switch instr := instruction.(type) {
 		case *ssa.Call:
 			if mutex := preprocessor.GetLockedMutex(instr.Common()); mutex != nil {
@@ -178,17 +181,19 @@ func (pass *FnPass) updateBlockState(block *ssa.BasicBlock, acqIn *pointer.Acces
 				}
 			} else {
 				// Apply the callee's summary.
-				fun := GetFunctionFromCallCommon(instr.Common())
-				if calleePass, ok := pass.Visitor.passes[fun]; ok && fun != nil {
-					pass.applyCalleeSummary(calleePass, instr, false, acqIn, escIn, accessMap)
+				for _, edge := range pass.Visitor.instrSiteMap[instr] {
+					fun := edge.Callee.Func
+					if calleePass, ok := pass.Visitor.passes[fun]; ok && fun != nil {
+						escIn.UnionWith(&calleePass.escapedBorrowedPointSet.Sparse)
+						pass.applyCalleeSummary(calleePass, instr, false, acqIn, escIn, accessMap, edge)
 
-					acqIn.UnionWith(&calleePass.acquiredPointSet.Sparse)
-					escIn.UnionWith(&calleePass.escapedBorrowedPointSet.Sparse)
+						acqIn.UnionWith(&calleePass.acquiredPointSet.Sparse)
+					}
 				}
 			}
 		case *ssa.Go:
-			if fun := GetFunctionFromCallCommon(instr.Common()); fun != nil {
-				// Capture escaped values.
+			for _, edge := range pass.Visitor.instrSiteMap[instr] {
+				fun := edge.Callee.Func
 				for _, v := range fun.FreeVars {
 					if ps := pass.valueToPointSet(v); ps != nil {
 						escIn.UnionWith(&ps.Sparse)
@@ -202,15 +207,21 @@ func (pass *FnPass) updateBlockState(block *ssa.BasicBlock, acqIn *pointer.Acces
 
 				// Apply the callee's summary.
 				if calleePass, ok := pass.Visitor.passes[fun]; ok {
-					pass.applyCalleeSummary(calleePass, instr, true, acqIn, escIn, accessMap)
+					pass.applyCalleeSummary(calleePass, instr, true, acqIn, escIn, accessMap, edge)
 				}
 			}
+
 		case *ssa.UnOp:
 			if instr.Op == token.MUL {
+				pass.updateStateViaIndirection(instr, instr.X, escIn)
 				pass.makeAccess(instr, instr.X, false, acqIn, escIn, accessMap, accessPointSet)
 			}
 		case *ssa.Store:
 			pass.makeAccess(instr, instr.Addr, true, acqIn, escIn, accessMap, accessPointSet)
+		case *ssa.IndexAddr:
+			pass.updateStateViaIndirection(instr, instr.X, escIn)
+		case *ssa.FieldAddr:
+			pass.updateStateViaIndirection(instr, instr.X, escIn)
 		default:
 			// Let instr acquire all points in acqIn.
 			acqAP := pass.acquireMap[instr]
@@ -235,109 +246,55 @@ func (pass *FnPass) updateBlockState(block *ssa.BasicBlock, acqIn *pointer.Acces
 	return true
 }
 
+func (pass *FnPass) updateStateViaIndirection(target ssa.Value, base ssa.Value, escIn *pointer.AccessPointSet) {
+	targetPS := pass.valueToPointSet(target)
+	basePS := pass.valueToPointSet(base)
+	if targetPS != nil && basePS != nil {
+		if escIn.Intersects(&basePS.Sparse) {
+			escIn.UnionWith(&targetPS.Sparse)
+		}
+		if pass.borrowedPointSet.Intersects(&basePS.Sparse) {
+			pass.borrowedPointSet.UnionWith(&targetPS.Sparse)
+		}
+	}
+	log.Debug("borrowed: ", pass.borrowedPointSet.AppendTo([]int{}), "escaped: ", escIn.AppendTo([]int{}))
+}
 
 func (pass *FnPass) applyCalleeSummary(calleePass *FnPass, site ssa.Instruction, crossThread bool, acqIn *pointer.AccessPointSet,
-	escIn *pointer.AccessPointSet, accessMap map[int][]*Access) {
-	if escIn.Intersects(&calleePass.accessPointSet.Sparse) {
-		for p, accesses := range calleePass.accessMeta {
-			for _, acc := range accesses {
-				accNew := &Access{
-					Instr:            acc.Instr,
-					Write:            acc.Write,
-					Addr:             acc.Addr,
-					Pred:             acc,
-					PredSite:         site,
-					CrossThread:      crossThread || acc.CrossThread,
-				}
+	escIn *pointer.AccessPointSet, accessMap map[int][]*Access, edge *callgraph.Edge) {
+	for p, accesses := range calleePass.accessMeta {
+		for _, acc := range accesses {
+			accNew := &Access{
+				Instr:            acc.Instr,
+				Write:            acc.Write,
+				Addr:             acc.Addr,
+				Pred:             acc,
+				PredSite:         edge,
+				CrossThread:      crossThread || acc.CrossThread,
+			}
 
-				// Merge the acquired point sets if the access is bound to the current thread.
-				if !accNew.CrossThread {
-					accNew.AcquiredPointSet.Union(&acc.AcquiredPointSet.Sparse, &acqIn.Sparse)
-				}
+			if !accNew.CrossThread {
+				accNew.AcquiredPointSet.Union(&acc.AcquiredPointSet.Sparse, &acqIn.Sparse)
+			}
 
+			escaped := pass.isAddrEscaped(acc.Addr, pass.valueToPointSet(acc.Addr), escIn)
+			// Check races if the access is bound to the current thread.
+			if !accNew.CrossThread && escaped {
 				for _, accCur := range accessMap[p] {
 					if accCur.RacesWith(accNew) {
 						pass.ReportRace(accCur, accNew)
 					}
 				}
 			}
+
+			// Merge the access into caller's pass.
+			if escaped || pass.isAddrNonLocal1(acc.Addr) || accNew.CrossThread {
+				pass.accessPointSet.Insert(p)
+				accessMap[p] = append(accessMap[p], accNew)
+			}
 		}
 	}
 }
-
-//
-//func (pass *FnPass) computeEscapedAccessPoints(function *ssa.Function) []map[pointer.AccessPointId]int {
-//	escapedPerBlock := make([]map[pointer.AccessPointId]int, len(function.Blocks))
-//	for i := 0; i < len(function.Blocks); i++ {
-//		escapedPerBlock[i] = make(map[pointer.AccessPointId]int) // maps point to the index of the call/go instruction where the point escapes
-//	}
-//
-//	for blockIdx, block := range function.Blocks {
-//		for instrIdx, instruction := range block.Instrs {
-//			switch instr := instruction.(type) {
-//			case *ssa.Defer:
-//			//	TODO
-//			case *ssa.Call:
-//				if fun := GetFunctionFromCallCommon(instr.Common()); fun != nil {
-//					if calleePass, ok := pass.Visitor.passes[fun]; ok {
-//						for pts, _ := range calleePass.escapedBorrowedPointSet {
-//							escapedPerBlock[blockIdx][pts] = instrIdx
-//						}
-//					}
-//				}
-//			case *ssa.Go:
-//				if fun := GetFunctionFromCallCommon(instr.Common()); fun != nil {
-//					for _, v := range fun.Params {
-//						for _, p := range pass.valueToPointSlice(v) {
-//							escapedPerBlock[blockIdx][p] = instrIdx
-//						}
-//					}
-//					for _, v := range fun.FreeVars {
-//						for _, p := range pass.valueToPointSlice(v) {
-//							escapedPerBlock[blockIdx][p] = instrIdx
-//						}
-//					}
-//				}
-//			}
-//		}
-//	}
-//
-//	// Compute transitive closure for escaped points of each block.
-//	// Exclude the entry block initially, whose Preds is nil.
-//	worklist := make([]int, len(function.Blocks)-1)
-//	for i := 1; i < len(function.Blocks); i++ {
-//		worklist[i-1] = i
-//	}
-//	for len(worklist) > 0 {
-//		idx := worklist[0]
-//		worklist = worklist[1:]
-//		block := function.Blocks[idx]
-//		changed := false
-//		for _, pred := range block.Preds {
-//			for pt, _ := range escapedPerBlock[pred.Index] {
-//				if _, ok := escapedPerBlock[idx][pt]; !ok {
-//					changed = true
-//				}
-//				// If pt is already seen by block idx, overwrite its index to 0.
-//				escapedPerBlock[idx][pt] = 0
-//			}
-//		}
-//		if changed {
-//			for _, succ := range block.Succs {
-//				worklist = append(worklist, succ.Index)
-//			}
-//		}
-//	}
-//	return escapedPerBlock
-////}
-//
-//func (pass *FnPass) setEscapedPointsByValue(v ssa.Value, escapedToCallee map[pointer.AccessPointId]bool, instrIdx int, target map[pointer.AccessPointId]int) {
-//	for _, p := range pass.Visitor.ptaResult.Queries[v].AccessPointSet().ToSlice() {
-//		if escapedToCallee[p] {
-//			target[p] = instrIdx
-//		}
-//	}
-//}
 
 func (pass *FnPass) makeAccess(instr ssa.Instruction, addr ssa.Value, write bool, acqIn *pointer.AccessPointSet,
 	escIn *pointer.AccessPointSet, accessMap map[int][]*Access, accessPointSet *pointer.AccessPointSet) {
@@ -352,11 +309,11 @@ func (pass *FnPass) makeAccess(instr ssa.Instruction, addr ssa.Value, write bool
 		}
 		acc.AcquiredPointSet.Copy(&acqIn.Sparse)
 
-		// Check races on any escaped values.
+		// Check races on the subset of escaped values.
 		var intersection pointer.AccessPointSet
 		var space [8]int
-		intersection.Intersection(&escIn.Sparse, &ps.Sparse)
-		if !intersection.IsEmpty() {
+		escaped := pass.isAddrEscaped(addr, ps, escIn)
+		if escaped {
 			for _, p := range intersection.Sparse.AppendTo(space[:0]) {
 				for _, acc1 := range accessMap[p] {
 					if acc.RacesWith(acc1) {
@@ -366,12 +323,62 @@ func (pass *FnPass) makeAccess(instr ssa.Instruction, addr ssa.Value, write bool
 			}
 		}
 
-		// Store access metadata.
-		for _, p := range ps.Sparse.AppendTo(space[:0]) {
-			accessMap[p] = append(accessMap[p], acc)
+		// Store access metadata if its address is non-local or escaped.
+		nonlocal := pass.isAddrNonLocal(addr, ps)
+		if escaped || nonlocal {
+			for _, p := range ps.Sparse.AppendTo(space[:0]) {
+				accessMap[p] = append(accessMap[p], acc)
+			}
+			accessPointSet.UnionWith(&ps.Sparse)
 		}
-		accessPointSet.UnionWith(&ps.Sparse)
+		if nonlocal {
+			pass.escapedBorrowedPointSet.UnionWith(&ps.Sparse)
+		}
 	}
+}
+
+func (pass *FnPass) isAddrNonLocal1(value ssa.Value) bool {
+	if ps := pass.valueToPointSet(value); ps != nil {
+		if pass.borrowedPointSet.Intersects(&ps.Sparse) {
+			return true
+		}
+		if fieldAddrInstr, ok := value.(*ssa.FieldAddr); ok {
+			return pass.isAddrNonLocal1(fieldAddrInstr.X)
+		} else if ptr, ok := value.Type().Underlying().(*types.Pointer); ok {
+			log.Debugln("ptr", ptr)
+		}
+	}
+	return false
+}
+
+func (pass *FnPass) isAddrEscaped(value ssa.Value, ps *pointer.AccessPointSet, escIn *pointer.AccessPointSet) bool {
+	if escIn.Intersects(&ps.Sparse) {
+		return true
+	}
+	if fieldAddrInstr, ok := value.(*ssa.FieldAddr); ok {
+		ps = pass.valueToPointSet(fieldAddrInstr.X)
+		if ps != nil {
+			return pass.isAddrEscaped(fieldAddrInstr.X, ps, escIn)
+		}
+	}
+	return false
+}
+
+func (pass *FnPass) isAddrNonLocal(value ssa.Value, ps *pointer.AccessPointSet) bool {
+	if pass.borrowedPointSet.Intersects(&ps.Sparse) {
+		return true
+	}
+	if fieldAddrInstr, ok := value.(*ssa.FieldAddr); ok {
+		ps = pass.valueToPointSet(fieldAddrInstr.X)
+		if ps != nil {
+			return pass.isAddrNonLocal(fieldAddrInstr.X, ps)
+		}
+	}
+	return false
+}
+
+func (pass *FnPass) GetSSAValueByPointID(p int) ssa.Value {
+	return pass.Visitor.aPointer.GetSSAValue(p)
 }
 
 func (a *Access) RacesWith(b *Access) bool {
@@ -381,7 +388,7 @@ func (a *Access) RacesWith(b *Access) bool {
 	if a.AcquiredPointSet.Intersects(&b.AcquiredPointSet.Sparse) {
 		return false
 	}
-	if !b.CrossThread {
+	if !a.CrossThread && !b.CrossThread {
 		return false
 	}
 	return true
@@ -417,6 +424,16 @@ func (a *Access) String() string {
 	return fmt.Sprintf("Read of %s from %s @T%s", a.Addr, a.Instr, a.Thread)
 }
 
+func (a *Access) UnrollStack() CallStack {
+	var res CallStack
+	cur := a
+	for cur.Pred != nil {
+		res = append(res, cur.PredSite)
+		cur = cur.Pred
+	}
+	return res
+}
+
 func (a *Access) StringWithPos(fset *token.FileSet) string {
 	if a.Write {
 		return fmt.Sprintf("Write of %s by T%s, Acquired: %+q, %s", a.Addr, a.Thread, a.AcquiredValues, fset.Position(a.Instr.Pos()))
@@ -444,9 +461,11 @@ func (pass *FnPass) ReportRace(a1, a2 *Access) {
 	log.Println("========== DATA RACE ==========")
 	log.Printf("  %s", a1.StringWithPos(fset))
 	log.Println("  Call stack:")
-	PrintStack(pass.stack)
+	PrintStack(a1.UnrollStack())
+	PrintStack(pass.fowardStack)
 	log.Printf("  %s", a2.StringWithPos(fset))
 	log.Println("  Call stack:")
-	PrintStack(a2.Stack)
+	PrintStack(a2.UnrollStack())
+	PrintStack(pass.fowardStack)
 	log.Println("===============================")
 }

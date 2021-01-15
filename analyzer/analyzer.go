@@ -23,7 +23,6 @@ type AnalyzerConfig struct {
 	passes              map[*ssa.Function]*pass.FnPass
 	accessesByAllocSite map[pointer.Pointer][]*pass.Access
 	accessesMerged      map[pointer.Pointer][]*pass.Access
-	FnNodeMap           map[*ssa.Function]*callgraph.Node
 }
 
 func NewAnalyzerConfig(paths []string, excluded []string) *AnalyzerConfig {
@@ -36,7 +35,6 @@ func NewAnalyzerConfig(paths []string, excluded []string) *AnalyzerConfig {
 		fnSummaries:         make(map[*ssa.Function]preprocessor.FnSummary),
 		passes:              make(map[*ssa.Function]*pass.FnPass),
 		accessesByAllocSite: make(map[pointer.Pointer][]*pass.Access),
-		FnNodeMap:           make(map[*ssa.Function]*callgraph.Node),
 	}
 }
 
@@ -92,18 +90,17 @@ func (a *AnalyzerConfig) Run() {
 		log.Fatalln(err)
 	}
 
-	domains := ComputeThreadDomains(a.ptaResult.CallGraph, preprocessor.ExcludedPkg, 3)
 	//funcAcquiredValues := make(map[*ssa.Function][]ssa.Value)
-	cfgVisitor := pass.NewCFGVisitorState(a.ptaResult, a.sharedPtrSet, domains, preprocessor.EscapedValues, a.program)
+	instrEdgeMap := make(map[ssa.CallInstruction][]*callgraph.Edge)
+	cfgVisitor := pass.NewCFGVisitorState(a.ptaResult, a.sharedPtrSet, preprocessor.EscapedValues, a.program, instrEdgeMap)
 	err = GraphVisitEdgesFiltered(a.ptaResult.CallGraph, preprocessor.ExcludedPkg, func(edge *callgraph.Edge, stack pass.CallStack) error {
 		callee := edge.Callee.Func
 		// External function.
 		if callee.Blocks == nil {
 			return nil
 		}
-		a.FnNodeMap[callee] = edge.Callee
+		instrEdgeMap[edge.Site] = append(instrEdgeMap[edge.Site], edge)
 		log.Debugf("%s --> %s", edge.Caller.Func, edge.Callee.Func)
-		//pass.PrintStack(stack)
 		cfgVisitor.VisitFunction(callee, stack)
 		return nil
 	})

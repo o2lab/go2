@@ -1,5 +1,7 @@
 package pointer
 
+import "golang.org/x/tools/go/ssa"
+
 type AccessPointId = nodeid
 type AccessPointSet = nodeset
 
@@ -8,6 +10,16 @@ func (p *Pointer) AccessPointSet() *AccessPointSet {
 		return nil
 	}
 	return &p.a.nodes[p.n].solve.pts
+}
+
+func (p *Pointer) GetSSAValue(id int) ssa.Value {
+	if id == 0 {
+		panic("GetData: id cannot be 0")
+	}
+	if v, ok := p.a.nodes[id].obj.data.(ssa.Value); ok {
+		return v
+	}
+	return nil
 }
 
 func (a *AccessPointSet) ToSlice() []AccessPointId {

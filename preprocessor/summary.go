@@ -8,23 +8,22 @@ import (
 )
 
 type FnSummary struct {
-	fset      *token.FileSet
+	fset         *token.FileSet
 	preprocessor *Preprocessor
-	AccessSet map[ssa.Value]IsWrite
-	AllocSet  map[*ssa.Alloc]ssa.Instruction
-	MutexSet  map[ssa.Value]bool
-	ExitBlocks []*ssa.BasicBlock
+	AccessSet    map[ssa.Value]IsWrite
+	HeadAllocs   []ssa.Value
+	MutexSet     map[ssa.Value]bool
+	ExitBlocks   []*ssa.BasicBlock
 }
 
 type IsWrite bool
 
 func NewFnSummary(fset *token.FileSet, preprocessor *Preprocessor) *FnSummary {
 	return &FnSummary{
-		fset:      fset,
-		preprocessor:preprocessor,
-		AccessSet: make(map[ssa.Value]IsWrite),
-		AllocSet:  make(map[*ssa.Alloc]ssa.Instruction),
-		MutexSet:  make(map[ssa.Value]bool),
+		fset:         fset,
+		preprocessor: preprocessor,
+		AccessSet:    make(map[ssa.Value]IsWrite),
+		MutexSet:     make(map[ssa.Value]bool),
 	}
 }
 
@@ -88,6 +87,7 @@ func (f *FnSummary) visitUnOp(instr *ssa.UnOp) {
 	case token.MUL:
 		log.Debugf("deref %s %s", instr.X, f.fset.Position(instr.X.Pos()))
 		f.recordRead(instr.X)
+		f.recordRead(instr) // indirect access
 	case token.ARROW:
 		log.Debugf("recv")
 	}
@@ -106,7 +106,7 @@ func (f *FnSummary) visitLookup(instr *ssa.Lookup) {
 func (f *FnSummary) visitAlloc(instr *ssa.Alloc) {
 	log.Debugf("Alloc %s", instr)
 	if instr.Heap {
-		f.AllocSet[instr] = instr
+		f.HeadAllocs = append(f.HeadAllocs, instr)
 	}
 }
 
