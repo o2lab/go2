@@ -12,14 +12,13 @@ import (
 )
 
 type FnPass struct {
-	//BlockStates               map[int]*BlockState
 	thread                    ThreadDomain
 	summary                   preprocessor.FnSummary
 	acquiredPointSet          pointer.AccessPointSet
 	escapedBorrowedPointSet   pointer.AccessPointSet
 	borrowedPointSet          pointer.AccessPointSet
 	accessPointSet            pointer.AccessPointSet
-	fowardStack               CallStack
+	forwardStack              CallStack
 	escapedValues             []ssa.Value
 	Visitor                   *CFGVisitor
 	accessMeta                map[int][]*Access
@@ -67,11 +66,10 @@ func (d ThreadDomain) String() string {
 
 func NewFnPass(visitor *CFGVisitor, domain ThreadDomain, summary preprocessor.FnSummary, stack CallStack) *FnPass {
 	return &FnPass{
-		//BlockStates:               make(map[int]*BlockState),
 		Visitor:                   visitor,
 		thread:                    domain,
 		summary:                   summary,
-		fowardStack:               stack.Copy(),
+		forwardStack:              stack.Copy(),
 		seenAccessInstrs:          make(map[ssa.Instruction]bool),
 		accessInstrs:              make(map[ssa.Instruction]bool),
 		acquireMap:                make(map[ssa.Instruction]*pointer.AccessPointSet),
@@ -103,6 +101,22 @@ func (pass *FnPass) valueToPointSet(v ssa.Value) *pointer.AccessPointSet {
 	return p.AccessPointSet()
 }
 
+func (pass *FnPass) extendPointSetIfStruct(ps *pointer.AccessPointSet, v ssa.Value) []int {
+	var space [4]int
+	res := ps.AppendTo(space[:0])
+	if named, ok := v.Type().Underlying().(*types.Pointer).Elem().(*types.Named); ok {
+		if t, ok := named.Underlying().(*types.Struct); ok {
+			n := t.NumFields()
+			for _, p := range res {
+				for i := 0; i < n; i++ {
+					res = append(res, p + i + 1)
+				}
+			}
+		}
+	}
+	return res
+}
+
 func (pass *FnPass) dataflowAnalysis(function *ssa.Function) {
 	size := len(function.Blocks)
 	acquiredOuts := make([]*pointer.AccessPointSet, size)
@@ -131,7 +145,7 @@ func (pass *FnPass) dataflowAnalysis(function *ssa.Function) {
 			acqIn.IntersectionWith(&acquiredOuts[predIdx].Sparse)
 		}
 
-		// escIn is the union of outs for each predecessor.
+		// escIn is the union of escapedOuts for each predecessor.
 		var escIn pointer.AccessPointSet
 		for _, pred := range block.Preds {
 			escIn.UnionWith(&escapedOuts[pred.Index].Sparse)
@@ -158,12 +172,10 @@ func (pass *FnPass) dataflowAnalysis(function *ssa.Function) {
 
 func (pass *FnPass) updateBlockState(block *ssa.BasicBlock, acqIn *pointer.AccessPointSet, escIn *pointer.AccessPointSet,
 	acqOut *pointer.AccessPointSet, escOut *pointer.AccessPointSet, accessMap map[int][]*Access, accessPointSet *pointer.AccessPointSet) bool {
-	var acqInOld, escInOld pointer.AccessPointSet
-	acqInOld.Copy(&acqIn.Sparse)
-	escInOld.Copy(&escIn.Sparse)
+	log.Debugf("Block %d", block.Index)
 
 	for _, instruction := range block.Instrs {
-		log.Debugln(instruction)
+		log.Debugln("  ", instruction)
 		switch instr := instruction.(type) {
 		case *ssa.Call:
 			if mutex := preprocessor.GetLockedMutex(instr.Common()); mutex != nil {
@@ -222,18 +234,10 @@ func (pass *FnPass) updateBlockState(block *ssa.BasicBlock, acqIn *pointer.Acces
 			pass.updateStateViaIndirection(instr, instr.X, escIn)
 		case *ssa.FieldAddr:
 			pass.updateStateViaIndirection(instr, instr.X, escIn)
-		default:
-			// Let instr acquire all points in acqIn.
-			acqAP := pass.acquireMap[instr]
-			if acqAP == nil {
-				acqAP = &pointer.AccessPointSet{}
-				pass.acquireMap[instr] = acqAP
-			}
-			acqAP.UnionWith(&acqIn.Sparse)
 		}
 	}
-	acqFixed := acqOut.Equals(&acqInOld.Sparse)
-	escFixed := escOut.Equals(&escInOld.Sparse)
+	acqFixed := acqIn.Equals(&acqOut.Sparse)
+	escFixed := escIn.Equals(&escOut.Sparse)
 	if acqFixed && escFixed {
 		return false
 	}
@@ -257,7 +261,7 @@ func (pass *FnPass) updateStateViaIndirection(target ssa.Value, base ssa.Value, 
 			pass.borrowedPointSet.UnionWith(&targetPS.Sparse)
 		}
 	}
-	log.Debug("borrowed: ", pass.borrowedPointSet.AppendTo([]int{}), "escaped: ", escIn.AppendTo([]int{}))
+	log.Debug("   => borrowed: ", pass.borrowedPointSet.AppendTo([]int{}), " escaped: ", escIn.AppendTo([]int{}))
 }
 
 func (pass *FnPass) applyCalleeSummary(calleePass *FnPass, site ssa.Instruction, crossThread bool, acqIn *pointer.AccessPointSet,
@@ -310,11 +314,10 @@ func (pass *FnPass) makeAccess(instr ssa.Instruction, addr ssa.Value, write bool
 		acc.AcquiredPointSet.Copy(&acqIn.Sparse)
 
 		// Check races on the subset of escaped values.
-		var intersection pointer.AccessPointSet
-		var space [8]int
 		escaped := pass.isAddrEscaped(addr, ps, escIn)
+		points := pass.extendPointSetIfStruct(ps, addr)
 		if escaped {
-			for _, p := range intersection.Sparse.AppendTo(space[:0]) {
+			for _, p := range points {
 				for _, acc1 := range accessMap[p] {
 					if acc.RacesWith(acc1) {
 						pass.ReportRace(acc, acc1)
@@ -326,7 +329,7 @@ func (pass *FnPass) makeAccess(instr ssa.Instruction, addr ssa.Value, write bool
 		// Store access metadata if its address is non-local or escaped.
 		nonlocal := pass.isAddrNonLocal(addr, ps)
 		if escaped || nonlocal {
-			for _, p := range ps.Sparse.AppendTo(space[:0]) {
+			for _, p := range points {
 				accessMap[p] = append(accessMap[p], acc)
 			}
 			accessPointSet.UnionWith(&ps.Sparse)
@@ -344,8 +347,6 @@ func (pass *FnPass) isAddrNonLocal1(value ssa.Value) bool {
 		}
 		if fieldAddrInstr, ok := value.(*ssa.FieldAddr); ok {
 			return pass.isAddrNonLocal1(fieldAddrInstr.X)
-		} else if ptr, ok := value.Type().Underlying().(*types.Pointer); ok {
-			log.Debugln("ptr", ptr)
 		}
 	}
 	return false
@@ -462,10 +463,10 @@ func (pass *FnPass) ReportRace(a1, a2 *Access) {
 	log.Printf("  %s", a1.StringWithPos(fset))
 	log.Println("  Call stack:")
 	PrintStack(a1.UnrollStack())
-	PrintStack(pass.fowardStack)
+	PrintStack(pass.forwardStack)
 	log.Printf("  %s", a2.StringWithPos(fset))
 	log.Println("  Call stack:")
 	PrintStack(a2.UnrollStack())
-	PrintStack(pass.fowardStack)
+	PrintStack(pass.forwardStack)
 	log.Println("===============================")
 }
