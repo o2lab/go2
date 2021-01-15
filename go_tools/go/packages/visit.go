@@ -53,3 +53,50 @@ func PrintErrors(pkgs []*Package) int {
 	})
 	return n
 }
+
+//bz: i need the index of pkgs
+func VisitAndMore(pkgs []*Package, pre func(*Package) bool, post func(int, *Package)) {
+	seen := make(map[*Package]bool)
+	var visit func(int, *Package)
+	visit = func(idx int, pkg *Package) {
+		if !seen[pkg] {
+			seen[pkg] = true
+
+			if pre == nil || pre(pkg) {
+				paths := make([]string, 0, len(pkg.Imports))
+				for path := range pkg.Imports {
+					paths = append(paths, path)
+				}
+				sort.Strings(paths) // Imports is a map, this makes visit stable
+				for _, path := range paths {
+					visit(-1, pkg.Imports[path])
+				}
+			}
+
+			if post != nil {
+				post(idx, pkg)
+			}
+		}
+	}
+	for idx, pkg := range pkgs {
+		visit(idx, pkg)
+	}
+}
+
+
+//bz: race_checker api -> i want to know who are those pkgs with errors.
+//and I also want to exclude those error pkgs from pkgs (input)
+func PrintErrorsAndMore(pkgs []*Package) (int, []*Package) {
+	var n int
+	var errorPkgs []*Package
+	VisitAndMore(pkgs, nil, func(idx int, pkg *Package) {
+		for _, err := range pkg.Errors {
+			fmt.Fprintln(os.Stderr, err)
+			//bz: More
+			pkgs[idx] = nil //remove it if it has error
+			errorPkgs = append(errorPkgs, pkg) //record
+			n++
+		}
+	})
+	return n, errorPkgs
+}

@@ -104,17 +104,27 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		Tests: false,                  // setting Tests will include related test packages
 	}
 	log.Info("Loading input packages...")
-	initial, err := packages.Load(cfg, args...) //bz: total includes initial now
+	startLoad := time.Now()
+	initial, err := packages.Load(cfg, args...) //bz: total includes initial now  ->  go list
 	if err != nil {
 		return err
 	}
-	if packages.PrintErrors(initial) > 0 {
-		return fmt.Errorf("packages contain errors")
+	t := time.Now()
+	elapsedLoad := t.Sub(startLoad)
+	if len(initial) > 0 {
+		errSize, errPkgs := packages.PrintErrorsAndMore(initial)
+		if errSize > 0 {
+			log.Info("Excluded the following packages contain errors, due to the above errors. ")
+			for i, errPkg := range errPkgs {
+				log.Info(i, " ", errPkg.ID)
+			}
+			log.Info("Continue   -- ")
+		}
 	} else if len(initial) == 0 {
 		return fmt.Errorf("package list empty")
 	}
 
-	log.Info("Done  -- ", len(initial), " packages loaded, ", "? Go files analyzed.")
+	log.Info("Done  -- Using ", elapsedLoad.String(), " ", len(initial), " packages loaded, ", "? Go files analyzed.")
 
 	checkMains, err := findAllMainPkgs(initial)
 	if err != nil {

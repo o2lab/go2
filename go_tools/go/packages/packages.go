@@ -631,6 +631,7 @@ func (ld *loader) refine(roots []string, list ...*Package) ([]*Package, error) {
 		case grey:
 			panic("internal error: grey node")
 		}
+
 		lpkg.color = grey
 		stack = append(stack, lpkg) // push
 		stubs := lpkg.Imports       // the structure form has only stubs with the ID in the Imports

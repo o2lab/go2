@@ -196,15 +196,15 @@ extractQueries:
 	// !! bz: when run race_checker under proj dir, it goes to here
 	//        hence we are going to make this recursively traverse the subdir under the initial cfg.Dir
 	if len(restPatterns) > 0 || len(patterns) == 0 {
-		dr, err := state.createDriverResponse(restPatterns...)
+		dr, err := state.createDriverResponse(restPatterns...) //bz: go list
 		if err != nil {
 			return nil, err
 		}
 		response.addAll(dr)
 
-	    //TODO: bz: tmp condition filter to do the list all main entry points
+		//TODO: bz: tmp condition filter to do the list all main entry points
 		cmd := exec.Command("find", ".", "-type", "d") //bz: list this subdir recursively until none
-		cmd.Dir = cfg.Dir //set cmd dir
+		cmd.Dir = cfg.Dir                              //set cmd dir
 		var stdout, stderr bytes.Buffer
 		cmd.Stdout = &stdout
 		cmd.Stderr = &stderr
@@ -215,19 +215,19 @@ extractQueries:
 		}
 		outStr, _ := string(stdout.Bytes()), string(stderr.Bytes())
 		//fmt.Printf("run ls cmd. out:\n%s\nerr:\n%s\n", outStr, errStr) //bz: for me to debug
-		subdirs := strings.Split(outStr, "\n")//bz: record the future dir we need to traverse
+		subdirs := strings.Split(outStr, "\n") //bz: record the future dir we need to traverse
 
 		var _wg sync.WaitGroup
-		results := make([]*driverResponse, len(subdirs) - 2) //all results
-		for i := 1; i < len(subdirs) - 1; i++ { //bz: 1st element is ".", the last element is "", skip them
+		results := make([]*driverResponse, len(subdirs)-2) //all results
+		for i := 1; i < len(subdirs)-1; i++ {              //bz: 1st element is ".", the last element is "", skip them
 			subdir := subdirs[i]
 			_cfg := &Config{
-				Mode:  LoadAllSyntax,
+				Mode:    LoadAllSyntax,
 				Context: cfg.Context,
-				Logf: cfg.Logf,
-				Dir:   cfg.Dir + subdir[1:], // bz: we update this. remove the "." in subdir
-				Env: cfg.Env,
-				Tests: false,
+				Logf:    cfg.Logf,
+				Dir:     cfg.Dir + subdir[1:], // bz: we update this. remove the "." in subdir
+				Env:     cfg.Env,
+				Tests:   false,
 			}
 			_state := &golistState{
 				cfg:        _cfg,
@@ -238,10 +238,10 @@ extractQueries:
 			go func(i int, _state *golistState, restPatterns []string) {
 				_dr, _err := _state.createDriverResponse(restPatterns...)
 				if _err != nil {
-					fmt.Println(_err)
-					results[i - 1] = nil
-				}else{
-					results[i - 1] = _dr
+					fmt.Printf("ERROR from _state.createDriverResponse: %s", _err)
+					results[i-1] = nil
+				} else {
+					results[i-1] = _dr
 				}
 				_wg.Done()
 			}(i, _state, restPatterns)
@@ -291,7 +291,7 @@ extractQueries:
 			for _, f := range containFiles {
 				for _, g := range pkg.GoFiles {
 					if sameFile(f, g) {
-						response.addRoot(id)
+						response.addRoot(id) //main
 					}
 				}
 			}
@@ -885,7 +885,7 @@ func (state *golistState) invokeGo(verb string, args ...string) (*bytes.Buffer, 
 		BuildFlags: cfg.BuildFlags,
 		Env:        cfg.Env,
 		Logf:       cfg.Logf,
-		WorkingDir: cfg.Dir,  //bz: this is the key part
+		WorkingDir: cfg.Dir, //bz: this is the key part
 	}
 	gocmdRunner := cfg.gocmdRunner
 	if gocmdRunner == nil {
