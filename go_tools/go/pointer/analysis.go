@@ -460,15 +460,21 @@ func AnalyzeWCtx(config *Config) (result *ResultWCtx, err error) { //Result
 
 	//update analysis scope
 	fmt.Println(" *** MODE: " + mode + " *** ")
-	fmt.Println(" *** Analyze Scope *** ")
+	fmt.Println(" *** Analyze Scope ***************** ")
 	if len(a.config.Scope) > 0 {
 		for _, pkg := range a.config.Scope {
 			fmt.Println(" - " + pkg)
 		}
-	}else{
-		fmt.Println(" - default: command-line-arguments")
 	}
-	fmt.Println(" ********************* ")
+	fmt.Println(" - command-line-arguments (default)")
+	fmt.Println(" *********************************** ")
+	if len(a.config.Mains) > 1 {
+	    fmt.Println(" *** Multiple Mains **************** ")
+	    for i, main := range a.config.Mains {
+			fmt.Println(strconv.Itoa(i) + ": " + main.String())
+		}
+		fmt.Println(" *********************************** ")
+	}
 
 	if a.log != nil {
 		fmt.Fprintln(a.log, "==== Starting analysis and logging: ")
@@ -605,7 +611,7 @@ func AnalyzeWCtx(config *Config) (result *ResultWCtx, err error) { //Result
 	return a.result, nil
 }
 
-//bz:
+//bz: used by me
 func ContainString(s []string, e string) bool {
 	for _, a := range s {
 		if a == e {
