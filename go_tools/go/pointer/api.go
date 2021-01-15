@@ -371,10 +371,10 @@ func (r *ResultWCtx) PointsToByMain(v ssa.Value) PointerWCtx {
 	}
 	ptss = r.PointsToRegular(v) //return type: []PointerWCtx
 	for _, pts := range ptss {
-		if pts.cgn == nil {
-			continue //from extended query
+		if pts.cgn == nil || pts.cgn.callersite == nil || pts.cgn.callersite[0] == nil {
+			continue //from extended query or shared contour
 		}
-		if pts.cgn.idx == r.main.idx {
+		if pts.cgn.callersite[0].targets  == r.main.callersite[0].targets {
 			return pts
 		}
 	}
