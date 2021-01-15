@@ -93,7 +93,9 @@ func PrintErrorsAndMore(pkgs []*Package) (int, []*Package) {
 		for _, err := range pkg.Errors {
 			fmt.Fprintln(os.Stderr, err)
 			//bz: More
-			pkgs[idx] = nil //remove it if it has error
+			if idx != -1 {
+				pkgs[idx] = nil //remove it if it has error
+			}
 			errorPkgs = append(errorPkgs, pkg) //record
 			n++
 		}
