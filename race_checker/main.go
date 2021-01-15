@@ -97,7 +97,7 @@ var (
 	testMode     = false // Used by race_test.go for collecting output.
 )
 
-var useNewPTA = false //bz: default value for this branch
+var useNewPTA = true //bz: default value for this branch
 var doDebugPTA = false //bz: default value for this branch
 var doPTALog = false //bz: default value for this branch
 
