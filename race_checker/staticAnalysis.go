@@ -111,7 +111,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 	}
 	t := time.Now()
 	elapsedLoad := t.Sub(startLoad)
-	if len(initial) > 0 {
+	if efficiency && len(initial) > 0 {
 		errSize, errPkgs := packages.PrintErrorsAndMore(initial)
 		if errSize > 0 {
 			log.Info("Excluded the following packages contain errors, due to the above errors. ")
