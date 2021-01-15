@@ -279,6 +279,8 @@ func (pass *FnPass) applyCalleeSummary(calleePass *FnPass, site ssa.Instruction,
 
 			if !accNew.CrossThread {
 				accNew.AcquiredPointSet.Union(&acc.AcquiredPointSet.Sparse, &acqIn.Sparse)
+			} else {
+				accNew.AcquiredPointSet.Copy(&acc.AcquiredPointSet.Sparse)
 			}
 
 			escaped := pass.isAddrEscaped(acc.Addr, pass.valueToPointSet(acc.Addr), escIn)
@@ -437,9 +439,9 @@ func (a *Access) UnrollStack() CallStack {
 
 func (a *Access) StringWithPos(fset *token.FileSet) string {
 	if a.Write {
-		return fmt.Sprintf("Write of %s by T%s, Acquired: %+q, %s", a.Addr, a.Thread, a.AcquiredValues, fset.Position(a.Instr.Pos()))
+		return fmt.Sprintf("Write of %s by T%s, Acquired: %+q, %s", a.Addr, a.Thread, a.AcquiredPointSet.AppendTo([]int{}), fset.Position(a.Instr.Pos()))
 	}
-	return fmt.Sprintf("Read of %s by T%s, Acquired: %+q, %s", a.Addr, a.Thread, a.AcquiredValues, fset.Position(a.Instr.Pos()))
+	return fmt.Sprintf("Read of %s by T%s, Acquired: %+q, %s", a.Addr, a.Thread, a.AcquiredPointSet.AppendTo([]int{}), fset.Position(a.Instr.Pos()))
 }
 
 func PrintStack(stack CallStack) {
@@ -453,7 +455,7 @@ func PrintStack(stack CallStack) {
 			pos = f.Pos()
 		}
 		signature := fmt.Sprintf("%s", f.Name())
-		log.Infof("    %-14s %v", signature, f.Prog.Fset.Position(pos))
+		log.Infof("    %s %v", signature, f.Prog.Fset.Position(pos))
 	}
 }
 
