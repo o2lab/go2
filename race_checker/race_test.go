@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"flag"
 	"fmt"
 	"github.com/rogpeppe/go-internal/testenv"
@@ -12,14 +11,10 @@ import (
 	"go/scanner"
 	"go/token"
 	"go/types"
-	"golang.org/x/sync/semaphore"
 	"io/ioutil"
 	"path/filepath"
 	"regexp"
-	"runtime"
 	"strings"
-	"sync"
-	"sync/atomic"
 	"testing"
 )
 
@@ -27,7 +22,6 @@ var (
 	haltOnError = flag.Bool("halt", false, "halt on error")
 	listErrors  = flag.Bool("errlist", false, "list errors")
 	testFiles   = flag.String("files", "", "space-separated list of test files")
-	parallel    = flag.Int("cpu", 0, "max parallelism")
 )
 
 var tests = []string{
@@ -55,7 +49,6 @@ var tests = []string{
 	"tests/race_example1.go",
 	"tests/race_example2.go",
 	"tests/race_example3.go",
-	"tests/runc_simple.go",
 	"tests/rwmutex_lock.go",
 	"tests/select.go",
 	"tests/select_all_ready.go",
@@ -64,7 +57,7 @@ var tests = []string{
 	"tests/select_nonblock_fp.go",
 	"tests/select_rpc.go",
 	"tests/select_sends.go", // WIP - determine readiness
-	"tests/select_timeout.go", // WIP - handle timeout portal - perhaps same as default
+	//"tests/select_timeout.go", // WIP - handle timeout portal - perhaps same as default
 	"tests/send_after_select.go",
 	"tests/single_case_select.go",
 	"tests/test1.go",
@@ -99,7 +92,7 @@ var tests = []string{
 	//"tests/godel2/dine5-chan-race/main.go",
 }
 
-var passed int32 = 0
+var passed = 0
 
 var fset = token.NewFileSet()
 
@@ -246,8 +239,6 @@ func runChecker(t *testing.T, filenames []string) ([]*ast.File, []error) {
 
 func checkFile(t *testing.T, testfiles []string) {
 	// parse files and collect parser errors
-	logrus.Infof("Running %s", testfiles[0])
-
 	files, errlist := runChecker(t, testfiles)
 
 	if *listErrors && len(errlist) > 0 {
@@ -299,20 +290,15 @@ func checkFile(t *testing.T, testfiles []string) {
 		}
 	}
 	if marker == "." {
-		atomic.AddInt32(&passed, 1)
+		passed++
 	}
 	fmt.Printf("%40s %s\n", testfiles, marker)
 }
 
 func TestRace(t *testing.T) {
+	logrus.SetLevel(logrus.FatalLevel)
 	testenv.MustHaveGoBuild(t)
 	testMode = true
-	if *parallel == 0 {
-		*parallel = runtime.GOMAXPROCS(0)
-	}
-
-	logrus.Infof("Parallelism=%d", *parallel)
-	logrus.SetLevel(logrus.FatalLevel)
 
 	// If explicit test files are specified, only check those.
 	if files := *testFiles; files != "" {
@@ -320,26 +306,10 @@ func TestRace(t *testing.T) {
 		return
 	}
 
-	// Otherwise, run all the tests in parallel.
-	var (
-		sem = semaphore.NewWeighted(int64(*parallel))
-		ctx = context.Background()
-		wg  = sync.WaitGroup{}
-	)
-
-	wg.Add(len(tests))
+	// Otherwise, run all the tests.
 	for _, file := range tests {
-		if err := sem.Acquire(ctx, 1); err != nil {
-			logrus.Fatalf("Failed to acquire semaphore: %v", err)
-		}
-		go func(file string) {
-			defer sem.Release(1)
-			defer wg.Done()
-			checkFile(t, []string{file})
-		}(file)
+		checkFile(t, []string{file})
 	}
-
-	wg.Wait()
 
 	fmt.Printf("Passed %d/%d\n", passed, len(tests))
 }
