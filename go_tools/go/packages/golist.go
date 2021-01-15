@@ -253,7 +253,7 @@ extractQueries:
 		}
 	}
 
-	if len(containFiles) != 0 { //bz: another option
+	if len(containFiles) != 0 { //bz: another option ？ not used now
 		if err := state.runContainsQueries(response, containFiles); err != nil {
 			return nil, err
 		}

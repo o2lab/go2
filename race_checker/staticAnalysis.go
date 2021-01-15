@@ -105,7 +105,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 	}
 	log.Info("Loading input packages...")
 	startLoad := time.Now()
-	initial, err := packages.Load(cfg, args...) //bz: total includes initial now  ->  go list
+	initial, err := packages.Load(cfg, args...)
 	if err != nil {
 		return err
 	}
