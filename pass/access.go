@@ -66,10 +66,11 @@ func (a *Access) MayAlias(b *Access, q map[ssa.Value]pointer.Pointer) bool {
 }
 
 func (a *Access) String() string {
+	typ := "Read"
 	if a.Write {
-		return fmt.Sprintf("Write of %s from %s", a.Addr, a.Instr)
+		typ = "Write"
 	}
-	return fmt.Sprintf("Read of %s from %s", a.Addr, a.Instr)
+	return fmt.Sprintf("%s of %s, async=%t, acq=%+q", typ, a.Addr, a.CrossThread, a.AcquiredPointSet.AppendTo([]int{}))
 }
 
 func (a *Access) UnrollStack() CallStack {

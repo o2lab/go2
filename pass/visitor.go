@@ -48,7 +48,6 @@ func (v *CFGVisitor) VisitFunction(function *ssa.Function, stack CallStack) {
 		v.passes[function] = fnPass
 	}
 	fnPass.extractBorrowedAccessSet(function)
-	log.Debugln("Borrowed:", fnPass.borrowedPointSet.AppendTo([]int{}))
 	fnPass.dataflowAnalysis(function)
 	fnPass.maskUnborrowedAccess()
 }
@@ -66,6 +65,7 @@ func (pass *FnPass) extractBorrowedAccessSet(function *ssa.Function) {
 			log.Debugf("param: %s", v)
 		}
 	}
+	log.Debugln("   => Borrowed:", pass.borrowedPointSet.AppendTo([]int{}))
 }
 
 func (pass *FnPass) maskUnborrowedAccess() {

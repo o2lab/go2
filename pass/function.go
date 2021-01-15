@@ -241,6 +241,10 @@ func (pass *FnPass) applyCalleeSummary(calleePass *FnPass, site ssa.Instruction,
 			}
 
 			escaped := pass.isAddrEscaped(acc.Addr, pass.valueToPointSet(acc.Addr), escIn)
+			nonlocal := pass.isAddrNonLocal1(acc.Addr)
+
+			log.Debugf("   => ACCESS callee esc=%t nonlocal=%t %s", escaped, nonlocal, accNew)
+
 			// Check races if the access is bound to the current thread.
 			if !accNew.CrossThread && escaped {
 				for _, accCur := range accessMap[p] {
@@ -251,7 +255,7 @@ func (pass *FnPass) applyCalleeSummary(calleePass *FnPass, site ssa.Instruction,
 			}
 
 			// Merge the access into caller's pass.
-			if escaped || pass.isAddrNonLocal1(acc.Addr) || accNew.CrossThread {
+			if escaped || nonlocal || accNew.CrossThread {
 				pass.accessPointSet.Insert(p)
 				accessMap[p] = append(accessMap[p], accNew)
 			}
@@ -287,6 +291,9 @@ func (pass *FnPass) makeAccess(instr ssa.Instruction, addr ssa.Value, write bool
 
 		// Store access metadata if its address is non-local or escaped.
 		nonlocal := pass.isAddrNonLocal(addr, ps)
+
+		log.Debugf("   => ACCESS esc=%t nonlocal=%t %s", escaped, nonlocal, acc)
+
 		if escaped || nonlocal {
 			for _, p := range points {
 				accessMap[p] = append(accessMap[p], acc)

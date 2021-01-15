@@ -37,6 +37,14 @@ func (f *FnSummary) Preprocess(function *ssa.Function, ptaConfig *pointer.Config
 			f.ExitBlocks = append(f.ExitBlocks, block)
 		}
 	}
+	for _, v := range function.FreeVars {
+		ptaConfig.AddQuery(v)
+	}
+	for _, v := range function.Params {
+		if pointer.CanPoint(v.Type()) {
+			ptaConfig.AddQuery(v)
+		}
+	}
 	for loc, _ := range f.AccessSet {
 		ptaConfig.AddQuery(loc)
 	}

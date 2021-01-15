@@ -11,6 +11,7 @@ var excluded = []string{
 	//"fmt",
 	//"log",
 
+	"context",
 	"runtime",
 	"internal",
 	"race",
