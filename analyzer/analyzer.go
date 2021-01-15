@@ -116,17 +116,6 @@ func (a *AnalyzerConfig) Run() {
 	//log.Infof("Found %d race(s)", len(races))
 }
 
-func (a *AnalyzerConfig) ReportRace(race RacePair) {
-	log.Println("========== DATA RACE ==========")
-	log.Printf("  %s", race.First.StringWithPos(a.program.Fset))
-	log.Println("  Call stack:")
-	pass.PrintStack(race.First.Stack)
-	log.Printf("  %s", race.Second.StringWithPos(a.program.Fset))
-	log.Println("  Call stack:")
-	pass.PrintStack(race.Second.Stack)
-	log.Println("===============================")
-}
-
 // GraphVisitEdgesFiltered visits all reachable nodes from the root of g in post order. Nodes that belong to any package
 // in excluded are not visited.
 func GraphVisitEdgesFiltered(g *callgraph.Graph, excluded map[string]bool, edge func(*callgraph.Edge, pass.CallStack) error) error {
@@ -158,99 +147,6 @@ func GraphVisitEdgesFiltered(g *callgraph.Graph, excluded map[string]bool, edge 
 		return err
 	}
 	return nil
-}
-
-func ComputeThreadDomains(g *callgraph.Graph, excluded map[string]bool, times int) map[*ssa.Function]pass.ThreadDomain {
-	seen := make(map[*callgraph.Node]int)
-	var visit func(n *callgraph.Node, callerTid int)
-	globalID := 0
-	domains := make(map[*ssa.Function]pass.ThreadDomain)
-	visit = func(n *callgraph.Node, callerTid int) {
-		caller := n.Func
-		if caller.Pkg != nil {
-			if pathRoot := strings.Split(caller.Pkg.Pkg.Path(), "/")[0]; excluded[pathRoot] {
-				return
-			}
-		}
-
-		if seen[n] < times {
-			seen[n] = seen[n] + 1
-			if dom, ok := domains[caller]; ok {
-				if callerTid != dom.ID {
-					dom.Reflexive = true
-				}
-			} else {
-				domains[caller] = pass.ThreadDomain{ID: callerTid}
-			}
-			for _, e := range n.Out {
-				if e.Callee.Func.Blocks == nil {
-					continue
-				}
-				if _, ok := e.Site.(*ssa.Go); ok {
-					globalID++
-				}
-				visit(e.Callee, globalID)
-			}
-		}
-		return
-	}
-	visit(g.Root, globalID)
-	return domains
-}
-
-type RacePair struct {
-	First, Second *pass.Access
-}
-
-func (a *AnalyzerConfig) checkRaces() (races []RacePair) {
-	//mergedAccesses := a.filterAccesses()
-	var reads, writes, allAcc []*pass.Access
-	for _, accesses := range a.accessesByAllocSite {
-		for _, acc := range accesses {
-			if acc.Write {
-				writes = append(writes, acc)
-			} else {
-				reads = append(reads, acc)
-			}
-		}
-	}
-	allAcc = append(allAcc, writes...)
-	allAcc = append(allAcc, reads...)
-	log.Infof("Check races for %d reads, %d writes", len(reads), len(writes))
-	for i := 0; i < len(writes); i++ {
-		for j := i + 1; j < len(allAcc); j++ {
-			log.Debugf("Check %s <> %s", writes[i], allAcc[j])
-			if a.checkRace(writes[i], allAcc[j]) {
-				races = append(races, RacePair{writes[i], allAcc[j]})
-			}
-		}
-	}
-	return
-}
-
-func (a *AnalyzerConfig) checkRace(acc1, acc2 *pass.Access) bool {
-	if !acc1.WriteAndThreadConflictsWith(acc2) ||
-		acc1.MutualExclusive(acc2, a.ptaResult.Queries) ||
-		!acc1.MayAlias(acc2, a.ptaResult.Queries) {
-		return false
-	}
-	return true
-}
-
-func (a *AnalyzerConfig) MayAlias(x, y ssa.Value) bool {
-	return a.ptaResult.Queries[x].MayAlias(a.ptaResult.Queries[y])
-}
-
-func (a *AnalyzerConfig) filterAccesses() map[pointer.Pointer][]*pass.Access {
-	result := make(map[pointer.Pointer][]*pass.Access)
-	for ptr1, _ := range a.sharedPtrSet {
-		for ptr2, accesses := range a.accessesByAllocSite {
-			if ptr1.MayAlias(ptr2) {
-				result[ptr1] = append(result[ptr1], accesses...)
-			}
-		}
-	}
-	return result
 }
 
 func mainPackages(pkgs []*ssa.Package) []*ssa.Package {

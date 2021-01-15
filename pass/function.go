@@ -1,7 +1,6 @@
 package pass
 
 import (
-	"fmt"
 	"github.com/o2lab/go2/pointer"
 	"github.com/o2lab/go2/preprocessor"
 	log "github.com/sirupsen/logrus"
@@ -12,7 +11,6 @@ import (
 )
 
 type FnPass struct {
-	thread                    ThreadDomain
 	summary                   preprocessor.FnSummary
 	acquiredPointSet          pointer.AccessPointSet
 	escapedBorrowedPointSet   pointer.AccessPointSet
@@ -28,46 +26,9 @@ type FnPass struct {
 	accessPointSetByCallInstr map[ssa.Instruction]*pointer.AccessPointSet
 }
 
-type Access struct {
-	Instr            ssa.Instruction
-	Write            bool
-	Addr             ssa.Value
-	Pred             *Access
-	PredSite         *callgraph.Edge
-	AcquiredPointSet pointer.AccessPointSet
-
-	// TODO: remove these
-	AccessPoints   *pointer.AccessPointSet
-	AcquiredValues []ssa.Value
-	Thread         ThreadDomain
-	Stack          CallStack
-	CrossThread    bool
-}
-
-type RefState int
-
-const (
-	Owned RefState = iota
-	Shared
-	Inherent
-)
-
-type ThreadDomain struct {
-	ID        int
-	Reflexive bool
-}
-
-func (d ThreadDomain) String() string {
-	if d.Reflexive {
-		return fmt.Sprintf("%d#", d.ID)
-	}
-	return fmt.Sprintf("%d", d.ID)
-}
-
-func NewFnPass(visitor *CFGVisitor, domain ThreadDomain, summary preprocessor.FnSummary, stack CallStack) *FnPass {
+func NewFnPass(visitor *CFGVisitor, summary preprocessor.FnSummary, stack CallStack) *FnPass {
 	return &FnPass{
 		Visitor:                   visitor,
-		thread:                    domain,
 		summary:                   summary,
 		forwardStack:              stack.Copy(),
 		seenAccessInstrs:          make(map[ssa.Instruction]bool),
@@ -79,10 +40,6 @@ func NewFnPass(visitor *CFGVisitor, domain ThreadDomain, summary preprocessor.Fn
 
 func (pass *FnPass) GetPointer(value ssa.Value) pointer.Pointer {
 	return pass.Visitor.ptaResult.Queries[value]
-}
-
-func (pass *FnPass) ThreadDomain() ThreadDomain {
-	return pass.thread
 }
 
 func (pass *FnPass) Position(pos token.Pos) token.Position {
@@ -384,91 +341,3 @@ func (pass *FnPass) GetSSAValueByPointID(p int) ssa.Value {
 	return pass.Visitor.aPointer.GetSSAValue(p)
 }
 
-func (a *Access) RacesWith(b *Access) bool {
-	if !a.Write && !b.Write {
-		return false
-	}
-	if a.AcquiredPointSet.Intersects(&b.AcquiredPointSet.Sparse) {
-		return false
-	}
-	if !a.CrossThread && !b.CrossThread {
-		return false
-	}
-	return true
-}
-
-func (a *Access) MutualExclusive(b *Access, queries map[ssa.Value]pointer.Pointer) bool {
-	for _, acq1 := range a.AcquiredValues {
-		for _, acq2 := range b.AcquiredValues {
-			if queries[acq1].MayAlias(queries[acq2]) {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-func (a *Access) WriteConflictsWith(b *Access) bool {
-	return a.Write || b.Write
-}
-
-func (a *Access) WriteAndThreadConflictsWith(b *Access) bool {
-	return (a.Write || b.Write) && (a.Thread.ID != b.Thread.ID)
-}
-
-func (a *Access) MayAlias(b *Access, q map[ssa.Value]pointer.Pointer) bool {
-	return q[a.Addr].MayAlias(q[b.Addr])
-}
-
-func (a *Access) String() string {
-	if a.Write {
-		return fmt.Sprintf("Write of %s from %s @T%s", a.Addr, a.Instr, a.Thread)
-	}
-	return fmt.Sprintf("Read of %s from %s @T%s", a.Addr, a.Instr, a.Thread)
-}
-
-func (a *Access) UnrollStack() CallStack {
-	var res CallStack
-	cur := a
-	for cur.Pred != nil {
-		res = append(res, cur.PredSite)
-		cur = cur.Pred
-	}
-	return res
-}
-
-func (a *Access) StringWithPos(fset *token.FileSet) string {
-	if a.Write {
-		return fmt.Sprintf("Write of %s by T%s, Acquired: %+q, %s", a.Addr, a.Thread, a.AcquiredPointSet.AppendTo([]int{}), fset.Position(a.Instr.Pos()))
-	}
-	return fmt.Sprintf("Read of %s by T%s, Acquired: %+q, %s", a.Addr, a.Thread, a.AcquiredPointSet.AppendTo([]int{}), fset.Position(a.Instr.Pos()))
-}
-
-func PrintStack(stack CallStack) {
-	for i := len(stack) - 1; i >= 0; i-- {
-		e := stack[i]
-		f := e.Callee.Func
-		var pos token.Pos
-		if e.Site != nil {
-			pos = e.Site.Pos()
-		} else {
-			pos = f.Pos()
-		}
-		signature := fmt.Sprintf("%s", f.Name())
-		log.Infof("    %s %v", signature, f.Prog.Fset.Position(pos))
-	}
-}
-
-func (pass *FnPass) ReportRace(a1, a2 *Access) {
-	fset := pass.Visitor.program.Fset
-	log.Println("========== DATA RACE ==========")
-	log.Printf("  %s", a1.StringWithPos(fset))
-	log.Println("  Call stack:")
-	PrintStack(a1.UnrollStack())
-	PrintStack(pass.forwardStack)
-	log.Printf("  %s", a2.StringWithPos(fset))
-	log.Println("  Call stack:")
-	PrintStack(a2.UnrollStack())
-	PrintStack(pass.forwardStack)
-	log.Println("===============================")
-}
