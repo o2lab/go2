@@ -7,10 +7,15 @@ import (
 )
 
 var excluded = []string{
-	//"sync",
-	//"fmt",
-	//"log",
+	"sync",
+	"fmt",
+	"log",
 
+	"io",
+	"bufio",
+	"errors",
+	"strings",
+	"flag",
 	"context",
 	"runtime",
 	"internal",

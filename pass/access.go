@@ -24,12 +24,17 @@ type Access struct {
 	Pred             *Access
 	PredSite         *callgraph.Edge
 	AcquiredPointSet pointer.AccessPointSet
-
-	// TODO: remove these
-	AccessPoints   *pointer.AccessPointSet
-	AcquiredValues []ssa.Value
-	Stack          CallStack
 	CrossThread    bool
+}
+
+// Subsumes is a relation that orders accesses by their likeliness of being racy.
+// a subsumes x if (x, b) being a race pair implies that (x, a) is a racy pair for some access b.
+// Precondition: a and x must access the same address.
+func (a *Access) Subsumes(x *Access) bool {
+	if (!a.Write && x.Write) || (!a.CrossThread && x.CrossThread) {
+		return false
+	}
+	return a.AcquiredPointSet.SubsetOf(&x.AcquiredPointSet.Sparse)
 }
 
 func (a *Access) RacesWith(b *Access) bool {
@@ -43,17 +48,6 @@ func (a *Access) RacesWith(b *Access) bool {
 		return false
 	}
 	return true
-}
-
-func (a *Access) MutualExclusive(b *Access, queries map[ssa.Value]pointer.Pointer) bool {
-	for _, acq1 := range a.AcquiredValues {
-		for _, acq2 := range b.AcquiredValues {
-			if queries[acq1].MayAlias(queries[acq2]) {
-				return true
-			}
-		}
-	}
-	return false
 }
 
 func (a *Access) WriteConflictsWith(b *Access) bool {

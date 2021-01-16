@@ -39,7 +39,7 @@ func NewAnalyzerConfig(paths []string, excluded []string) *AnalyzerConfig {
 }
 
 func (a *AnalyzerConfig) Run() {
-	log.Infof("Loading packages %s", a.Paths)
+	log.Infof("Loading packages at %s", a.Paths)
 	initial, err := packages.Load(&packages.Config{
 		Mode:       packages.LoadAllSyntax,
 		Context:    nil,
@@ -90,7 +90,6 @@ func (a *AnalyzerConfig) Run() {
 		log.Fatalln(err)
 	}
 
-	//funcAcquiredValues := make(map[*ssa.Function][]ssa.Value)
 	instrEdgeMap := make(map[ssa.CallInstruction][]*callgraph.Edge)
 	cfgVisitor := pass.NewCFGVisitorState(a.ptaResult, a.sharedPtrSet, preprocessor.EscapedValues, a.program, instrEdgeMap)
 	err = GraphVisitEdgesFiltered(a.ptaResult.CallGraph, preprocessor.ExcludedPkg, func(edge *callgraph.Edge, stack pass.CallStack) error {
@@ -100,20 +99,17 @@ func (a *AnalyzerConfig) Run() {
 			return nil
 		}
 		instrEdgeMap[edge.Site] = append(instrEdgeMap[edge.Site], edge)
-		log.Debugf("%s --> %s", edge.Caller.Func, edge.Callee.Func)
-		cfgVisitor.VisitFunction(callee, stack)
+		// Temporarily ignore functions in the testing package.
+		if callee.Pkg != nil && strings.Split(callee.Pkg.Pkg.Path(), "/")[0] != "testing" {
+			log.Debugf("%s --> %s", edge.Caller.Func, edge.Callee.Func)
+			cfgVisitor.VisitFunction(callee, stack)
+		}
 		return nil
 	})
 
 	if err != nil {
 		log.Fatalln(err)
 	}
-
-	//races := a.checkRaces()
-	//for _, race := range races {
-	//	a.ReportRace(race)
-	//}
-	//log.Infof("Found %d race(s)", len(races))
 }
 
 // GraphVisitEdgesFiltered visits all reachable nodes from the root of g in post order. Nodes that belong to any package
@@ -123,15 +119,16 @@ func GraphVisitEdgesFiltered(g *callgraph.Graph, excluded map[string]bool, edge 
 	var visit func(n *callgraph.Node, stack pass.CallStack) error
 	var stack pass.CallStack
 	visit = func(n *callgraph.Node, stack pass.CallStack) error {
+		if n.Func.Pkg != nil {
+			if pathRoot := strings.Split(n.Func.Pkg.Pkg.Path(), "/")[0]; excluded[pathRoot] {
+				return nil
+			}
+		}
+
 		if !seen[n] {
 			seen[n] = true
 			for _, e := range n.Out {
 				callee := e.Callee
-				if callee.Func.Pkg != nil {
-					if pathRoot := strings.Split(callee.Func.Pkg.Pkg.Path(), "/")[0]; excluded[pathRoot] {
-						return nil
-					}
-				}
 				newStack := append(stack, e)
 				if err := visit(callee, newStack); err != nil {
 					return err

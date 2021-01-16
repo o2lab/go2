@@ -1,14 +1,26 @@
 package main
 
-type TT struct {
-	a, b, c, d int
-}
+import (
+	"sync"
+)
 
 func main() {
-	t := TT{}
+	var mu sync.Mutex
+	var x int16 = 0
+	_ = x
+	ch := make(chan bool, 2)
 	go func() {
-		t.a = 1
+		x = 1
+		mu.Lock()
+		defer mu.Unlock()
+		ch <- true
 	}()
-	_ = t.a
-	_ = t.b
+	go func() {
+		x = 2
+		mu.Lock()
+		mu.Unlock()
+		ch <- true
+	}()
+	<-ch
+	<-ch
 }

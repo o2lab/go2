@@ -6,6 +6,7 @@ import (
 	"go/token"
 	"go/types"
 	"golang.org/x/tools/go/ssa"
+	"strings"
 )
 
 type Preprocessor struct {
@@ -32,8 +33,8 @@ func (p *Preprocessor) Run(packages []*ssa.Package) map[*ssa.Function]FnSummary 
 	logrus.Debugln("Preprocessing...")
 	summaries := make(map[*ssa.Function]FnSummary)
 	for _, pkg := range packages {
-		if p.ExcludedPkg[pkg.Pkg.Name()] {
-			logrus.Debugf("Exclude pkg %s", pkg)
+		if pathRoot := strings.Split(pkg.Pkg.Path(), "/")[0]; p.ExcludedPkg[pathRoot] {
+			logrus.Debugf("Exclude %s", pkg)
 			continue
 		}
 		logrus.Debugf("Preprocessing %s", pkg)
@@ -59,9 +60,6 @@ func (p *Preprocessor) Run(packages []*ssa.Package) map[*ssa.Function]FnSummary 
 }
 
 func (p *Preprocessor) visitFunction(function *ssa.Function) FnSummary {
-	if p.ExcludedPkg[function.Pkg.Pkg.Name()] {
-		logrus.Debugln("Exclude", function)
-	}
 	logrus.Debugf("visiting %s: %s", function, function.Type())
 
 	// Skip external functions.

@@ -241,21 +241,24 @@ func (pass *FnPass) applyCalleeSummary(calleePass *FnPass, site ssa.Instruction,
 			}
 
 			escaped := pass.isAddrEscaped(acc.Addr, pass.valueToPointSet(acc.Addr), escIn)
-			nonlocal := pass.isAddrNonLocal1(acc.Addr)
+			nonlocal := accNew.CrossThread || pass.isAddrNonLocal1(acc.Addr)
 
 			log.Debugf("   => ACCESS callee esc=%t nonlocal=%t %s", escaped, nonlocal, accNew)
 
 			// Check races if the access is bound to the current thread.
-			if !accNew.CrossThread && escaped {
-				for _, accCur := range accessMap[p] {
-					if accCur.RacesWith(accNew) {
-						pass.ReportRace(accCur, accNew)
-					}
+			stored := false // store once
+			for i, accCur := range accessMap[p] {
+				if !accNew.CrossThread && escaped && accCur.RacesWith(accNew) {
+					pass.ReportRace(accCur, accNew)
+				}
+				if !stored && accNew.Subsumes(accCur) {
+					accessMap[p][i] = accNew
+					stored = true
 				}
 			}
 
 			// Merge the access into caller's pass.
-			if escaped || nonlocal || accNew.CrossThread {
+			if !stored && (escaped || nonlocal) {
 				pass.accessPointSet.Insert(p)
 				accessMap[p] = append(accessMap[p], accNew)
 			}
@@ -277,27 +280,29 @@ func (pass *FnPass) makeAccess(instr ssa.Instruction, addr ssa.Value, write bool
 		acc.AcquiredPointSet.Copy(&acqIn.Sparse)
 
 		// Check races on the subset of escaped values.
-		escaped := pass.isAddrEscaped(addr, ps, escIn)
 		points := pass.extendPointSetIfStruct(ps, addr)
-		if escaped {
-			for _, p := range points {
-				for _, acc1 := range accessMap[p] {
-					if acc.RacesWith(acc1) {
-						pass.ReportRace(acc, acc1)
-					}
+		escaped := pass.isAddrEscaped(addr, ps, escIn)
+		nonlocal := pass.isAddrNonLocal(addr, ps)
+		log.Debugf("   => ACCESS esc=%t nonlocal=%t %s", escaped, nonlocal, acc)
+
+		for _, p := range points {
+			stored := false
+			for accIdx, acc1 := range accessMap[p] {
+				if escaped && acc.RacesWith(acc1) {
+					pass.ReportRace(acc, acc1)
 				}
+				if !stored && acc.Subsumes(acc1) {
+					accessMap[p][accIdx] = acc
+					stored = true
+				}
+			}
+			// Store access metadata if its address is non-local or escaped.
+			if !stored && (escaped || nonlocal) {
+				accessMap[p] = append(accessMap[p], acc)
 			}
 		}
 
-		// Store access metadata if its address is non-local or escaped.
-		nonlocal := pass.isAddrNonLocal(addr, ps)
-
-		log.Debugf("   => ACCESS esc=%t nonlocal=%t %s", escaped, nonlocal, acc)
-
-		if escaped || nonlocal {
-			for _, p := range points {
-				accessMap[p] = append(accessMap[p], acc)
-			}
+		if escaped && nonlocal {
 			accessPointSet.UnionWith(&ps.Sparse)
 		}
 		if nonlocal {
