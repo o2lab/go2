@@ -12,6 +12,8 @@ import (
 	"go/token"
 	"go/types"
 	"os"
+	"strconv"
+
 	//"path/filepath"
 	"strings"
 	"time"
@@ -130,40 +132,56 @@ func (runner *AnalysisRunner) Run(args []string) error {
 	} else if len(initial) == 0 {
 		return fmt.Errorf("package list empty")
 	}
-
-	checkMains, goFiles, err := findAllMainPkgs(initial)
-	if err != nil {
-		return err
+	var goFiles int
+	for _, p := range initial {
+		if p != nil {
+			goFiles += len(p.GoFiles)
+		}
 	}
 
 	log.Info("Done  -- Using ", elapsedLoad.String(), " ", len(initial), " packages loaded and ",  goFiles, " Go files detected.")
 
-
-
-	var mainInd int
-	var mainPkgs []*packages.Package
-	if efficiency && len(checkMains) > 1 {
-		// Provide entry-point options and retrieve user selection
-		fmt.Println(len(checkMains), " entry points identified: ")
-		for i, ep := range checkMains {
-			fmt.Println("Option", i+1, ": ", ep.String())
-		}
-		fmt.Print("Enter option number of choice: ")
-		fmt.Scan(&mainInd)
-		mainPkgs = append(mainPkgs, checkMains[mainInd-1])
-	} else {
-		mainPkgs = checkMains
-	}
-
-	prog, pkgs := ssautil.AllPackages(mainPkgs, 0)
+	var prog *ssa.Program
+	var pkgs []*ssa.Package
+	var mainPkgs []*ssa.Package
 
 	log.Info("Building SSA code for entire program...")
+	prog, pkgs = ssautil.AllPackages(initial, 0) // TODO: program needs all pointers recorded from initial list of packages
 	prog.Build()
-	log.Info("Done  -- SSA code built")
+	noFunc := len(ssautil.AllFunctions(prog))
+	mainPkgs = ssautil.MainPackages(pkgs)
+	log.Info("Done  -- SSA code built. ", noFunc, " functions detected. ")
 
-	mains, err := mainSSAPackages(pkgs)
-	if err != nil {
-		return err
+	var mainInd string
+	var enterAt string
+	var mains []*ssa.Package
+	userEP := false // user specified entry function
+	if efficiency && len(mainPkgs) > 1 {
+		// Provide entry-point options and retrieve user selection
+		fmt.Println(len(mainPkgs), " main() entry-points identified: ")
+		for i, ep := range mainPkgs {
+			fmt.Println("Option", i+1, ": ", ep.String())
+		}
+		fmt.Print("Enter option number of choice: (or enter - for other desired entry point)")
+		fmt.Scan(&mainInd)
+		if mainInd == "-" {
+			fmt.Print("Enter function name to begin analysis from: ")
+			fmt.Scan(&enterAt)
+			for _, p := range pkgs {
+				if p.Func(enterAt) != nil {
+					userEP = true
+					mains = append(mainPkgs, p)
+				}
+			}
+			if !userEP {
+				fmt.Print("Function not found. ") // TODO: request input again
+			}
+		} else if i, err0 := strconv.Atoi(mainInd); err0 == nil {
+			mains = append(mainPkgs, mainPkgs[i-1])
+		}
+
+	} else {
+		mains = mainPkgs
 	}
 
 	logfile, err := os.Create("go_pta_log") //bz: for me ...
