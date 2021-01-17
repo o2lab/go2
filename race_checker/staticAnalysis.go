@@ -67,17 +67,22 @@ func isSynthetic(fn *ssa.Function) bool { // ignore functions that are NOT true 
 }
 
 //bz:
-func findAllMainPkgs(total []*packages.Package) ([]*packages.Package, error) {
+func findAllMainPkgs(total []*packages.Package) ([]*packages.Package, int, error) {
 	var mains []*packages.Package
+	counter := 0
 	for _, p := range total {
 		if p != nil && p.Name == "main" {
 			mains = append(mains, p)
 		}
+		if p != nil {
+			counter += len(p.GoFiles)
+		}
+
 	}
 	if len(mains) == 0 {
-		return nil, fmt.Errorf("no main packages in *packages.Package")
+		return nil, counter, fmt.Errorf("no main packages in *packages.Package")
 	}
-	return mains, nil
+	return mains, counter, nil
 }
 
 // bz: mainPackages returns the main packages to analyze.
@@ -105,6 +110,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 	}
 	log.Info("Loading input packages...")
 	startLoad := time.Now()
+	os.Stderr = nil
 	initial, err := packages.Load(cfg, args...)
 	if err != nil {
 		return err
@@ -114,22 +120,25 @@ func (runner *AnalysisRunner) Run(args []string) error {
 	if efficiency && len(initial) > 0 {
 		errSize, errPkgs := packages.PrintErrorsAndMore(initial)
 		if errSize > 0 {
-			log.Info("Excluded the following packages contain errors, due to the above errors. ")
-			for i, errPkg := range errPkgs {
-				log.Info(i, " ", errPkg.ID)
-			}
-			log.Info("Continue   -- ")
+			//log.Info("Excluded the following packages contain errors, due to the above errors. ")
+			//for i, errPkg := range errPkgs {
+			//	log.Info(i, " ", errPkg.ID)
+			//}
+			//log.Info("Continue   -- ")
+			_ = errPkgs
 		}
 	} else if len(initial) == 0 {
 		return fmt.Errorf("package list empty")
 	}
 
-	log.Info("Done  -- Using ", elapsedLoad.String(), " ", len(initial), " packages loaded, ", "? Go files analyzed.")
-
-	checkMains, err := findAllMainPkgs(initial)
+	checkMains, goFiles, err := findAllMainPkgs(initial)
 	if err != nil {
 		return err
 	}
+
+	log.Info("Done  -- Using ", elapsedLoad.String(), " ", len(initial), " packages loaded and ",  goFiles, " Go files detected.")
+
+
 
 	var mainInd int
 	var mainPkgs []*packages.Package
