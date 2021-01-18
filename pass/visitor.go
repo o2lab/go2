@@ -48,7 +48,8 @@ func (v *CFGVisitor) VisitFunction(function *ssa.Function, stack CallStack) {
 		v.passes[function] = fnPass
 	}
 	fnPass.extractBorrowedAccessSet(function)
-	fnPass.dataflowAnalysis(function)
+	fnPass.backwardsDataflowAnalysis(function)
+	fnPass.forwardDataflowAnalysis(function)
 	fnPass.maskUnborrowedAccess()
 }
 

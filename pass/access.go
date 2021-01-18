@@ -24,6 +24,7 @@ type Access struct {
 	Pred             *Access
 	PredSite         *callgraph.Edge
 	AcquiredPointSet pointer.AccessPointSet
+	ReleasedPointSet pointer.AccessPointSet
 	CrossThread    bool
 }
 
@@ -41,7 +42,7 @@ func (a *Access) RacesWith(b *Access) bool {
 	if !a.Write && !b.Write {
 		return false
 	}
-	if a.AcquiredPointSet.Intersects(&b.AcquiredPointSet.Sparse) {
+	if a.AcquiredPointSet.Intersects(&b.ReleasedPointSet.Sparse) || a.ReleasedPointSet.Intersects(&b.AcquiredPointSet.Sparse) {
 		return false
 	}
 	if !a.CrossThread && !b.CrossThread {
@@ -64,7 +65,7 @@ func (a *Access) String() string {
 	if a.Write {
 		typ = "Write"
 	}
-	return fmt.Sprintf("%s of %s, async=%t, acq=%+q", typ, a.Addr, a.CrossThread, a.AcquiredPointSet.AppendTo([]int{}))
+	return fmt.Sprintf("%s of %s, async=%t, acq=%+q, rel=%+q", typ, a.Addr, a.CrossThread, a.AcquiredPointSet.AppendTo([]int{}), a.AcquiredPointSet.AppendTo([]int{}))
 }
 
 func (a *Access) UnrollStack() CallStack {
@@ -79,9 +80,9 @@ func (a *Access) UnrollStack() CallStack {
 
 func (a *Access) StringWithPos(fset *token.FileSet) string {
 	if a.Write {
-		return fmt.Sprintf("Write of %s, Acquired: %+q, %s", a.Addr, a.AcquiredPointSet.AppendTo([]int{}), fset.Position(a.Instr.Pos()))
+		return fmt.Sprintf("Write of %s, Acq/rel: %+q %+q, %s", a.Addr, a.AcquiredPointSet.AppendTo([]int{}), a.ReleasedPointSet.AppendTo([]int{}), fset.Position(a.Instr.Pos()))
 	}
-	return fmt.Sprintf("Read of %s, Acquired: %+q, %s", a.Addr, a.AcquiredPointSet.AppendTo([]int{}), fset.Position(a.Instr.Pos()))
+	return fmt.Sprintf("Read of %s, Acq/rel: %+q %+q, %s", a.Addr, a.AcquiredPointSet.AppendTo([]int{}), a.ReleasedPointSet.AppendTo([]int{}), fset.Position(a.Instr.Pos()))
 }
 
 func PrintStack(stack CallStack) {

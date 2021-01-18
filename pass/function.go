@@ -13,6 +13,7 @@ import (
 type FnPass struct {
 	summary                   preprocessor.FnSummary
 	acquiredPointSet          pointer.AccessPointSet
+	releasedPointSet          pointer.AccessPointSet
 	escapedBorrowedPointSet   pointer.AccessPointSet
 	borrowedPointSet          pointer.AccessPointSet
 	accessPointSet            pointer.AccessPointSet
@@ -24,6 +25,7 @@ type FnPass struct {
 	acquireMap                map[ssa.Instruction]*pointer.AccessPointSet // set of acquired points per instruction
 	accessInstrs              map[ssa.Instruction]bool
 	accessPointSetByCallInstr map[ssa.Instruction]*pointer.AccessPointSet
+	releasedPerIns            [][]*pointer.AccessPointSet // filled by backwardsDataflowAnalysis
 }
 
 func NewFnPass(visitor *CFGVisitor, summary preprocessor.FnSummary, stack CallStack) *FnPass {
@@ -66,7 +68,7 @@ func (pass *FnPass) extendPointSetIfStruct(ps *pointer.AccessPointSet, v ssa.Val
 			n := t.NumFields()
 			for _, p := range res {
 				for i := 0; i < n; i++ {
-					res = append(res, p + i + 1)
+					res = append(res, p+i+1)
 				}
 			}
 		}
@@ -74,7 +76,116 @@ func (pass *FnPass) extendPointSetIfStruct(ps *pointer.AccessPointSet, v ssa.Val
 	return res
 }
 
-func (pass *FnPass) dataflowAnalysis(function *ssa.Function) {
+func (pass *FnPass) backwardsDataflowAnalysis(function *ssa.Function) {
+	size := len(function.Blocks)
+	releasedPerIns := make([][]*pointer.AccessPointSet, size)
+
+	worklist := make([]int, size)
+	for i := 0; i < size; i++ {
+		worklist[i] = size - i - 1 // reverse order
+		releasedPerIns[i] = make([]*pointer.AccessPointSet, len(function.Blocks[i].Instrs))
+	}
+
+	for len(worklist) > 0 {
+		blockIdx := worklist[0]
+		worklist = worklist[1:]
+		block := function.Blocks[blockIdx]
+
+		if block.Index != blockIdx {
+			log.Fatalln("assert fail")
+		}
+
+		var releasedOut pointer.AccessPointSet
+		succs := block.Succs
+		if len(succs) > 0 {
+			if in := releasedPerIns[succs[0].Index][0]; in != nil {
+				releasedOut.Copy(&in.Sparse)
+			}
+		}
+		for i := 1; i < len(succs); i++ {
+			if in := releasedPerIns[succs[i].Index][0]; in != nil {
+				releasedOut.Intersects(&in.Sparse)
+			}
+		}
+
+		if pass.updateBlockStateOnRelease(block, releasedPerIns[block.Index], &releasedOut) {
+			for _, pred := range block.Preds {
+				appendIfNotPresent(worklist, pred.Index)
+			}
+		}
+	}
+	pass.releasedPerIns = releasedPerIns
+}
+
+func appendIfNotPresent(worklist []int, x int) {
+	idx := 0
+	for ; idx < len(worklist); idx++ {
+		if worklist[idx] == x {
+			break
+		}
+	}
+	if idx == len(worklist) {
+		worklist = append(worklist, x)
+	}
+}
+
+// release ops beside lock: chan send/recv, waitgroup wait/done/add
+func (pass *FnPass) updateBlockStateOnRelease(block *ssa.BasicBlock, relMap []*pointer.AccessPointSet, releasedOut *pointer.AccessPointSet) bool {
+	prevAcq := &pointer.AccessPointSet{}
+	var oldRelIn pointer.AccessPointSet
+	if relMap[0] != nil {
+		oldRelIn.Copy(&relMap[0].Sparse)
+	}
+	handleCall := func(i int, instr ssa.CallInstruction) {
+		//	TODO: waitgroup wait/done/add
+		if mutex := preprocessor.GetLockedMutex(instr.Common()); mutex != nil {
+			if ps := pass.valueToPointSet(mutex); ps != nil {
+				releasedOut.DifferenceWith(&ps.Sparse)
+				prevAcq = &pointer.AccessPointSet{}
+				prevAcq.Copy(&releasedOut.Sparse)
+			}
+		} else if mutex := preprocessor.GetUnlockedMutex(instr.Common()); mutex != nil {
+			if ps := pass.valueToPointSet(mutex); ps != nil {
+				releasedOut.UnionWith(&ps.Sparse)
+				prevAcq = &pointer.AccessPointSet{}
+				prevAcq.Copy(&releasedOut.Sparse)
+			}
+		} else {
+			for _, edge := range pass.Visitor.instrSiteMap[instr] {
+				if calleeSummary := pass.Visitor.passes[edge.Callee.Func]; calleeSummary != nil {
+					if !calleeSummary.releasedPointSet.IsEmpty() {
+						releasedOut.UnionWith(&calleeSummary.releasedPointSet.Sparse)
+						prevAcq = &pointer.AccessPointSet{}
+						prevAcq.Copy(&releasedOut.Sparse)
+					}
+				}
+			}
+		}
+	}
+	for i := len(block.Instrs) - 1; i >= 0; i-- { // reverse
+		switch instr := block.Instrs[i].(type) {
+		case preprocessor.SyntheticDeferred:
+			handleCall(i, instr)
+		case *ssa.Call:
+			handleCall(i, instr)
+		case *ssa.Send:
+			if ps := pass.valueToPointSet(instr.Chan); ps != nil {
+				releasedOut.UnionWith(&ps.Sparse)
+			}
+		case *ssa.UnOp:
+			if instr.Op == token.ARROW { // channel receive
+				if ps := pass.valueToPointSet(instr.X); ps != nil {
+					releasedOut.UnionWith(&ps.Sparse)
+				}
+			}
+		}
+		relMap[i] = prevAcq
+	}
+
+	return !oldRelIn.Equals(&releasedOut.Sparse)
+}
+
+func (pass *FnPass) forwardDataflowAnalysis(function *ssa.Function) {
 	size := len(function.Blocks)
 	acquiredOuts := make([]*pointer.AccessPointSet, size)
 	escapedOuts := make([]*pointer.AccessPointSet, size)
@@ -88,9 +199,13 @@ func (pass *FnPass) dataflowAnalysis(function *ssa.Function) {
 	}
 
 	for len(worklist) > 0 {
-		targetIdx := worklist[0]
+		blockIdx := worklist[0]
 		worklist = worklist[1:]
-		block := function.Blocks[targetIdx]
+		block := function.Blocks[blockIdx]
+
+		if block.Index != blockIdx {
+			log.Fatalln("assert fail")
+		}
 
 		// acqIn is the intersection of outs for each predecessor.
 		var acqIn pointer.AccessPointSet
@@ -108,18 +223,9 @@ func (pass *FnPass) dataflowAnalysis(function *ssa.Function) {
 			escIn.UnionWith(&escapedOuts[pred.Index].Sparse)
 		}
 
-		if pass.updateBlockState(block, &acqIn, &escIn, acquiredOuts[targetIdx], escapedOuts[targetIdx], accessMap, &pass.accessPointSet) {
+		if pass.updateBlockState(block, &acqIn, &escIn, acquiredOuts[blockIdx], pass.releasedPerIns[blockIdx], escapedOuts[blockIdx], accessMap, &pass.accessPointSet) {
 			for _, succ := range block.Succs {
-				// Do not add the same index twice if it is already in the worklist.
-				idx := 0
-				for ; idx < len(worklist); idx++ {
-					if worklist[idx] == succ.Index {
-						break
-					}
-				}
-				if idx == len(worklist) {
-					worklist = append(worklist, succ.Index)
-				}
+				appendIfNotPresent(worklist, succ.Index)
 			}
 		}
 	}
@@ -128,38 +234,45 @@ func (pass *FnPass) dataflowAnalysis(function *ssa.Function) {
 }
 
 func (pass *FnPass) updateBlockState(block *ssa.BasicBlock, acqIn *pointer.AccessPointSet, escIn *pointer.AccessPointSet,
-	acqOut *pointer.AccessPointSet, escOut *pointer.AccessPointSet, accessMap map[int][]*Access, accessPointSet *pointer.AccessPointSet) bool {
+	acqOut *pointer.AccessPointSet, relMap []*pointer.AccessPointSet, escOut *pointer.AccessPointSet,
+	accessMap map[int][]*Access, accessPointSet *pointer.AccessPointSet) bool {
 	log.Debugf("Block %d", block.Index)
 
-	for _, instruction := range block.Instrs {
-		log.Debugln("  ", instruction)
-		switch instr := instruction.(type) {
-		case *ssa.Call:
-			if mutex := preprocessor.GetLockedMutex(instr.Common()); mutex != nil {
-				log.Debugf("Lock on %s", mutex)
-				if ps := pass.valueToPointSet(mutex); ps != nil {
-					acqIn.UnionWith(&ps.Sparse)
+	handleCall := func(i int, instr ssa.CallInstruction) {
+		if mutex := preprocessor.GetLockedMutex(instr.Common()); mutex != nil {
+			log.Debugf("Lock on %s", mutex)
+			if ps := pass.valueToPointSet(mutex); ps != nil {
+				acqIn.UnionWith(&ps.Sparse)
+			}
+		} else if mutex := preprocessor.GetUnlockedMutex(instr.Common()); mutex != nil {
+			log.Debugf("Unlock on %s", mutex)
+			if ps := pass.valueToPointSet(mutex); ps != nil {
+				if !acqIn.Intersects(&ps.Sparse) {
+					log.Warnf("Unlock of an unlocked mutex %s at %s", mutex, pass.Position(mutex.Pos()))
 				}
-			} else if mutex := preprocessor.GetUnlockedMutex(instr.Common()); mutex != nil {
-				log.Debugf("Unlock on %s", mutex)
-				if ps := pass.valueToPointSet(mutex); ps != nil {
-					if !acqIn.Intersects(&ps.Sparse) {
-						log.Warnf("Unlock of an unlocked mutex %s at %s", mutex, pass.Position(mutex.Pos()))
-					}
-					acqIn.DifferenceWith(&ps.Sparse)
-				}
-			} else {
-				// Apply the callee's summary.
-				for _, edge := range pass.Visitor.instrSiteMap[instr] {
-					fun := edge.Callee.Func
-					if calleePass, ok := pass.Visitor.passes[fun]; ok && fun != nil {
-						escIn.UnionWith(&calleePass.escapedBorrowedPointSet.Sparse)
-						pass.applyCalleeSummary(calleePass, instr, false, acqIn, escIn, accessMap, edge)
+				acqIn.DifferenceWith(&ps.Sparse)
+			}
+		} else {
+			// Apply the callee's summary.
+			for _, edge := range pass.Visitor.instrSiteMap[instr] {
+				fun := edge.Callee.Func
+				if calleePass, ok := pass.Visitor.passes[fun]; ok && fun != nil {
+					escIn.UnionWith(&calleePass.escapedBorrowedPointSet.Sparse)
+					pass.applyCalleeSummary(calleePass, false, acqIn, relMap[i], escIn, accessMap, edge)
 
-						acqIn.UnionWith(&calleePass.acquiredPointSet.Sparse)
-					}
+					acqIn.UnionWith(&calleePass.acquiredPointSet.Sparse)
 				}
 			}
+		}
+	}
+
+	for i, instruction := range block.Instrs {
+		log.Debugln("  ", instruction)
+		switch instr := instruction.(type) {
+		case preprocessor.SyntheticDeferred:
+			handleCall(i, instr)
+		case *ssa.Call:
+			handleCall(i, instr)
 		case *ssa.Go:
 			for _, edge := range pass.Visitor.instrSiteMap[instr] {
 				fun := edge.Callee.Func
@@ -176,17 +289,17 @@ func (pass *FnPass) updateBlockState(block *ssa.BasicBlock, acqIn *pointer.Acces
 
 				// Apply the callee's summary.
 				if calleePass, ok := pass.Visitor.passes[fun]; ok {
-					pass.applyCalleeSummary(calleePass, instr, true, acqIn, escIn, accessMap, edge)
+					pass.applyCalleeSummary(calleePass, true, acqIn, relMap[i], escIn, accessMap, edge)
 				}
 			}
 
 		case *ssa.UnOp:
 			if instr.Op == token.MUL {
 				pass.updateStateViaIndirection(instr, instr.X, escIn)
-				pass.makeAccess(instr, instr.X, false, acqIn, escIn, accessMap, accessPointSet)
+				pass.makeAccess(instr, instr.X, false, acqIn, relMap[i], escIn, accessMap, accessPointSet)
 			}
 		case *ssa.Store:
-			pass.makeAccess(instr, instr.Addr, true, acqIn, escIn, accessMap, accessPointSet)
+			pass.makeAccess(instr, instr.Addr, true, acqIn, relMap[i], escIn, accessMap, accessPointSet)
 		case *ssa.IndexAddr:
 			pass.updateStateViaIndirection(instr, instr.X, escIn)
 		case *ssa.FieldAddr:
@@ -221,23 +334,25 @@ func (pass *FnPass) updateStateViaIndirection(target ssa.Value, base ssa.Value, 
 	log.Debug("   => borrowed: ", pass.borrowedPointSet.AppendTo([]int{}), " escaped: ", escIn.AppendTo([]int{}))
 }
 
-func (pass *FnPass) applyCalleeSummary(calleePass *FnPass, site ssa.Instruction, crossThread bool, acqIn *pointer.AccessPointSet,
+func (pass *FnPass) applyCalleeSummary(calleePass *FnPass, crossThread bool, acqIn *pointer.AccessPointSet, rel *pointer.AccessPointSet,
 	escIn *pointer.AccessPointSet, accessMap map[int][]*Access, edge *callgraph.Edge) {
 	for p, accesses := range calleePass.accessMeta {
 		for _, acc := range accesses {
 			accNew := &Access{
-				Instr:            acc.Instr,
-				Write:            acc.Write,
-				Addr:             acc.Addr,
-				Pred:             acc,
-				PredSite:         edge,
-				CrossThread:      crossThread || acc.CrossThread,
+				Instr:       acc.Instr,
+				Write:       acc.Write,
+				Addr:        acc.Addr,
+				Pred:        acc,
+				PredSite:    edge,
+				CrossThread: crossThread || acc.CrossThread,
 			}
 
 			if !accNew.CrossThread {
 				accNew.AcquiredPointSet.Union(&acc.AcquiredPointSet.Sparse, &acqIn.Sparse)
+				accNew.ReleasedPointSet.Union(&acc.ReleasedPointSet.Sparse, &rel.Sparse)
 			} else {
 				accNew.AcquiredPointSet.Copy(&acc.AcquiredPointSet.Sparse)
+				accNew.ReleasedPointSet.Copy(&acc.ReleasedPointSet.Sparse)
 			}
 
 			escaped := pass.isAddrEscaped(acc.Addr, pass.valueToPointSet(acc.Addr), escIn)
@@ -248,7 +363,7 @@ func (pass *FnPass) applyCalleeSummary(calleePass *FnPass, site ssa.Instruction,
 			// Check races if the access is bound to the current thread.
 			stored := false // store once
 			for i, accCur := range accessMap[p] {
-				if !accNew.CrossThread && escaped && accCur.RacesWith(accNew) {
+				if (!accNew.CrossThread || accCur.CrossThread) && escaped && accCur.RacesWith(accNew) {
 					pass.ReportRace(accCur, accNew)
 				}
 				if !stored && accNew.Subsumes(accCur) {
@@ -267,7 +382,7 @@ func (pass *FnPass) applyCalleeSummary(calleePass *FnPass, site ssa.Instruction,
 }
 
 func (pass *FnPass) makeAccess(instr ssa.Instruction, addr ssa.Value, write bool, acqIn *pointer.AccessPointSet,
-	escIn *pointer.AccessPointSet, accessMap map[int][]*Access, accessPointSet *pointer.AccessPointSet) {
+	rel *pointer.AccessPointSet, escIn *pointer.AccessPointSet, accessMap map[int][]*Access, accessPointSet *pointer.AccessPointSet) {
 	if ps := pass.valueToPointSet(addr); ps != nil {
 		acc := &Access{
 			Instr:       instr,
@@ -278,6 +393,7 @@ func (pass *FnPass) makeAccess(instr ssa.Instruction, addr ssa.Value, write bool
 			PredSite:    nil,
 		}
 		acc.AcquiredPointSet.Copy(&acqIn.Sparse)
+		acc.ReleasedPointSet.Copy(&rel.Sparse)
 
 		// Check races on the subset of escaped values.
 		points := pass.extendPointSetIfStruct(ps, addr)
@@ -352,4 +468,3 @@ func (pass *FnPass) isAddrNonLocal(value ssa.Value, ps *pointer.AccessPointSet) 
 func (pass *FnPass) GetSSAValueByPointID(p int) ssa.Value {
 	return pass.Visitor.aPointer.GetSSAValue(p)
 }
-

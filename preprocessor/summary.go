@@ -82,6 +82,23 @@ func (f *FnSummary) visitIns(instruction ssa.Instruction) {
 		for _, value := range escaped {
 			f.preprocessor.EscapedValues[instr] = append(f.preprocessor.EscapedValues[instr], value)
 		}
+	case *ssa.Defer:
+		// Append a synthetic deferred instruction to the end of all reachable blocks from instr.Block().
+		stack := []*ssa.BasicBlock{instr.Block()}
+		seen := make([]bool, len(instr.Parent().Blocks))
+		for len(stack) > 0 {
+			block := stack[0]
+			stack = stack[1:]
+			if seen[block.Index] {
+				continue
+			}
+			seen[block.Index] = true
+			if len(block.Succs) == 0 {
+				block.Instrs = append(block.Instrs, SyntheticDeferred{instr})
+			} else {
+				stack = append(stack, block.Succs...)
+			}
+		}
 	}
 }
 

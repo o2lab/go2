@@ -101,7 +101,7 @@ func (a *AnalyzerConfig) Run() {
 		instrEdgeMap[edge.Site] = append(instrEdgeMap[edge.Site], edge)
 		// Temporarily ignore functions in the testing package.
 		if callee.Pkg != nil && strings.Split(callee.Pkg.Pkg.Path(), "/")[0] != "testing" {
-			log.Debugf("%s --> %s", edge.Caller.Func, edge.Callee.Func)
+			log.Infof("%s --> %s", edge.Caller.Func, edge.Callee.Func)
 			cfgVisitor.VisitFunction(callee, stack)
 		}
 		return nil
@@ -119,16 +119,15 @@ func GraphVisitEdgesFiltered(g *callgraph.Graph, excluded map[string]bool, edge 
 	var visit func(n *callgraph.Node, stack pass.CallStack) error
 	var stack pass.CallStack
 	visit = func(n *callgraph.Node, stack pass.CallStack) error {
-		if n.Func.Pkg != nil {
-			if pathRoot := strings.Split(n.Func.Pkg.Pkg.Path(), "/")[0]; excluded[pathRoot] {
-				return nil
-			}
-		}
-
 		if !seen[n] {
 			seen[n] = true
 			for _, e := range n.Out {
 				callee := e.Callee
+				if callee.Func.Pkg != nil {
+					if pathRoot := strings.Split(callee.Func.Pkg.Pkg.Path(), "/")[0]; excluded[pathRoot] {
+						continue
+					}
+				}
 				newStack := append(stack, e)
 				if err := visit(callee, newStack); err != nil {
 					return err
