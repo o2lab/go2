@@ -18,11 +18,8 @@ type AnalyzerConfig struct {
 	packages            []*ssa.Package
 	program             *ssa.Program
 	ptaResult           *pointer.Result
-	sharedPtrSet        map[pointer.Pointer]bool
 	fnSummaries         map[*ssa.Function]preprocessor.FnSummary
 	passes              map[*ssa.Function]*pass.FnPass
-	accessesByAllocSite map[pointer.Pointer][]*pass.Access
-	accessesMerged      map[pointer.Pointer][]*pass.Access
 }
 
 func NewAnalyzerConfig(paths []string, excluded []string) *AnalyzerConfig {
@@ -31,10 +28,8 @@ func NewAnalyzerConfig(paths []string, excluded []string) *AnalyzerConfig {
 		ExcludedPackages:    excluded,
 		program:             nil,
 		packages:            nil,
-		sharedPtrSet:        make(map[pointer.Pointer]bool),
 		fnSummaries:         make(map[*ssa.Function]preprocessor.FnSummary),
 		passes:              make(map[*ssa.Function]*pass.FnPass),
-		accessesByAllocSite: make(map[pointer.Pointer][]*pass.Access),
 	}
 }
 
@@ -91,7 +86,7 @@ func (a *AnalyzerConfig) Run() {
 	}
 
 	instrEdgeMap := make(map[ssa.CallInstruction][]*callgraph.Edge)
-	cfgVisitor := pass.NewCFGVisitorState(a.ptaResult, a.sharedPtrSet, preprocessor.EscapedValues, a.program, instrEdgeMap)
+	cfgVisitor := pass.NewCFGVisitorState(a.ptaResult, preprocessor.EscapedValues, a.program, instrEdgeMap)
 	err = GraphVisitEdgesFiltered(a.ptaResult.CallGraph, preprocessor.ExcludedPkg, func(edge *callgraph.Edge, stack pass.CallStack) error {
 		callee := edge.Callee.Func
 		// External function.

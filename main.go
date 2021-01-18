@@ -52,6 +52,7 @@ func main() {
 		FullTimestamp:   true,
 		TimestampFormat: "15:04:05",
 	})
+
 	config := analyzer.NewAnalyzerConfig(flag.Args(), excluded)
 	config.Run()
 }

@@ -11,7 +11,6 @@ import (
 type CFGVisitor struct {
 	program            *ssa.Program
 	ptaResult          *pointer.Result
-	sharedPtrSet       map[pointer.Pointer]bool
 	Accesses           map[pointer.Pointer][]*Access
 	passes             map[*ssa.Function]*FnPass
 	summaries          map[*ssa.Function]preprocessor.FnSummary
@@ -22,11 +21,9 @@ type CFGVisitor struct {
 	aPointer           pointer.Pointer
 }
 
-func NewCFGVisitorState(ptaResult *pointer.Result, sharedPtrSet map[pointer.Pointer]bool,
-	escapedValues map[*ssa.Go][]ssa.Value, program *ssa.Program, instrSiteMap map[ssa.CallInstruction][]*callgraph.Edge) *CFGVisitor {
+func NewCFGVisitorState(ptaResult *pointer.Result, escapedValues map[*ssa.Go][]ssa.Value, program *ssa.Program, instrSiteMap map[ssa.CallInstruction][]*callgraph.Edge) *CFGVisitor {
 	v := &CFGVisitor{
 		ptaResult:          ptaResult,
-		sharedPtrSet:       sharedPtrSet,
 		escapedValues:      escapedValues,
 		passes:             make(map[*ssa.Function]*FnPass),
 		FuncAcquiredValues: make(map[*ssa.Function][]ssa.Value),
