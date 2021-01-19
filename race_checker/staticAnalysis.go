@@ -146,7 +146,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 	var mainPkgs []*ssa.Package
 
 	log.Info("Building SSA code for entire program...")
-	prog, pkgs = ssautil.AllPackages(initial, 0) // TODO: program needs all pointers recorded from initial list of packages
+	prog, pkgs = ssautil.AllPackages(initial, 0) // TODO: program needs all pointers recorded from initial list of packages  --> bz: ???
 	prog.Build()
 	noFunc := len(ssautil.AllFunctions(prog))
 	mainPkgs = ssautil.MainPackages(pkgs)
