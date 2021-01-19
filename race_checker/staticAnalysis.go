@@ -65,55 +65,6 @@ func isSynthetic(fn *ssa.Function) bool { // ignore functions that are NOT true 
 	return fn.Synthetic != "" || fn.Pkg == nil
 }
 
-//bz: whether we have a main.go file in a root (*packages.Package)
-func hasMainGoFile(compiledGoFiles []string) bool {
-	if compiledGoFiles == nil {
-		return false
-	}
-	for _, gofile := range compiledGoFiles {
-		last := strings.LastIndex(gofile,"/")
-		if strings.EqualFold(gofile[last:], "/main.go") {
-			return true
-		}
-	}
-	return false
-}
-
-//bz:
-func findAllMainPkgs(total []*packages.Package) ([]*packages.Package, int, int, error) {
-	var mains []*packages.Package
-	counter := 0
-	numMain := 0 //since we need to remove nil from initial
-	for _, p := range total {
-		if p != nil && p.Name == "main" { //&& hasMainGoFile(p.CompiledGoFiles)
-			mains = append(mains, p)
-			numMain++
-		}
-		if p != nil {
-			counter += len(p.GoFiles)
-		}
-
-	}
-	if len(mains) == 0 {
-		return nil, counter, numMain, fmt.Errorf("no main packages in *packages.Package")
-	}
-	return mains, counter, numMain, nil
-}
-
-// bz: mainPackages returns the main packages to analyze.
-// Each resulting package is named "main" and has a main function.
-func mainSSAPackages(pkgs []*ssa.Package) ([]*ssa.Package, error) {
-	var mains []*ssa.Package
-	for _, p := range pkgs {
-		if p != nil && p.Pkg.Name() == "main" && p.Func("main") != nil {
-			mains = append(mains, p)
-		}
-	}
-	if len(mains) == 0 {
-		return nil, fmt.Errorf("no main packages in *ssa.Package")
-	}
-	return mains, nil
-}
 func pkgSelection(initial []*packages.Package) ([]*ssa.Package, *ssa.Program, []*ssa.Package) {
 	if efficiency && len(initial) > 0 {
 		errSize, errPkgs := packages.PrintErrorsAndMore(initial) //bz: errPkg will be nil in initial
@@ -134,11 +85,11 @@ func pkgSelection(initial []*packages.Package) ([]*ssa.Package, *ssa.Program, []
 	var mainPkgs []*ssa.Package
 
 	log.Info("Building SSA code for entire program...")
-	prog, pkgs = ssautil.AllPackages(initial, 0) // TODO: perhaps able to obtain fn info from packages.Packages instead??
+	prog, pkgs = ssautil.AllPackages(initial, 0)
 	prog.Build()
 	noFunc := len(ssautil.AllFunctions(prog))
 	mainPkgs = ssautil.MainPackages(pkgs)
-	log.Info("Done  -- SSA code built. ", noFunc, " functions detected. ")
+	log.Info("Done  -- SSA code built. ", len(pkgs), " packages and ", noFunc, " functions detected. ")
 
 	var mainInd string
 	var enterAt string
@@ -146,11 +97,11 @@ func pkgSelection(initial []*packages.Package) ([]*ssa.Package, *ssa.Program, []
 	userEP := false // user specified entry function
 	if efficiency && len(mainPkgs) > 1 {
 		// Provide entry-point options and retrieve user selection
-		fmt.Println(len(mainPkgs), " main() entry-points identified: ")
+		fmt.Println(len(mainPkgs), "main() entry-points identified: ")
 		for i, ep := range mainPkgs {
 			fmt.Println("Option", i+1, ": ", ep.String())
 		}
-		fmt.Print("Enter option number of choice: (or enter - for other desired entry point)")
+		fmt.Print("Enter option number of choice: (or enter - for other desired entry point)\n")
 		fmt.Scan(&mainInd)
 		if mainInd == "-" {
 			fmt.Print("Enter function name to begin analysis from: ")
@@ -169,26 +120,24 @@ func pkgSelection(initial []*packages.Package) ([]*ssa.Package, *ssa.Program, []
 			selection := strings.Split(mainInd, ",")
 			for _, s := range selection {
 				i, _ := strconv.Atoi(s) // convert to integer
-				mains = append(mainPkgs, mainPkgs[i-1])
+				mains = append(mains, mainPkgs[i-1])
 			}
-		} else if  strings.Contains(mainInd, "-") { // selected range
+		} else if strings.Contains(mainInd, "-") { // selected range
 			selection := strings.Split(mainInd, "-")
 			begin, _ := strconv.Atoi(selection[0])
 			end, _ := strconv.Atoi(selection[1])
 			for i := begin; i <= end; i++ {
-				mains = append(mainPkgs, mainPkgs[i-1])
+				mains = append(mains, mainPkgs[i-1])
 			}
 		} else if i, err0 := strconv.Atoi(mainInd); err0 == nil {
-			mains = append(mainPkgs, mainPkgs[i-1])
+			mains = append(mains, mainPkgs[i-1])
 		}
-
 	} else {
 		mains = mainPkgs
 	}
 	return mains, prog, pkgs
 }
 
-// Run builds a Happens-Before Graph and calls other functions like visitAllInstructions to drive the program further
 func (runner *AnalysisRunner) Run(args []string) error {
 	cfg := &packages.Config{
 		Mode:  packages.LoadAllSyntax, // the level of information returned for each package
@@ -197,7 +146,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 	}
 	log.Info("Loading input packages...")
 	startLoad := time.Now()
-	os.Stderr = nil // No need to output package errors for now. Delete this line
+	os.Stderr = nil // No need to output package errors for now. Delete this line to view package errors
 	initial, err := packages.Load(cfg, args...)
 	if err != nil {
 		return err
@@ -218,10 +167,10 @@ func (runner *AnalysisRunner) Run(args []string) error {
 	//	return err
 	//}
 
-	for _, main := range mains {
-		log.Info("Solving for " + main.String() + "... ")
-		runner.runEachMainBaseline(main, prog, pkgs)
-		log.Info("Done for " + main.String() + "... \n\n")
+	for _, m := range mains {
+		log.Info("Solving for " + m.String() + "... ")
+		runner.runEachMainBaseline(m, prog, pkgs)
+		log.Info("Done for " + m.String() + "... \n\n")
 	}
 	return nil
 }
@@ -295,9 +244,9 @@ func (runner *AnalysisRunner) runEachMainBaseline(main *ssa.Package, prog *ssa.P
 
 	if runner.Analysis.useNewPTA {
 		start := time.Now()
-		result, err := pointer.AnalyzeWCtx(runner.Analysis.ptaConfig) // conduct pointer analysis
-		if err != nil {
-			log.Fatal(err)
+		result, err2 := pointer.AnalyzeWCtx(runner.Analysis.ptaConfig) // conduct pointer analysis
+		if err2 != nil {
+			log.Fatal(err2)
 		}
 		t := time.Now()
 		elapsed := t.Sub(start)
@@ -319,9 +268,9 @@ func (runner *AnalysisRunner) runEachMainBaseline(main *ssa.Package, prog *ssa.P
 	log.Info("Done  -- ", len(runner.Analysis.RWIns), " goroutines analyzed! ", totalIns, " instructions of interest detected! ")
 
 	if !runner.Analysis.useNewPTA { //original code
-		result, err := pointer.Analyze(runner.Analysis.ptaConfig) // conduct pointer analysis
-		if err != nil {
-			log.Fatal(err)
+		result, err2 := pointer.Analyze(runner.Analysis.ptaConfig) // conduct pointer analysis
+		if err2 != nil {
+			log.Fatal(err2)
 		}
 		runner.Analysis.result = result
 	}
