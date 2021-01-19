@@ -218,17 +218,31 @@ func (runner *AnalysisRunner) Run(args []string) error {
 	//	return err
 	//}
 
+	for _, main := range mains {
+		log.Info("Solving for " + main.String() + "... ")
+		runner.runEachMainBaseline(main, prog, pkgs)
+		log.Info("Done for " + main.String() + "... \n\n")
+	}
+	return nil
+}
+
+//bz: do each main one by one -> performance base line
+func (runner *AnalysisRunner) runEachMainBaseline(main *ssa.Package, prog *ssa.Program, pkgs []*ssa.Package) {
 	logfile, err := os.Create("go_pta_log") //bz: for me ...
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
 	if !doPTALog {
 		logfile = nil
 	}
-
-	//for im, main := range mains { ... } TODO: WIP
 
 	var scope []string
 	if fromPath != "" {
 		scope = []string{fromPath}
 	}
+	var mains []*ssa.Package
+	mains = append(mains, main)
 	// Configure pointer analysis to build call-graph
 	ptaconfig := &pointer.Config{
 		Mains:          mains, //bz: NOW assume only one main
@@ -334,5 +348,4 @@ func (runner *AnalysisRunner) Run(args []string) error {
 
 	log.Info("Checking for data races... ")
 	runner.Analysis.checkRacyPairs()
-	return nil
 }
