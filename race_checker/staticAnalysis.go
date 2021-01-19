@@ -114,7 +114,7 @@ func mainSSAPackages(pkgs []*ssa.Package) ([]*ssa.Package, error) {
 	}
 	return mains, nil
 }
-func pkgSelection(initial []*packages.Package) []*packages.Package {
+func pkgSelection(initial []*packages.Package) ([]*ssa.Package, *ssa.Program, []*ssa.Package) {
 	if efficiency && len(initial) > 0 {
 		errSize, errPkgs := packages.PrintErrorsAndMore(initial) //bz: errPkg will be nil in initial
 		if errSize > 0 {
@@ -129,20 +129,25 @@ func pkgSelection(initial []*packages.Package) []*packages.Package {
 		log.Panic("package list empty")
 	}
 
-	checkMains, goFiles, numMain, err := findAllMainPkgs(initial)
-	if err != nil {
-		log.Panic(err)
-	}
-	log.Info(numMain, " packages loaded and ",  goFiles, " Go files detected.")
+	var prog *ssa.Program
+	var pkgs []*ssa.Package
+	var mainPkgs []*ssa.Package
+
+	log.Info("Building SSA code for entire program...")
+	prog, pkgs = ssautil.AllPackages(initial, 0) // TODO: perhaps able to obtain fn info from packages.Packages instead??
+	prog.Build()
+	noFunc := len(ssautil.AllFunctions(prog))
+	mainPkgs = ssautil.MainPackages(pkgs)
+	log.Info("Done  -- SSA code built. ", noFunc, " functions detected. ")
 
 	var mainInd string
 	var enterAt string
-	var mainPkgs []*packages.Package
+	var mains []*ssa.Package
 	userEP := false // user specified entry function
-	if efficiency && len(checkMains) > 1 {
+	if efficiency && len(mainPkgs) > 1 {
 		// Provide entry-point options and retrieve user selection
-		fmt.Println(len(checkMains), " main() entry-points identified: ")
-		for i, ep := range checkMains {
+		fmt.Println(len(mainPkgs), " main() entry-points identified: ")
+		for i, ep := range mainPkgs {
 			fmt.Println("Option", i+1, ": ", ep.String())
 		}
 		fmt.Print("Enter option number of choice: (or enter - for other desired entry point)")
@@ -150,12 +155,12 @@ func pkgSelection(initial []*packages.Package) []*packages.Package {
 		if mainInd == "-" {
 			fmt.Print("Enter function name to begin analysis from: ")
 			fmt.Scan(&enterAt)
-			for _, p := range checkMains {
-				//if p.Func(enterAt) != nil {
-				userEP = true
-				mainPkgs = append(mainPkgs, p)
-				entryFn = enterAt // start analysis at user specified function
-				//}
+			for _, p := range pkgs {
+				if p.Func(enterAt) != nil {
+					userEP = true
+					mains = append(mainPkgs, p)
+					entryFn = enterAt // start analysis at user specified function
+				}
 			}
 			if !userEP {
 				fmt.Print("Function not found. ") // TODO: request input again
@@ -164,23 +169,23 @@ func pkgSelection(initial []*packages.Package) []*packages.Package {
 			selection := strings.Split(mainInd, ",")
 			for _, s := range selection {
 				i, _ := strconv.Atoi(s) // convert to integer
-				mainPkgs = append(mainPkgs, mainPkgs[i-1])
+				mains = append(mainPkgs, mainPkgs[i-1])
 			}
-		} else if strings.Contains(mainInd, "-") { // selected range
+		} else if  strings.Contains(mainInd, "-") { // selected range
 			selection := strings.Split(mainInd, "-")
 			begin, _ := strconv.Atoi(selection[0])
 			end, _ := strconv.Atoi(selection[1])
 			for i := begin; i <= end; i++ {
-				mainPkgs = append(mainPkgs, mainPkgs[i-1])
+				mains = append(mainPkgs, mainPkgs[i-1])
 			}
 		} else if i, err0 := strconv.Atoi(mainInd); err0 == nil {
-			mainPkgs = append(mainPkgs, checkMains[i-1])
+			mains = append(mainPkgs, mainPkgs[i-1])
 		}
 
 	} else {
-		mainPkgs = checkMains
+		mains = mainPkgs
 	}
-	return mainPkgs
+	return mains, prog, pkgs
 }
 
 // Run builds a Happens-Before Graph and calls other functions like visitAllInstructions to drive the program further
@@ -200,18 +205,18 @@ func (runner *AnalysisRunner) Run(args []string) error {
 	t := time.Now()
 	elapsedLoad := t.Sub(startLoad)
 	log.Info("Done  -- Using ", elapsedLoad.String())
-	mainPkgs := pkgSelection(initial)
+	mains, prog, pkgs := pkgSelection(initial)
 
 
-	prog, pkgs := ssautil.AllPackages(mainPkgs, 0)
-	log.Info("Building SSA code for entire program...")
-	prog.Build()
-	log.Info("Done  -- SSA code built. ")
-
-	mains, err := mainSSAPackages(pkgs)
-	if err != nil {
-		return err
-	}
+	//prog, pkgs := ssautil.AllPackages(mainPkgs, 0)
+	//log.Info("Building SSA code for entire program...")
+	//prog.Build()
+	//log.Info("Done  -- SSA code built. ")
+	//
+	//mains, err := mainSSAPackages(pkgs)
+	//if err != nil {
+	//	return err
+	//}
 
 	logfile, err := os.Create("go_pta_log") //bz: for me ...
 	if !doPTALog {
@@ -325,7 +330,6 @@ func (runner *AnalysisRunner) Run(args []string) error {
 	log.Info("Building Happens-Before graph... ")
 	runner.Analysis.HBgraph = graph.New(graph.Directed)
 	runner.Analysis.buildHB(runner.Analysis.HBgraph)
-
 	log.Info("Done  -- Happens-Before graph built ")
 
 	log.Info("Checking for data races... ")
