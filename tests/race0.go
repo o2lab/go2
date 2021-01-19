@@ -1,6 +1,6 @@
 package main
 
-import "time"
+import "runtime"
 
 var y int
 
@@ -14,19 +14,16 @@ func b() {
 }
 
 func main() {
-	c := make(chan *int, 1)
-	c <- nil
+	v := 0
+	_ = v
+	c := make(chan int, 10)
+	c <- 1
 	go func() {
-		i := 42
-		c <- &i
+		v = 1
+		<-c
 	}()
-	time.Sleep(10 * time.Millisecond)
-	<-c
-	select {
-	case p := <-c:
-		if *p != 42 {
-
-		}
-	case <-make(chan int):
+	for len(c) != 0 {
+		runtime.Gosched()
 	}
+	v = 2
 }

@@ -228,13 +228,13 @@ func TestRaceChanRecvLen(t *testing.T) {
 	c := make(chan int, 10)
 	c <- 1
 	go func() {
-		v = 1
+		v = 1 // want `Write`
 		<-c
 	}()
 	for len(c) != 0 {
 		runtime.Gosched()
 	}
-	v = 2
+	v = 2 // want `Write`
 }
 
 func TestRaceChanSendSend(t *testing.T) {
