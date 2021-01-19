@@ -5,6 +5,7 @@ import (
 	"github.com/o2lab/go2/pointer"
 	"github.com/o2lab/go2/preprocessor"
 	log "github.com/sirupsen/logrus"
+	"go/token"
 	"golang.org/x/tools/go/callgraph"
 	"golang.org/x/tools/go/packages"
 	"golang.org/x/tools/go/ssa"
@@ -12,28 +13,33 @@ import (
 	"strings"
 )
 
-type AnalyzerConfig struct {
-	Paths               []string
-	ExcludedPackages    []string
-	packages            []*ssa.Package
-	program             *ssa.Program
-	ptaResult           *pointer.Result
-	fnSummaries         map[*ssa.Function]preprocessor.FnSummary
-	passes              map[*ssa.Function]*pass.FnPass
+type Config struct {
+	Paths            []string
+	ExcludedPackages []string
+	testOutput       map[token.Position][]string
+	packages         []*ssa.Package
+	program          *ssa.Program
+	ptaResult        *pointer.Result
+	fnSummaries      map[*ssa.Function]preprocessor.FnSummary
+	passes           map[*ssa.Function]*pass.FnPass
 }
 
-func NewAnalyzerConfig(paths []string, excluded []string) *AnalyzerConfig {
-	return &AnalyzerConfig{
-		Paths:               paths,
-		ExcludedPackages:    excluded,
-		program:             nil,
-		packages:            nil,
-		fnSummaries:         make(map[*ssa.Function]preprocessor.FnSummary),
-		passes:              make(map[*ssa.Function]*pass.FnPass),
+func NewAnalyzerConfig(paths []string, excluded []string) *Config {
+	return &Config{
+		Paths:            paths,
+		ExcludedPackages: excluded,
+		program:          nil,
+		packages:         nil,
+		fnSummaries:      make(map[*ssa.Function]preprocessor.FnSummary),
+		passes:           make(map[*ssa.Function]*pass.FnPass),
 	}
 }
 
-func (a *AnalyzerConfig) Run() {
+func (a *Config) SetTestOutput(out map[token.Position][]string) {
+	a.testOutput = out
+}
+
+func (a *Config) Run() {
 	log.Infof("Loading packages at %s", a.Paths)
 	initial, err := packages.Load(&packages.Config{
 		Mode:       packages.LoadAllSyntax,
@@ -87,6 +93,10 @@ func (a *AnalyzerConfig) Run() {
 
 	instrEdgeMap := make(map[ssa.CallInstruction][]*callgraph.Edge)
 	cfgVisitor := pass.NewCFGVisitorState(a.ptaResult, preprocessor.EscapedValues, a.program, instrEdgeMap)
+	if a.testOutput != nil {
+		cfgVisitor.SetTestOutput(a.testOutput)
+	}
+
 	err = GraphVisitEdgesFiltered(a.ptaResult.CallGraph, preprocessor.ExcludedPkg, func(edge *callgraph.Edge, stack pass.CallStack) error {
 		callee := edge.Callee.Func
 		// External function.

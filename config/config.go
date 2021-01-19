@@ -1,0 +1,30 @@
+package config
+
+var ExcludedPkgs = []string{
+	"sync",
+	"fmt",
+	"log",
+
+	"io",
+	"bufio",
+	"errors",
+	"strings",
+	"flag",
+	"context",
+	"runtime",
+	"internal",
+	"race",
+	"unsafe",
+	"debug",
+	"os",
+	"crypto",
+	"regexp",
+	"strconv",
+	"bytes",
+	"math",
+	"unicode",
+	"encoding",
+	"time",
+	"reflect",
+	"sort",
+}

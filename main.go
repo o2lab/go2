@@ -2,39 +2,10 @@ package main
 
 import (
 	"flag"
-	analyzer "github.com/o2lab/go2/analyzer"
+	"github.com/o2lab/go2/analyzer"
+	"github.com/o2lab/go2/config"
 	log "github.com/sirupsen/logrus"
 )
-
-var excluded = []string{
-	"sync",
-	"fmt",
-	"log",
-
-	"io",
-	"bufio",
-	"errors",
-	"strings",
-	"flag",
-	"context",
-	"runtime",
-	"internal",
-	"race",
-	"unsafe",
-	"debug",
-	"os",
-	"crypto",
-	"regexp",
-	"strconv",
-	"bytes",
-	"math",
-	"unicode",
-	"encoding",
-	"time",
-	"reflect",
-	"sort",
-}
-
 
 func main() {
 	debug := flag.Bool("debug", false, "Prints debug messages.")
@@ -53,6 +24,6 @@ func main() {
 		TimestampFormat: "15:04:05",
 	})
 
-	config := analyzer.NewAnalyzerConfig(flag.Args(), excluded)
-	config.Run()
+	analyzer := analyzer.NewAnalyzerConfig(flag.Args(), config.ExcludedPkgs)
+	analyzer.Run()
 }

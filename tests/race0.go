@@ -1,7 +1,5 @@
 package main
 
-import "sync"
-
 var y int
 
 func a() {
@@ -14,12 +12,13 @@ func b() {
 }
 
 func main() {
-	c := make(chan bool, 1)
-	var mu sync.Mutex
+	v := 0
+	_ = v
+	c := make(chan int)
 	go func() {
-		mu = sync.Mutex{}
-		c <- true
+		v = 1
+		c <- 0
 	}()
-	mu.Lock()
 	<-c
+	v = 2
 }

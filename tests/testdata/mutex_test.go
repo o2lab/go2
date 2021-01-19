@@ -8,9 +8,9 @@ import (
 func TestRace2(t *testing.T) {
 	x := 0
 	go func() {
-		x = 1
+		x = 1 // want `Write`
 	}()
-	_ = x
+	_ = x // want `Read`
 }
 
 func TestNoRaceMutex(t *testing.T) {
@@ -40,13 +40,13 @@ func TestRaceMutex(t *testing.T) {
 	_ = x
 	ch := make(chan bool, 2)
 	go func() {
-		x = 1
+		x = 1 // want `Write`
 		mu.Lock()
 		defer mu.Unlock()
 		ch <- true
 	}()
 	go func() {
-		x = 2
+		x = 2 // want `Write`
 		mu.Lock()
 		mu.Unlock()
 		ch <- true
@@ -64,12 +64,12 @@ func TestRaceMutex2(t *testing.T) {
 	go func() {
 		mu1.Lock()
 		defer mu1.Unlock()
-		x = 1
+		x = 1 // want `Write`
 		ch <- true
 	}()
 	go func() {
 		mu2.Lock()
-		x = 2
+		x = 2 // want `Write`
 		mu2.Unlock()
 		ch <- true
 	}()
@@ -115,10 +115,10 @@ func TestRaceMutexOverwrite(t *testing.T) {
 	c := make(chan bool, 1)
 	var mu sync.Mutex
 	go func() {
-		mu = sync.Mutex{}
+		mu = sync.Mutex{} // want `Write`
 		c <- true
 	}()
-	mu.Lock()
+	mu.Lock() // want `Read`
 	<-c
 }
 

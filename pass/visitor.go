@@ -4,6 +4,7 @@ import (
 	"github.com/o2lab/go2/pointer"
 	"github.com/o2lab/go2/preprocessor"
 	log "github.com/sirupsen/logrus"
+	"go/token"
 	"golang.org/x/tools/go/callgraph"
 	"golang.org/x/tools/go/ssa"
 )
@@ -19,6 +20,7 @@ type CFGVisitor struct {
 	goStacks           map[*ssa.Go]CallStack
 	instrSiteMap       map[ssa.CallInstruction][]*callgraph.Edge
 	aPointer           pointer.Pointer
+	testOutput         map[token.Position][]string
 }
 
 func NewCFGVisitorState(ptaResult *pointer.Result, escapedValues map[*ssa.Go][]ssa.Value, program *ssa.Program, instrSiteMap map[ssa.CallInstruction][]*callgraph.Edge) *CFGVisitor {
@@ -36,6 +38,10 @@ func NewCFGVisitorState(ptaResult *pointer.Result, escapedValues map[*ssa.Go][]s
 		break
 	}
 	return v
+}
+
+func (v *CFGVisitor) SetTestOutput(out map[token.Position][]string) {
+	v.testOutput = out
 }
 
 func (v *CFGVisitor) VisitFunction(function *ssa.Function, stack CallStack) {

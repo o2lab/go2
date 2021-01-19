@@ -102,6 +102,15 @@ func PrintStack(stack CallStack) {
 
 func (pass *FnPass) ReportRace(a1, a2 *Access) {
 	fset := pass.Visitor.program.Fset
+
+	if pass.Visitor.testOutput != nil {
+		p1 := fset.Position(a1.Instr.Pos())
+		p2 := fset.Position(a2.Instr.Pos())
+		pass.Visitor.testOutput[p1]	= append(pass.Visitor.testOutput[p1], a1.String())
+		pass.Visitor.testOutput[p2]	= append(pass.Visitor.testOutput[p2], a2.String())
+		return
+	}
+
 	logrus.Println("========== DATA RACE ==========")
 	logrus.Printf("  %s", a1.StringWithPos(fset))
 	logrus.Println("  Call stack:")
