@@ -105,6 +105,7 @@ var trieLimit = 2      // set as user config option later, an integer that dicta
 var efficiency = false // configuration setting to avoid recursion in tested program
 var channelComm = true // analyze channel communication
 var fromPath = ""      // interested packages are those located at this path
+var entryFn = "main"
 
 func init() {
 	excludedPkgs = []string{
