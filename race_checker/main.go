@@ -62,6 +62,7 @@ type analysis struct {
 
 type AnalysisRunner struct {
 	Analysis *analysis
+	ptaconfig *pointer.Config
 }
 
 type fnInfo struct { // all fields must be comparable for fnInfo to be used as key to trieMap
@@ -111,6 +112,28 @@ func init() {
 	excludedPkgs = []string{
 		"fmt",
 		"reflect",
+		"encoding",
+		"errors",
+		"bytes",
+		"strconv",
+		"strings",
+		"bytealg",
+		"race",
+		"syscall",
+		"poll",
+		"trace",
+		"logging",
+		"os",
+		"builtin",
+		"pflag",
+		"log",
+		"reflect",
+		"internal",
+		"impl",
+		"transport", // grpc
+		"version",
+		"sort",
+		"filepath",
 	}
 
 	nonMainPkgs = []string{
