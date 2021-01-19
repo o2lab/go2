@@ -1,24 +1,24 @@
 package main
 
 import (
-	"sync"
 	"fmt"
+	"sync"
 )
 
 type ClientConn struct {
-	mu	sync.RWMutex
-	sc	int
+	mu sync.RWMutex
+	sc int
 }
 
 func main() {
-	x := 0
-	y := 1
+	x5 := 0
+	y5 := 1
 	cc := &ClientConn{
-		sc: x,
+		sc: x5,
 	}
 	res := false
 	go func() {
-		res = cc.GetMethodConfig(y)
+		res = cc.GetMethodConfig(y5)
 		fmt.Println(res)
 	}()
 	cc.mu.Lock()
@@ -37,5 +37,3 @@ func (cc *ClientConn) GetMethodConfig(y int) bool {
 	}
 	return false
 }
-
-

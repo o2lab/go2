@@ -7,37 +7,37 @@ import (
 
 func main() {
 	mu := sync.Mutex{}
-	x:=0
-	go func() bool{
+	x3 := 0
+	go func() bool {
 		var err bool
 		err = false
 		mu.Lock()
 		var ret bool
-		if err{
+		if err {
 			mu.Unlock()
-			x/* RACE Write */=3
+			x3 /* RACE Write */ = 3
 			return err
 		} else {
-			if x==5 {
+			if x3 == 5 {
 				return err
 			} else {
 				ret = true
 				if err {
-					var err bool
-					if err {
-						err = false
+					var e bool
+					if e {
+						e = false
 					} else {
-						err = true
+						e = true
 					}
 					mu.Unlock()
-					x=7
+					x3 = 7
 					return ret
 				}
 			}
 		}
 		mu.Unlock()
-		x=9
+		x3 = 9
 		return ret
 	}()
-	fmt.Println(x/* RACE Read */)
+	fmt.Println(x3 /* RACE Read */)
 }

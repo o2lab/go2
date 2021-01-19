@@ -5,18 +5,18 @@ import "fmt"
 func main() {
 	ch1 := make(chan int)
 	ch2 := make(chan int)
-	x := 0
+	x01 := 0
 	select {
 	case a := <-ch1:
-		x = a
+		x01 = a
 	case a := <-ch2:
-		x = a + 1
+		x01 = a + 1
 	default:
-		x = 20
-		fmt.Println(x)
+		x01 = 20
+		fmt.Println(x01)
 	}
 	go func() {
-		x = 2
+		x01 = 2
 		ch2 <- 2
 	}()
 }

@@ -2,7 +2,7 @@ package main
 
 import "fmt"
 
-var m map[int]int = make(map[int]int)
+var m = make(map[int]int)
 
 func main() {
 	var s []int

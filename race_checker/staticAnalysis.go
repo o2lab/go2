@@ -1,7 +1,6 @@
 package main
 
 import (
-	//"flag"
 	"fmt"
 	log "github.com/sirupsen/logrus"
 	"github.com/twmb/algoimpl/go/graph"
@@ -13,8 +12,6 @@ import (
 	"go/types"
 	"os"
 	"strconv"
-
-	//"path/filepath"
 	"strings"
 	"time"
 )
@@ -104,7 +101,6 @@ func mainSSAPackages(pkgs []*ssa.Package) ([]*ssa.Package, error) {
 	return mains, nil
 }
 
-
 // Run builds a Happens-Before Graph and calls other functions like visitAllInstructions to drive the program further
 func (runner *AnalysisRunner) Run(args []string) error {
 	cfg := &packages.Config{
@@ -134,6 +130,10 @@ func (runner *AnalysisRunner) Run(args []string) error {
 	} else if len(initial) == 0 {
 		return fmt.Errorf("package list empty")
 	}
+
+	//var prog *ssa.Program
+	//var pkgs []*ssa.Package
+	//var mainPkgs []*ssa.Package
 
 	checkMains, goFiles, numMain, err := findAllMainPkgs(initial)
 	if err != nil {
@@ -172,7 +172,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 				i, _ := strconv.Atoi(s) // convert to integer
 				mains = append(mainPkgs, mainPkgs[i-1])
 			}
-		} else if  strings.Contains(mainInd, "-") { // selected range
+		} else if strings.Contains(mainInd, "-") { // selected range
 			selection := strings.Split(mainInd, "-")
 			begin, _ := strconv.Atoi(selection[0])
 			end, _ := strconv.Atoi(selection[1])
@@ -504,4 +504,3 @@ func (runner *AnalysisRunner) Run(args []string) error {
 	runner.Analysis.checkRacyPairs()
 	return nil
 }
-

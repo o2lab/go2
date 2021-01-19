@@ -7,9 +7,9 @@ func main() {
 	ch2 := make(chan int)
 	ch3 := make(chan int)
 	ch4 := make(chan int)
-	x := 0
+	x66 := 0
 	go func() {
-		x /* RACE Write */= 1
+		x66 /* RACE Write */ = 1
 		ch1 <- 1
 	}()
 	go func() {
@@ -17,17 +17,17 @@ func main() {
 	}()
 	select {
 	case a := <-ch1:
-		x = a
+		x66 = a
 	case a := <-ch2:
-		x = a + 1
+		x66 = a + 1
 	default:
-		x /* RACE Write */= 20
-		fmt.Println(x)
+		x66 /* RACE Write */ = 20
+		fmt.Println(x66)
 	}
 	select {
 	case a := <-ch3:
-		x = a + 10
+		x66 = a + 10
 	case a := <-ch4:
-		x = a + 20
+		x66 = a + 20
 	}
 }
