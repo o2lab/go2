@@ -73,9 +73,9 @@ func findAllMainPkgs(total []*packages.Package) ([]*packages.Package, int, int, 
 	for _, p := range total {
 		if p != nil && p.Name == "main" {
 			mains = append(mains, p)
+			numMain++
 		}
 		if p != nil {
-			numMain++
 			counter += len(p.GoFiles)
 		}
 
@@ -144,7 +144,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 	var mainInd string
 	var enterAt string
 	var mainPkgs []*packages.Package
-	//userEP := false // user specified entry function
+	userEP := false // user specified entry function
 	if efficiency && len(checkMains) > 1 {
 		// Provide entry-point options and retrieve user selection
 		fmt.Println(len(checkMains), " main() entry-points identified: ")
@@ -156,12 +156,12 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		if mainInd == "-" {
 			fmt.Print("Enter function name to begin analysis from: ")
 			fmt.Scan(&enterAt)
-			for _, p := range pkgs {
-				if p.Func(enterAt) != nil {
+			for _, p := range checkMains {
+				//if p.Func(enterAt) != nil {
 					userEP = true
-					mains = append(mainPkgs, p)
+					mainPkgs = append(mainPkgs, p)
 					entryFn = enterAt // start analysis at user specified function
-				}
+				//}
 			}
 			if !userEP {
 				fmt.Print("Function not found. ") // TODO: request input again
@@ -170,14 +170,14 @@ func (runner *AnalysisRunner) Run(args []string) error {
 			selection := strings.Split(mainInd, ",")
 			for _, s := range selection {
 				i, _ := strconv.Atoi(s) // convert to integer
-				mains = append(mainPkgs, mainPkgs[i-1])
+				mainPkgs = append(mainPkgs, mainPkgs[i-1])
 			}
 		} else if strings.Contains(mainInd, "-") { // selected range
 			selection := strings.Split(mainInd, "-")
 			begin, _ := strconv.Atoi(selection[0])
 			end, _ := strconv.Atoi(selection[1])
 			for i := begin; i <= end; i++ {
-				mains = append(mainPkgs, mainPkgs[i-1])
+				mainPkgs = append(mainPkgs, mainPkgs[i-1])
 			}
 		} else if i, err0 := strconv.Atoi(mainInd); err0 == nil {
 			mainPkgs = append(mainPkgs, checkMains[i-1])
