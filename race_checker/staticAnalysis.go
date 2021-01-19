@@ -171,6 +171,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 				if p.Func(enterAt) != nil {
 					userEP = true
 					mains = append(mainPkgs, p)
+					entryFn = enterAt // start analysis at user specified function
 				}
 			}
 			if !userEP {
@@ -260,7 +261,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 
 	log.Info("Compiling stack trace for every Goroutine... ")
 	log.Debug(strings.Repeat("-", 35), "Stack trace begins", strings.Repeat("-", 35))
-	runner.Analysis.visitAllInstructions(mains[0].Func("main"), 0)
+	runner.Analysis.visitAllInstructions(mains[0].Func(entryFn), 0)
 	log.Debug(strings.Repeat("-", 35), "Stack trace ends", strings.Repeat("-", 35))
 	totalIns := 0
 	for g, _ := range runner.Analysis.RWIns {
