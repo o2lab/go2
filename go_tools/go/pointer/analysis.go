@@ -514,7 +514,7 @@ func AnalyzeWCtx(config *Config) (result *ResultWCtx, err error) { //Result
 			a.reflectZeros.SetHasher(a.hasher)
 		}
 	}else{
-		a.considerReflect = false //update
+		a.considerReflect = false //update -> do not consider 'reflect'
 	}
 	if !ContainString(a.config.Exclusions, "runtime") { //bz: only do if race checker considers
 		if runtime := a.prog.ImportedPackage("runtime"); runtime != nil {

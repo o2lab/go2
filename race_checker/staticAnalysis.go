@@ -69,22 +69,24 @@ func isSynthetic(fn *ssa.Function) bool { // ignore functions that are NOT true 
 }
 
 //bz:
-func findAllMainPkgs(total []*packages.Package) ([]*packages.Package, int, error) {
+func findAllMainPkgs(total []*packages.Package) ([]*packages.Package, int, int, error) {
 	var mains []*packages.Package
 	counter := 0
+	numMain := 0 //since we need to remove nil from initial
 	for _, p := range total {
 		if p != nil && p.Name == "main" {
 			mains = append(mains, p)
 		}
 		if p != nil {
+			numMain++
 			counter += len(p.GoFiles)
 		}
 
 	}
 	if len(mains) == 0 {
-		return nil, counter, fmt.Errorf("no main packages in *packages.Package")
+		return nil, counter, numMain, fmt.Errorf("no main packages in *packages.Package")
 	}
-	return mains, counter, nil
+	return mains, counter, numMain, nil
 }
 
 // bz: mainPackages returns the main packages to analyze.
@@ -120,7 +122,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 	t := time.Now()
 	elapsedLoad := t.Sub(startLoad)
 	if efficiency && len(initial) > 0 {
-		errSize, errPkgs := packages.PrintErrorsAndMore(initial)
+		errSize, errPkgs := packages.PrintErrorsAndMore(initial) //bz: errPkg will be nil in initial
 		if errSize > 0 {
 			//log.Info("Excluded the following packages contain errors, due to the above errors. ")
 			//for i, errPkg := range errPkgs {
@@ -132,34 +134,21 @@ func (runner *AnalysisRunner) Run(args []string) error {
 	} else if len(initial) == 0 {
 		return fmt.Errorf("package list empty")
 	}
-	var goFiles int
-	for _, p := range initial {
-		if p != nil {
-			goFiles += len(p.GoFiles)
-		}
+
+	checkMains, goFiles, numMain, err := findAllMainPkgs(initial)
+	if err != nil {
+		return err
 	}
-
-	log.Info("Done  -- Using ", elapsedLoad.String(), " ", len(initial), " packages loaded and ",  goFiles, " Go files detected.")
-
-	var prog *ssa.Program
-	var pkgs []*ssa.Package
-	var mainPkgs []*ssa.Package
-
-	log.Info("Building SSA code for entire program...")
-	prog, pkgs = ssautil.AllPackages(initial, 0) // TODO: program needs all pointers recorded from initial list of packages  --> bz: ???
-	prog.Build()
-	noFunc := len(ssautil.AllFunctions(prog))
-	mainPkgs = ssautil.MainPackages(pkgs)
-	log.Info("Done  -- SSA code built. ", noFunc, " functions detected. ")
+	log.Info("Done  -- Using ", elapsedLoad.String(), " ", numMain, " packages loaded and ",  goFiles, " Go files detected.")
 
 	var mainInd string
 	var enterAt string
-	var mains []*ssa.Package
-	userEP := false // user specified entry function
-	if efficiency && len(mainPkgs) > 1 {
+	var mainPkgs []*packages.Package
+	//userEP := false // user specified entry function
+	if efficiency && len(checkMains) > 1 {
 		// Provide entry-point options and retrieve user selection
-		fmt.Println(len(mainPkgs), " main() entry-points identified: ")
-		for i, ep := range mainPkgs {
+		fmt.Println(len(checkMains), " main() entry-points identified: ")
+		for i, ep := range checkMains {
 			fmt.Println("Option", i+1, ": ", ep.String())
 		}
 		fmt.Print("Enter option number of choice: (or enter - for other desired entry point)")
@@ -167,22 +156,32 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		if mainInd == "-" {
 			fmt.Print("Enter function name to begin analysis from: ")
 			fmt.Scan(&enterAt)
-			for _, p := range pkgs {
-				if p.Func(enterAt) != nil {
-					userEP = true
-					mains = append(mainPkgs, p)
-					entryFn = enterAt // start analysis at user specified function
-				}
-			}
-			if !userEP {
-				fmt.Print("Function not found. ") // TODO: request input again
-			}
+			//for _, p := range pkgs {
+			//	if p.Func(enterAt) != nil {
+			//		userEP = true
+			//		mains = append(mainPkgs, p)
+			//		entryFn = enterAt // start analysis at user specified function
+			//	}
+			//}
+			//if !userEP {
+			//	fmt.Print("Function not found. ") // TODO: request input again
+			//}
 		} else if i, err0 := strconv.Atoi(mainInd); err0 == nil {
-			mains = append(mainPkgs, mainPkgs[i-1])
+			mainPkgs = append(mainPkgs, checkMains[i-1])
 		}
 
 	} else {
-		mains = mainPkgs
+		mainPkgs = checkMains
+	}
+
+	prog, pkgs := ssautil.AllPackages(mainPkgs, 0)
+	log.Info("Building SSA code for entire program...")
+	prog.Build()
+	log.Info("Done  -- SSA code built. ")
+
+	mains, err := mainSSAPackages(pkgs)
+	if err != nil {
+		return err
 	}
 
 	logfile, err := os.Create("go_pta_log") //bz: for me ...
