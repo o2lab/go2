@@ -216,40 +216,9 @@ extractQueries:
 		outStr, _ := string(stdout.Bytes()), string(stderr.Bytes())
 		//fmt.Printf("run ls cmd. out:\n%s\nerr:\n%s\n", outStr, errStr) //bz: for me to debug
 		subdirs := strings.Split(outStr, "\n") //bz: record the future dir we need to traverse
-
-		var _wg sync.WaitGroup
-		results := make([]*driverResponse, len(subdirs)-2) //all results
-		for i := 1; i < len(subdirs)-1; i++ {              //bz: 1st element is ".", the last element is "", skip them
-			subdir := subdirs[i]
-			_cfg := &Config{
-				Mode:    LoadAllSyntax,
-				Context: cfg.Context,
-				Logf:    cfg.Logf,
-				Dir:     cfg.Dir + subdir[1:], // bz: we update this. remove the "." in subdir
-				Env:     cfg.Env,
-				Tests:   false,
-			}
-			_state := &golistState{
-				cfg:        _cfg,
-				ctx:        ctx,
-				vendorDirs: map[string]bool{},
-			}
-			_wg.Add(1)
-			go func(i int, _state *golistState, restPatterns []string) {
-				_dr, _err := _state.createDriverResponse(restPatterns...)
-				if _err != nil {
-					fmt.Printf("ERROR from _state.createDriverResponse: %s", _err)
-					results[i-1] = nil
-				} else {
-					results[i-1] = _dr
-				}
-				_wg.Done()
-			}(i, _state, restPatterns)
-		}
-		_wg.Wait()
-		//bz: sum
-		for _, ret := range results {
-			response.addAll(ret)
+		size := len(subdirs) - 2
+		if size > 0 {
+			goListDriverRecursive(subdirs, size, response, cfg, ctx, restPatterns)
 		}
 	}
 
@@ -304,6 +273,46 @@ extractQueries:
 	}
 	return response.dr, nil
 }
+
+//bz: do main search
+func goListDriverRecursive(subdirs []string, size int, response *responseDeduper, cfg *Config,
+	ctx context.Context, restPatterns []string) {
+	var _wg sync.WaitGroup
+	results := make([]*driverResponse, size) //all results
+	for i := 1; i < len(subdirs)-1; i++ {              //bz: 1st element is ".", the last element is "", skip them
+		subdir := subdirs[i]
+		_cfg := &Config{
+			Mode:    LoadAllSyntax,
+			Context: cfg.Context,
+			Logf:    cfg.Logf,
+			Dir:     cfg.Dir + subdir[1:], // bz: we update this. remove the "." in subdir
+			Env:     cfg.Env,
+			Tests:   false,
+		}
+		_state := &golistState{
+			cfg:        _cfg,
+			ctx:        ctx,
+			vendorDirs: map[string]bool{},
+		}
+		_wg.Add(1)
+		go func(i int, _state *golistState, restPatterns []string) {
+			_dr, _err := _state.createDriverResponse(restPatterns...)
+			if _err != nil {
+				fmt.Printf("ERROR from _state.createDriverResponse: %s", _err)
+				results[i-1] = nil
+			} else {
+				results[i-1] = _dr
+			}
+			_wg.Done()
+		}(i, _state, restPatterns)
+	}
+	_wg.Wait()
+	//bz: sum up
+	for _, ret := range results {
+		response.addAll(ret)
+	}
+}
+
 
 func (state *golistState) addNeededOverlayPackages(response *responseDeduper, pkgs []string) error {
 	if len(pkgs) == 0 {

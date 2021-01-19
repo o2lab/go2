@@ -20,6 +20,9 @@ func Visit(pkgs []*Package, pre func(*Package) bool, post func(*Package)) {
 			seen[pkg] = true
 
 			if pre == nil || pre(pkg) {
+				if pkg == nil {
+					return //bz: added to bypass
+				}
 				paths := make([]string, 0, len(pkg.Imports))
 				for path := range pkg.Imports {
 					paths = append(paths, path)
