@@ -7,14 +7,14 @@ import (
 
 func main() {
 	wg := sync.WaitGroup{}
-	x := 1
+	x04 := 1
 	wg.Add(1)
 	go func() {
-		x /* RACE Write */= 1
+		x04 /* RACE Write */ = 1
 		wg.Done()
 	}()
 	go func() {
-		fmt.Println(x/* RACE Read */)
+		fmt.Println(x04 /* RACE Read */)
 	}()
 	wg.Wait()
 }

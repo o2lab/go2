@@ -8,18 +8,17 @@ import (
 func main() {
 	ch1 := make(chan int)
 	mumu := sync.RWMutex{}
-	x := 0
+	x4 := 0
 	go func() {
 		mumu.RLock()
-		ch1 <- x
+		ch1 <- x4
 		mumu.RUnlock()
 	}()
 
 	go func() {
 		mumu.Lock()
-		x += 1
+		x4 += 1
 		mumu.Unlock()
 	}()
 
 }
-

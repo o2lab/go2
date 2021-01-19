@@ -2,14 +2,14 @@ package main
 
 import "fmt"
 
-var x = 1
+var x2 = 1
 var ch = make(chan bool)
 var y = false
 
 func main() {
 	func() {
 		go func() {
-			x = 1
+			x2 = 1
 			ch <- true
 		}()
 		funcOne()

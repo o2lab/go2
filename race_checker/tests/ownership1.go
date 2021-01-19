@@ -8,14 +8,14 @@ func main() {
 }
 
 func readOnly(i int) {
-	m := i
-	_ = m
+	m3 := i
+	_ = m3
 	i = i + 1
 }
 
 func readSlice(s []int) {
 	sum := 0
-	for _, i := range s {
-		sum += i
+	for _, i3 := range s {
+		sum += i3
 	}
 }

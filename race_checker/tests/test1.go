@@ -197,14 +197,14 @@
 //}
 //
 //func main() {
-//	x := someData{someInt: 5}
+//	x2 := someData{someInt: 5}
 //	var j int
 //	go func() {
-//		x.someInt = 2 * x.someInt
-//		x.justSend()
+//		x2.someInt = 2 * x2.someInt
+//		x2.justSend()
 //	}()
 //	go func() {
-//		j = x.justRecv()
+//		j = x2.justRecv()
 //		fmt.Println(j)
 //	}()
 //}
@@ -213,12 +213,12 @@ package main
 import "fmt"
 
 func main() {
-	var m map[int]int
-	m = make(map[int]int)
-	for j := 0; j < 3; j++ {
-		m[j] = j + 1
+	var m02 map[int]int
+	m02 = make(map[int]int)
+	for j02 := 0; j02 < 3; j02++ {
+		m02[j02] = j02 + 1
 	}
-	for _, i := range m {
-		fmt.Println("Let's see ", i)
+	for _, i02 := range m02 {
+		fmt.Println("Let's see ", i02)
 	}
 }

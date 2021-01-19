@@ -17,12 +17,12 @@ func main() {
 }
 
 func getNumber() int {
-	var i int
+	var i22 int
 	writeI := func() {
-		i = 1
+		i22 = 1
 	}
 	go func() {
-		_ = i
+		_ = i22
 		m1.Lock()
 		writeI()
 		m1.Unlock()
@@ -33,7 +33,7 @@ func getNumber() int {
 	//m.Unlock()
 	//k := <-ch
 	m1.Lock()
-	_ = i
+	_ = i22
 	m1.Unlock()
 	return 0
 }

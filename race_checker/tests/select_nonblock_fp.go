@@ -5,9 +5,9 @@ import "fmt"
 func main() {
 	ch1 := make(chan int)
 	ch2 := make(chan int)
-	x := 0
+	x88 := 0
 	go func() {
-		x /* RACE Write */= 1
+		x88 /* RACE Write */ = 1
 		ch1 <- 1
 	}()
 	go func() {
@@ -15,12 +15,12 @@ func main() {
 	}()
 	select {
 	case a := <-ch1:
-		x = a
+		x88 = a
 	case a := <-ch2:
-		x /* RACE Write */ = a + 1
-		fmt.Println(x)
+		x88 /* RACE Write */ = a + 1
+		fmt.Println(x88)
 	default:
-		//x /* RACE Write */= 20
-		//fmt.Println(x)
+		//x2 /* RACE Write */= 20
+		//fmt.Println(x2)
 	}
 }

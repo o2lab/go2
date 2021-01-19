@@ -10,11 +10,11 @@ func main() {
 		a: 1,
 		b: 2,
 	}
-	ch := make(chan struct{})
+	c := make(chan struct{})
 	go func() {
 		s.a = 1
-		ch <- struct{}{}
+		c <- struct{}{}
 	}()
 	s.b = 2
-	<-ch
+	<-c
 }
