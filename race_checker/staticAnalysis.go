@@ -65,13 +65,27 @@ func isSynthetic(fn *ssa.Function) bool { // ignore functions that are NOT true 
 	return fn.Synthetic != "" || fn.Pkg == nil
 }
 
+//bz: whether we have a main.go file in a root (*packages.Package)
+func hasMainGoFile(compiledGoFiles []string) bool {
+	if compiledGoFiles == nil {
+		return false
+	}
+	for _, gofile := range compiledGoFiles {
+		last := strings.LastIndex(gofile,"/")
+		if strings.EqualFold(gofile[last:], "/main.go") {
+			return true
+		}
+	}
+	return false
+}
+
 //bz:
 func findAllMainPkgs(total []*packages.Package) ([]*packages.Package, int, int, error) {
 	var mains []*packages.Package
 	counter := 0
 	numMain := 0 //since we need to remove nil from initial
 	for _, p := range total {
-		if p != nil && p.Name == "main" {
+		if p != nil && p.Name == "main" && hasMainGoFile(p.CompiledGoFiles){
 			mains = append(mains, p)
 			numMain++
 		}
