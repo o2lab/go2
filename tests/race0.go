@@ -1,5 +1,7 @@
 package main
 
+import "time"
+
 var y int
 
 func a() {
@@ -12,21 +14,19 @@ func b() {
 }
 
 func main() {
-	done := make(chan bool)
-	x := 0
-	c1 := make(chan int)
-	c2 := make(chan int)
+	c := make(chan *int, 1)
+	c <- nil
 	go func() {
-		select {
-		case c1 <- x: // read of x does not race with...
-		case c2 <- 1:
-		}
-		done <- true
+		i := 42
+		c <- &i
 	}()
+	time.Sleep(10 * time.Millisecond)
+	<-c
 	select {
-	case x = <-c1: // ... write to x here
-	case c2 <- 1:
-		x = 9
+	case p := <-c:
+		if *p != 42 {
+
+		}
+	case <-make(chan int):
 	}
-	<-done
 }

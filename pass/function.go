@@ -191,6 +191,15 @@ func (pass *FnPass) updateBlockStateOnRelease(block *ssa.BasicBlock, relMap []*p
 					prevAcq.Copy(&releasedOut.Sparse)
 				}
 			}
+		case *ssa.Select:
+			// overapproximate all release ops for a select statement
+			for _, state := range instr.States {
+				if ps := pass.valueToPointSet(state.Chan); ps != nil {
+					releasedOut.UnionWith(&ps.Sparse)
+					prevAcq = &pointer.AccessPointSet{}
+					prevAcq.Copy(&releasedOut.Sparse)
+				}
+			}
 		}
 		relMap[i] = prevAcq
 	}
@@ -326,12 +335,6 @@ func (pass *FnPass) updateBlockState(block *ssa.BasicBlock, acqIn *pointer.Acces
 			pass.updateStateViaIndirection(instr, instr.X, escIn)
 		case *ssa.FieldAddr:
 			pass.updateStateViaIndirection(instr, instr.X, escIn)
-		case *ssa.Select:
-			t := instr.Type()
-			_ = t
-			for _, state := range instr.States {
-				log.Infoln(state.DebugNode)
-			}
 		}
 	}
 	acqFixed := acqIn.Equals(&acqOut.Sparse)

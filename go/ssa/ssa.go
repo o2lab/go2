@@ -874,6 +874,7 @@ type SelectState struct {
 	Chan      Value         // channel to use (for send or receive)
 	Send      Value         // value to send (for send)
 	Pos       token.Pos     // position of token.ARROW
+	BodyBlock *BasicBlock
 	DebugNode ast.Node      // ast.SendStmt or ast.UnaryExpr(<-) [debug mode]
 }
 
@@ -1449,6 +1450,7 @@ func (v *Alloc) Pos() token.Pos            { return v.pos }
 
 func (v *register) Type() types.Type          { return v.typ }
 func (v *register) setType(typ types.Type)    { v.typ = typ }
+func (v *register) SetType(typ types.Type)    { v.typ = typ }
 func (v *register) Name() string              { return fmt.Sprintf("t%d", v.num) }
 func (v *register) setNum(num int)            { v.num = num }
 func (v *register) Referrers() *[]Instruction { return &v.referrers }
@@ -1458,6 +1460,7 @@ func (v *register) setPos(pos token.Pos)      { v.pos = pos }
 func (v *anInstruction) Parent() *Function          { return v.block.parent }
 func (v *anInstruction) Block() *BasicBlock         { return v.block }
 func (v *anInstruction) setBlock(block *BasicBlock) { v.block = block }
+func (v *anInstruction) SetBlock(block *BasicBlock) { v.block = block }
 func (v *anInstruction) Referrers() *[]Instruction  { return nil }
 
 func (t *Type) Name() string                         { return t.object.Name() }

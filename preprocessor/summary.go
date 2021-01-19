@@ -5,6 +5,7 @@ import (
 	"github.com/o2lab/go2/pointer"
 	log "github.com/sirupsen/logrus"
 	"go/token"
+	"go/types"
 )
 
 type FnSummary struct {
@@ -98,6 +99,29 @@ func (f *FnSummary) visitIns(instruction ssa.Instruction) {
 			} else {
 				stack = append(stack, block.Succs...)
 			}
+		}
+	case *ssa.Select:
+		for _, state := range instr.States {
+			var synthetic ssa.Instruction
+			if state.Dir == types.SendOnly {
+				send := &ssa.Send{
+					Chan: state.Chan,
+					X: state.Send,
+				}
+				send.SetBlock(instr.Block())
+				synthetic = send
+			} else { // must be types.RecvOnly
+				unop := &ssa.UnOp{
+					Op:token.ARROW,
+					X: state.Chan,
+				}
+				typ := state.Chan.Type().(*types.Chan).Elem()
+				unop.SetType(typ)
+				unop.SetBlock(instr.Block())
+				synthetic = unop
+			}
+			log.Infoln(synthetic)
+			state.BodyBlock.Instrs = append([]ssa.Instruction{synthetic}, state.BodyBlock.Instrs...)
 		}
 	}
 }

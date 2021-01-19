@@ -64,7 +64,7 @@ func (a *Access) String() string {
 	if a.Write {
 		typ = "Write"
 	}
-	return fmt.Sprintf("%s of %s, async=%t, acq=%+q, rel=%+q", typ, a.Addr, a.CrossThread, a.AcquiredPointSet.AppendTo([]int{}), a.AcquiredPointSet.AppendTo([]int{}))
+	return fmt.Sprintf("%s of %s, async=%t, acq=%+v, rel=%+v", typ, a.Addr, a.CrossThread, a.AcquiredPointSet.AppendTo([]int{}), a.ReleasedPointSet.AppendTo([]int{}))
 }
 
 func (a *Access) UnrollStack() CallStack {
@@ -78,10 +78,11 @@ func (a *Access) UnrollStack() CallStack {
 }
 
 func (a *Access) StringWithPos(fset *token.FileSet) string {
+	typ := "Read"
 	if a.Write {
-		return fmt.Sprintf("Write of %s, Acq/rel: %+q %+q, %s", a.Addr, a.AcquiredPointSet.AppendTo([]int{}), a.ReleasedPointSet.AppendTo([]int{}), fset.Position(a.Instr.Pos()))
+		typ = "Write"
 	}
-	return fmt.Sprintf("Read of %s, Acq/rel: %+q %+q, %s", a.Addr, a.AcquiredPointSet.AppendTo([]int{}), a.ReleasedPointSet.AppendTo([]int{}), fset.Position(a.Instr.Pos()))
+	return fmt.Sprintf("%s of %s, Acq/rel: %+v %+v cross=%t: %s", typ, a.Addr, a.AcquiredPointSet.AppendTo([]int{}), a.ReleasedPointSet.AppendTo([]int{}), a.CrossThread, fset.Position(a.Instr.Pos()))
 }
 
 func PrintStack(stack CallStack) {

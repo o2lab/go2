@@ -1565,6 +1565,7 @@ func (b *builder) selectStmt(fn *Function, s *ast.SelectStmt, label *lblock) {
 		}
 		body := fn.newBasicBlock("select.body")
 		next := fn.newBasicBlock("select.next")
+		states[state].BodyBlock = body
 		emitIf(fn, emitCompare(fn, token.EQL, idx, intConst(int64(state)), token.NoPos), body, next)
 		fn.currentBlock = body
 		fn.targets = &targets{
