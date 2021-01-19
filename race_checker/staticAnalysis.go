@@ -146,7 +146,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 	var mainPkgs []*ssa.Package
 
 	log.Info("Building SSA code for entire program...")
-	prog, pkgs = ssautil.AllPackages(initial, 0) // TODO: program needs all pointers recorded from initial list of packages  --> bz: ???
+	prog, pkgs = ssautil.AllPackages(initial, 0) // TODO: perhaps able to obtain fn info from packages.Packages instead??
 	prog.Build()
 	noFunc := len(ssautil.AllFunctions(prog))
 	mainPkgs = ssautil.MainPackages(pkgs)
@@ -177,6 +177,19 @@ func (runner *AnalysisRunner) Run(args []string) error {
 			if !userEP {
 				fmt.Print("Function not found. ") // TODO: request input again
 			}
+		} else if strings.Contains(mainInd, ",") { // multiple selections
+			selection := strings.Split(mainInd, ",")
+			for _, s := range selection {
+				i, _ := strconv.Atoi(s) // convert to integer
+				mains = append(mainPkgs, mainPkgs[i-1])
+			}
+		} else if  strings.Contains(mainInd, "-") { // selected range
+			selection := strings.Split(mainInd, "-")
+			begin, _ := strconv.Atoi(selection[0])
+			end, _ := strconv.Atoi(selection[1])
+			for i := begin; i <= end; i++ {
+				mains = append(mainPkgs, mainPkgs[i-1])
+			}
 		} else if i, err0 := strconv.Atoi(mainInd); err0 == nil {
 			mains = append(mainPkgs, mainPkgs[i-1])
 		}
@@ -189,6 +202,8 @@ func (runner *AnalysisRunner) Run(args []string) error {
 	if !doPTALog {
 		logfile = nil
 	}
+
+	//for im, main := range mains { ... } TODO: WIP
 
 	var scope []string
 	if fromPath != "" {
