@@ -110,14 +110,14 @@ func (pass *FnPass) backwardsDataflowAnalysis(function *ssa.Function) {
 
 		if pass.updateBlockStateOnRelease(block, releasedPerIns[block.Index], &releasedOut) {
 			for _, pred := range block.Preds {
-				appendIfNotPresent(worklist, pred.Index)
+				worklist = appendIfNotPresent(worklist, pred.Index)
 			}
 		}
 	}
 	pass.releasedPerIns = releasedPerIns
 }
 
-func appendIfNotPresent(worklist []int, x int) {
+func appendIfNotPresent(worklist []int, x int) []int {
 	idx := 0
 	for ; idx < len(worklist); idx++ {
 		if worklist[idx] == x {
@@ -127,6 +127,7 @@ func appendIfNotPresent(worklist []int, x int) {
 	if idx == len(worklist) {
 		worklist = append(worklist, x)
 	}
+	return worklist
 }
 
 // release ops beside lock: chan send/recv, waitgroup wait/done/add
@@ -136,6 +137,7 @@ func (pass *FnPass) updateBlockStateOnRelease(block *ssa.BasicBlock, relMap []*p
 	if relMap[0] != nil {
 		oldRelIn.Copy(&relMap[0].Sparse)
 	}
+
 	handleCall := func(i int, instr ssa.CallInstruction) {
 		//	TODO: waitgroup wait/done/add
 		if mutex := preprocessor.GetLockedMutex(instr.Common()); mutex != nil {
@@ -146,6 +148,12 @@ func (pass *FnPass) updateBlockStateOnRelease(block *ssa.BasicBlock, relMap []*p
 			}
 		} else if mutex := preprocessor.GetUnlockedMutex(instr.Common()); mutex != nil {
 			if ps := pass.valueToPointSet(mutex); ps != nil {
+				releasedOut.UnionWith(&ps.Sparse)
+				prevAcq = &pointer.AccessPointSet{}
+				prevAcq.Copy(&releasedOut.Sparse)
+			}
+		} else if ch := preprocessor.GetClosedChan(instr.Common()); ch != nil {
+			if ps := pass.valueToPointSet(ch); ps != nil {
 				releasedOut.UnionWith(&ps.Sparse)
 				prevAcq = &pointer.AccessPointSet{}
 				prevAcq.Copy(&releasedOut.Sparse)
@@ -162,6 +170,7 @@ func (pass *FnPass) updateBlockStateOnRelease(block *ssa.BasicBlock, relMap []*p
 			}
 		}
 	}
+
 	for i := len(block.Instrs) - 1; i >= 0; i-- { // reverse
 		switch instr := block.Instrs[i].(type) {
 		case preprocessor.SyntheticDeferred:
@@ -171,11 +180,15 @@ func (pass *FnPass) updateBlockStateOnRelease(block *ssa.BasicBlock, relMap []*p
 		case *ssa.Send:
 			if ps := pass.valueToPointSet(instr.Chan); ps != nil {
 				releasedOut.UnionWith(&ps.Sparse)
+				prevAcq = &pointer.AccessPointSet{}
+				prevAcq.Copy(&releasedOut.Sparse)
 			}
 		case *ssa.UnOp:
 			if instr.Op == token.ARROW { // channel receive
 				if ps := pass.valueToPointSet(instr.X); ps != nil {
 					releasedOut.UnionWith(&ps.Sparse)
+					prevAcq = &pointer.AccessPointSet{}
+					prevAcq.Copy(&releasedOut.Sparse)
 				}
 			}
 		}
@@ -225,7 +238,7 @@ func (pass *FnPass) forwardDataflowAnalysis(function *ssa.Function) {
 
 		if pass.updateBlockState(block, &acqIn, &escIn, acquiredOuts[blockIdx], pass.releasedPerIns[blockIdx], escapedOuts[blockIdx], accessMap, &pass.accessPointSet) {
 			for _, succ := range block.Succs {
-				appendIfNotPresent(worklist, succ.Index)
+				worklist = appendIfNotPresent(worklist, succ.Index)
 			}
 		}
 	}
@@ -236,7 +249,7 @@ func (pass *FnPass) forwardDataflowAnalysis(function *ssa.Function) {
 func (pass *FnPass) updateBlockState(block *ssa.BasicBlock, acqIn *pointer.AccessPointSet, escIn *pointer.AccessPointSet,
 	acqOut *pointer.AccessPointSet, relMap []*pointer.AccessPointSet, escOut *pointer.AccessPointSet,
 	accessMap map[int][]*Access, accessPointSet *pointer.AccessPointSet) bool {
-	log.Debugf("Block %d", block.Index)
+	log.Debugf("Block %d: %s", block.Index, block.Comment)
 
 	handleCall := func(i int, instr ssa.CallInstruction) {
 		if mutex := preprocessor.GetLockedMutex(instr.Common()); mutex != nil {
@@ -267,7 +280,7 @@ func (pass *FnPass) updateBlockState(block *ssa.BasicBlock, acqIn *pointer.Acces
 	}
 
 	for i, instruction := range block.Instrs {
-		log.Debugln("  ", instruction)
+		log.Debugf("  %s pos=%v", instruction, instruction.Pos())
 		switch instr := instruction.(type) {
 		case preprocessor.SyntheticDeferred:
 			handleCall(i, instr)
@@ -297,6 +310,15 @@ func (pass *FnPass) updateBlockState(block *ssa.BasicBlock, acqIn *pointer.Acces
 			if instr.Op == token.MUL {
 				pass.updateStateViaIndirection(instr, instr.X, escIn)
 				pass.makeAccess(instr, instr.X, false, acqIn, relMap[i], escIn, accessMap, accessPointSet)
+			} else if instr.Op == token.ARROW {
+				if ps := pass.valueToPointSet(instr.X); ps != nil {
+					acqIn.UnionWith(&ps.Sparse)
+				}
+			}
+		case *ssa.Send:
+			// TODO: only unbuffered sends should acquire. Here we temporarily do acquire for all sends.
+			if ps := pass.valueToPointSet(instr.Chan); ps != nil {
+				acqIn.UnionWith(&ps.Sparse)
 			}
 		case *ssa.Store:
 			pass.makeAccess(instr, instr.Addr, true, acqIn, relMap[i], escIn, accessMap, accessPointSet)
@@ -304,6 +326,12 @@ func (pass *FnPass) updateBlockState(block *ssa.BasicBlock, acqIn *pointer.Acces
 			pass.updateStateViaIndirection(instr, instr.X, escIn)
 		case *ssa.FieldAddr:
 			pass.updateStateViaIndirection(instr, instr.X, escIn)
+		case *ssa.Select:
+			t := instr.Type()
+			_ = t
+			for _, state := range instr.States {
+				log.Infoln(state.DebugNode)
+			}
 		}
 	}
 	acqFixed := acqIn.Equals(&acqOut.Sparse)

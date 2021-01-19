@@ -52,9 +52,9 @@ func TestRaceChanAsyncRev(t *testing.T) {
 	c := make(chan int, 10)
 	go func() {
 		c <- 0
-		v = 1
+		v = 1 // want `Write`
 	}()
-	v = 2
+	v = 2 // want `Write`
 	<-c
 }
 
@@ -148,13 +148,13 @@ func TestRaceChanSyncCloseSend(t *testing.T) {
 	c := make(chan int)
 	go func() {
 		v = 1
-		close(c)
+		close(c) // want `Write`
 	}()
 	func() {
 		defer func() {
 			recover()
 		}()
-		c <- 0
+		c <- 0 // want `Read`
 	}()
 	v = 2
 }
@@ -165,14 +165,14 @@ func TestRaceChanAsyncCloseSend(t *testing.T) {
 	c := make(chan int, 10)
 	go func() {
 		v = 1
-		close(c)
+		close(c) // want `Write`
 	}()
 	func() {
 		defer func() {
 			recover()
 		}()
 		for {
-			c <- 0
+			c <- 0 // want `Read`
 		}
 	}()
 	v = 2
@@ -187,21 +187,21 @@ func TestRaceChanCloseClose(t *testing.T) {
 	go func() {
 		defer func() {
 			if recover() != nil {
-				v2 = 2
+				v2 = 2 // want `Write`
 			}
 			compl <- true
 		}()
-		v1 = 1
+		v1 = 1 // want `Write`
 		close(c)
 	}()
 	go func() {
 		defer func() {
 			if recover() != nil {
-				v1 = 2
+				v1 = 2 // want `Write`
 			}
 			compl <- true
 		}()
-		v2 = 1
+		v2 = 1 // want `Write`
 		close(c)
 	}()
 	<-compl
@@ -213,13 +213,13 @@ func TestRaceChanSendLen(t *testing.T) {
 	_ = v
 	c := make(chan int, 10)
 	go func() {
-		v = 1
+		v = 1 // want `Write`
 		c <- 1
 	}()
 	for len(c) == 0 {
 		runtime.Gosched()
 	}
-	v = 2
+	v = 2 // want `Write`
 }
 
 func TestRaceChanRecvLen(t *testing.T) {
@@ -244,20 +244,20 @@ func TestRaceChanSendSend(t *testing.T) {
 	_ = v1 + v2
 	c := make(chan int, 1)
 	go func() {
-		v1 = 1
+		v1 = 1 // want `Write`
 		select {
 		case c <- 1:
 		default:
-			v2 = 2
+			v2 = 2 // want `Write`
 		}
 		compl <- true
 	}()
 	go func() {
-		v2 = 1
+		v2 = 1 // want `Write`
 		select {
 		case c <- 1:
 		default:
-			v1 = 2
+			v1 = 2 // want `Write`
 		}
 		compl <- true
 	}()
@@ -283,18 +283,19 @@ func TestRaceChanWrongSend(t *testing.T) {
 	_ = v1 + v2
 	c := make(chan int, 2)
 	go func() {
-		v1 = 1
+		v1 = 1 // want `Write`
 		c <- 1
 	}()
 	go func() {
-		v2 = 2
+		v2 = 2 // want `Write`
 		c <- 2
 	}()
 	time.Sleep(1e7)
 	if <-c == 1 {
-		v2 = 3
+		v2 = 3 // want `Write`
 	} else {
-		v1 = 3
+		// not reachable
+		v1 = 3 // want `Write`
 	}
 }
 
@@ -309,18 +310,18 @@ func TestRaceChanWrongClose(t *testing.T) {
 			recover()
 		}()
 		v1 = 1
-		c <- 1
+		c <- 1 // want `Read`
 		done <- true
 	}()
 	go func() {
 		time.Sleep(1e7)
-		v2 = 2
-		close(c)
+		v2 = 2 // true `Write` but missed by our approach
+		close(c) // want `Write`
 		done <- true
 	}()
 	time.Sleep(2e7)
 	if _, who := <-c; who {
-		v2 = 2
+		v2 = 2 // true `Write` but missed by our approach
 	} else {
 		v1 = 2
 	}
@@ -336,39 +337,39 @@ func TestRaceChanSendClose(t *testing.T) {
 			recover()
 			compl <- true
 		}()
-		c <- 1
+		c <- 1 // want `Read`
 	}()
 	go func() {
 		time.Sleep(10 * time.Millisecond)
-		close(c)
+		close(c) // want `Write`
 		compl <- true
 	}()
 	<-compl
 	<-compl
 }
 
-func TestRaceChanSendSelectClose(t *testing.T) {
-	compl := make(chan bool, 2)
-	c := make(chan int, 1)
-	c1 := make(chan int)
-	go func() {
-		defer func() {
-			recover()
-			compl <- true
-		}()
-		time.Sleep(10 * time.Millisecond)
-		select {
-		case c <- 1:
-		case <-c1:
-		}
-	}()
-	go func() {
-		close(c)
-		compl <- true
-	}()
-	<-compl
-	<-compl
-}
+//func TestRaceChanSendSelectClose(t *testing.T) {
+//	compl := make(chan bool, 2)
+//	c := make(chan int, 1)
+//	c1 := make(chan int)
+//	go func() {
+//		defer func() {
+//			recover()
+//			compl <- true
+//		}()
+//		time.Sleep(10 * time.Millisecond)
+//		select {
+//		case c <- 1:
+//		case <-c1:
+//		}
+//	}()
+//	go func() {
+//		close(c)
+//		compl <- true
+//	}()
+//	<-compl
+//	<-compl
+//}
 
 func TestRaceSelectReadWriteAsync(t *testing.T) {
 	done := make(chan bool)
@@ -379,13 +380,13 @@ func TestRaceSelectReadWriteAsync(t *testing.T) {
 	c2 <- 1
 	go func() {
 		select {
-		case c1 <- x: // read of x races with...
+		case c1 <- x: // want `Read`
 		case c3 <- 1:
 		}
 		done <- true
 	}()
 	select {
-	case x = <-c2: // ... write to x here
+	case x = <-c2: // want `Write`
 	case c3 <- 1:
 	}
 	<-done
@@ -406,13 +407,13 @@ func TestRaceSelectReadWriteSync(t *testing.T) {
 	}()
 	go func() {
 		select {
-		case c1 <- x: // read of x races with...
+		case c1 <- x: // want `Read`
 		case c3 <- 1:
 		}
 		done <- true
 	}()
 	select {
-	case x = <-c2: // ... write to x here
+	case x = <-c2: // want `Write`
 	case c3 <- 1:
 	}
 	<-done
@@ -444,10 +445,10 @@ func TestRaceChanReadWriteAsync(t *testing.T) {
 	c2 <- 10
 	x := 0
 	go func() {
-		c1 <- x // read of x races with...
+		c1 <- x // want `Read`
 		done <- true
 	}()
-	x = <-c2 // ... write to x here
+	x = <-c2 // want `Write`
 	<-done
 }
 
@@ -464,10 +465,10 @@ func TestRaceChanReadWriteSync(t *testing.T) {
 	}()
 	x := 0
 	go func() {
-		c1 <- x // read of x races with...
+		c1 <- x // want `Read`
 		done <- true
 	}()
-	x = <-c2 // ... write to x here
+	x = <-c2 // want `Write`
 	<-done
 }
 

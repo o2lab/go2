@@ -191,6 +191,15 @@ func GetUnlockedMutex(call *ssa.CallCommon) ssa.Value {
 	return nil
 }
 
+func GetClosedChan(call *ssa.CallCommon) ssa.Value {
+	if builtIn, ok := call.Value.(*ssa.Builtin); ok {
+		if builtIn.Name() == "close" {
+			return call.Args[0]
+		}
+	}
+	return nil
+}
+
 func captureEscapedVariables(goCall *ssa.Go) []ssa.Value {
 	common := goCall.Common()
 	var escaped []ssa.Value

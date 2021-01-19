@@ -12,13 +12,21 @@ func b() {
 }
 
 func main() {
-	v := 0
-	_ = v
-	c := make(chan int)
+	done := make(chan bool)
+	x := 0
+	c1 := make(chan int)
+	c2 := make(chan int)
 	go func() {
-		v = 1
-		c <- 0
+		select {
+		case c1 <- x: // read of x does not race with...
+		case c2 <- 1:
+		}
+		done <- true
 	}()
-	<-c
-	v = 2
+	select {
+	case x = <-c1: // ... write to x here
+	case c2 <- 1:
+		x = 9
+	}
+	<-done
 }
