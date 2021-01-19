@@ -85,7 +85,7 @@ func findAllMainPkgs(total []*packages.Package) ([]*packages.Package, int, int, 
 	counter := 0
 	numMain := 0 //since we need to remove nil from initial
 	for _, p := range total {
-		if p != nil && p.Name == "main" && hasMainGoFile(p.CompiledGoFiles){
+		if p != nil && p.Name == "main" { //&& hasMainGoFile(p.CompiledGoFiles)
 			mains = append(mains, p)
 			numMain++
 		}
