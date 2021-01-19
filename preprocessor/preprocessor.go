@@ -1,11 +1,11 @@
 package preprocessor
 
 import (
+	"github.com/o2lab/go2/go/ssa"
 	"github.com/o2lab/go2/pointer"
 	"github.com/sirupsen/logrus"
 	"go/token"
 	"go/types"
-	"golang.org/x/tools/go/ssa"
 	"strings"
 )
 

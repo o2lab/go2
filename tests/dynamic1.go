@@ -32,12 +32,12 @@ func (r *Rectangle) Reset() {
 	r.b = 0
 }
 
-func reset(s Shape, times int)  {
+func reset(s Shape, times int) {
 	if times == 0 {
 		s.Reset()
 		return
 	}
-	reset(s, times - 1)
+	reset(s, times-1)
 }
 
 func main() {

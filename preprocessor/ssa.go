@@ -1,7 +1,7 @@
 package preprocessor
 
 import (
-	"golang.org/x/tools/go/ssa"
+	"github.com/o2lab/go2/go/ssa"
 )
 
 // SyntheticDeferred represents a manually injected ssa.Deferred instruction in
@@ -10,4 +10,3 @@ import (
 type SyntheticDeferred struct {
 	*ssa.Defer
 }
-

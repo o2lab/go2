@@ -1,10 +1,10 @@
 package preprocessor
 
 import (
+	"github.com/o2lab/go2/go/ssa"
 	"github.com/o2lab/go2/pointer"
 	log "github.com/sirupsen/logrus"
 	"go/token"
-	"golang.org/x/tools/go/ssa"
 )
 
 type FnSummary struct {

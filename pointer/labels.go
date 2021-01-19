@@ -10,7 +10,7 @@ import (
 	"go/types"
 	"strings"
 
-	"golang.org/x/tools/go/ssa"
+	"github.com/o2lab/go2/go/ssa"
 )
 
 // A Label is an entity that may be pointed to by a pointer, map,

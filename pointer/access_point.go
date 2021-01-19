@@ -1,6 +1,6 @@
 package pointer
 
-import "golang.org/x/tools/go/ssa"
+import "github.com/o2lab/go2/go/ssa"
 
 type AccessPointId = nodeid
 type AccessPointSet = nodeset

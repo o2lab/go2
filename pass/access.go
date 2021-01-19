@@ -2,11 +2,11 @@ package pass
 
 import (
 	"fmt"
+	"github.com/o2lab/go2/go/callgraph"
+	"github.com/o2lab/go2/go/ssa"
 	"github.com/o2lab/go2/pointer"
 	"github.com/sirupsen/logrus"
 	"go/token"
-	"golang.org/x/tools/go/callgraph"
-	"golang.org/x/tools/go/ssa"
 )
 
 type CallStack []*callgraph.Edge
@@ -25,7 +25,7 @@ type Access struct {
 	PredSite         *callgraph.Edge
 	AcquiredPointSet pointer.AccessPointSet
 	ReleasedPointSet pointer.AccessPointSet
-	CrossThread    bool
+	CrossThread      bool
 }
 
 // Subsumes is a relation that orders accesses by their likeliness of being racy.
@@ -54,7 +54,6 @@ func (a *Access) RacesWith(b *Access) bool {
 func (a *Access) WriteConflictsWith(b *Access) bool {
 	return a.Write || b.Write
 }
-
 
 func (a *Access) MayAlias(b *Access, q map[ssa.Value]pointer.Pointer) bool {
 	return q[a.Addr].MayAlias(q[b.Addr])
@@ -106,8 +105,8 @@ func (pass *FnPass) ReportRace(a1, a2 *Access) {
 	if pass.Visitor.testOutput != nil {
 		p1 := fset.Position(a1.Instr.Pos())
 		p2 := fset.Position(a2.Instr.Pos())
-		pass.Visitor.testOutput[p1]	= append(pass.Visitor.testOutput[p1], a1.String())
-		pass.Visitor.testOutput[p2]	= append(pass.Visitor.testOutput[p2], a2.String())
+		pass.Visitor.testOutput[p1] = append(pass.Visitor.testOutput[p1], a1.String())
+		pass.Visitor.testOutput[p2] = append(pass.Visitor.testOutput[p2], a2.String())
 		return
 	}
 

@@ -14,7 +14,6 @@ func (s *S) write(i int) {
 	s.i /* RACE Write */ = i
 }
 
-
 func main() {
 	var m sync.Mutex
 	s := &S{

@@ -1,12 +1,12 @@
 package pass
 
 import (
+	"github.com/o2lab/go2/go/callgraph"
+	"github.com/o2lab/go2/go/ssa"
 	"github.com/o2lab/go2/pointer"
 	"github.com/o2lab/go2/preprocessor"
 	log "github.com/sirupsen/logrus"
 	"go/token"
-	"golang.org/x/tools/go/callgraph"
-	"golang.org/x/tools/go/ssa"
 )
 
 type CFGVisitor struct {

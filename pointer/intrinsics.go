@@ -19,7 +19,7 @@ import (
 	"fmt"
 	"go/types"
 
-	"golang.org/x/tools/go/ssa"
+	"github.com/o2lab/go2/go/ssa"
 )
 
 // Instances of 'intrinsic' generate analysis constraints for calls to

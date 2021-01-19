@@ -23,10 +23,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/o2lab/go2/go/ssa"
+	"github.com/o2lab/go2/go/ssa/ssautil"
 	"golang.org/x/tools/go/buildutil"
 	"golang.org/x/tools/go/loader"
-	"golang.org/x/tools/go/ssa"
-	"golang.org/x/tools/go/ssa/ssautil"
 )
 
 var runStdlibTest = flag.Bool("stdlib", false, "Run the (slow) stdlib test")
