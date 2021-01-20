@@ -127,10 +127,9 @@ func init() {
 		"builtin",
 		"pflag",
 		"log",
-		"reflect",
 		"internal",
 		"impl",
-		"transport", // grpc
+		"transport",
 		"version",
 		"sort",
 		"filepath",
@@ -193,7 +192,6 @@ func main() {
 	newPTA := flag.Bool("useNewPTA", true, "Use the new pointer analysis in go_tools.")
 	debugPTA := flag.Bool("debugPTA", false, "Prints all PTA debug messages in console.")
 	keepPTALog := flag.Bool("keepPTALog", false, "Create a log file for all details in PTA.")
-	projPath := flag.String("path", "", "Include path.")
 	debug := flag.Bool("debug", false, "Prints log.Debug messages.")
 	lockOps := flag.Bool("lockOps", false, "Prints lock and unlock operations. ")
 	flag.BoolVar(&stats.CollectStats, "collectStats", false, "Collect analysis statistics.")
@@ -230,8 +228,6 @@ func main() {
 		efficiency = true
 		channelComm = true
 	}
-
-	fromPath = *projPath
 
 	log.SetFormatter(&log.TextFormatter{
 		FullTimestamp:   true,

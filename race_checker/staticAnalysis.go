@@ -151,21 +151,12 @@ func (runner *AnalysisRunner) Run(args []string) error {
 	if err != nil {
 		return err
 	}
+	fromPath = initial[0].ID
+	log.Debug(fromPath)
 	t := time.Now()
 	elapsedLoad := t.Sub(startLoad)
 	log.Info("Done  -- Using ", elapsedLoad.String())
 	mains, prog, pkgs := pkgSelection(initial)
-
-
-	//prog, pkgs := ssautil.AllPackages(mainPkgs, 0)
-	//log.Info("Building SSA code for entire program...")
-	//prog.Build()
-	//log.Info("Done  -- SSA code built. ")
-	//
-	//mains, err := mainSSAPackages(pkgs)
-	//if err != nil {
-	//	return err
-	//}
 
 	for _, m := range mains {
 		log.Info("Solving for " + m.String() + "... ")
@@ -203,7 +194,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 			ifFnReturn:      make(map[*ssa.Function]*ssa.Return),
 			ifSuccEnd:       make(map[ssa.Instruction]*ssa.Return),
 		}
-		log.Info("Done for " + m.String() + "... \n\n")
+		
 		log.Info("Compiling stack trace for every Goroutine... ")
 		log.Debug(strings.Repeat("-", 35), "Stack trace begins", strings.Repeat("-", 35))
 		runner.Analysis.visitAllInstructions(mains[0].Func(entryFn), 0)
@@ -236,6 +227,8 @@ func (runner *AnalysisRunner) Run(args []string) error {
 
 		log.Info("Checking for data races... ")
 		runner.Analysis.checkRacyPairs()
+
+		log.Info("Done for " + m.String() + "... \n\n")
 	}
 	return nil
 }
