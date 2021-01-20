@@ -40,6 +40,7 @@ var excludedPkgs = []string{
 	//"sort",
 	//"filepath",
 }
+var projPath = ""      // interested packages are those located at this path
 
 // mainPackages returns the main packages to analyze.
 // Each resulting package is named "main" and has a main function.
@@ -71,7 +72,7 @@ func findMainPackages(pkgs []*ssa.Package) ([]*ssa.Package, error) {
 
 //TODO: program counter ???
 func main() {
-	projPath := flag.String("path", "", "Designated project filepath. ")
+	projPath = *flag.String("path", "", "Designated project filepath. ")
 	flag.Parse()
 	args := flag.Args()
 	cfg := &packages.Config{
@@ -85,19 +86,20 @@ func main() {
 		return
 	}
 	if packages.PrintErrors(initial) > 0 {
-		fmt.Println("packages contain errors")
-		return
+		errSize, errPkgs := packages.PrintErrorsAndMore(initial) //bz: errPkg will be nil in initial
+		if errSize > 0 {
+			log.Info("Excluded the following packages contain errors, due to the above errors. ")
+			for i, errPkg := range errPkgs {
+				log.Info(i, " ", errPkg.ID)
+			}
+			log.Info("Continue   -- ")
+		}
 	} else if len(initial) == 0 {
 		fmt.Println("package list empty")
 		return
 	}
+	fmt.Println("Done  -- " + strconv.Itoa(len(initial)) + " packages loaded")
 
-	// Print the names of the source files
-	// for each package listed on the command line.
-	for nP, pkg := range initial {
-		fmt.Println(pkg.ID, pkg.GoFiles)
-		fmt.Println("Done  -- " + strconv.Itoa(nP+1) + " packages loaded")
-	}
 	// Create and build SSA-form program representation.
 	prog, pkgs := ssautil.AllPackages(initial, 0)
 
@@ -111,16 +113,30 @@ func main() {
 		return
 	}
 
+	//baseline: foreach
+	start := time.Now()   //performance
+	for i, main := range mains {
+		fmt.Println(i, " ", main.String())
+		doEachMain(main)
+		fmt.Println("============================================================================= \n")
+	}
+	t := time.Now()
+	elapsed := t.Sub(start)
+	fmt.Println("\n\n\nAll Done  -- PTA/CG Build; Using " + elapsed.String() + ".")
+}
+
+func doEachMain(main *ssa.Package) {
 	//create my log file
 	logfile, err := os.Create("gologfile") //bz: i do not want messed up log, create/overwrite one each time
 	log.SetFormatter(&log.TextFormatter{
 		FullTimestamp: true,
 	})
-
 	var scope []string
-	if projPath != nil {
-		scope = []string {*projPath}
+	if projPath != "" {
+		scope = []string {projPath}
 	}
+	var mains []*ssa.Package
+	mains = append(mains, main)
 	// Configure pointer analysis to build call-graph
 	ptaConfig := &pointer.Config{
 		Mains:          mains, //bz: NOW assume only one main

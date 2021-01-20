@@ -108,7 +108,7 @@ func pkgSelection(initial []*packages.Package) ([]*ssa.Package, *ssa.Program, []
 			fmt.Scan(&enterAt)
 			for _, p := range pkgs {
 				if len(p.Members) == 0 {
-					continue //bz: skip the panic if no function in this pkg
+					continue //bz: skip the panic if no function in *ssa.Package
 				}
 				if p.Func(enterAt) != nil {
 					userEP = true
