@@ -1,29 +1,36 @@
 package main
 
-import "runtime"
+import "sync"
 
-var y int
-
-func a() {
-	y++
-	b()
+type P struct {
+	x, y int
 }
 
-func b() {
-	y--
+type S struct {
+	s1, s2 P
+}
+
+type P2 P
+type S2 S
+type X2 X
+
+type X struct {
+	V [4]P
+	m sync.Mutex
 }
 
 func main() {
-	v := 0
-	_ = v
-	c := make(chan int, 10)
-	c <- 1
+	x := X{}
+	a := 0
+	_ = a
 	go func() {
-		v = 1
-		<-c
+		x.m.Lock()
+		defer x.m.Unlock()
+		a = 1
 	}()
-	for len(c) != 0 {
-		runtime.Gosched()
-	}
-	v = 2
+	go func() {
+		x.m.Lock()
+		defer x.m.Unlock()
+		a = 1
+	}()
 }

@@ -55,6 +55,14 @@ func (f *FnSummary) Preprocess(function *ssa.Function, ptaConfig *pointer.Config
 }
 
 func (f *FnSummary) visitIns(instruction ssa.Instruction) {
+	handleCall := func(common *ssa.CallCommon) {
+		if o := GetLockedMutex(common); o != nil {
+			f.MutexSet[o] = true
+		} else if o := GetUnlockedMutex(common); o != nil {
+			f.MutexSet[o] = true
+		}
+	}
+
 	switch instr := instruction.(type) {
 	case *ssa.UnOp:
 		f.visitUnOp(instr)
@@ -73,17 +81,17 @@ func (f *FnSummary) visitIns(instruction ssa.Instruction) {
 		log.Debugf("fieldAddr %s", instr.X)
 		f.recordRead(instr.X)
 	case *ssa.Call:
-		if o := GetLockedMutex(instr.Common()); o != nil {
-			f.MutexSet[o] = true
-		} else if o := GetUnlockedMutex(instr.Common()); o != nil {
-			f.MutexSet[o] = true
-		}
+		handleCall(instr.Common())
 	case *ssa.Go:
 		escaped := captureEscapedVariables(instr)
 		for _, value := range escaped {
 			f.preprocessor.EscapedValues[instr] = append(f.preprocessor.EscapedValues[instr], value)
 		}
 	case *ssa.Defer:
+		if _, ok := instruction.(SyntheticDeferred); ok {
+			return
+		}
+		handleCall(instr.Common())
 		// Append a synthetic deferred instruction to the end of all reachable blocks from instr.Block().
 		stack := []*ssa.BasicBlock{instr.Block()}
 		seen := make([]bool, len(instr.Parent().Blocks))
@@ -111,16 +119,20 @@ func (f *FnSummary) visitIns(instruction ssa.Instruction) {
 				send.SetBlock(instr.Block())
 				synthetic = send
 			} else { // must be types.RecvOnly
+				chanType, ok := state.Chan.Type().(*types.Chan)
+				if !ok {
+					log.Warnf("chan type error %v: state=%v, select=%s %s", state.Chan, state, instr, f.fset.Position(state.Pos))
+					continue
+				}
+				typ := chanType.Elem()
 				unop := &ssa.UnOp{
 					Op:token.ARROW,
 					X: state.Chan,
 				}
-				typ := state.Chan.Type().(*types.Chan).Elem()
 				unop.SetType(typ)
 				unop.SetBlock(instr.Block())
 				synthetic = unop
 			}
-			log.Infoln(synthetic)
 			state.BodyBlock.Instrs = append([]ssa.Instruction{synthetic}, state.BodyBlock.Instrs...)
 		}
 	}

@@ -49,10 +49,10 @@ func checkRaceOutput(t *testing.T, want map[posKey][]*regexp.Regexp, results map
 			unmatched = append(unmatched, fmt.Sprintf("%q", exp))
 		}
 		if unmatched == nil {
-			fmt.Printf("%v: unexpected race: %v\n", posn, message)
+			fmt.Printf("%v:%d: unexpected race: %v\n", k.file, k.line, message)
 		} else {
-			fmt.Printf("%v: %q does not match pattern %s\n",
-				posn, message, strings.Join(unmatched, " or "))
+			fmt.Printf("%v:%d: %q does not match pattern %s\n",
+				k.file, k.line, message, strings.Join(unmatched, " or "))
 		}
 		t.Fail()
 	}

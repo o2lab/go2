@@ -142,3 +142,22 @@ func TestNoRaceRWLockConflict(t *testing.T) {
 	}
 }
 
+type MComp struct {
+	m sync.Mutex
+}
+
+func TestNoRaceCompDefer(t *testing.T) {
+	x := MComp{}
+	a := 0
+	_ = a
+	go func() {
+		x.m.Lock()
+		defer x.m.Unlock()
+		a = 1
+	}()
+	go func() {
+		x.m.Lock()
+		defer x.m.Unlock()
+		a = 1
+	}()
+}
