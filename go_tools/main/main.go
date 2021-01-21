@@ -41,6 +41,9 @@ var excludedPkgs = []string{
 	//"filepath",
 }
 var projPath = ""      // interested packages are those located at this path
+var maxTime time.Duration
+var minTime time.Duration
+
 
 // mainPackages returns the main packages to analyze.
 // Each resulting package is named "main" and has a main function.
@@ -57,23 +60,19 @@ func findMainPackages(pkgs []*ssa.Package) ([]*ssa.Package, error) {
 	return mains, nil
 }
 
-//bz: tested
-// cmd/callgraph/testdata/src/pkg/pkg.go
-// godel2: mytest/dine3-chan-race.go, mytest/no-race-mut-bad.go, mytest/prod-cons-race.go
-// ../go2/race_checker/GoBench/Kubernetes/88331/main.go
-// ../go2/race_checker/GoBench/Grpc/3090/main.go
-// ../go2/race_checker/pointer_analysis_test/main.go
+/**
+bz: test record
+16   package google.golang.org/grpc/interop/client  -> .taggedValue panic
 
-// ../go2/race_checker/GoBench/Cockroach/35501/main.go
-// ../go2/race_checker/GoBench/Etcd/9446/main.go
-// ../go2/race_checker/tests/GoBench/Grpc/1862/main.go
-// ../go2/race_checker/GoBench/Istio/8144/main.go
-// ../go2/race_checker/GoBench/Istio/8967/main.go
+ */
 
 //TODO: program counter ???
 func main() {
-	projPath = *flag.String("path", "", "Designated project filepath. ")
+	path := flag.String("path", "", "Designated project filepath. ")
 	flag.Parse()
+	if *path != "" {
+		projPath = *path
+	}
 	args := flag.Args()
 	cfg := &packages.Config{
 		Mode:  packages.LoadAllSyntax, // the level of information returned for each package
@@ -113,16 +112,27 @@ func main() {
 		return
 	}
 
+	fmt.Println("#TOTAL MAIN: " + strconv.Itoa(len(mains)) + "\n")
+
+	maxTime = 0
+	minTime = 10000000000000
+
 	//baseline: foreach
 	start := time.Now()   //performance
 	for i, main := range mains {
-		fmt.Println(i, " ", main.String())
+		if i == 16 {
+			continue  //TODO: panic panic
+		}
+ 		fmt.Println(i, " ", main.String())
 		doEachMain(main)
-		fmt.Println("============================================================================= \n")
+		fmt.Println("=============================================================================")
 	}
 	t := time.Now()
 	elapsed := t.Sub(start)
-	fmt.Println("\n\n\nAll Done  -- PTA/CG Build; Using " + elapsed.String() + ".")
+	fmt.Println("\n\nAll Done  -- PTA/CG Build.\nTOTAL: ", elapsed.String() + ".")
+	fmt.Println("Max: ", maxTime.String() + ".")
+	fmt.Println("Min: ", minTime.String() + ".")
+	fmt.Println("Avg: ", (float32(elapsed.Milliseconds())/float32(len(mains) - 1)/float32(1000)), "s." )
 }
 
 func doEachMain(main *ssa.Package) {
@@ -142,7 +152,7 @@ func doEachMain(main *ssa.Package) {
 		Mains:          mains, //bz: NOW assume only one main
 		Reflection:     false,
 		BuildCallGraph: true,
-		Log:            logfile,
+		Log:            nil,//logfile,
 		//kcfa
 		//CallSiteSensitive: true,
 		//origin
@@ -150,7 +160,7 @@ func doEachMain(main *ssa.Package) {
 		//shared config
 		K:          1,
 		LimitScope: true, //bz: only consider app methods now
-		DEBUG:      true, //bz: rm all printed out info in console
+		DEBUG:      false, //bz: rm all printed out info in console
 		Scope:      scope, //bz: analyze scope
 		Exclusions: excludedPkgs,//bz: copied from race_checker
 	}
@@ -166,6 +176,13 @@ func doEachMain(main *ssa.Package) {
 	defer logfile.Close()
 	log.SetOutput(logfile)
 	fmt.Println("\nDone  -- PTA/CG Build; Using " + elapsed.String() + ". \nGo check gologfile for detail. ")
+
+	if maxTime < elapsed {
+		maxTime = elapsed
+	}
+	if minTime > elapsed {
+		minTime = elapsed
+	}
 
 	if ptaConfig.DEBUG {
 		result.DumpAll()
