@@ -575,7 +575,7 @@ func (a *analysis) rtypeTaggedValue(obj nodeid) types.Type {
 // values containing no pointers.
 //
 func (a *analysis) valueNode(v ssa.Value) nodeid {
-	// Value nodes for locals are created en masse by genFunc.
+	// Value nodes for locals are created en masse (== in a group) by genFunc.
 	if id, ok := a.localval[v]; ok {
 		return id
 	}
@@ -2012,6 +2012,14 @@ func (a *analysis) genFunc(cgn *cgnode) {
 		}
 	}
 
+	//bz: copy if within scope
+	if withinScope {
+		cgn.setMyLocalMaps(a.localval, a.localobj)
+		if a.config.DEBUG {
+			fmt.Println("copied a.localval, a.localobj for " + cgn.String())
+		}
+	}
+
 	a.localval = nil
 	a.localobj = nil
 }
@@ -2107,7 +2115,7 @@ func (a *analysis) generate() {
 	}
 
 	// Discard generation state, to avoid confusion after node renumbering.
-	if a.config.K == 0 { //bz: we are using kcfa or origin
+	if a.config.K == 0 { //bz: when we are using kcfa or origin, we still need this when genInvoke on-the-fly
 		a.panicNode = 0
 		a.globalval = nil
 	}

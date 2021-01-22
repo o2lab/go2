@@ -526,7 +526,7 @@ func AnalyzeWCtx(config *Config) (result *ResultWCtx, err error) { //Result
 	a.generate()   //bz: a preprocess for reflection/runtime/import libs
 	a.showCounts() //bz: print out size ...
 
-	if optRenumber {
+	if optRenumber { //bz: default true
 		a.renumber()
 	}
 

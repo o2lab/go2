@@ -275,6 +275,7 @@ func (r *ResultWCtx) GetMain() *Node {
 //output: PointerWCtx
 //panic: if no record for such input
 func (r *ResultWCtx) PointsTo(v ssa.Value) []PointerWCtx {
+	fmt.Println(v)
 	pointers := r.PointsToFreeVar(v)
 	if pointers != nil {
 		return pointers
@@ -288,6 +289,7 @@ func (r *ResultWCtx) PointsTo(v ssa.Value) []PointerWCtx {
 	}
 	return nil
 }
+
 //bz: return []PointerWCtx for query and indirect query and extended query
 func (r *ResultWCtx) PointsToRegular(v ssa.Value) []PointerWCtx {
 	pointers := r.Queries[v]
@@ -344,6 +346,7 @@ func (r *ResultWCtx) PointsToFurther(v ssa.Value) []PointerWCtx {
 //input: ssa.Value, *ssa.GO;
 //output: PointerWCtx; this can be empty with nothing if we cannot match any
 func (r *ResultWCtx) PointsToByGo(v ssa.Value, goInstr *ssa.Go) PointerWCtx {
+	fmt.Println(v)
 	ptss := r.PointsToFreeVar(v)
 	if ptss != nil {
 		return ptss[0] //bz: should only have one value
@@ -365,6 +368,7 @@ func (r *ResultWCtx) PointsToByGo(v ssa.Value, goInstr *ssa.Go) PointerWCtx {
 
 //bz: user API: return PointerWCtx for a ssa.Value used under the main context
 func (r *ResultWCtx) PointsToByMain(v ssa.Value) PointerWCtx {
+	fmt.Println(v)
 	ptss := r.PointsToFreeVar(v)
 	if ptss != nil {
 		return ptss[0] //bz: should only have one value

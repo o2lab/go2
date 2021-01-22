@@ -19,7 +19,12 @@ type solverState struct {
 	prevPTS nodeset      // pts(n) in previous iteration (for difference propagation)
 }
 
+var num_constraints int
+
 func (a *analysis) solve() {
+	num_constraints = 0
+	fmt.Println("#constraints (approx number before solve()): ", len(a.constraints)) //bz: performance test of optRenumber
+
 	start("Solving")
 	if a.log != nil {
 		fmt.Fprintf(a.log, "\n\n==== Solving constraints\n\n")
@@ -74,6 +79,8 @@ func (a *analysis) solve() {
 		n.solve.copyTo.Clear()
 		n.solve.prevPTS.Clear()
 	}
+	fmt.Println("#pts: ", len(a.nodes))                           //bz: performance test of optRenumber
+	fmt.Println("#constraints (totol num): ", len(a.constraints)) //bz: performance test of optRenumber
 
 	if a.log != nil {
 		fmt.Fprintf(a.log, "Solver done\n")
@@ -96,6 +103,9 @@ func (a *analysis) solve() {
 func (a *analysis) processNewConstraints() {
 	// Take the slice of new constraints.
 	// (May grow during call to solveConstraints.)
+	if len(a.constraints) > 0 {
+		num_constraints = num_constraints + len(a.constraints)
+	}
 	constraints := a.constraints
 	a.constraints = nil
 
@@ -339,7 +349,7 @@ func (c *invokeConstraint) solve(a *analysis, delta *nodeset) {
 		isOnline := false
 		if fnObj == 0 {
 			if a.log != nil { //debug
-				fmt.Fprintf(a.log, "\n\n------------- GENERATING INVOKE FUNC HERE: " + fn.String() + " ------------------------------ \n")
+				fmt.Fprintf(a.log, "\n\n------------- GENERATING INVOKE FUNC HERE: "+fn.String()+" ------------------------------ \n")
 			}
 			// a.objectNode(fn) was not called during gen phase.
 			if a.considerMyContext(fn.String()) {
@@ -354,16 +364,16 @@ func (c *invokeConstraint) solve(a *analysis, delta *nodeset) {
 					fmt.Println("!! GENERATING INVOKE FUNC HERE: " + fn.String())
 				}
 				fnObj = a.genOnline(c.caller, c.site, fn)
-			}else{ //newly created app func invokes lib func: use share contour
+			} else { //newly created app func invokes lib func: use share contour
 				fnObj = a.genOnline(nil, nil, fn)
 			}
 			isOnline = true
 			if a.log != nil { //debug
 				fmt.Fprintf(a.log, "------------------------------ ------------------------------ ---------------------------- \n")
 			}
-		}else{
+		} else {
 			if a.log != nil { //debug
-				fmt.Fprintf(a.log, "!! ALREADY EXIST INVOKE FUNC: " + fn.String() + "\n")
+				fmt.Fprintf(a.log, "!! ALREADY EXIST INVOKE FUNC: "+fn.String()+"\n")
 			}
 		}
 

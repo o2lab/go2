@@ -121,16 +121,16 @@ func (a *analysis) renumber() {
 		}
 		a.result.GlobalQueries[v] = tmp
 	}
-	//// bz: we are not using this, comment off
-	//for _, queries := range a.config.extendedQueries {
-	//	for _, query := range queries {
-	//		if query.ptr != nil {
-	//			query.ptr.n = renumbering[query.ptr.n]
-	//		}
-	//	}
-	//}
+	for _, queries := range a.config.extendedQueries {
+		for _, query := range queries {
+			if query.ptr != nil {
+				query.ptr.n = renumbering[query.ptr.n]
+			}
+		}
+	}
 
 	// Renumber nodeids in global objects.
+	// TODO: check if a.panicNode is still ok?
 	for v, id := range a.globalobj {
 		a.globalobj[v] = renumbering[id]
 	}
