@@ -608,7 +608,7 @@ func AnalyzeWCtx(config *Config) (result *ResultWCtx, err error) { //Result
 	}
 
 	a.result.CallGraph.computeFn2CGNode() //bz: update Fn2CGNode for user API
-	a.result.nodes = a.nodes //bz: just in case
+	a.result.a = a //bz: update
 
 	return a.result, nil
 }
