@@ -309,7 +309,9 @@ func goListDriverRecursive(subdirs []string, size int, response *responseDeduper
 	_wg.Wait()
 	//bz: sum up
 	for _, ret := range results {
-		response.addAll(ret)
+		if ret != nil {
+			response.addAll(ret)
+		}
 	}
 }
 

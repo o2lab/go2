@@ -94,7 +94,7 @@ func main() {
 			log.Info("Continue   -- ")
 		}
 	} else if len(initial) == 0 {
-		fmt.Println("package list empty")
+		fmt.Println("Package list empty")
 		return
 	}
 	fmt.Println("Done  -- " + strconv.Itoa(len(initial)) + " packages loaded")
@@ -129,7 +129,7 @@ func main() {
 	}
 	t := time.Now()
 	elapsed := t.Sub(start)
-	fmt.Println("\n\nAll Done  -- PTA/CG Build.\nTOTAL: ", elapsed.String() + ".")
+	fmt.Println("\n\nBASELINE All Done  -- PTA/CG Build.\nTOTAL: ", elapsed.String() + ".")
 	fmt.Println("Max: ", maxTime.String() + ".")
 	fmt.Println("Min: ", minTime.String() + ".")
 	fmt.Println("Avg: ", (float32(elapsed.Milliseconds())/float32(len(mains) - 1)/float32(1000)), "s." )
@@ -152,7 +152,7 @@ func doEachMain(main *ssa.Package) {
 		Mains:          mains, //bz: NOW assume only one main
 		Reflection:     false,
 		BuildCallGraph: true,
-		Log:            nil,//logfile,
+		Log:            logfile,
 		//kcfa
 		//CallSiteSensitive: true,
 		//origin
@@ -160,9 +160,11 @@ func doEachMain(main *ssa.Package) {
 		//shared config
 		K:          1,
 		LimitScope: true, //bz: only consider app methods now
-		DEBUG:      false, //bz: rm all printed out info in console
+		DEBUG:      true, //bz: rm all printed out info in console
 		Scope:      scope, //bz: analyze scope
 		Exclusions: excludedPkgs,//bz: copied from race_checker
+
+		DiscardQueries: true, //bz: do not use query any more
 	}
 
 	//*** compute pta here

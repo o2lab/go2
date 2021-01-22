@@ -81,6 +81,8 @@ type Config struct {
 	DEBUG              bool //print out debug info
 	Scope              []string //analyzed scope -> packages, can be null
 	Exclusions         []string //excluded packages from this analysis -> from race_checker if any
+
+	DiscardQueries     bool //bz: do not use queries, but keep every pts info in *cgnode
 }
 
 type track uint32

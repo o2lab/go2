@@ -2013,10 +2013,10 @@ func (a *analysis) genFunc(cgn *cgnode) {
 	}
 
 	//bz: copy if within scope
-	if withinScope {
+	if a.config.DiscardQueries && withinScope {
 		cgn.setMyLocalMaps(a.localval, a.localobj)
 		if a.config.DEBUG {
-			fmt.Println("copied a.localval, a.localobj for " + cgn.String())
+			fmt.Println(">> copied a.localval, a.localobj for " + cgn.String())
 		}
 	}
 

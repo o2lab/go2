@@ -475,6 +475,11 @@ func AnalyzeWCtx(config *Config) (result *ResultWCtx, err error) { //Result
 		}
 		fmt.Println(" *********************************** ")
 	}
+	if a.config.DiscardQueries {
+		fmt.Println(" *** No Queries *** ")
+	}else{
+		fmt.Println(" *** Use Queries/IndirectQueries/ExtendedQueries *** ")
+	}
 
 	if a.log != nil {
 		fmt.Fprintln(a.log, "==== Starting analysis and logging: ")
