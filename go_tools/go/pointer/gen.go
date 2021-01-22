@@ -1957,8 +1957,19 @@ func (a *analysis) genFunc(cgn *cgnode) {
 		fmt.Fprintln(a.log, "; Creating nodes for local values")
 	}
 
-	a.localval = make(map[ssa.Value]nodeid)
-	a.localobj = make(map[ssa.Value]nodeid)
+	if a.config.DiscardQueries {
+		//bz: we do replace a.localval and a.localobj by cgn's
+		cgn.initLocalMaps()
+		a.localval = cgn.localval
+		a.localobj = cgn.localobj
+
+		if a.config.DEBUG {
+			fmt.Println(">> replaced a.localval, a.localobj for " + cgn.String())
+		}
+	}else{
+		a.localval = make(map[ssa.Value]nodeid)
+		a.localobj = make(map[ssa.Value]nodeid)
+	}
 
 	// The value nodes for the params are in the func object block.
 	params := a.funcParams(cgn.obj)
@@ -2013,14 +2024,6 @@ func (a *analysis) genFunc(cgn *cgnode) {
 	for _, b := range fn.Blocks {
 		for _, instr := range b.Instrs {
 			a.genInstr(cgn, instr)
-		}
-	}
-
-	//bz: copy if within scope
-	if a.config.DiscardQueries && withinScope {
-		cgn.setMyLocalMaps(a.localval, a.localobj)
-		if a.config.DEBUG {
-			fmt.Println(">> copied a.localval, a.localobj for " + cgn.String())
 		}
 	}
 

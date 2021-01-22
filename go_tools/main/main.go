@@ -152,7 +152,7 @@ func doEachMain(main *ssa.Package) {
 		Mains:          mains, //bz: NOW assume only one main
 		Reflection:     false,
 		BuildCallGraph: true,
-		Log:            logfile,
+		Log:            nil, //logfile,
 		//kcfa
 		//CallSiteSensitive: true,
 		//origin
@@ -160,7 +160,7 @@ func doEachMain(main *ssa.Package) {
 		//shared config
 		K:          1,
 		LimitScope: true, //bz: only consider app methods now
-		DEBUG:      true, //bz: rm all printed out info in console
+		DEBUG:      false, //bz: rm all printed out info in console
 		Scope:      scope, //bz: analyze scope
 		Exclusions: excludedPkgs,//bz: copied from race_checker
 

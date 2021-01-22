@@ -45,26 +45,11 @@ type cgnode struct {
 	localobj   map[ssa.Value]nodeid  //bz: same as above
 }
 
-//bz: going to store a.localval and a.localobj here when calling genFunc() (gen.go)
+//bz: going to replace and store (borrow them a pointer) a.localval and a.localobj here when calling genFunc() (gen.go)
 //only copy if func is in analysis scope
-func (n *cgnode) setMyLocalMaps(alocalval map[ssa.Value]nodeid, alocalobj map[ssa.Value]nodeid)  {
-	//lazy initial and copy
-	//copy ? TODO: maybe replace these with the one in anlaysis.go
-	if len(alocalval) > 0 {
-		n.localval = make(map[ssa.Value]nodeid)
-		copyMap(alocalval, n.localval)
-	}
-	if len(alocalobj) > 0 {
-		n.localobj = make(map[ssa.Value]nodeid)
-		copyMap(alocalobj, n.localobj)
-	}
-}
-
-//bz: copy map
-func copyMap(origin map[ssa.Value]nodeid, copy map[ssa.Value]nodeid) {
-	for val, nid := range origin {
-		copy[val] = nid
-	}
+func (n *cgnode) initLocalMaps()  {
+	n.localval = make(map[ssa.Value]nodeid)
+	n.localobj = make(map[ssa.Value]nodeid)
 }
 
 // contour returns a description of this node's contour.
