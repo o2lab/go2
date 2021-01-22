@@ -21,13 +21,13 @@ func fromPkgsOfInterest(fn *ssa.Function) bool {
 	if fn.Pkg == nil || fn.Pkg.Pkg == nil {
 		return false
 	}
+	if fn.Pkg.Pkg.Name() == "main" || fn.Pkg.Pkg.Name() == "cli" {
+		return true
+	}
 	for _, excluded := range excludedPkgs {
 		if fn.Pkg.Pkg.Name() == excluded {
 			return false
 		}
-	}
-	if fn.Pkg.Pkg.Name() == "main" || fn.Pkg.Pkg.Name() == "cli" {
-		return true
 	}
 	if !strings.HasPrefix(fn.Pkg.Pkg.Path(), fromPath) { // path is dependent on tested program
 		return false
