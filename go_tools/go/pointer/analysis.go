@@ -425,16 +425,13 @@ func AnalyzeWCtx(config *Config) (result *ResultWCtx, err error) { //Result
 		atFuncs:     make(map[*ssa.Function]bool),
 		hasher:      typeutil.MakeHasher(),
 		intrinsics:  make(map[*ssa.Function]intrinsic),
-		//result: &Result{
-		//	Queries:         make(map[ssa.Value]Pointer),
-		//	IndirectQueries: make(map[ssa.Value]Pointer),
-		//},
 		result: &ResultWCtx{
 			Queries:         make(map[ssa.Value][]PointerWCtx),
 			IndirectQueries: make(map[ssa.Value][]PointerWCtx),
 			GlobalQueries:   make(map[ssa.Value][]PointerWCtx),
 			ExtendedQueries: make(map[ssa.Value][]PointerWCtx),
 			DEBUG:           config.DEBUG,
+			DiscardQueries:  config.DiscardQueries,
 		},
 		deltaSpace: make([]int, 0, 100),
 		//bz: i did not clear the following two after offline TODO: do I ?

@@ -79,8 +79,9 @@ func (a *analysis) solve() {
 		n.solve.copyTo.Clear()
 		n.solve.prevPTS.Clear()
 	}
-	fmt.Println("#pts: ", len(a.nodes))                           //bz: performance test of optRenumber
-	fmt.Println("#constraints (totol num): ", len(a.constraints)) //bz: performance test of optRenumber
+
+	fmt.Println("#pts: ", len(a.nodes))                        //bz: performance test of optRenumber
+	fmt.Println("#constraints (totol num): ", num_constraints) //bz: performance test of optRenumber
 
 	if a.log != nil {
 		fmt.Fprintf(a.log, "Solver done\n")

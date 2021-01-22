@@ -129,12 +129,7 @@ func (a *analysis) pointerAnalysis_new(location ssa.Value, goID int, theIns ssa.
 				return
 			}
 			//do the same as case *ssa.Function
-			fnName := invokeFunc.Name()
-			if !a.exploredFunction(invokeFunc, goID, theIns) {
-				a.updateRecords(fnName, goID, "PUSH ")
-				a.RWIns[goID] = append(a.RWIns[goID], theIns)
-				a.visitAllInstructions(invokeFunc, goID)
-			}
+			a.traverseFunc(invokeFunc, goID, theIns)
 		}
 		return
 	}
@@ -146,7 +141,6 @@ func (a *analysis) pointerAnalysis_new(location ssa.Value, goID int, theIns ssa.
 		}
 	}
 	pts_labels := pts.Labels() // set of labels for locations that the pointer points to
-	var fnName string
 	rightLoc := 0            // initialize index for the right points-to location
 	if len(pts_labels) > 1 { // multiple targets returned by pointer analysis
 		//log.Trace("***Pointer Analysis revealed ", len(pts_labels), " targets for location - ", a.prog.Fset.Position(location.Pos()))
@@ -169,24 +163,14 @@ func (a *analysis) pointerAnalysis_new(location ssa.Value, goID int, theIns ssa.
 	}
 	switch theFunc := pts_labels[rightLoc].Value().(type) {
 	case *ssa.Function:
-		fnName = theFunc.Name()
-		if !a.exploredFunction(theFunc, goID, theIns) {
-			a.updateRecords(fnName, goID, "PUSH ")
-			a.RWIns[goID] = append(a.RWIns[goID], theIns)
-			a.visitAllInstructions(theFunc, goID)
-		}
+		a.traverseFunc(theFunc, goID, theIns)
 	case *ssa.MakeInterface:
 		methodName := theIns.(*ssa.Call).Call.Method.Name()                                                      //ctx ??
 		if a.prog.MethodSets.MethodSet(pts.DynamicTypes().Keys()[0]).Lookup(a.mains[0].Pkg, methodName) == nil { // ignore abstract methods
 			break
 		}
 		check := a.prog.LookupMethod(pts.DynamicTypes().Keys()[0], a.mains[0].Pkg, methodName)
-		fnName = check.Name()
-		if !a.exploredFunction(check, goID, theIns) {
-			a.updateRecords(fnName, goID, "PUSH ")
-			a.RWIns[goID] = append(a.RWIns[goID], theIns)
-			a.visitAllInstructions(check, goID)
-		}
+		a.traverseFunc(check, goID, theIns)
 	case *ssa.MakeChan:
 		a.chanName = theFunc.Name()
 	case *ssa.Alloc: //bz: missing invoke callee target if func is wrapped as parameter, e.g., Kubernetes.88331
@@ -194,14 +178,19 @@ func (a *analysis) pointerAnalysis_new(location ssa.Value, goID int, theIns ssa.
 		if call, ok := theIns.(*ssa.Call); ok {
 			invokeFunc := a.result.GetFreeVarFunc(theFunc, call, goInstr)
 			//do the same as case *ssa.Function
-			fnName = invokeFunc.Name()
-			if !a.exploredFunction(invokeFunc, goID, theIns) {
-				a.updateRecords(fnName, goID, "PUSH ")
-				a.RWIns[goID] = append(a.RWIns[goID], theIns)
-				a.visitAllInstructions(invokeFunc, goID)
-			}
+			a.traverseFunc(invokeFunc, goID, theIns)
 		}
 	default:
 		break
+	}
+}
+
+//bz: abstract out
+func (a *analysis) traverseFunc(invokeFunc *ssa.Function, goID int, theIns ssa.Instruction) {
+	if !a.exploredFunction(invokeFunc, goID, theIns) {
+		fnName := invokeFunc.Name()
+		a.updateRecords(fnName, goID, "PUSH ")
+		a.RWIns[goID] = append(a.RWIns[goID], theIns)
+		a.visitAllInstructions(invokeFunc, goID)
 	}
 }

@@ -185,16 +185,73 @@ type Result struct {
 
 //bz: same as above, but we want contexts
 type ResultWCtx struct {
+	a               *analysis            // bz: we need a lot from here...
+	main            *cgnode              // bz: the cgnode for main method
 	CallGraph       *GraphWCtx           // discovered call graph
+
+	//bz: if DiscardQueries the following will be empty
 	Queries         map[ssa.Value][]PointerWCtx // pts(v) for each v in setValueNode().
 	IndirectQueries map[ssa.Value][]PointerWCtx // pts(*v) for each v in setValueNode().
 	GlobalQueries   map[ssa.Value][]PointerWCtx // pts(v) for each freevar in setValueNode().
 	ExtendedQueries map[ssa.Value][]PointerWCtx
 	Warnings        []Warning                   // warnings of unsoundness
-	main            *cgnode              // bz: the cgnode for main method
-	nodes           []*node              // bz: just in case a pointer we did not record
+
 	DEBUG           bool                 // bz: print out debug info ...
+	DiscardQueries  bool                 // bz: do not use queries, but keep every pts info in *cgnode
 }
+
+//bz: user API (DiscardQueries = true):
+//we find the instr.register (instead of the things on the rhs) in this fn under this goInstr routine
+//most of time used in sameAddress(from race_checker)
+func (r *ResultWCtx) PointsTo2(instr ssa.Instruction, goInstr *ssa.Go, fn *ssa.Function) PointerWCtx {
+	//this is where we find the pts
+	v, _ := instr.(ssa.Value) // val := v.Name() //this is what we recorded in cgn
+
+	cgns := r.GetCGNodebyFunc(fn)
+	for _, cgn := range cgns {
+		if matchMyContext(cgn, goInstr) {
+			nodeid := cgn.localval[v]
+			//n := r.a.nodes[nodeid]
+			return PointerWCtx{a: r.a, n: nodeid, cgn: cgn}
+		}
+		fmt.Println(" ****  Pointer Analysis: " + instr.String() + " has no match *cgnode **** ")
+	}
+
+	//check if in a.globalval
+	nodeid := r.a.globalval[v]
+	if nodeid != 0 { //v exist
+		//n := r.a.nodes[nodeid]
+		return PointerWCtx{a: r.a, n: nodeid, cgn: nil}
+	}
+
+	fmt.Println(" ****  Pointer Analysis: " + instr.String() + " has no match in a.globalval **** ")
+	return PointerWCtx{a: nil}
+}
+
+
+
+//bz: whether goID is match with the contexts in this cgn
+//TODO: this does not match parent context if callsite.length > 1 (k > 1)
+func matchMyContext(cgn *cgnode, go_instr *ssa.Go) bool {
+	if cgn.callersite == nil || cgn.callersite[0] == nil {
+		return false
+	}
+	if cgn.callersite[0].goInstr == go_instr {
+		return true
+	}
+	if cgn.actualCallerSite == nil {
+		return false
+	}
+	//double check actualCallerSite
+	for _, actualCS := range cgn.actualCallerSite {
+		if actualCS[0].goInstr == go_instr {
+			return true
+		}
+	}
+	return false
+}
+
+
 
 //bz: user API: tmp solution for missing invoke callee target if func wrapped in parameters
 //alloc should be a freevar
@@ -277,7 +334,6 @@ func (r *ResultWCtx) GetMain() *Node {
 //output: PointerWCtx
 //panic: if no record for such input
 func (r *ResultWCtx) PointsTo(v ssa.Value) []PointerWCtx {
-	fmt.Println(v)
 	pointers := r.PointsToFreeVar(v)
 	if pointers != nil {
 		return pointers
@@ -290,6 +346,50 @@ func (r *ResultWCtx) PointsTo(v ssa.Value) []PointerWCtx {
 		fmt.Println(" ****  Pointer Analysis did not record for this ssa.Value: " + v.String() + " **** ") //panic
 	}
 	return nil
+}
+
+//bz: user API: return PointerWCtx for a ssa.Value used under context of *ssa.GO,
+//input: ssa.Value, *ssa.GO;
+//output: PointerWCtx; this can be empty with nothing if we cannot match any
+func (r *ResultWCtx) PointsToByGo(v ssa.Value, goInstr *ssa.Go) PointerWCtx {
+	ptss := r.PointsToFreeVar(v)
+	if ptss != nil {
+		return ptss[0] //bz: should only have one value
+	}
+	if goInstr == nil {
+		return r.PointsToByMain(v)
+	}
+	ptss = r.PointsToRegular(v) //return type: []PointerWCtx
+	for _, pts := range ptss {
+		if pts.MatchMyContext(goInstr) {
+			return pts
+		}
+	}
+	if r.DEBUG {
+		fmt.Println(" ****  Pointer Analysis cannot match this ssa.Value: " + v.String() + " with this *ssa.GO: " + goInstr.String() + " **** ") //panic
+	}
+	return PointerWCtx{a: nil}
+}
+
+//bz: user API: return PointerWCtx for a ssa.Value used under the main context
+func (r *ResultWCtx) PointsToByMain(v ssa.Value) PointerWCtx {
+	ptss := r.PointsToFreeVar(v)
+	if ptss != nil {
+		return ptss[0] //bz: should only have one value
+	}
+	ptss = r.PointsToRegular(v) //return type: []PointerWCtx
+	for _, pts := range ptss {
+		if pts.cgn == nil || pts.cgn.callersite == nil || pts.cgn.callersite[0] == nil {
+			continue //from extended query or shared contour
+		}
+		if pts.cgn.callersite[0].targets  == r.main.callersite[0].targets {
+			return pts
+		}
+	}
+	if r.DEBUG {
+		fmt.Println(" ****  Pointer Analysis cannot match this ssa.Value: " + v.String() + " with main thread **** ") //panic
+	}
+	return PointerWCtx{a: nil}
 }
 
 //bz: return []PointerWCtx for query and indirect query and extended query
@@ -335,59 +435,12 @@ func (r *ResultWCtx) PointsToFreeVar(v ssa.Value) []PointerWCtx {
 //bz: just in case we did not record for v
 //TODO: (incomplete) iterate all a.nodes to find it ....
 func (r *ResultWCtx) PointsToFurther(v ssa.Value) []PointerWCtx {
-	for _, p := range r.nodes {
+	for _, p := range r.a.nodes {
 		if p.solve.pts.IsEmpty() {
 			continue //not a pointer or empty pts
 		}
 	}
 	return nil
-}
-
-
-//bz: user API: return PointerWCtx for a ssa.Value used under context of *ssa.GO,
-//input: ssa.Value, *ssa.GO;
-//output: PointerWCtx; this can be empty with nothing if we cannot match any
-func (r *ResultWCtx) PointsToByGo(v ssa.Value, goInstr *ssa.Go) PointerWCtx {
-	fmt.Println(v)
-	ptss := r.PointsToFreeVar(v)
-	if ptss != nil {
-		return ptss[0] //bz: should only have one value
-	}
-	if goInstr == nil {
-		return r.PointsToByMain(v)
-	}
-	ptss = r.PointsToRegular(v) //return type: []PointerWCtx
-	for _, pts := range ptss {
-		if pts.MatchMyContext(goInstr) {
-			return pts
-		}
-	}
-	if r.DEBUG {
-		fmt.Println(" ****  Pointer Analysis cannot match this ssa.Value: " + v.String() + " with this *ssa.GO: " + goInstr.String() + " **** ") //panic
-	}
-	return PointerWCtx{a: nil}
-}
-
-//bz: user API: return PointerWCtx for a ssa.Value used under the main context
-func (r *ResultWCtx) PointsToByMain(v ssa.Value) PointerWCtx {
-	fmt.Println(v)
-	ptss := r.PointsToFreeVar(v)
-	if ptss != nil {
-		return ptss[0] //bz: should only have one value
-	}
-	ptss = r.PointsToRegular(v) //return type: []PointerWCtx
-	for _, pts := range ptss {
-		if pts.cgn == nil || pts.cgn.callersite == nil || pts.cgn.callersite[0] == nil {
-			continue //from extended query or shared contour
-		}
-		if pts.cgn.callersite[0].targets  == r.main.callersite[0].targets {
-			return pts
-		}
-	}
-	if r.DEBUG {
-		fmt.Println(" ****  Pointer Analysis cannot match this ssa.Value: " + v.String() + " with main thread **** ") //panic
-	}
-	return PointerWCtx{a: nil}
 }
 
 //bz: user API: for debug to dump all result out
@@ -508,6 +561,12 @@ type Pointer struct {
 type PointsToSet struct {
 	a   *analysis // may be nil if pts is nil
 	pts *nodeset
+}
+
+
+//bz: we created an empty PointerWCTx to return
+func (s PointsToSet) IsNil() bool {
+	return s.pts == nil
 }
 
 func (s PointsToSet) String() string {
@@ -688,7 +747,7 @@ func (p PointerWCtx) DynamicTypes() *typeutil.Map {
 }
 
 // PointsTo returns the set of labels that this points-to set
-// contains. -- TODO: bz: is this working??
+// contains.
 func (p PointerWCtx) Labels() []*Label {
 	var labels []*Label
 	var pp = p.PointsTo()

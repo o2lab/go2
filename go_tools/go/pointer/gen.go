@@ -84,6 +84,10 @@ func (a *analysis) setValueNode(v ssa.Value, id nodeid, cgn *cgnode) {
 		fmt.Fprintf(a.log, "\tval[%s] = n%d  (%T)\n", v.Name(), id, v)
 	}
 
+	if a.config.DiscardQueries {
+		return //bz: skip recording queries
+	}
+
 	// Default: Due to context-sensitivity, we may encounter the same Value
 	// in many contexts. We merge them to a canonical node, since
 	// that's what all clients want.
