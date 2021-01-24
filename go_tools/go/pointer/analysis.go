@@ -477,6 +477,11 @@ func AnalyzeWCtx(config *Config) (result *ResultWCtx, err error) { //Result
 	}else{
 		fmt.Println(" *** Use Queries/IndirectQueries/ExtendedQueries *** ")
 	}
+	if optRenumber {
+		fmt.Println(" *** optRenumber ON *** ")
+	}else{
+		fmt.Println(" *** optRenumber OFF *** ")
+	}
 
 	if a.log != nil {
 		fmt.Fprintln(a.log, "==== Starting analysis and logging: ")

@@ -1,0 +1,881 @@
+GOROOT=/usr/local/Cellar/go/1.15/libexec #gosetup
+GOPATH=/Users/bozhen/go #gosetup
+/usr/local/Cellar/go/1.15/libexec/bin/go build -o /private/var/folders/mg/0t9c66c122ldr_vvfsvj3m900000gn/T/___go_build_main_go /Users/bozhen/Documents/GO2/go2/go_tools/main/main.go #gosetup
+/private/var/folders/mg/0t9c66c122ldr_vvfsvj3m900000gn/T/___go_build_main_go -path=google.golang.org/grpc
+Loading input packages...
+-: build constraints exclude all Go files in /Users/bozhen/Documents/GO2/go2/grpc-go/test/tools
+-: build constraints exclude all Go files in /Users/bozhen/Documents/GO2/go2/grpc-go/interop/grpclb_fallback
+-: build constraints exclude all Go files in /Users/bozhen/Documents/GO2/go2/grpc-go/test/tools
+-: build constraints exclude all Go files in /Users/bozhen/Documents/GO2/go2/grpc-go/interop/grpclb_fallback
+INFO[0021] Excluded the following packages contain errors, due to the above errors.
+INFO[0021] 0 google.golang.org/grpc/test/tools
+INFO[0021] 1 google.golang.org/grpc/interop/grpclb_fallback
+INFO[0021] Continue   --
+Done  -- 213 packages loaded
+Building SSA code for entire program...
+Done  -- SSA code built
+#TOTAL MAIN: 62
+
+0   package google.golang.org/grpc/benchmark/server
+ *** MODE: 1-ORIGIN-SENSITIVE ***
+ *** Analyze Scope *****************
+ - google.golang.org/grpc
+ - command-line-arguments (default)
+ ***********************************
+ *** No Queries ***
+#constraints (approx number before solve()):  423042
+#pts:  1492424
+#constraints (totol num):  445528
+
+Done  -- PTA/CG Build; Using 17.197530807s.
+Go check gologfile for detail.
+=============================================================================
+1   package google.golang.org/grpc/benchmark/benchmain
+ *** MODE: 1-ORIGIN-SENSITIVE ***
+ *** Analyze Scope *****************
+ - google.golang.org/grpc
+ - command-line-arguments (default)
+ ***********************************
+ *** No Queries ***
+#constraints (approx number before solve()):  428728
+#pts:  1540665
+#constraints (totol num):  481881
+
+Done  -- PTA/CG Build; Using 17.051394664s.
+Go check gologfile for detail.
+=============================================================================
+2   package google.golang.org/grpc/benchmark/benchresult
+ *** MODE: 1-ORIGIN-SENSITIVE ***
+ *** Analyze Scope *****************
+ - google.golang.org/grpc
+ - command-line-arguments (default)
+ ***********************************
+ *** No Queries ***
+#constraints (approx number before solve()):  407021
+#pts:  1417399
+#constraints (totol num):  407048
+
+Done  -- PTA/CG Build; Using 17.174474771s.
+Go check gologfile for detail.
+=============================================================================
+3   package google.golang.org/grpc/benchmark/worker
+ *** MODE: 1-ORIGIN-SENSITIVE ***
+ *** Analyze Scope *****************
+ - google.golang.org/grpc
+ - command-line-arguments (default)
+ ***********************************
+ *** No Queries ***
+#constraints (approx number before solve()):  422933
+#pts:  1492116
+#constraints (totol num):  445406
+
+Done  -- PTA/CG Build; Using 18.404313971s.
+Go check gologfile for detail.
+=============================================================================
+4   package google.golang.org/grpc/benchmark/client
+ *** MODE: 1-ORIGIN-SENSITIVE ***
+ *** Analyze Scope *****************
+ - google.golang.org/grpc
+ - command-line-arguments (default)
+ ***********************************
+ *** No Queries ***
+#constraints (approx number before solve()):  407899
+#pts:  1475896
+#constraints (totol num):  445440
+
+Done  -- PTA/CG Build; Using 16.541800495s.
+Go check gologfile for detail.
+=============================================================================
+5   package google.golang.org/grpc/cmd/protoc-gen-go-grpc
+ *** MODE: 1-ORIGIN-SENSITIVE ***
+ *** Analyze Scope *****************
+ - google.golang.org/grpc
+ - command-line-arguments (default)
+ ***********************************
+ *** No Queries ***
+#constraints (approx number before solve()):  400161
+#pts:  1143300
+#constraints (totol num):  400170
+
+Done  -- PTA/CG Build; Using 8.220118632s.
+Go check gologfile for detail.
+=============================================================================
+6   package google.golang.org/grpc/test/go_vet
+ *** MODE: 1-ORIGIN-SENSITIVE ***
+ *** Analyze Scope *****************
+ - google.golang.org/grpc
+ - command-line-arguments (default)
+ ***********************************
+ *** No Queries ***
+#constraints (approx number before solve()):  389590
+#pts:  1087888
+#constraints (totol num):  389599
+
+Done  -- PTA/CG Build; Using 8.836664981s.
+Go check gologfile for detail.
+=============================================================================
+7   package google.golang.org/grpc/security/advancedtls/examples/credential_reloading_from_files/server
+ *** MODE: 1-ORIGIN-SENSITIVE ***
+ *** Analyze Scope *****************
+ - google.golang.org/grpc
+ - command-line-arguments (default)
+ ***********************************
+ *** No Queries ***
+#constraints (approx number before solve()):  421895
+#pts:  1475863
+#constraints (totol num):  444883
+
+Done  -- PTA/CG Build; Using 13.018912077s.
+Go check gologfile for detail.
+=============================================================================
+8   package google.golang.org/grpc/security/advancedtls/examples/credential_reloading_from_files/client
+ *** MODE: 1-ORIGIN-SENSITIVE ***
+ *** Analyze Scope *****************
+ - google.golang.org/grpc
+ - command-line-arguments (default)
+ ***********************************
+ *** No Queries ***
+#constraints (approx number before solve()):  406883
+#pts:  1451999
+#constraints (totol num):  437598
+
+Done  -- PTA/CG Build; Using 15.670498858s.
+Go check gologfile for detail.
+=============================================================================
+9   package google.golang.org/grpc/interop/server
+ *** MODE: 1-ORIGIN-SENSITIVE ***
+ *** Analyze Scope *****************
+ - google.golang.org/grpc
+ - command-line-arguments (default)
+ ***********************************
+ *** No Queries ***
+#constraints (approx number before solve()):  422103
+#pts:  1519344
+#constraints (totol num):  467373
+
+Done  -- PTA/CG Build; Using 13.065601192s.
+Go check gologfile for detail.
+=============================================================================
+10   package google.golang.org/grpc/interop/http2
+ *** MODE: 1-ORIGIN-SENSITIVE ***
+ *** Analyze Scope *****************
+ - google.golang.org/grpc
+ - command-line-arguments (default)
+ ***********************************
+ *** No Queries ***
+#constraints (approx number before solve()):  406980
+#pts:  1474535
+#constraints (totol num):  449468
+
+Done  -- PTA/CG Build; Using 12.046810518s.
+Go check gologfile for detail.
+=============================================================================
+11   package google.golang.org/grpc/interop/alts/server
+ *** MODE: 1-ORIGIN-SENSITIVE ***
+ *** Analyze Scope *****************
+ - google.golang.org/grpc
+ - command-line-arguments (default)
+ ***********************************
+ *** No Queries ***
+#constraints (approx number before solve()):  422031
+#pts:  1518332
+#constraints (totol num):  466796
+
+Done  -- PTA/CG Build; Using 15.662759589s.
+Go check gologfile for detail.
+=============================================================================
+12   package google.golang.org/grpc/interop/alts/client
+ *** MODE: 1-ORIGIN-SENSITIVE ***
+ *** Analyze Scope *****************
+ - google.golang.org/grpc
+ - command-line-arguments (default)
+ ***********************************
+ *** No Queries ***
+#constraints (approx number before solve()):  406929
+#pts:  1474975
+#constraints (totol num):  442632
+
+Done  -- PTA/CG Build; Using 10.67730571s.
+Go check gologfile for detail.
+=============================================================================
+13   package google.golang.org/grpc/interop/fake_grpclb
+ *** MODE: 1-ORIGIN-SENSITIVE ***
+ *** Analyze Scope *****************
+ - google.golang.org/grpc
+ - command-line-arguments (default)
+ ***********************************
+ *** No Queries ***
+#constraints (approx number before solve()):  421916
+#pts:  1512488
+#constraints (totol num):  467186
+
+Done  -- PTA/CG Build; Using 13.893516345s.
+Go check gologfile for detail.
+=============================================================================
+14   package google.golang.org/grpc/interop/xds/server
+ *** MODE: 1-ORIGIN-SENSITIVE ***
+ *** Analyze Scope *****************
+ - google.golang.org/grpc
+ - command-line-arguments (default)
+ ***********************************
+ *** No Queries ***
+#constraints (approx number before solve()):  421528
+#pts:  1482249
+#constraints (totol num):  443558
+
+Done  -- PTA/CG Build; Using 10.814735125s.
+Go check gologfile for detail.
+=============================================================================
+15   package google.golang.org/grpc/interop/xds/client
+ *** MODE: 1-ORIGIN-SENSITIVE ***
+ *** Analyze Scope *****************
+ - google.golang.org/grpc
+ - command-line-arguments (default)
+ ***********************************
+ *** No Queries ***
+#constraints (approx number before solve()):  440244
+#pts:  2044878
+#constraints (totol num):  518897
+
+Done  -- PTA/CG Build; Using 21.748620196s.
+Go check gologfile for detail.
+=============================================================================
+17   package google.golang.org/grpc/profiling/cmd
+ *** MODE: 1-ORIGIN-SENSITIVE ***
+ *** Analyze Scope *****************
+ - google.golang.org/grpc
+ - command-line-arguments (default)
+ ***********************************
+ *** No Queries ***
+#constraints (approx number before solve()):  408782
+#pts:  1457196
+#constraints (totol num):  438805
+
+Done  -- PTA/CG Build; Using 13.781131197s.
+Go check gologfile for detail.
+=============================================================================
+18   package google.golang.org/grpc/examples/helloworld/greeter_server
+ *** MODE: 1-ORIGIN-SENSITIVE ***
+ *** Analyze Scope *****************
+ - google.golang.org/grpc
+ - command-line-arguments (default)
+ ***********************************
+ *** No Queries ***
+#constraints (approx number before solve()):  421358
+#pts:  1473166
+#constraints (totol num):  443388
+
+Done  -- PTA/CG Build; Using 13.358046839s.
+Go check gologfile for detail.
+=============================================================================
+19   package google.golang.org/grpc/examples/helloworld/greeter_client
+ *** MODE: 1-ORIGIN-SENSITIVE ***
+ *** Analyze Scope *****************
+ - google.golang.org/grpc
+ - command-line-arguments (default)
+ ***********************************
+ *** No Queries ***
+#constraints (approx number before solve()):  406425
+#pts:  1449866
+#constraints (totol num):  436429
+
+Done  -- PTA/CG Build; Using 13.936456172s.
+Go check gologfile for detail.
+=============================================================================
+20   package google.golang.org/grpc/examples/features/cancellation/server
+ *** MODE: 1-ORIGIN-SENSITIVE ***
+ *** Analyze Scope *****************
+ - google.golang.org/grpc
+ - command-line-arguments (default)
+ ***********************************
+ *** No Queries ***
+#constraints (approx number before solve()):  421404
+#pts:  1473851
+#constraints (totol num):  443434
+
+Done  -- PTA/CG Build; Using 13.776755727s.
+Go check gologfile for detail.
+=============================================================================
+21   package google.golang.org/grpc/examples/features/cancellation/client
+ *** MODE: 1-ORIGIN-SENSITIVE ***
+ *** Analyze Scope *****************
+ - google.golang.org/grpc
+ - command-line-arguments (default)
+ ***********************************
+ *** No Queries ***
+#constraints (approx number before solve()):  406501
+#pts:  1450632
+#constraints (totol num):  436500
+
+Done  -- PTA/CG Build; Using 12.317613241s.
+Go check gologfile for detail.
+=============================================================================
+22   package google.golang.org/grpc/examples/features/encryption/TLS/server
+ *** MODE: 1-ORIGIN-SENSITIVE ***
+ *** Analyze Scope *****************
+ - google.golang.org/grpc
+ - command-line-arguments (default)
+ ***********************************
+ *** No Queries ***
+#constraints (approx number before solve()):  421478
+#pts:  1474849
+#constraints (totol num):  444018
+
+Done  -- PTA/CG Build; Using 13.432310766s.
+Go check gologfile for detail.
+=============================================================================
+23   package google.golang.org/grpc/examples/features/encryption/TLS/client
+ *** MODE: 1-ORIGIN-SENSITIVE ***
+ *** Analyze Scope *****************
+ - google.golang.org/grpc
+ - command-line-arguments (default)
+ ***********************************
+ *** No Queries ***
+#constraints (approx number before solve()):  406520
+#pts:  1451299
+#constraints (totol num):  436946
+
+Done  -- PTA/CG Build; Using 12.850064425s.
+Go check gologfile for detail.
+=============================================================================
+24   package google.golang.org/grpc/examples/features/encryption/ALTS/server
+ *** MODE: 1-ORIGIN-SENSITIVE ***
+ *** Analyze Scope *****************
+ - google.golang.org/grpc
+ - command-line-arguments (default)
+ ***********************************
+ *** No Queries ***
+#constraints (approx number before solve()):  421735
+#pts:  1508941
+#constraints (totol num):  466499
+
+Done  -- PTA/CG Build; Using 15.909124844s.
+Go check gologfile for detail.
+=============================================================================
+25   package google.golang.org/grpc/examples/features/encryption/ALTS/client
+ *** MODE: 1-ORIGIN-SENSITIVE ***
+ *** Analyze Scope *****************
+ - google.golang.org/grpc
+ - command-line-arguments (default)
+ ***********************************
+ *** No Queries ***
+#constraints (approx number before solve()):  406796
+#pts:  1466574
+#constraints (totol num):  442499
+
+Done  -- PTA/CG Build; Using 12.353358878s.
+Go check gologfile for detail.
+=============================================================================
+26   package google.golang.org/grpc/examples/features/name_resolving/server
+ *** MODE: 1-ORIGIN-SENSITIVE ***
+ *** Analyze Scope *****************
+ - google.golang.org/grpc
+ - command-line-arguments (default)
+ ***********************************
+ *** No Queries ***
+#constraints (approx number before solve()):  421369
+#pts:  1473745
+#constraints (totol num):  443399
+
+Done  -- PTA/CG Build; Using 11.398404516s.
+Go check gologfile for detail.
+=============================================================================
+27   package google.golang.org/grpc/examples/features/name_resolving/client
+ *** MODE: 1-ORIGIN-SENSITIVE ***
+ *** Analyze Scope *****************
+ - google.golang.org/grpc
+ - command-line-arguments (default)
+ ***********************************
+ *** No Queries ***
+#constraints (approx number before solve()):  406469
+#pts:  1450654
+#constraints (totol num):  436565
+
+Done  -- PTA/CG Build; Using 12.911561447s.
+Go check gologfile for detail.
+=============================================================================
+28   package google.golang.org/grpc/examples/features/retry/server
+ *** MODE: 1-ORIGIN-SENSITIVE ***
+ *** Analyze Scope *****************
+ - google.golang.org/grpc
+ - command-line-arguments (default)
+ ***********************************
+ *** No Queries ***
+#constraints (approx number before solve()):  421413
+#pts:  1473871
+#constraints (totol num):  443443
+
+Done  -- PTA/CG Build; Using 14.76820522s.
+Go check gologfile for detail.
+=============================================================================
+29   package google.golang.org/grpc/examples/features/retry/client
+ *** MODE: 1-ORIGIN-SENSITIVE ***
+ *** Analyze Scope *****************
+ - google.golang.org/grpc
+ - command-line-arguments (default)
+ ***********************************
+ *** No Queries ***
+#constraints (approx number before solve()):  406479
+#pts:  1450567
+#constraints (totol num):  436483
+
+Done  -- PTA/CG Build; Using 10.467626158s.
+Go check gologfile for detail.
+=============================================================================
+30   package google.golang.org/grpc/examples/features/load_balancing/server
+ *** MODE: 1-ORIGIN-SENSITIVE ***
+ *** Analyze Scope *****************
+ - google.golang.org/grpc
+ - command-line-arguments (default)
+ ***********************************
+ *** No Queries ***
+#constraints (approx number before solve()):  432567
+#pts:  1516013
+#constraints (totol num):  471534
+
+Done  -- PTA/CG Build; Using 16.00789314s.
+Go check gologfile for detail.
+=============================================================================
+31   package google.golang.org/grpc/examples/features/load_balancing/client
+ *** MODE: 1-ORIGIN-SENSITIVE ***
+ *** Analyze Scope *****************
+ - google.golang.org/grpc
+ - command-line-arguments (default)
+ ***********************************
+ *** No Queries ***
+#constraints (approx number before solve()):  406479
+#pts:  1450675
+#constraints (totol num):  436573
+
+Done  -- PTA/CG Build; Using 10.515627237s.
+Go check gologfile for detail.
+=============================================================================
+32   package google.golang.org/grpc/examples/features/health/server
+ *** MODE: 1-ORIGIN-SENSITIVE ***
+ *** Analyze Scope *****************
+ - google.golang.org/grpc
+ - command-line-arguments (default)
+ ***********************************
+ *** No Queries ***
+#constraints (approx number before solve()):  421525
+#pts:  1475377
+#constraints (totol num):  443556
+
+Done  -- PTA/CG Build; Using 10.92558619s.
+Go check gologfile for detail.
+=============================================================================
+33   package google.golang.org/grpc/examples/features/health/client
+ *** MODE: 1-ORIGIN-SENSITIVE ***
+ *** Analyze Scope *****************
+ - google.golang.org/grpc
+ - command-line-arguments (default)
+ ***********************************
+ *** No Queries ***
+#constraints (approx number before solve()):  406602
+#pts:  1452157
+#constraints (totol num):  436679
+
+Done  -- PTA/CG Build; Using 14.349565055s.
+Go check gologfile for detail.
+=============================================================================
+34   package google.golang.org/grpc/examples/features/debugging/server
+ *** MODE: 1-ORIGIN-SENSITIVE ***
+ *** Analyze Scope *****************
+ - google.golang.org/grpc
+ - command-line-arguments (default)
+ ***********************************
+ *** No Queries ***
+#constraints (approx number before solve()):  443702
+#pts:  1576680
+#constraints (totol num):  500366
+
+Done  -- PTA/CG Build; Using 17.923633254s.
+Go check gologfile for detail.
+=============================================================================
+35   package google.golang.org/grpc/examples/features/debugging/client
+ *** MODE: 1-ORIGIN-SENSITIVE ***
+ *** Analyze Scope *****************
+ - google.golang.org/grpc
+ - command-line-arguments (default)
+ ***********************************
+ *** No Queries ***
+#constraints (approx number before solve()):  423599
+#pts:  1529890
+#constraints (totol num):  475729
+
+Done  -- PTA/CG Build; Using 15.10334373s.
+Go check gologfile for detail.
+=============================================================================
+36   package google.golang.org/grpc/examples/features/deadline/server
+ *** MODE: 1-ORIGIN-SENSITIVE ***
+ *** Analyze Scope *****************
+ - google.golang.org/grpc
+ - command-line-arguments (default)
+ ***********************************
+ *** No Queries ***
+#constraints (approx number before solve()):  422967
+#pts:  1504357
+#constraints (totol num):  469290
+
+Done  -- PTA/CG Build; Using 14.13272734s.
+Go check gologfile for detail.
+=============================================================================
+37   package google.golang.org/grpc/examples/features/deadline/client
+ *** MODE: 1-ORIGIN-SENSITIVE ***
+ *** Analyze Scope *****************
+ - google.golang.org/grpc
+ - command-line-arguments (default)
+ ***********************************
+ *** No Queries ***
+#constraints (approx number before solve()):  406494
+#pts:  1450747
+#constraints (totol num):  436565
+
+Done  -- PTA/CG Build; Using 15.084506168s.
+Go check gologfile for detail.
+=============================================================================
+38   package google.golang.org/grpc/examples/features/profiling/server
+ *** MODE: 1-ORIGIN-SENSITIVE ***
+ *** Analyze Scope *****************
+ - google.golang.org/grpc
+ - command-line-arguments (default)
+ ***********************************
+ *** No Queries ***
+#constraints (approx number before solve()):  421542
+#pts:  1475950
+#constraints (totol num):  443573
+
+Done  -- PTA/CG Build; Using 14.012821044s.
+Go check gologfile for detail.
+=============================================================================
+39   package google.golang.org/grpc/examples/features/profiling/client
+ *** MODE: 1-ORIGIN-SENSITIVE ***
+ *** Analyze Scope *****************
+ - google.golang.org/grpc
+ - command-line-arguments (default)
+ ***********************************
+ *** No Queries ***
+#constraints (approx number before solve()):  423171
+#pts:  1513146
+#constraints (totol num):  475191
+
+Done  -- PTA/CG Build; Using 16.828515257s.
+Go check gologfile for detail.
+=============================================================================
+40   package google.golang.org/grpc/examples/features/compression/server
+ *** MODE: 1-ORIGIN-SENSITIVE ***
+ *** Analyze Scope *****************
+ - google.golang.org/grpc
+ - command-line-arguments (default)
+ ***********************************
+ *** No Queries ***
+#constraints (approx number before solve()):  421428
+#pts:  1474278
+#constraints (totol num):  443831
+
+Done  -- PTA/CG Build; Using 13.213740499s.
+Go check gologfile for detail.
+=============================================================================
+41   package google.golang.org/grpc/examples/features/compression/client
+ *** MODE: 1-ORIGIN-SENSITIVE ***
+ *** Analyze Scope *****************
+ - google.golang.org/grpc
+ - command-line-arguments (default)
+ ***********************************
+ *** No Queries ***
+#constraints (approx number before solve()):  406502
+#pts:  1450711
+#constraints (totol num):  436578
+
+Done  -- PTA/CG Build; Using 12.104891677s.
+Go check gologfile for detail.
+=============================================================================
+42   package google.golang.org/grpc/examples/features/wait_for_ready
+ *** MODE: 1-ORIGIN-SENSITIVE ***
+ *** Analyze Scope *****************
+ - google.golang.org/grpc
+ - command-line-arguments (default)
+ ***********************************
+ *** No Queries ***
+#constraints (approx number before solve()):  423048
+#pts:  1526305
+#constraints (totol num):  488676
+
+Done  -- PTA/CG Build; Using 16.750169875s.
+Go check gologfile for detail.
+=============================================================================
+43   package google.golang.org/grpc/examples/features/keepalive/server
+ *** MODE: 1-ORIGIN-SENSITIVE ***
+ *** Analyze Scope *****************
+ - google.golang.org/grpc
+ - command-line-arguments (default)
+ ***********************************
+ *** No Queries ***
+#constraints (approx number before solve()):  421465
+#pts:  1473975
+#constraints (totol num):  443500
+
+Done  -- PTA/CG Build; Using 14.844775198s.
+Go check gologfile for detail.
+=============================================================================
+44   package google.golang.org/grpc/examples/features/keepalive/client
+ *** MODE: 1-ORIGIN-SENSITIVE ***
+ *** Analyze Scope *****************
+ - google.golang.org/grpc
+ - command-line-arguments (default)
+ ***********************************
+ *** No Queries ***
+#constraints (approx number before solve()):  406498
+#pts:  1450600
+#constraints (totol num):  436502
+
+Done  -- PTA/CG Build; Using 12.716678518s.
+Go check gologfile for detail.
+=============================================================================
+45   package google.golang.org/grpc/examples/features/errors/server
+ *** MODE: 1-ORIGIN-SENSITIVE ***
+ *** Analyze Scope *****************
+ - google.golang.org/grpc
+ - command-line-arguments (default)
+ ***********************************
+ *** No Queries ***
+#constraints (approx number before solve()):  421674
+#pts:  1476816
+#constraints (totol num):  443704
+
+Done  -- PTA/CG Build; Using 16.768885724s.
+Go check gologfile for detail.
+=============================================================================
+46   package google.golang.org/grpc/examples/features/errors/client
+ *** MODE: 1-ORIGIN-SENSITIVE ***
+ *** Analyze Scope *****************
+ - google.golang.org/grpc
+ - command-line-arguments (default)
+ ***********************************
+ *** No Queries ***
+#constraints (approx number before solve()):  406793
+#pts:  1453592
+#constraints (totol num):  436762
+
+Done  -- PTA/CG Build; Using 15.330672851s.
+Go check gologfile for detail.
+=============================================================================
+47   package google.golang.org/grpc/examples/features/multiplex/server
+ *** MODE: 1-ORIGIN-SENSITIVE ***
+ *** Analyze Scope *****************
+ - google.golang.org/grpc
+ - command-line-arguments (default)
+ ***********************************
+ *** No Queries ***
+#constraints (approx number before solve()):  421487
+#pts:  1474745
+#constraints (totol num):  443518
+
+Done  -- PTA/CG Build; Using 13.064643706s.
+Go check gologfile for detail.
+=============================================================================
+48   package google.golang.org/grpc/examples/features/multiplex/client
+ *** MODE: 1-ORIGIN-SENSITIVE ***
+ *** Analyze Scope *****************
+ - google.golang.org/grpc
+ - command-line-arguments (default)
+ ***********************************
+ *** No Queries ***
+#constraints (approx number before solve()):  406575
+#pts:  1451551
+#constraints (totol num):  436599
+
+Done  -- PTA/CG Build; Using 13.205887373s.
+Go check gologfile for detail.
+=============================================================================
+49   package google.golang.org/grpc/examples/features/xds/server
+ *** MODE: 1-ORIGIN-SENSITIVE ***
+ *** Analyze Scope *****************
+ - google.golang.org/grpc
+ - command-line-arguments (default)
+ ***********************************
+ *** No Queries ***
+#constraints (approx number before solve()):  422266
+#pts:  1495953
+#constraints (totol num):  444298
+
+Done  -- PTA/CG Build; Using 13.000168431s.
+Go check gologfile for detail.
+=============================================================================
+50   package google.golang.org/grpc/examples/features/xds/client
+ *** MODE: 1-ORIGIN-SENSITIVE ***
+ *** Analyze Scope *****************
+ - google.golang.org/grpc
+ - command-line-arguments (default)
+ ***********************************
+ *** No Queries ***
+#constraints (approx number before solve()):  423159
+#pts:  1964920
+#constraints (totol num):  471258
+
+Done  -- PTA/CG Build; Using 12.859679498s.
+Go check gologfile for detail.
+=============================================================================
+51   package google.golang.org/grpc/examples/features/authentication/server
+ *** MODE: 1-ORIGIN-SENSITIVE ***
+ *** Analyze Scope *****************
+ - google.golang.org/grpc
+ - command-line-arguments (default)
+ ***********************************
+ *** No Queries ***
+#constraints (approx number before solve()):  421505
+#pts:  1474892
+#constraints (totol num):  444046
+
+Done  -- PTA/CG Build; Using 14.637233239s.
+Go check gologfile for detail.
+=============================================================================
+52   package google.golang.org/grpc/examples/features/authentication/client
+ *** MODE: 1-ORIGIN-SENSITIVE ***
+ *** Analyze Scope *****************
+ - google.golang.org/grpc
+ - command-line-arguments (default)
+ ***********************************
+ *** No Queries ***
+#constraints (approx number before solve()):  406709
+#pts:  1452366
+#constraints (totol num):  437213
+
+Done  -- PTA/CG Build; Using 14.188152331s.
+Go check gologfile for detail.
+=============================================================================
+53   package google.golang.org/grpc/examples/features/metadata/server
+ *** MODE: 1-ORIGIN-SENSITIVE ***
+ *** Analyze Scope *****************
+ - google.golang.org/grpc
+ - command-line-arguments (default)
+ ***********************************
+ *** No Queries ***
+#constraints (approx number before solve()):  421406
+#pts:  1473859
+#constraints (totol num):  443436
+
+Done  -- PTA/CG Build; Using 11.256162488s.
+Go check gologfile for detail.
+=============================================================================
+54   package google.golang.org/grpc/examples/features/metadata/client
+ *** MODE: 1-ORIGIN-SENSITIVE ***
+ *** Analyze Scope *****************
+ - google.golang.org/grpc
+ - command-line-arguments (default)
+ ***********************************
+ *** No Queries ***
+#constraints (approx number before solve()):  406824
+#pts:  1456026
+#constraints (totol num):  440762
+
+Done  -- PTA/CG Build; Using 10.767654812s.
+Go check gologfile for detail.
+=============================================================================
+55   package google.golang.org/grpc/examples/features/interceptor/server
+ *** MODE: 1-ORIGIN-SENSITIVE ***
+ *** Analyze Scope *****************
+ - google.golang.org/grpc
+ - command-line-arguments (default)
+ ***********************************
+ *** No Queries ***
+#constraints (approx number before solve()):  421503
+#pts:  1474915
+#constraints (totol num):  444045
+
+Done  -- PTA/CG Build; Using 14.969361605s.
+Go check gologfile for detail.
+=============================================================================
+56   package google.golang.org/grpc/examples/features/interceptor/client
+ *** MODE: 1-ORIGIN-SENSITIVE ***
+ *** Analyze Scope *****************
+ - google.golang.org/grpc
+ - command-line-arguments (default)
+ ***********************************
+ *** No Queries ***
+#constraints (approx number before solve()):  406702
+#pts:  1452494
+#constraints (totol num):  437275
+
+Done  -- PTA/CG Build; Using 14.768821228s.
+Go check gologfile for detail.
+=============================================================================
+57   package google.golang.org/grpc/examples/features/reflection/server
+ *** MODE: 1-ORIGIN-SENSITIVE ***
+ *** Analyze Scope *****************
+ - google.golang.org/grpc
+ - command-line-arguments (default)
+ ***********************************
+ *** No Queries ***
+#constraints (approx number before solve()):  422212
+#pts:  1495835
+#constraints (totol num):  444244
+
+Done  -- PTA/CG Build; Using 16.233744301s.
+Go check gologfile for detail.
+=============================================================================
+58   package google.golang.org/grpc/examples/route_guide/server
+ *** MODE: 1-ORIGIN-SENSITIVE ***
+ *** Analyze Scope *****************
+ - google.golang.org/grpc
+ - command-line-arguments (default)
+ ***********************************
+ *** No Queries ***
+#constraints (approx number before solve()):  421515
+#pts:  1475610
+#constraints (totol num):  444055
+
+Done  -- PTA/CG Build; Using 13.138749867s.
+Go check gologfile for detail.
+=============================================================================
+59   package google.golang.org/grpc/examples/route_guide/client
+ *** MODE: 1-ORIGIN-SENSITIVE ***
+ *** Analyze Scope *****************
+ - google.golang.org/grpc
+ - command-line-arguments (default)
+ ***********************************
+ *** No Queries ***
+#constraints (approx number before solve()):  406772
+#pts:  1457128
+#constraints (totol num):  441030
+
+Done  -- PTA/CG Build; Using 9.989376163s.
+Go check gologfile for detail.
+=============================================================================
+60   package google.golang.org/grpc/stress/metrics_client
+ *** MODE: 1-ORIGIN-SENSITIVE ***
+ *** Analyze Scope *****************
+ - google.golang.org/grpc
+ - command-line-arguments (default)
+ ***********************************
+ *** No Queries ***
+#constraints (approx number before solve()):  406505
+#pts:  1450503
+#constraints (totol num):  436582
+
+Done  -- PTA/CG Build; Using 14.108659852s.
+Go check gologfile for detail.
+=============================================================================
+61   package google.golang.org/grpc/stress/client
+ *** MODE: 1-ORIGIN-SENSITIVE ***
+ *** Analyze Scope *****************
+ - google.golang.org/grpc
+ - command-line-arguments (default)
+ ***********************************
+ *** No Queries ***
+#constraints (approx number before solve()):  425059
+#pts:  1536592
+#constraints (totol num):  485709
+
+Done  -- PTA/CG Build; Using 13.600093238s.
+Go check gologfile for detail.
+=============================================================================
+
+
+BASELINE All Done  -- PTA/CG Build.
+TOTAL:  14m7.695824038s.
+Max:  21.748620196s.
+Min:  8.220118632s.
+Avg:  13.89664 s.
+
+Process finished with exit code 0

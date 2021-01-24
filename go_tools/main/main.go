@@ -121,7 +121,7 @@ func main() {
 	start := time.Now()   //performance
 	for i, main := range mains {
 		if i == 16 {
-			continue  //TODO: panic panic
+			continue  //TODO: bz: panic for grpc
 		}
  		fmt.Println(i, " ", main.String())
 		doEachMain(main)
@@ -152,7 +152,7 @@ func doEachMain(main *ssa.Package) {
 		Mains:          mains, //bz: NOW assume only one main
 		Reflection:     false,
 		BuildCallGraph: true,
-		Log:            nil, //logfile,
+		Log:            logfile,
 		//kcfa
 		//CallSiteSensitive: true,
 		//origin
@@ -164,7 +164,7 @@ func doEachMain(main *ssa.Package) {
 		Scope:      scope, //bz: analyze scope
 		Exclusions: excludedPkgs,//bz: copied from race_checker
 
-		DiscardQueries: true, //bz: do not use query any more
+		DiscardQueries: false, //bz: do not use query any more
 	}
 
 	//*** compute pta here
