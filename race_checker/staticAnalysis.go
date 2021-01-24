@@ -101,19 +101,23 @@ func pkgSelection(initial []*packages.Package) ([]*ssa.Package, *ssa.Program, []
 		for i, ep := range mainPkgs {
 			fmt.Println("Option", i+1, ": ", ep.String())
 		}
-		fmt.Print("Enter option number of choice: (or enter - for other desired entry point)\n")
+		fmt.Print("Enter option number of choice: (or enter \"-\" for other desired entry point)\n")
 		fmt.Scan(&mainInd)
 		if mainInd == "-" {
 			fmt.Print("Enter function name to begin analysis from: ")
 			fmt.Scan(&enterAt)
-			for _, p := range pkgs {
-				if len(p.Members) == 0 {
-					continue //bz: skip the panic if no function in *ssa.Package
-				}
-				if p.Func(enterAt) != nil {
-					userEP = true
-					mains = append(mainPkgs, p)
-					entryFn = enterAt // start analysis at user specified function
+			for _ , p := range pkgs {
+				//if len(p.Members) == 0 {
+				//	continue //bz: skip the panic if no function in *ssa.Package
+				//}
+
+				if p != nil {
+					if fnMem, okf := p.Members[enterAt]; okf { // package contains function to enter at
+						userEP = true
+						mains = append(mainPkgs, p)
+						entryFn = enterAt // start analysis at user specified function
+						_ = fnMem
+					}
 				}
 			}
 			if !userEP {
@@ -155,7 +159,6 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		return err
 	}
 	fromPath = initial[0].ID
-	log.Debug(fromPath)
 	t := time.Now()
 	elapsedLoad := t.Sub(startLoad)
 	log.Info("Done  -- Using ", elapsedLoad.String())
