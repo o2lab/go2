@@ -203,6 +203,7 @@ func (a* analysis) buildHB(HBgraph *graph.Graph) {
 
 // visitAllInstructions visits each line and calls the corresponding helper function to drive the tool
 func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
+	curVisitingFn = fn // for PTA use
 	if a.useNewPTA && a.ptaConfig.DEBUG { //bz: useNewPTA ...
 		fmt.Println(".... " + fn.String())
 	}
