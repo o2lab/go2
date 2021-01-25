@@ -25,7 +25,7 @@ import (
 
 const (
 	// optimization options; enable all when committing
-	optRenumber = true // enable renumbering optimization (makes logs hard to read)
+	optRenumber = false // enable renumbering optimization (makes logs hard to read)
 	optHVN      = true // enable pointer equivalence via Hash-Value Numbering
 
 	// debugging options; disable all when committing
