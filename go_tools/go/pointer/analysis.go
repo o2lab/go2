@@ -149,7 +149,7 @@ type analysis struct {
 	// NOW also used for static and invoke calls TODO: may be should use nodeid not int (idx) ?
 	closures            map[*ssa.Function]*Ctx2nodeid //bz: solution for makeclosure
     result              *ResultWCtx                   //bz: our result, dump all
-    closureWOGo         map[nodeid]nodeid                     //bz: solution@field actualCallerSite []*callsite of cgnode type
+    closureWOGo         map[nodeid]nodeid             //bz: solution@field actualCallerSite []*callsite of cgnode type
 
 	considerReflect     bool //bz: whether we have reflect in exclusions
 }

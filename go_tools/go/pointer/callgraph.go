@@ -216,7 +216,16 @@ type Ctx2nodeid struct {
 	ctx2nodeid map[*callsite][]nodeid
 }
 
-
+//bz: renumbering func for opt
+func (r *Ctx2nodeid) renumber(renumbering []nodeid)  {
+	for cs, array := range r.ctx2nodeid {
+		objs := make([]nodeid, len(array))
+		for idx, ele := range array {
+			objs[idx] = renumbering[ele]
+		}
+		r.ctx2nodeid[cs] = objs
+	}
+}
 
 
 //////////////////////////////// call graph to users ////////////////////////////////

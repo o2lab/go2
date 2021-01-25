@@ -100,6 +100,9 @@ func (a *analysis) renumber() {
 	for v, id := range a.globalobj {
 		a.globalobj[v] = renumbering[id]
 	}
+	for v, id := range a.globalval { //bz: why this is not renumbered previously ??
+		a.globalval[v] = renumbering[id]
+	}
 
 	// Renumber nodeids in constraints.
 	for _, c := range a.constraints {
@@ -122,6 +125,18 @@ func (a *analysis) renumber() {
 		}
 	}
 
+	// Renumber nodeids in others
+	tmp := make(map[nodeid]nodeid)
+	for key, val := range a.closureWOGo {
+		tmp[renumbering[key]] = renumbering[val]
+	}
+	a.closureWOGo = tmp
+
+	for _, val := range a.closures {
+		val.renumber(renumbering)
+	}
+
+	//bz: special options
 	if !a.config.DiscardQueries {
 		//bz: we are now using this, update for all recorded queries
 		// Renumber nodeids in queried Pointers.

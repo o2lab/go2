@@ -99,6 +99,7 @@ var (
 )
 
 var useNewPTA = true //bz: default value for this branch
+var useQueries = false //bz: whether we use Queries in pointer analysis
 var doDebugPTA = false //bz: default value for this branch
 var doPTALog = false //bz: default value for this branch
 
@@ -192,6 +193,7 @@ func init() {
 // main sets up arguments and calls staticAnalysis function
 func main() {
 	newPTA := flag.Bool("useNewPTA", true, "Use the new pointer analysis in go_tools.")
+	setUseQueries := flag.Bool("useQueries", false, "Use the new pointer analysis in go_tools.")
 	debugPTA := flag.Bool("debugPTA", false, "Prints all PTA debug messages in console.")
 	keepPTALog := flag.Bool("keepPTALog", false, "Create a log file for all details in PTA.")
 	debug := flag.Bool("debug", false, "Prints log.Debug messages.")
@@ -207,6 +209,9 @@ func main() {
 	}
 	if *newPTA {
 		useNewPTA = true
+	}
+	if *setUseQueries {
+		useQueries = *setUseQueries
 	}
 	if *debugPTA {
 		doDebugPTA = true

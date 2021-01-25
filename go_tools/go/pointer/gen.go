@@ -674,7 +674,7 @@ func (a *analysis) copy(dst, src nodeid, sizeof uint32) {
 		if Online { //bz: Online solving
 			a.addWork(dst)
 			if a.log != nil {
-				fmt.Fprintf(a.log, "%s\n\n", " -> add Online constraint to worklist: " + dst.String() + " " + src.String())
+				fmt.Fprintf(a.log, "%s\n", " -> add Online constraint to worklist: " + dst.String() + " " + src.String())
 			}
 		}
 

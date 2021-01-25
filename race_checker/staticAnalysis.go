@@ -270,6 +270,7 @@ func (runner *AnalysisRunner) runEachMainBaseline(main *ssa.Package) *pointer.Re
 		DEBUG:      doDebugPTA,   //bz: do all printed out info in console --> turn off to avoid internal nil reference panic
 		Scope:      scope,        //bz: analyze scope, default is "command-line-arguments"
 		Exclusions: excludedPkgs, //excludedPkgs here
+		DiscardQueries: !useQueries, //bz: new flag
 	}
 
 	start := time.Now()
