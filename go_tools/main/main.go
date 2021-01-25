@@ -13,34 +13,37 @@ import (
 	"time"
 )
 
-var excludedPkgs = []string{
-	//"runtime",
-	//"fmt",
-	//"reflect",
-	//"encoding",
-	//"errors",
-	//"bytes",
-	//"strconv",
-	//"strings",
-	//"bytealg",
-	//"race",
-	//"syscall",
-	//"poll",
-	//"trace",
-	//"logging",
-	//"os",
-	//"builtin",
-	//"pflag",
-	//"log",
-	//"reflect",
-	//"internal",
-	//"impl",
-	//"transport", // grpc
-	//"version",
-	//"sort",
-	//"filepath",
+var excludedPkgs = []string{//bz: from previous race_checker defined var
+	"runtime",
+	"fmt",
+	"reflect",
+	"encoding",
+	"errors",
+	"bytes",
+	"strconv",
+	"strings",
+	"bytealg",
+	"race",
+	"syscall",
+	"poll",
+	"trace",
+	"logging",
+	"os",
+	"builtin",
+	"pflag",
+	"log",
+	"reflect",
+	"internal",
+	"impl",
+	"transport", // grpc
+	"version",
+	"sort",
+	"filepath",
 }
-var projPath = ""      // interested packages are those located at this path
+var projPath =
+	//""      // interested packages are those located at this path
+    //"github.com/pingcap/tidb"
+    "google.golang.org/grpc"
 var maxTime time.Duration
 var minTime time.Duration
 
@@ -63,10 +66,9 @@ func findMainPackages(pkgs []*ssa.Package) ([]*ssa.Package, error) {
 /**
 bz: test record
 16   package google.golang.org/grpc/interop/client  -> .taggedValue panic
-
- */
-
-//TODO: program counter ???
+---------------------------------------------------------------------------
+../race_checker/tests/cg.go
+*/
 func main() {
 	path := flag.String("path", "", "Designated project filepath. ")
 	flag.Parse()
@@ -120,9 +122,9 @@ func main() {
 	//baseline: foreach
 	start := time.Now()   //performance
 	for i, main := range mains {
-		if i == 16 {
-			continue  //TODO: bz: panic for grpc
-		}
+		//if i == 16 {
+		//	continue  //TODO: bz: panic for grpc
+		//}
  		fmt.Println(i, " ", main.String())
 		doEachMain(main)
 		fmt.Println("=============================================================================")
@@ -137,7 +139,7 @@ func main() {
 
 func doEachMain(main *ssa.Package) {
 	//create my log file
-	logfile, err := os.Create("gologfile") //bz: i do not want messed up log, create/overwrite one each time
+	logfile, err := os.Create("/Users/bozhen/Documents/GO2/go2/go_tools/_logs/full_log")
 	log.SetFormatter(&log.TextFormatter{
 		FullTimestamp: true,
 	})
@@ -152,19 +154,16 @@ func doEachMain(main *ssa.Package) {
 		Mains:          mains, //bz: NOW assume only one main
 		Reflection:     false,
 		BuildCallGraph: true,
-		Log:            logfile,
-		//kcfa
-		//CallSiteSensitive: true,
-		//origin
-		Origin: true,
+		Log:            nil,//logfile,
+		//CallSiteSensitive: true, //kcfa
+		Origin:     true, //origin
 		//shared config
 		K:          1,
 		LimitScope: true, //bz: only consider app methods now
 		DEBUG:      false, //bz: rm all printed out info in console
 		Scope:      scope, //bz: analyze scope
 		Exclusions: excludedPkgs,//bz: copied from race_checker
-
-		DiscardQueries: false, //bz: do not use query any more
+		DiscardQueries: true, //bz: do not use query any more
 	}
 
 	//*** compute pta here

@@ -12,7 +12,6 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
-	"strings"
 	"time"
 
 	"github.tamu.edu/April1989/go_tools/container/intsets"
@@ -226,7 +225,8 @@ func (a *analysis) shouldTrack(T types.Type) bool {
 		}
 		// bz: here track == false --> this will topple the true assignment at the function beginning ...
 		// BUT we track all types declared in app, since we cannot pre-populated them
-		if !strings.Contains(T.String(), "command-line-arguments.") {
+		// UPDATE: also track types declared in path
+		if a.withinScope(T.String()) {
 			a.trackTypes[T] = track
 			if !track && a.log != nil {
 				fmt.Fprintf(a.log, "\ttype not tracked: %s\n", T)

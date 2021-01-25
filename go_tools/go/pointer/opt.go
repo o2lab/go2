@@ -95,40 +95,6 @@ func (a *analysis) renumber() {
 	// Now renumber all existing nodeids to use the new node permutation.
 	// It is critical that all reachable nodeids are accounted for!
 
-	//bz: we are now using this, update for all recorded queries
-	// Renumber nodeids in queried Pointers.
-	for v, ptrs := range a.result.Queries {
-		tmp := make([]PointerWCtx, len(ptrs))
-		for i, ptr := range ptrs {
-			ptr.n = renumbering[ptr.n]
-			tmp[i] = ptr
-		}
-		a.result.Queries[v] = tmp
-	}
-	for v, ptrs := range a.result.IndirectQueries {
-		tmp := make([]PointerWCtx, len(ptrs))
-		for i, ptr := range ptrs {
-			ptr.n = renumbering[ptr.n]
-			tmp[i] = ptr
-		}
-		a.result.IndirectQueries[v] = tmp
-	}
-	for v, ptrs := range a.result.GlobalQueries {
-		tmp := make([]PointerWCtx, len(ptrs))
-		for i, ptr := range ptrs {
-			ptr.n = renumbering[ptr.n]
-			tmp[i] = ptr
-		}
-		a.result.GlobalQueries[v] = tmp
-	}
-	for _, queries := range a.config.extendedQueries {
-		for _, query := range queries {
-			if query.ptr != nil {
-				query.ptr.n = renumbering[query.ptr.n]
-			}
-		}
-	}
-
 	// Renumber nodeids in global objects.
 	// TODO: check if a.panicNode is still ok?
 	for v, id := range a.globalobj {
@@ -150,6 +116,45 @@ func (a *analysis) renumber() {
 		}
 		for _, site := range cgn.sites {
 			site.targets = renumbering[site.targets]
+		}
+		if a.config.DiscardQueries { //bz: also update its local mapping
+			cgn.renumber(renumbering)
+		}
+	}
+
+	if !a.config.DiscardQueries {
+		//bz: we are now using this, update for all recorded queries
+		// Renumber nodeids in queried Pointers.
+		for v, ptrs := range a.result.Queries {
+			tmp := make([]PointerWCtx, len(ptrs))
+			for i, ptr := range ptrs {
+				ptr.n = renumbering[ptr.n]
+				tmp[i] = ptr
+			}
+			a.result.Queries[v] = tmp
+		}
+		for v, ptrs := range a.result.IndirectQueries {
+			tmp := make([]PointerWCtx, len(ptrs))
+			for i, ptr := range ptrs {
+				ptr.n = renumbering[ptr.n]
+				tmp[i] = ptr
+			}
+			a.result.IndirectQueries[v] = tmp
+		}
+		for v, ptrs := range a.result.GlobalQueries {
+			tmp := make([]PointerWCtx, len(ptrs))
+			for i, ptr := range ptrs {
+				ptr.n = renumbering[ptr.n]
+				tmp[i] = ptr
+			}
+			a.result.GlobalQueries[v] = tmp
+		}
+		for _, queries := range a.config.extendedQueries {
+			for _, query := range queries {
+				if query.ptr != nil {
+					query.ptr.n = renumbering[query.ptr.n]
+				}
+			}
 		}
 	}
 

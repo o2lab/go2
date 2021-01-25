@@ -52,6 +52,16 @@ func (n *cgnode) initLocalMaps()  {
 	n.localobj = make(map[ssa.Value]nodeid)
 }
 
+//bz: if not use queries, do this renumbering
+func (n *cgnode) renumber(renumbering []nodeid) {
+	for v, oldID := range n.localval {
+		n.localval[v] = renumbering[oldID]
+	}
+	for obj, oldID := range n.localobj {
+		n.localobj[obj] = renumbering[oldID]
+	}
+}
+
 // contour returns a description of this node's contour.
 //bz: only used for log
 func (n *cgnode) contour(isKcfa bool) string {
@@ -119,6 +129,7 @@ func (n *cgnode) contourkActualFull() string {
 func (n *cgnode) String() string {
 	return fmt.Sprintf("cg%d:%s@%s", n.obj, n.fn, n.contourkFull())
 }
+
 
 // A callsite represents a single call site within a cgnode;
 // it is implicitly context-sensitive.
