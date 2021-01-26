@@ -16,18 +16,32 @@ func (a *analysis) checkRacyPairs() {
 	for i := 0; i < len(a.RWIns); i++ {
 		for j := i + 1; j < len(a.RWIns); j++ { // must be in different goroutines, j always greater than i
 			for ii, goI := range a.RWIns[i] {
-				if (i == 0 && ii < a.insDRA) || (channelComm && sliceContainsBloc(a.omitComm, goI.Block())) { continue } // do not check race-free instructions in main goroutine
+				//bz: ii is goID
+				if (i == 0 && ii < a.insDRA) || (channelComm && sliceContainsBloc(a.omitComm, goI.Block())) {
+					continue
+				} // do not check race-free instructions in main goroutine
 				for jj, goJ := range a.RWIns[j] {
-					if channelComm && sliceContainsBloc(a.omitComm, goJ.Block()) { continue }
+					//bz: jj is goID
+					if channelComm && sliceContainsBloc(a.omitComm, goJ.Block()) {
+						continue
+					}
 					if (isWriteIns(goI) && isWriteIns(goJ)) || (isWriteIns(goI) && a.isReadIns(goJ)) || (a.isReadIns(goI) && isWriteIns(goJ)) { // only read and write instructions
 						//if a.useNewPTA && a.ptaConfig.DEBUG { //bz: useNewPTA ...
 						//	fmt.Println(goI.String() + "\n" + goJ.String() + "\n ---------------------------") //bz: debug -> missing fn
 						//}
 						insSlice := []ssa.Instruction{goI, goJ}
 						addressPair := a.insAddress(insSlice) // one instruction from each goroutine
-						if len(addressPair) > 1 &&
-							a.sameAddress(addressPair[0], addressPair[1]) &&
-							!sliceContains(a.reportedAddr, addressPair[0]) &&
+						var theSame bool //bz: see different conditions from config
+						if a.ptaConfig.DiscardQueries {
+							theSame = a.sameAddress2(addressPair[0], goI, ii, addressPair[1], goJ, jj)
+						} else {
+							if len(addressPair) > 1 {
+								theSame = a.sameAddress(addressPair[0], addressPair[1])
+							} else {
+								theSame = false
+							}
+						}
+						if theSame && !sliceContains(a.reportedAddr, addressPair[0]) &&
 							!a.reachable(goI, i, goJ, j) &&
 							!a.reachable(goJ, j, goI, i) &&
 							!a.lockSetsIntersect(insSlice[0], insSlice[1]) &&
@@ -82,6 +96,36 @@ func (a *analysis) insAddress(insSlice []ssa.Instruction) []ssa.Value { // obtai
 		}
 	}
 	return theAddrs
+}
+
+// bz: update
+func (a *analysis) sameAddress2(addr1 ssa.Value, goI ssa.Instruction, goID1 int, addr2 ssa.Value, goJ ssa.Instruction, goID2 int) bool {
+	if global1, ok1 := addr1.(*ssa.Global); ok1 {
+		if global2, ok2 := addr2.(*ssa.Global); ok2 {
+			return global1.Pos() == global2.Pos() // compare position of identifiers
+		}
+	} else if freevar1, ok := addr1.(*ssa.FreeVar); ok {
+		if freevar2, ok2 := addr2.(*ssa.FreeVar); ok2 {
+			return freevar1.Pos() == freevar2.Pos() // compare position of identifiers
+		}
+	}
+
+	// check points-to set to see if they can point to the same object
+	if a.useNewPTA { //return type: []PointerWCtx
+		goInstr1 := a.getGoInstrForGoID(goID1)
+		pts1 := a.result.PointsTo2(goI, goInstr1,goI.Parent())
+		goInstr2 := a.getGoInstrForGoID(goID2)
+		pts2 := a.result.PointsTo2(goJ, goInstr2, goJ.Parent())
+
+		if pts1 == nil || pts2 == nil {
+			return false
+		}
+		return pts1.MayAlias(pts2)
+	}else{
+		panic("Use default pta: WRONG PATH !!! @ a.sameAddress()")
+		//ptset := a.result.Queries
+		//return ptset[addr1].PointsTo().Intersects(ptset[addr2].PointsTo())
+	}
 }
 
 // sameAddress determines if two addresses have the same global address(for package-level variables only)

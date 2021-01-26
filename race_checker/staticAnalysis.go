@@ -253,6 +253,11 @@ func (runner *AnalysisRunner) runEachMainBaseline(main *ssa.Package) *pointer.Re
 	if fromPath != "" {
 		scope = []string{fromPath}
 	}
+	if len(includePkgs) > 0 {
+		for _, include := range includePkgs {
+			scope = append(scope, include)
+		}
+	}
 	var mains []*ssa.Package
 	mains = append(mains, main)
 	// Configure pointer analysis to build call-graph
@@ -270,7 +275,7 @@ func (runner *AnalysisRunner) runEachMainBaseline(main *ssa.Package) *pointer.Re
 		DEBUG:      doDebugPTA,   //bz: do all printed out info in console --> turn off to avoid internal nil reference panic
 		Scope:      scope,        //bz: analyze scope, default is "command-line-arguments"
 		Exclusion: excludedPkgs, //excludedPkgs here
-		DiscardQueries: !useQueries, //bz: new flag
+		DiscardQueries: !useQueries, //bz: new flag -> if we use queries
 	}
 
 	start := time.Now()

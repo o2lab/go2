@@ -93,6 +93,7 @@ type trie struct {
 }
 
 var (
+	includePkgs  []string
 	excludedPkgs []string
 	nonMainPkgs  []string
 	testMode     = false // Used by race_test.go for collecting output.
@@ -112,32 +113,43 @@ var fromPath = ""      // interested packages are those located at this path
 var entryFn = "main"
 
 func init() {
-	excludedPkgs = []string{
-		"fmt",
-		"reflect",
-		"encoding",
-		"errors",
-		"bytes",
-		"strconv",
-		"strings",
-		"bytealg",
-		"race",
-		"syscall",
-		"poll",
-		"trace",
-		"logging",
-		"os",
-		"builtin",
-		"pflag",
-		"log",
-		"internal",
-		"impl",
-		"transport",
-		"version",
-		"sort",
-		"filepath",
-	}
+	//excludedPkgs = []string{ //bz: see if this is still useful
+	//	"fmt",
+	//	"reflect",
+	//	"encoding",
+	//	"errors",
+	//	"bytes",
+	//	"strconv",
+	//	"strings",
+	//	"bytealg",
+	//	"race",
+	//	"syscall",
+	//	"poll",
+	//	"trace",
+	//	"logging",
+	//	"os",
+	//	"builtin",
+	//	"pflag",
+	//	"log",
+	//	"internal",
+	//	"impl",
+	//	"transport",
+	//	"version",
+	//	"sort",
+	//	"filepath",
+	//}
 
+	excludedPkgs = []string{//bz: excluded a lot of default constraints
+		"runtime",
+		"reflect",
+		"os",
+	}
+	includePkgs = []string{ // bz: we only include these pkgs
+		"atomic",
+		"sync",
+		"google.golang.org/grpc",
+		"github.com/pingcap/tidb",
+	}
 	nonMainPkgs = []string{
 		"runtime",
 		"fmt",

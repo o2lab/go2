@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 	"strconv"
-	//"github.tamu.edu/April1989/go_tools/go/pointer"
+	"github.tamu.edu/April1989/go_tools/go/api"
 	"github.tamu.edu/April1989/go_tools/go/ssa"
 	//"go/types"
 	//log "github.com/sirupsen/logrus"
@@ -97,13 +97,7 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 //	}
 //}
 
-func (a *analysis) pointerAnalysis_new(location ssa.Value, goID int, theIns ssa.Instruction) {
-	switch locType := location.(type) {
-	case *ssa.Parameter:
-		if locType.Object().Pkg().Name() == "reflect" { // ignore reflect library
-			return
-		}
-	}
+func (a *analysis) getGoInstrForGoID(goID int) *ssa.GO {
 	//TODO: bz: needs to match with goID, currently a rough match
 	var goInstr *ssa.Go
 	if goID == 0 {
@@ -114,26 +108,45 @@ func (a *analysis) pointerAnalysis_new(location ssa.Value, goID int, theIns ssa.
 			panic("Not recorded go instruction in a.goID2info @ goID" + strconv.Itoa(goID))
 		}
 	}
-	pts := a.result.PointsToByGo(location, goInstr) //return type: PointerWCtx
-	if pts.IsNil() {
-		if a.useNewPTA && a.ptaConfig.DEBUG { //bz: useNewPTA ...
-			fmt.Println(" *** nil pts: " + location.Name() + "  goID: " + strconv.Itoa(goID) + " *** ")
+	return goInstr
+}
+
+func (a *analysis) pointerAnalysis_new(location ssa.Value, goID int, theIns ssa.Instruction) {//bz: useNewPTA ...
+	switch locType := location.(type) {
+	case *ssa.Parameter:
+		if locType.Object().Pkg().Name() == "reflect" { // ignore reflect library
+			return
 		}
-		//bz: the callee target is recorded in cg, not pta
+	}
+	goInstr := a.getGoInstrForGoID(goID)
+	//return type: PointerWCtx
+	var pts PointerWCtx
+	if a.ptaConfig.DiscardQueries { // bz: we are not using queries now
+		pts = a.result.PointsTo2(theIns, goInstr, theIns.Parent())
+	}else{ //bz: use queries/indirect/global/extended
+		pts = a.result.PointsToByGo(location, goInstr)
+	}
+
+	if pts.IsNil() {
 		if call, ok := theIns.(*ssa.Call); ok {
+			//bz: the callee target is recorded in cg, not pta
 			invokeFunc := a.result.GetFunc(location, call, goInstr)
 			if invokeFunc == nil {
-				if a.useNewPTA && a.ptaConfig.DEBUG {//bz: useNewPTA ...
+				if a.useNewPTA && a.ptaConfig.DEBUG {
 					fmt.Println(" *** nil invokeFunc: " + location.Name() + " call: " + call.String() + "  goID: " + strconv.Itoa(goID) + " *** ")
 				}
 				return
 			}
 			//do the same as case *ssa.Function
 			a.traverseFunc(invokeFunc, goID, theIns)
+			return
+		}
+		if a.ptaConfig.DEBUG { //debug use
+			fmt.Println(" *** nil pts: " + location.Name() + "  goID: " + strconv.Itoa(goID) + " *** ")
 		}
 		return
 	}
-	if a.useNewPTA && a.ptaConfig.DEBUG {//bz: useNewPTA ...
+	if a.ptaConfig.DEBUG {
 		if goInstr == nil {
 			fmt.Println(" *** ssa.Value: " + location.Name() + "  goID: " + strconv.Itoa(goID) + " main *** ")
 		}else {
