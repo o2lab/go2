@@ -7,15 +7,13 @@ package pointer
 import (
 	"bytes"
 	"fmt"
-	"go/token"
-	"io"
-	"strconv"
-	"strings"
-
 	"github.tamu.edu/April1989/go_tools/container/intsets"
 	"github.tamu.edu/April1989/go_tools/go/callgraph"
 	"github.tamu.edu/April1989/go_tools/go/ssa"
 	"github.tamu.edu/April1989/go_tools/go/types/typeutil"
+	"go/token"
+	"io"
+	"strconv"
 )
 
 // A Config formulates a pointer analysis problem for Analyze. It is
@@ -80,8 +78,7 @@ type Config struct {
 	LimitScope         bool  //only apply kcfa to app methods
 	DEBUG              bool //print out debug info
 	Scope              []string //analyzed scope -> packages, can be null
-	Exclusions         []string //excluded packages from this analysis -> from race_checker if any
-
+	Exclusion          []string //excluded packages from this analysis -> from race_checker if any
 	DiscardQueries     bool //bz: do not use queries, but keep every pts info in *cgnode
 }
 
@@ -455,14 +452,18 @@ func (r *ResultWCtx) DumpAll() {
 	callers := r.CallGraph.Nodes
 	fmt.Println("#CGNode: " + strconv.Itoa(len(callers)))
 	for _, caller := range callers {
-		if !strings.Contains(caller.GetFunc().String(), "command-line-arguments.") {
-			continue //we only want the app call edges
-		}
+		//if !strings.Contains(caller.GetFunc().String(), "command-line-arguments.") {
+		//	continue //we only want the app call edges
+		//}
 		fmt.Println(caller.String()) //bz: with context
 		outs := caller.Out           // caller --> callee
 		for _, out := range outs {   //callees
 			fmt.Println("  -> " + out.Callee.String()) //bz: with context
 		}
+	}
+
+	if r.DiscardQueries {
+		return //nothing in queries
 	}
 
 	fmt.Println("\nWe are going to print out queries. If not desired, turn off DEBUG.")

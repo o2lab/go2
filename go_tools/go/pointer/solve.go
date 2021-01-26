@@ -23,7 +23,7 @@ var num_constraints int
 
 func (a *analysis) solve() {
 	num_constraints = 0
-	fmt.Println("#constraints (approx number before solve()): ", len(a.constraints)) //bz: performance test of optRenumber
+	fmt.Println("#constraints (before solve()): ", len(a.constraints)) //bz: performance test of optRenumber
 
 	start("Solving")
 	if a.log != nil {
@@ -238,9 +238,6 @@ func (a *analysis) onlineCopyN(dst, src nodeid, sizeof uint32) uint32 {
 	for i := uint32(0); i < sizeof; i++ {
 		if a.onlineCopy(dst, src) {
 			a.addWork(dst)
-			if Online && a.log != nil { //bz: Online solving debug
-				fmt.Fprintf(a.log, "%s\n\n", " -> add Online constraint to worklist: "+dst.String()+" "+src.String())
-			}
 		}
 		src++
 		dst++

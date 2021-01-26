@@ -191,7 +191,7 @@ func init() {
 }
 
 // main sets up arguments and calls staticAnalysis function
-func main() {
+func main() {//default: -useNewPTA -useQueries
 	newPTA := flag.Bool("useNewPTA", true, "Use the new pointer analysis in go_tools.")
 	setUseQueries := flag.Bool("useQueries", false, "Use the new pointer analysis in go_tools.")
 	debugPTA := flag.Bool("debugPTA", false, "Prints all PTA debug messages in console.")

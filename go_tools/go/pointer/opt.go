@@ -114,7 +114,7 @@ func (a *analysis) renumber() {
 		cgn.obj = renumbering[cgn.obj]
 		if a.config.DEBUG && a.config.Mains[0].Func("main") == cgn.fn {
 			// bz: it renumbered main cgn, we need to update mainID in pointer/callgraph.go
-			// should be only one callsite, which is also a fake one from root
+			// should be only one callsite, which is the fake one from root
 			UpdateMainID(cgn.callersite[0].targets)
 		}
 		for _, site := range cgn.sites {

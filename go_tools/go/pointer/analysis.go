@@ -497,7 +497,7 @@ func AnalyzeWCtx(config *Config) (result *ResultWCtx, err error) { //Result
 		}
 	}
 
-	if !ContainString(a.config.Exclusions, "reflect") { //bz: only do if race checker considers
+	if !ContainString(a.config.Exclusion, "reflect") { //bz: only do if race checker considers
 		a.considerReflect = true //update
 
 		if reflect := a.prog.ImportedPackage("reflect"); reflect != nil {
@@ -523,7 +523,7 @@ func AnalyzeWCtx(config *Config) (result *ResultWCtx, err error) { //Result
 	}else{
 		a.considerReflect = false //update -> do not consider 'reflect'
 	}
-	if !ContainString(a.config.Exclusions, "runtime") { //bz: only do if race checker considers
+	if !ContainString(a.config.Exclusion, "runtime") { //bz: only do if race checker considers
 		if runtime := a.prog.ImportedPackage("runtime"); runtime != nil {
 			a.runtimeSetFinalizer = runtime.Func("SetFinalizer")
 		}

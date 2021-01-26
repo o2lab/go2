@@ -128,7 +128,7 @@ func (a *analysis) setValueNode(v ssa.Value, id nodeid, cgn *cgnode) {
 		//}
 		if CanPoint(t) {
 			a.recordQueries(t, cgn, v, id)
-		}else
+		} else
 		//bz: this condition is copied from go2: indirect queries
 		if underType, ok := v.Type().Underlying().(*types.Pointer); ok && CanPoint(underType.Elem()) {
 			a.recordIndirectQueries(t, cgn, v, id)
@@ -233,13 +233,7 @@ func (a *analysis) makeFunctionObject(fn *ssa.Function, callersite *callsite) no
 	if a.log != nil {
 		fmt.Fprintf(a.log, "\t---- makeFunctionObject %s\n", fn)
 	}
-
-	if a.config.DEBUG && a.withinScope(fn.String()) {
-		fmt.Println("  DEBUG(makeFunctionObject): " + fn.String())
-		if len(fn.Params) > 0 {
-			fmt.Println(fn.Params[0].Type().String()) //---> receiver struct type
-		}
-	}
+	fmt.Println(" -- " + fn.String())
 
 	// obj is the function object (identity, params, results).
 	obj := a.nextNode()
@@ -298,7 +292,7 @@ func (a *analysis) makeFunctionObjectWithContext(caller *cgnode, fn *ssa.Functio
 			if !isNew {
 				return existNodeID, isNew
 			}
-		}else{
+		} else {
 			existFnIdx, multiFn, existNodeID, isNew = a.existContextFor(fn, caller)
 			if !isNew {
 				return existNodeID, isNew
@@ -431,7 +425,7 @@ func (a *analysis) makeCGNodeAndRelated(fn *ssa.Function, caller *cgnode, caller
 			} else if goInstr, ok := callersite.instr.(*ssa.Go); ok { //case 1 and 3: this is a *ssa.GO without closure
 				special := callersite
 				special.goInstr = goInstr //update
-				if loopID != -1 { //handle loop TODO: will this affect exist checking?
+				if loopID != -1 {         //handle loop TODO: will this affect exist checking?
 					special = &callsite{targets: callersite.targets, instr: callersite.instr, loopID: loopID, goInstr: goInstr}
 				}
 				fnkcs := a.createKCallSite(caller.callersite, special)
@@ -674,7 +668,7 @@ func (a *analysis) copy(dst, src nodeid, sizeof uint32) {
 		if Online { //bz: Online solving
 			a.addWork(dst)
 			if a.log != nil {
-				fmt.Fprintf(a.log, "%s\n", " -> add Online constraint to worklist: " + dst.String() + " " + src.String())
+				fmt.Fprintf(a.log, "%s\n", " -> add Online constraint to worklist: "+dst.String()+" "+src.String())
 			}
 		}
 
@@ -972,6 +966,7 @@ func (a *analysis) considerKCFA(fn string) bool {
 }
 
 //bz: continue with isMainMethod, currently compare string
+// already considered LimitScope
 func (a *analysis) withinScope(method string) bool {
 	if a.config.LimitScope {
 		if strings.Contains(method, "command-line-arguments") { //default scope
@@ -1009,7 +1004,7 @@ func (a *analysis) isInLoop(fn *ssa.Function, inst ssa.Instruction) bool {
 			} else { //continue
 				for _, nnbb := range nextbb.Succs {
 					if !total.Has(nnbb.Index) {
-						tmp[nnbb.Index] = nnbb //next nextbb
+						tmp[nnbb.Index] = nnbb   //next nextbb
 						total.Insert(nnbb.Index) //record
 					}
 				}
@@ -1026,6 +1021,9 @@ func (a *analysis) isInLoop(fn *ssa.Function, inst ssa.Instruction) bool {
 // bz: force call site here
 func (a *analysis) genStaticCall(caller *cgnode, instr ssa.CallInstruction, site *callsite, call *ssa.CallCommon, result nodeid) {
 	fn := call.StaticCallee()
+	if !a.withinScope(fn.String()) {
+		return
+	}
 
 	// Special cases for inlined intrinsics.
 	switch fn {
@@ -1075,21 +1073,9 @@ func (a *analysis) genStaticCall(caller *cgnode, instr ssa.CallInstruction, site
 			return
 		}
 
-		//ids, ok, _ := a.existClosure(fn, caller.callersite[0])
-		//if ok { //bz: the cgnode for fn is created already when its previous stmt is make closure;
-		//	    // we only want call edges/constraints here
-		//	if len(ids) > 1 || len(ids) == 0 {
-		//		panic("SHOULD BE == 1? in fn2closure: a.closure")
-		//	}
-		//	obj = ids[0]
-		//} else { //normal cases
-			//for kcfa: we need a new contour
-			//for origin: whatever left, we use caller context
-			obj, _ = a.makeFunctionObjectWithContext(caller, fn, site, nil, -1)
-			//if !isNew {
-			//	return //all constraints should be added already
-			//}
-		//}
+		//for kcfa: we need a new contour
+		//for origin: whatever left, we use caller context
+		obj, _ = a.makeFunctionObjectWithContext(caller, fn, site, nil, -1)
 	} else {
 		//default: context-insensitive
 		if a.shouldUseContext(fn) {
@@ -1211,7 +1197,7 @@ func (a *analysis) genConstraintsOnline() {
 func (a *analysis) valueNodeInvoke(caller *cgnode, site *callsite, fn *ssa.Function) nodeid {
 	if caller == nil && site == nil { //requires shared contour
 		obj := a.valueNode(fn)
-		return obj
+		return obj + 1 //bz: why obj is not the right one? not tagged with otFunction ??
 	}
 
 	//similar with valueNode(),  created on demand. Instead of a.globalval[], we use a.fn2cgnodeid[]
@@ -1289,13 +1275,16 @@ func (a *analysis) genInvoke(caller *cgnode, site *callsite, call *ssa.CallCommo
 //    rt.(*reflect.rtype).F()
 //bz: for now use 1-callsite (original defaut), TODO: if necessary, update to kcfa
 func (a *analysis) genInvokeReflectType(caller *cgnode, site *callsite, call *ssa.CallCommon, result nodeid) {
+	// Look up the concrete method.
+	fn := a.prog.LookupMethod(a.reflectRtypePtr, call.Method.Pkg(), call.Method.Name())
+	if !a.withinScope(fn.String()) {
+		return
+	}
+
 	// Unpack receiver into rtype
 	rtype := a.addOneNode(a.reflectRtypePtr, "rtype.recv", nil)
 	recv := a.valueNode(call.Value)
 	a.typeAssert(a.reflectRtypePtr, rtype, recv, true)
-
-	// Look up the concrete method.
-	fn := a.prog.LookupMethod(a.reflectRtypePtr, call.Method.Pkg(), call.Method.Name())
 
 	obj := a.makeFunctionObject(fn, site) // new contour for this call
 	a.callEdge(caller, site, obj)
@@ -1855,9 +1844,9 @@ func (a *analysis) isGoNext(instr *ssa.MakeClosure) *ssa.Go {
 						if instr == closure { //these two values should be the same
 							return goInstr
 						}
-					}else if _, ok := val.(*ssa.Function); ok {
+					} else if _, ok := val.(*ssa.Function); ok {
 						args := goInstr.Call.Args
-						closure := args[0] // this should be closure
+						closure := args[0]    // this should be closure
 						if instr == closure { //these two values should be the same
 							return goInstr
 						}
@@ -1962,11 +1951,7 @@ func (a *analysis) genFunc(cgn *cgnode) {
 		cgn.initLocalMaps()
 		a.localval = cgn.localval
 		a.localobj = cgn.localobj
-
-		if a.config.DEBUG {
-			fmt.Println(">> replaced a.localval, a.localobj for " + cgn.String())
-		}
-	}else{
+	} else {
 		a.localval = make(map[ssa.Value]nodeid)
 		a.localobj = make(map[ssa.Value]nodeid)
 	}
@@ -2072,7 +2057,7 @@ func (a *analysis) generate() {
 
 	root := a.genRootCalls()
 
-	if a.config.BuildCallGraph {//bz:
+	if a.config.BuildCallGraph { //bz:
 		a.result.CallGraph = NewWCtx(root)
 	}
 
@@ -2088,18 +2073,20 @@ func (a *analysis) generate() {
 			continue
 		}
 
-		if ContainString(a.config.Exclusions, _type) { //bz:
+		if a.withinScope(_type) { //bz:
+			a.genMethodsOf(T)
+		} else {
 			if a.config.DEBUG {
 				fmt.Println("EXCLUDE genMethodsOf() offline for type: " + T.String())
 			}
 			if a.log != nil {
-				fmt.Fprintf(a.log, "\nEXCLUDE genMethodsOf() offline for type: " + T.String() + "\n")
+				fmt.Fprintf(a.log, "EXCLUDE genMethodsOf() offline for type: "+T.String()+"\n")
 			}
 		}
-
-		a.genMethodsOf(T)
 	}
-
+	if a.config.DEBUG {
+		fmt.Println("\n Done genMethodsOf() offline. \n")
+	}
 	// Generate constraints for functions as they become reachable
 	// from the roots.  (No constraints are generated for functions
 	// that are dead in this analysis scope.)  ---> bz: want to generate cgn called by interfaces here, so it can have kcfa not shared contour
@@ -2110,7 +2097,7 @@ func (a *analysis) generate() {
 	}
 
 	// The runtime magically allocates os.Args; so should we.
-	if !(ContainString(a.config.Exclusions, "os") && ContainString(a.config.Exclusions, "runtime")) {
+	if !(ContainString(a.config.Exclusion, "os") && ContainString(a.config.Exclusion, "runtime")) {
 		//bz: we are trying to skip this iff "runtime" and "os" are both in exclusions
 		if os := a.prog.ImportedPackage("os"); os != nil {
 			// In effect:  os.Args = new([1]string)[:]

@@ -13,37 +13,18 @@ import (
 	"time"
 )
 
-var excludedPkgs = []string{//bz: from previous race_checker defined var
+var excludedPkgs = []string{//bz: excluded a lot of default constraints
 	"runtime",
-	"fmt",
 	"reflect",
-	"encoding",
-	"errors",
-	"bytes",
-	"strconv",
-	"strings",
-	"bytealg",
-	"race",
-	"syscall",
-	"poll",
-	"trace",
-	"logging",
 	"os",
-	"builtin",
-	"pflag",
-	"log",
-	"reflect",
-	"internal",
-	"impl",
-	"transport", // grpc
-	"version",
-	"sort",
-	"filepath",
 }
-var projPath =
-	//""      // interested packages are those located at this path
-    //"github.com/pingcap/tidb"
-    "google.golang.org/grpc"
+var includePkgs = []string{ // bz: we only include these pkgs
+	"atomic",
+	"sync",
+	"google.golang.org/grpc",
+	"github.com/pingcap/tidb",
+}
+var projPath = ""   // interested packages are those located at this path
 var maxTime time.Duration
 var minTime time.Duration
 
@@ -122,11 +103,11 @@ func main() {
 	//baseline: foreach
 	start := time.Now()   //performance
 	for i, main := range mains {
-		//if i == 16 {
-		//	continue  //TODO: bz: panic for grpc
-		//}
+		if i == 16 {
+			continue  //TODO: bz: panic for grpc
+		}
  		fmt.Println(i, " ", main.String())
-		doEachMain(main)
+		doEachMain(i, main)
 		fmt.Println("=============================================================================")
 	}
 	t := time.Now()
@@ -137,15 +118,20 @@ func main() {
 	fmt.Println("Avg: ", (float32(elapsed.Milliseconds())/float32(len(mains) - 1)/float32(1000)), "s." )
 }
 
-func doEachMain(main *ssa.Package) {
+func doEachMain(i int, main *ssa.Package) {
 	//create my log file
-	logfile, err := os.Create("/Users/bozhen/Documents/GO2/go2/go_tools/_logs/full_log")
+	logfile, err := os.Create("/Users/bozhen/Documents/GO2/go2/go_tools/_logs/full_log_" + strconv.Itoa(i))
 	log.SetFormatter(&log.TextFormatter{
 		FullTimestamp: true,
 	})
 	var scope []string
 	if projPath != "" {
 		scope = []string {projPath}
+	}
+	if len(includePkgs) > 0 {
+		for _, include := range includePkgs {
+			scope = append(scope, include)
+		}
 	}
 	var mains []*ssa.Package
 	mains = append(mains, main)
@@ -154,15 +140,15 @@ func doEachMain(main *ssa.Package) {
 		Mains:          mains, //bz: NOW assume only one main
 		Reflection:     false,
 		BuildCallGraph: true,
-		Log:            nil,//logfile,
+		Log:            logfile,
 		//CallSiteSensitive: true, //kcfa
 		Origin:     true, //origin
 		//shared config
 		K:          1,
-		LimitScope: true, //bz: only consider app methods now
+		LimitScope: true, //bz: only consider app methods now -> no import will be considered
 		DEBUG:      false, //bz: rm all printed out info in console
-		Scope:      scope, //bz: analyze scope
-		Exclusions: excludedPkgs,//bz: copied from race_checker
+		Scope:      scope, //bz: analyze scope + include
+		Exclusion:  excludedPkgs, //bz: copied from race_checker
 		DiscardQueries: true, //bz: do not use query any more
 	}
 
