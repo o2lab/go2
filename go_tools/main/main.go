@@ -140,7 +140,7 @@ func doEachMain(i int, main *ssa.Package) {
 		Mains:          mains, //bz: NOW assume only one main
 		Reflection:     false,
 		BuildCallGraph: true,
-		Log:            logfile,
+		Log:            nil,//logfile,
 		//CallSiteSensitive: true, //kcfa
 		Origin:     true, //origin
 		//shared config

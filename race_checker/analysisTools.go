@@ -148,7 +148,7 @@ func (a* analysis) buildHB(HBgraph *graph.Graph) {
 			} else if dIns, ok1 := anIns.(*ssa.Defer); ok1 {
 				if dIns.Call.Value.Name() == "Done" {
 					for wIns, wNode := range waitingN {
-						if a.sameAddress(dIns.Call.Args[0], wIns.Call.Args[0]) {
+						if a.sameAddress(dIns.Call.Args[0], wIns.Call.Args[0]) { //bz: freevar /ssa.alloc
 							err := HBgraph.MakeEdge(prevN, wNode) // create edge from Done node to Wait node
 							if err != nil {
 								log.Fatal(err)

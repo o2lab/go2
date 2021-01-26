@@ -291,3 +291,4 @@ func (runner *AnalysisRunner) runEachMainBaseline(main *ssa.Package) *pointer.Re
 	}
 	return result
 }
+

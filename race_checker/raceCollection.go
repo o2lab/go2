@@ -16,12 +16,12 @@ func (a *analysis) checkRacyPairs() {
 	for i := 0; i < len(a.RWIns); i++ {
 		for j := i + 1; j < len(a.RWIns); j++ { // must be in different goroutines, j always greater than i
 			for ii, goI := range a.RWIns[i] {
-				//bz: ii is goID
+				//bz: i is goID
 				if (i == 0 && ii < a.insDRA) || (channelComm && sliceContainsBloc(a.omitComm, goI.Block())) {
 					continue
 				} // do not check race-free instructions in main goroutine
 				for jj, goJ := range a.RWIns[j] {
-					//bz: jj is goID
+					//bz: j is goID
 					if channelComm && sliceContainsBloc(a.omitComm, goJ.Block()) {
 						continue
 					}
@@ -31,15 +31,14 @@ func (a *analysis) checkRacyPairs() {
 						//}
 						insSlice := []ssa.Instruction{goI, goJ}
 						addressPair := a.insAddress(insSlice) // one instruction from each goroutine
+						if len(addressPair) == 1 {
+							continue
+						}
 						var theSame bool //bz: see different conditions from config
 						if a.ptaConfig.DiscardQueries {
-							theSame = a.sameAddress2(addressPair[0], goI, ii, addressPair[1], goJ, jj)
+							theSame = a.sameAddress2(addressPair[0], goI, i, addressPair[1], goJ, j)
 						} else {
-							if len(addressPair) > 1 {
-								theSame = a.sameAddress(addressPair[0], addressPair[1])
-							} else {
-								theSame = false
-							}
+							theSame = a.sameAddress(addressPair[0], addressPair[1])
 						}
 						if theSame && !sliceContains(a.reportedAddr, addressPair[0]) &&
 							!a.reachable(goI, i, goJ, j) &&
@@ -113,15 +112,15 @@ func (a *analysis) sameAddress2(addr1 ssa.Value, goI ssa.Instruction, goID1 int,
 	// check points-to set to see if they can point to the same object
 	if a.useNewPTA { //return type: []PointerWCtx
 		goInstr1 := a.getGoInstrForGoID(goID1)
-		pts1 := a.result.PointsTo2(goI, goInstr1,goI.Parent())
+		pts1 := a.result.PointsTo2(goI, goInstr1, goI.Parent())
 		goInstr2 := a.getGoInstrForGoID(goID2)
 		pts2 := a.result.PointsTo2(goJ, goInstr2, goJ.Parent())
 
-		if pts1 == nil || pts2 == nil {
+		if pts1.IsNil() || pts2.IsNil() {
 			return false
 		}
 		return pts1.MayAlias(pts2)
-	}else{
+	} else {
 		panic("Use default pta: WRONG PATH !!! @ a.sameAddress()")
 		//ptset := a.result.Queries
 		//return ptset[addr1].PointsTo().Intersects(ptset[addr2].PointsTo())
@@ -164,7 +163,7 @@ func (a *analysis) sameAddress(addr1 ssa.Value, addr2 ssa.Value) bool {
 			return same //if any is different, return false -> not the same
 		}
 		return pts1[0].MayAlias(pts2[0])
-	}else{
+	} else {
 		panic("Use default pta: WRONG PATH !!! @ a.sameAddress()")
 		//ptset := a.result.Queries
 		//return ptset[addr1].PointsTo().Intersects(ptset[addr2].PointsTo())
@@ -182,14 +181,14 @@ func (a *analysis) reachable(fromIns ssa.Instruction, fromGo int, toIns ssa.Inst
 	fromInsKey := goIns{ins: fromIns, goID: fromGo}
 	toInsKey := goIns{ins: toIns, goID: toGo}
 	fromNode := a.RWinsMap[fromInsKey] // starting node
-	toNode := a.RWinsMap[toInsKey] // target node
+	toNode := a.RWinsMap[toInsKey]     // target node
 
 	//use breadth-first-search to traverse the Happens-Before Graph
 	var visited []graph.Node
 	q := &queue{}
 	q.enQueue(fromNode)
 	for !q.isEmpty() {
-		for size := q.size(); size>0; size-- {
+		for size := q.size(); size > 0; size-- {
 			node := q.deQueue()
 			if node == toNode {
 				return true
@@ -275,7 +274,6 @@ func getSrcPos(address ssa.Value) token.Pos {
 	}
 	return position
 }
-
 
 // printRace will print the details of a data race such as the write/read of a variable and other helpful information
 func (a *analysis) printRace(counter int, insPair []ssa.Instruction, addrPair []ssa.Value, goIDs []int, insInd []int) {

@@ -248,7 +248,21 @@ func matchMyContext(cgn *cgnode, go_instr *ssa.Go) bool {
 	return false
 }
 
-
+//bz: user API: used when DiscardQueries == true
+func (r *ResultWCtx) GetFunc2(pointer PointerWCtx) *ssa.Function {
+	pts := pointer.PointsTo()
+	if pts.pts.Len() > 1 {
+		if r.DEBUG {
+			fmt.Println(" ****  Pointer Analysis: " + pointer.String() + " has multiple targets **** ") //panic
+		}
+	}
+	tarID := pts.pts.Min()
+	tar := r.a.nodes[tarID]
+	if tar == nil {
+		return nil
+	}
+	return tar.obj.cgn.fn
+}
 
 //bz: user API: tmp solution for missing invoke callee target if func wrapped in parameters
 //alloc should be a freevar
