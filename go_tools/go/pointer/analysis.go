@@ -459,7 +459,7 @@ func AnalyzeWCtx(config *Config) (result *ResultWCtx, err error) { //Result
 	imports := a.config.Mains[0].Pkg.Imports()
 	if len(imports) > 0 {
 		for _, _import := range imports {
-			a.config.Scope = append(a.config.Scope, _import.Name())
+			a.config.imports = append(a.config.imports, _import.Name())
 		}
 	}
 	fmt.Println(" *** MODE: " + mode + " *** ")

@@ -77,9 +77,11 @@ type Config struct {
 	K              int      //how many level? the most recent callsite/origin?
 	LimitScope     bool     //only apply kcfa to app methods
 	DEBUG          bool     //print out debug info
-	Scope          []string //analyzed scope -> packages, can be null
+	Scope          []string //analyzed scope -> from user input: -path
 	Exclusion      []string //excluded packages from this analysis -> from race_checker if any
 	DiscardQueries bool     //bz: do not use queries, but keep every pts info in *cgnode
+
+	imports        []string //bz: internal use: store all import pkgs in a main
 }
 
 type track uint32

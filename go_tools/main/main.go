@@ -42,7 +42,9 @@ func findMainPackages(pkgs []*ssa.Package) ([]*ssa.Package, error) {
 bz: test record
 16   package google.golang.org/grpc/interop/client  -> .taggedValue panic
 ---------------------------------------------------------------------------
-../race_checker/tests/cg.go
+CURRENTLY:
+we only compute pts/call graph to the first level library (import)
+calls, further calls are ignored
 */
 func main() {
 	path := flag.String("path", "", "Designated project filepath. ")
@@ -135,7 +137,7 @@ func doEachMain(i int, main *ssa.Package) {
 		//shared config
 		K:          1,
 		LimitScope: true, //bz: only consider app methods now -> no import will be considered
-		DEBUG:      true, //bz: rm all printed out info in console
+		DEBUG:      false, //bz: rm all printed out info in console
 		Scope:      scope, //bz: analyze scope + include + import
 		Exclusion:  excludedPkgs, //bz: copied from race_checker
 		DiscardQueries: true, //bz: do not use query any more

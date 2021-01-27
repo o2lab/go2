@@ -233,7 +233,6 @@ func (a *analysis) makeFunctionObject(fn *ssa.Function, callersite *callsite) no
 	if a.log != nil {
 		fmt.Fprintf(a.log, "\t---- makeFunctionObject %s\n", fn)
 	}
-	fmt.Println(" -- " + fn.String())
 
 	// obj is the function object (identity, params, results).
 	obj := a.nextNode()
@@ -938,19 +937,7 @@ func (a *analysis) shouldUseContext(fn *ssa.Function) bool {
 	return true
 }
 
-// bz: whehter this is a main method, but actually we only use Mains[0]...
-// TODO: too much library methods .... cannot do this for all library methods ...
-func (a *analysis) isMainMethod(method *ssa.Function) bool {
-	for _, mainPkg := range a.config.Mains {
-		main := mainPkg.Func("main")
-		if main == method {
-			return true
-		}
-	}
-	return false
-}
-
-//bz: do pta use our context-sensitive algo? which algo?
+//bz: do pta use our context-sensitive algo? which algo? if true, must be in scope
 func (a *analysis) considerMyContext(fn string) bool {
 	return a.considerKCFA(fn) || a.considerOrigin(fn)
 }
@@ -965,8 +952,7 @@ func (a *analysis) considerKCFA(fn string) bool {
 	return a.config.CallSiteSensitive == true && a.withinScope(fn) //&& (caller.fn.IsFromApp || a.isMainMethod(caller.fn))
 }
 
-//bz: continue with isMainMethod, currently compare string
-// already considered LimitScope
+//bz:  currently compare string, already considered LimitScope
 func (a *analysis) withinScope(method string) bool {
 	if a.config.LimitScope {
 		if strings.Contains(method, "command-line-arguments") { //default scope
@@ -977,6 +963,21 @@ func (a *analysis) withinScope(method string) bool {
 					if strings.Contains(method, pkg) && !strings.Contains(method, "google.golang.org/grpc/grpclog") {
 						return true
 					}
+				}
+			}
+		}
+		return false
+	}
+	return true
+}
+
+//bz: whether a func is from a.config.imports
+func (a *analysis) fromImports(method string) bool {
+	if a.config.LimitScope {
+		if len(a.config.imports) > 0 { //user assigned scope
+			for _, pkg := range a.config.imports {
+				if strings.Contains(method, pkg) {
+					return true
 				}
 			}
 		}
@@ -1021,7 +1022,7 @@ func (a *analysis) isInLoop(fn *ssa.Function, inst ssa.Instruction) bool {
 // bz: force call site here
 func (a *analysis) genStaticCall(caller *cgnode, instr ssa.CallInstruction, site *callsite, call *ssa.CallCommon, result nodeid) {
 	fn := call.StaticCallee()
-	if !a.withinScope(fn.String()) {
+	if !a.withinScope(fn.String()) && !a.withinScope(caller.fn.String()) {
 		return
 	}
 
@@ -1045,10 +1046,6 @@ func (a *analysis) genStaticCall(caller *cgnode, instr ssa.CallInstruction, site
 			a.addressOf(fn.Signature.Results().At(0).Type(), result, ret)
 		}
 		return
-	}
-
-	if a.config.DEBUG && a.withinScope(fn.String()) {
-		fmt.Println("  DEBUG (genStaticCall): " + fn.String())
 	}
 
 	// Ascertain the context (contour/cgnode) for a particular call.
@@ -1277,7 +1274,7 @@ func (a *analysis) genInvoke(caller *cgnode, site *callsite, call *ssa.CallCommo
 func (a *analysis) genInvokeReflectType(caller *cgnode, site *callsite, call *ssa.CallCommon, result nodeid) {
 	// Look up the concrete method.
 	fn := a.prog.LookupMethod(a.reflectRtypePtr, call.Method.Pkg(), call.Method.Name())
-	if !a.withinScope(fn.String()) {
+	if !a.withinScope(fn.String()) && !a.withinScope(caller.fn.String()) {
 		return
 	}
 
@@ -2067,25 +2064,22 @@ func (a *analysis) generate() {
 		_type := T.String()
 		if a.considerMyContext(_type) {
 			//bz: we want to make function (called by interfaces) later for kcfa, here uses share contour
-			if a.config.DEBUG {
-				fmt.Println("SKIP genMethodsOf() offline for type: " + T.String())
+			if a.log != nil {
+				fmt.Fprintf(a.log,"SKIP genMethodsOf() offline for type: " + T.String() + "\n")
 			}
 			continue
 		}
 
-		if a.withinScope(_type) { //bz:
+		if a.withinScope(_type) || a.fromImports(_type) { //bz: generate for both
 			a.genMethodsOf(T)
 		} else {
-			if a.config.DEBUG {
-				fmt.Println("EXCLUDE genMethodsOf() offline for type: " + T.String())
-			}
 			if a.log != nil {
-				fmt.Fprintf(a.log, "EXCLUDE genMethodsOf() offline for type: "+T.String()+"\n")
+				fmt.Fprintf(a.log, "EXCLUDE genMethodsOf() offline for type: " + T.String() + "\n")
 			}
 		}
 	}
 	if a.config.DEBUG {
-		fmt.Println("\n Done genMethodsOf() offline. \n")
+		fmt.Fprintf(a.log,"\n Done genMethodsOf() offline. \n")
 	}
 	// Generate constraints for functions as they become reachable
 	// from the roots.  (No constraints are generated for functions

@@ -225,7 +225,6 @@ func (a *analysis) shouldTrack(T types.Type) bool {
 		}
 		// bz: here track == false --> this will topple the true assignment at the function beginning ...
 		// BUT we track all types declared in app, since we cannot pre-populated them
-		// UPDATE: also track types declared in path
 		if a.withinScope(T.String()) {
 			a.trackTypes[T] = track
 			if !track && a.log != nil {
@@ -234,9 +233,6 @@ func (a *analysis) shouldTrack(T types.Type) bool {
 		} else { //bz: just log
 			if track && a.log != nil {
 				fmt.Fprintf(a.log, "\tforce type tracked: %s\n", T)
-			}
-			if a.config.DEBUG {
-				fmt.Println(" -- force type tracked: " + T.String())
 			}
 			return true //bz: fake it to be true --> track it
 		}
