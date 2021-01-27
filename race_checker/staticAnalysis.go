@@ -17,8 +17,11 @@ import (
 )
 
 // fromPkgsOfInterest determines if a function is from a package of interest
-func fromPkgsOfInterest(fn *ssa.Function) bool {
+func (a *analysis) fromPkgsOfInterest(fn *ssa.Function) bool {
 	if fn.Pkg == nil || fn.Pkg.Pkg == nil {
+		if fn.IsFromApp {
+			return true //bz: otherwise missing func ...
+		}
 		return false
 	}
 	if fn.Pkg.Pkg.Name() == "main" || fn.Pkg.Pkg.Name() == "cli" {
@@ -27,6 +30,11 @@ func fromPkgsOfInterest(fn *ssa.Function) bool {
 	for _, excluded := range excludedPkgs {
 		if fn.Pkg.Pkg.Name() == excluded {
 			return false
+		}
+	}
+	for _, included := range a.includePkgs { // bz: update to include necessary functions in traversal
+		if fn.Pkg.Pkg.Name() == included {
+			return true
 		}
 	}
 	if !strings.HasPrefix(fn.Pkg.Pkg.Path(), fromPath) { // path is dependent on tested program
@@ -200,7 +208,12 @@ func (runner *AnalysisRunner) Run(args []string) error {
 			ifFnReturn:      make(map[*ssa.Function]*ssa.Return),
 			ifSuccEnd:       make(map[ssa.Instruction]*ssa.Return),
 		}
-		
+
+		//bz: update includedPkg to be used for future fromPkgsOfInterest()
+		for _, scope := range runner.ptaconfig.Scope {
+			runner.Analysis.includePkgs = append(runner.Analysis.includePkgs, scope)
+		}
+
 		log.Info("Compiling stack trace for every Goroutine... ")
 		log.Debug(strings.Repeat("-", 35), "Stack trace begins", strings.Repeat("-", 35))
 		runner.Analysis.visitAllInstructions(mains[0].Func(entryFn), 0)
@@ -253,11 +266,6 @@ func (runner *AnalysisRunner) runEachMainBaseline(main *ssa.Package) *pointer.Re
 	if fromPath != "" {
 		scope = []string{fromPath}
 	}
-	if len(includePkgs) > 0 {
-		for _, include := range includePkgs {
-			scope = append(scope, include)
-		}
-	}
 	var mains []*ssa.Package
 	mains = append(mains, main)
 	// Configure pointer analysis to build call-graph
@@ -289,6 +297,7 @@ func (runner *AnalysisRunner) runEachMainBaseline(main *ssa.Package) *pointer.Re
 	if runner.ptaconfig.DEBUG {
 		result.DumpAll()
 	}
+
 	return result
 }
 

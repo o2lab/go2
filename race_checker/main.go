@@ -15,6 +15,9 @@ type analysis struct {
 	result       *pointer.ResultWCtx //one time
 	ptaConfig    *pointer.Config
 	goID2info    map[int]goroutineInfo //goID -> goroutinInfo
+	includePkgs  []string // bz: we only include these pkgs from path + project import -> project specific
+	//"google.golang.org/grpc",
+	//"github.com/pingcap/tidb",
 
 	prog            *ssa.Program
 	pkgs            []*ssa.Package
@@ -93,7 +96,6 @@ type trie struct {
 }
 
 var (
-	includePkgs  []string
 	excludedPkgs []string
 	nonMainPkgs  []string
 	testMode     = false // Used by race_test.go for collecting output.
@@ -103,8 +105,6 @@ var useNewPTA = true //bz: default value for this branch
 var useQueries = false //bz: whether we use Queries in pointer analysis
 var doDebugPTA = false //bz: default value for this branch
 var doPTALog = false //bz: default value for this branch
-
-var curVisitingFn *ssa.Function // keeping tabs
 
 var trieLimit = 2      // set as user config option later, an integer that dictates how many times a function can be called under identical context
 var efficiency = false // configuration setting to avoid recursion in tested program
@@ -143,12 +143,6 @@ func init() {
 		"runtime",
 		"reflect",
 		"os",
-	}
-	includePkgs = []string{ // bz: we only include these pkgs
-		"atomic",
-		"sync",
-		"google.golang.org/grpc",
-		"github.com/pingcap/tidb",
 	}
 	nonMainPkgs = []string{
 		"runtime",
@@ -238,12 +232,12 @@ func main() {//default: -useNewPTA
 		log.SetLevel(log.TraceLevel)
 	}
 	if *withoutComm {
-		trieLimit = 1
+		//trieLimit = 1 //bz: we want trieLimit == 2, otherwise: missing function, e.g., TestIstio8214
 		efficiency = true
 		channelComm = false
 	}
 	if *withComm {
-		trieLimit = 1
+		//trieLimit = 1
 		efficiency = true
 		channelComm = true
 	}

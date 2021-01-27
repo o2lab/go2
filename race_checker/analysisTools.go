@@ -1,14 +1,14 @@
 package main
 
 import (
+	"fmt"
 	log "github.com/sirupsen/logrus"
 	"github.com/twmb/algoimpl/go/graph"
-	"strings"
 	"github.tamu.edu/April1989/go_tools/go/ssa"
-	"fmt"
+	"strings"
 )
 
-func (a* analysis) buildHB(HBgraph *graph.Graph) {
+func (a *analysis) buildHB(HBgraph *graph.Graph) {
 	var prevN graph.Node
 	var goCaller []graph.Node
 	var selectN []graph.Node
@@ -137,7 +137,17 @@ func (a* analysis) buildHB(HBgraph *graph.Graph) {
 					waitingN[callIns] = prevN // store Wait node for later edge creation TO this node
 				} else if callIns.Call.Value.Name() == "Done" {
 					for wIns, wNode := range waitingN {
-						if a.sameAddress(callIns.Call.Args[0], wIns.Call.Args[0]) {
+						var theSame bool
+						if a.ptaConfig.DiscardQueries {
+							if v, ok := (*wNode.Value).(goIns); ok {
+								theSame = a.sameAddress2(callIns.Call.Args[0], callIns, nGo, wIns.Call.Args[0], wIns, v.goID)
+							}else{
+								theSame = false
+							}
+						} else {
+							theSame = a.sameAddress(callIns.Call.Args[0], wIns.Call.Args[0])
+						}
+						if theSame {
 							err := HBgraph.MakeEdge(prevN, wNode) // create edge from Done node to Wait node
 							if err != nil {
 								log.Fatal(err)
@@ -148,7 +158,17 @@ func (a* analysis) buildHB(HBgraph *graph.Graph) {
 			} else if dIns, ok1 := anIns.(*ssa.Defer); ok1 {
 				if dIns.Call.Value.Name() == "Done" {
 					for wIns, wNode := range waitingN {
-						if a.sameAddress(dIns.Call.Args[0], wIns.Call.Args[0]) { //bz: freevar /ssa.alloc
+						var theSame bool
+						if a.ptaConfig.DiscardQueries {
+							if v, ok := (*wNode.Value).(goIns); ok {
+								theSame = a.sameAddress2(dIns.Call.Args[0], dIns, nGo, wIns.Call.Args[0], wIns, v.goID)
+							}else{
+								theSame = false
+							}
+						} else {
+							theSame = a.sameAddress(dIns.Call.Args[0], wIns.Call.Args[0])
+						}
+						if theSame { //bz: freevar /ssa.alloc
 							err := HBgraph.MakeEdge(prevN, wNode) // create edge from Done node to Wait node
 							if err != nil {
 								log.Fatal(err)
@@ -203,7 +223,6 @@ func (a* analysis) buildHB(HBgraph *graph.Graph) {
 
 // visitAllInstructions visits each line and calls the corresponding helper function to drive the tool
 func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
-	curVisitingFn = fn // for PTA use
 	if a.useNewPTA && a.ptaConfig.DEBUG { //bz: useNewPTA ...
 		fmt.Println(".... " + fn.String())
 	}
@@ -211,8 +230,8 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 	if fn == nil {
 		return
 	}
-	if !isSynthetic(fn) {                // if function is NOT synthetic
-		if !fromPkgsOfInterest(fn) {
+	if !isSynthetic(fn) { // if function is NOT synthetic
+		if !a.fromPkgsOfInterest(fn) {
 			a.updateRecords(fn.Name(), goID, "POP  ")
 			return
 		}
@@ -316,7 +335,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 					}
 					if deferIns.Call.StaticCallee() == nil {
 						continue
-					} else if fromPkgsOfInterest(deferIns.Call.StaticCallee()) && deferIns.Call.StaticCallee().Pkg.Pkg.Name() != "sync" {
+					} else if a.fromPkgsOfInterest(deferIns.Call.StaticCallee()) && deferIns.Call.StaticCallee().Pkg.Pkg.Name() != "sync" {
 						fnName := deferIns.Call.Value.Name()
 						fnName = checkTokenNameDefer(fnName, deferIns)
 						if !a.exploredFunction(deferIns.Call.StaticCallee(), goID, theIns) {
@@ -533,7 +552,7 @@ func (a *analysis) newGoroutine(info goroutineInfo) {
 
 // exploredFunction determines if we already visited this function
 func (a *analysis) exploredFunction(fn *ssa.Function, goID int, theIns ssa.Instruction) bool {
-	if efficiency && !fromPkgsOfInterest(fn) { // for temporary debugging purposes only
+	if efficiency && !a.fromPkgsOfInterest(fn) { // for temporary debugging purposes only
 		return true
 	}
 	if sliceContainsInsAt(a.RWIns[goID], theIns) >= 0 {

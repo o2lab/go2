@@ -3,3 +3,12 @@ race_checker/go.*
 race_checker/race_checker
 .DS_STORE
 .idea
+
+go_tools/_logs/
+go_tools/_mytestresult/
+go_tools/_mytests/
+grpc-go/
+race_checker/go_pta_log
+race_checker/pta_summary.md
+runc/
+tidb/
