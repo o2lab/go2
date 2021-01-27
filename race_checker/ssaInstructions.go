@@ -197,8 +197,10 @@ func (a *analysis) insUnOp(examIns *ssa.UnOp, goID int, theIns ssa.Instruction) 
 				}
 				for fnKey, member := range v.Pkg.Members {
 					if memberFn, isFn := member.(*ssa.Function); isFn && fnKey != "main" && fnKey != "init" {
-						a.updateRecords(memberFn.Name(), goID, "PUSH ")
-						a.visitAllInstructions(memberFn, goID)
+						if !a.exploredFunction(memberFn, goID, theIns) {
+							a.updateRecords(memberFn.Name(), goID, "PUSH ")
+							a.visitAllInstructions(memberFn, goID)
+						}
 					}
 				}
 			}
