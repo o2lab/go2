@@ -70,16 +70,16 @@ type Config struct {
 	Log io.Writer
 
 	//bz: kcfa
-	CallSiteSensitive  bool
+	CallSiteSensitive bool
 	//bz: origin-sensitive -> go routine as origin-entry
-	Origin             bool
+	Origin bool
 	//bz: shared config by context-sensitive
-	K                  int //how many level? the most recent callsite/origin?
-	LimitScope         bool  //only apply kcfa to app methods
-	DEBUG              bool //print out debug info
-	Scope              []string //analyzed scope -> packages, can be null
-	Exclusion          []string //excluded packages from this analysis -> from race_checker if any
-	DiscardQueries     bool //bz: do not use queries, but keep every pts info in *cgnode
+	K              int      //how many level? the most recent callsite/origin?
+	LimitScope     bool     //only apply kcfa to app methods
+	DEBUG          bool     //print out debug info
+	Scope          []string //analyzed scope -> packages, can be null
+	Exclusion      []string //excluded packages from this analysis -> from race_checker if any
+	DiscardQueries bool     //bz: do not use queries, but keep every pts info in *cgnode
 }
 
 type track uint32
@@ -182,36 +182,55 @@ type Result struct {
 
 //bz: same as above, but we want contexts
 type ResultWCtx struct {
-	a               *analysis            // bz: we need a lot from here...
-	main            *cgnode              // bz: the cgnode for main method
-	CallGraph       *GraphWCtx           // discovered call graph
+	a         *analysis  // bz: we need a lot from here...
+	main      *cgnode    // bz: the cgnode for main method
+	CallGraph *GraphWCtx // discovered call graph
 
 	//bz: if DiscardQueries the following will be empty
 	Queries         map[ssa.Value][]PointerWCtx // pts(v) for each v in setValueNode().
 	IndirectQueries map[ssa.Value][]PointerWCtx // pts(*v) for each v in setValueNode().
 	GlobalQueries   map[ssa.Value][]PointerWCtx // pts(v) for each freevar in setValueNode().
 	ExtendedQueries map[ssa.Value][]PointerWCtx
-	Warnings        []Warning                   // warnings of unsoundness
+	Warnings        []Warning // warnings of unsoundness
 
-	DEBUG           bool                 // bz: print out debug info ...
-	DiscardQueries  bool                 // bz: do not use queries, but keep every pts info in *cgnode
+	DEBUG          bool // bz: print out debug info ...
+	DiscardQueries bool // bz: do not use queries, but keep every pts info in *cgnode
+}
+
+//bz:
+func (r *ResultWCtx) getCGNodebyFuncGoInstr(fn *ssa.Function, goInstr *ssa.Go) *cgnode {
+	cgns := r.GetCGNodebyFunc(fn)
+	for _, cgn := range cgns {
+		if matchMyContext(cgn, goInstr) {
+			return cgn
+		}
+	}
+	if r.DEBUG {
+		fmt.Println(" **** no match *cgnode for " + fn.String() + " goID: " + goInstr.String() + " **** ")
+	}
+	return nil
 }
 
 //bz: user API (DiscardQueries = true):
 //we find the instr.register (instead of the things on the rhs) in this fn under this goInstr routine
 //most of time used in sameAddress(from race_checker)
-func (r *ResultWCtx) PointsTo2(instr ssa.Instruction, goInstr *ssa.Go, fn *ssa.Function) PointerWCtx {
-	//this is where we find the pts
-	v, _ := instr.(ssa.Value) // val := v.Name() //this is what we recorded in cgn
-
-	cgns := r.GetCGNodebyFunc(fn)
-	for _, cgn := range cgns {
-		if matchMyContext(cgn, goInstr) {
-			nodeid := cgn.localval[v]
-			//n := r.a.nodes[nodeid]
+func (r *ResultWCtx) PointsTo2(v ssa.Value, goInstr *ssa.Go, fn *ssa.Function) PointerWCtx {
+	cgn := r.getCGNodebyFuncGoInstr(fn, goInstr)
+	if cgn == nil {
+		if r.DEBUG {
+			fmt.Println(" ****  Pointer Analysis: " + v.String() + " has no match *cgnode **** ")
+		}
+	}else{
+		nodeid := cgn.localval[v]
+		if nodeid != 0 {
 			return PointerWCtx{a: r.a, n: nodeid, cgn: cgn}
 		}
-		fmt.Println(" ****  Pointer Analysis: " + instr.String() + " has no match *cgnode **** ")
+
+		//check if in a.localobj
+		nodeid = cgn.localobj[v]
+		if nodeid != 0 {
+			return PointerWCtx{a: r.a, n: nodeid, cgn: cgn}
+		}
 	}
 
 	//check if in a.globalval
@@ -221,11 +240,17 @@ func (r *ResultWCtx) PointsTo2(instr ssa.Instruction, goInstr *ssa.Go, fn *ssa.F
 		return PointerWCtx{a: r.a, n: nodeid, cgn: nil}
 	}
 
-	fmt.Println(" ****  Pointer Analysis: " + instr.String() + " has no match in a.globalval **** ")
+	//check if in a.globalobj
+	nodeid = r.a.globalobj[v]
+	if nodeid != 0 { //v exist
+		//n := r.a.nodes[nodeid]
+		return PointerWCtx{a: r.a, n: nodeid, cgn: nil}
+	}
+	if r.DEBUG {
+		fmt.Println(" ****  Pointer Analysis: " + v.String() + " has no match in a.globalval/globalobj **** ")
+	}
 	return PointerWCtx{a: nil}
 }
-
-
 
 //bz: whether goID is match with the contexts in this cgn
 //TODO: this does not match parent context if callsite.length > 1 (k > 1)
@@ -264,13 +289,30 @@ func (r *ResultWCtx) GetFunc2(pointer PointerWCtx) *ssa.Function {
 	return tar.obj.cgn.fn
 }
 
+//bz: user API: used when DiscardQueries == true
+//from call graph
+func (r *ResultWCtx) GetInvokeFunc(call *ssa.Call, pointer PointerWCtx, goInstr *ssa.Go) *ssa.Function {
+	fn := call.Parent()
+	cgn := r.getCGNodebyFuncGoInstr(fn, goInstr)
+	if cgn == nil {
+		return nil
+	}
+	caller := r.CallGraph.GetNodeWCtx(cgn)
+	for _, out := range caller.Out {
+		if call == out.Site {
+			return out.Callee.GetFunc()
+		}
+	}
+	return nil
+}
+
 //bz: user API: tmp solution for missing invoke callee target if func wrapped in parameters
 //alloc should be a freevar
 func (r *ResultWCtx) GetFreeVarFunc(alloc *ssa.Alloc, call *ssa.Call, goInstr *ssa.Go) *ssa.Function {
 	val, _ := call.Common().Value.(*ssa.UnOp)
 	freeV := val.X //this should be the free var of func
 	pointers := r.PointsToFreeVar(freeV)
-	p := pointers[0].PointsTo()//here should be only one element
+	p := pointers[0].PointsTo() //here should be only one element
 	a := p.a
 	pts := p.pts
 
@@ -285,7 +327,7 @@ func (r *ResultWCtx) GetFreeVarFunc(alloc *ssa.Alloc, call *ssa.Call, goInstr *s
 		pts = &n.solve.pts
 		if pts.IsEmpty() { //TODO: bz: this maybe right maybe wrong ....
 			return n.obj.cgn.fn
-		}//else: continue to find...
+		} //else: continue to find...
 	}
 
 	return nil
@@ -298,7 +340,7 @@ func (r *ResultWCtx) GetFunc(p ssa.Value, call *ssa.Call, goInstr *ssa.Go) *ssa.
 	//match the ctx
 	var parent_cgn *cgnode
 	for _, cand := range parent_cgns {
-		if cand.callersite[0] == nil {//shared contour
+		if cand.callersite[0] == nil { //shared contour
 			if len(parent_cgns) == 1 {
 				// + only one target
 				parent_cgn = cand
@@ -393,7 +435,7 @@ func (r *ResultWCtx) PointsToByMain(v ssa.Value) PointerWCtx {
 		if pts.cgn == nil || pts.cgn.callersite == nil || pts.cgn.callersite[0] == nil {
 			continue //from extended query or shared contour
 		}
-		if pts.cgn.callersite[0].targets  == r.main.callersite[0].targets {
+		if pts.cgn.callersite[0].targets == r.main.callersite[0].targets {
 			return pts
 		}
 	}
@@ -428,12 +470,12 @@ func (r *ResultWCtx) PointsToFreeVar(v ssa.Value) []PointerWCtx {
 		if pointers != nil {
 			return pointers
 		}
-	}else if freev, ok := v.(*ssa.FreeVar); ok {
+	} else if freev, ok := v.(*ssa.FreeVar); ok {
 		pointers := r.GlobalQueries[freev]
 		if pointers != nil {
 			return pointers
 		}
-	}else if op, ok := v.(*ssa.UnOp); ok {
+	} else if op, ok := v.(*ssa.UnOp); ok {
 		pointers := r.GlobalQueries[op.X] //bz: X is the freeVar
 		if pointers != nil {
 			return pointers
@@ -578,7 +620,6 @@ type PointsToSet struct {
 	pts *nodeset
 }
 
-
 //bz: we created an empty PointerWCTx to return
 func (s PointsToSet) IsNil() bool {
 	return s.pts == nil
@@ -684,12 +725,11 @@ func (p Pointer) DynamicTypes() *typeutil.Map {
 	return p.PointsTo().DynamicTypes()
 }
 
-
 // bz: a Pointer with context
 type PointerWCtx struct {
-	a     *analysis
-	n     nodeid
-	cgn   *cgnode
+	a   *analysis
+	n   nodeid
+	cgn *cgnode
 }
 
 //bz: we created an empty PointerWCTx to return
@@ -737,7 +777,7 @@ func (p PointerWCtx) String() string {
 	}
 	if p.cgn.actualCallerSite == nil {
 		return fmt.Sprintf("n%d&%s", p.n, p.cgn.contourkFull())
-	}else {
+	} else {
 		return fmt.Sprintf("n%d&%s%s", p.n, p.cgn.contourkFull(), p.cgn.contourkActualFull())
 	}
 }

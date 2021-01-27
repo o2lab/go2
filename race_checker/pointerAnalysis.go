@@ -47,7 +47,7 @@ func (a *analysis) pointerAnalysis_new(location ssa.Value, goID int, theIns ssa.
 	//return type: PointerWCtx
 	var pts pointer.PointerWCtx
 	if a.ptaConfig.DiscardQueries { // bz: we are not using queries now
-		pts = a.result.PointsTo2(theIns, goInstr, theIns.Parent())
+		pts = a.result.PointsTo2(location, goInstr, theIns.Parent())
 	}else{ //bz: use queries/indirect/global/extended
 		pts = a.result.PointsToByGo(location, goInstr)
 	}
@@ -104,7 +104,12 @@ func (a *analysis) pointerAnalysis_new(location ssa.Value, goID int, theIns ssa.
 		case *ssa.Function:
 			a.traverseFunc(theFunc, goID, theIns)
 		case *ssa.MakeInterface:
-			if call, ok := theFunc.X.(*ssa.Call); ok {
+			if call, ok := theIns.(*ssa.Call); ok {
+				invokeFunc := a.result.GetInvokeFunc(call, pts, goInstr)
+				if invokeFunc != nil {
+					a.traverseFunc(invokeFunc, goID, theIns)
+				}
+			}else if call, ok := theFunc.X.(*ssa.Call); ok {
 				val := call.Call.Value //bz: *ssa.Function
 				invokeFunc, _ := val.(*ssa.Function)
 				a.traverseFunc(invokeFunc, goID, theIns)
@@ -120,7 +125,7 @@ func (a *analysis) pointerAnalysis_new(location ssa.Value, goID int, theIns ssa.
 		default:
 			break
 		}
-	}else{
+	}else{ //bz: use queries
 		switch theFunc := pts_labels[rightLoc].Value().(type) {
 		case *ssa.Function:
 			a.traverseFunc(theFunc, goID, theIns)

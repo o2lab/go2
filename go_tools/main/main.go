@@ -18,12 +18,6 @@ var excludedPkgs = []string{//bz: excluded a lot of default constraints
 	"reflect",
 	"os",
 }
-var includePkgs = []string{ // bz: we only include these pkgs
-	"atomic",
-	"sync",
-	"google.golang.org/grpc",
-	"github.com/pingcap/tidb",
-}
 var projPath = ""   // interested packages are those located at this path
 var maxTime time.Duration
 var minTime time.Duration
@@ -128,26 +122,21 @@ func doEachMain(i int, main *ssa.Package) {
 	if projPath != "" {
 		scope = []string {projPath}
 	}
-	if len(includePkgs) > 0 {
-		for _, include := range includePkgs {
-			scope = append(scope, include)
-		}
-	}
-	var mains []*ssa.Package
+ 	var mains []*ssa.Package
 	mains = append(mains, main)
 	// Configure pointer analysis to build call-graph
 	ptaConfig := &pointer.Config{
 		Mains:          mains, //bz: NOW assume only one main
 		Reflection:     false,
 		BuildCallGraph: true,
-		Log:            nil,//logfile,
+		Log:            logfile,
 		//CallSiteSensitive: true, //kcfa
 		Origin:     true, //origin
 		//shared config
 		K:          1,
 		LimitScope: true, //bz: only consider app methods now -> no import will be considered
-		DEBUG:      false, //bz: rm all printed out info in console
-		Scope:      scope, //bz: analyze scope + include
+		DEBUG:      true, //bz: rm all printed out info in console
+		Scope:      scope, //bz: analyze scope + include + import
 		Exclusion:  excludedPkgs, //bz: copied from race_checker
 		DiscardQueries: true, //bz: do not use query any more
 	}

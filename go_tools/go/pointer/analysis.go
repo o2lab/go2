@@ -455,7 +455,13 @@ func AnalyzeWCtx(config *Config) (result *ResultWCtx, err error) { //Result
 
 	UpdateDEBUG(a.config.DEBUG) //in pointer/callgraph
 
-	//update analysis scope
+	//update analysis scope: +
+	imports := a.config.Mains[0].Pkg.Imports()
+	if len(imports) > 0 {
+		for _, _import := range imports {
+			a.config.Scope = append(a.config.Scope, _import.Name())
+		}
+	}
 	fmt.Println(" *** MODE: " + mode + " *** ")
 	fmt.Println(" *** Analyze Scope ***************** ")
 	if len(a.config.Scope) > 0 {
@@ -463,7 +469,7 @@ func AnalyzeWCtx(config *Config) (result *ResultWCtx, err error) { //Result
 			fmt.Println(" - " + pkg)
 		}
 	}
-	fmt.Println(" - command-line-arguments (default)")
+	//fmt.Println(" - command-line-arguments (default)")
 	fmt.Println(" *********************************** ")
 	if len(a.config.Mains) > 1 {
 	    fmt.Println(" *** Multiple Mains **************** ")

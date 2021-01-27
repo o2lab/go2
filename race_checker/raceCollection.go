@@ -26,9 +26,7 @@ func (a *analysis) checkRacyPairs() {
 						continue
 					}
 					if (isWriteIns(goI) && isWriteIns(goJ)) || (isWriteIns(goI) && a.isReadIns(goJ)) || (a.isReadIns(goI) && isWriteIns(goJ)) { // only read and write instructions
-						//if a.useNewPTA && a.ptaConfig.DEBUG { //bz: useNewPTA ...
-						//	fmt.Println(goI.String() + "\n" + goJ.String() + "\n ---------------------------") //bz: debug -> missing fn
-						//}
+						//fmt.Println(goI.String() + "\n" + goJ.String() + "\n ---------------------------") //bz: debug -> missing fn
 						insSlice := []ssa.Instruction{goI, goJ}
 						addressPair := a.insAddress(insSlice) // one instruction from each goroutine
 						if len(addressPair) == 1 {
@@ -40,10 +38,16 @@ func (a *analysis) checkRacyPairs() {
 						} else {
 							theSame = a.sameAddress(addressPair[0], addressPair[1])
 						}
-						if theSame && !sliceContains(a.reportedAddr, addressPair[0]) &&
+						var sameLock bool
+						if a.ptaConfig.DiscardQueries {
+							sameLock = a.lockSetsIntersect2(insSlice[0], i, insSlice[1], j) //bz: i need goID
+						} else {
+							sameLock = a.lockSetsIntersect(insSlice[0], insSlice[1])
+						}
+						if theSame && !sameLock &&
+							!sliceContains(a.reportedAddr, addressPair[0]) &&
 							!a.reachable(goI, i, goJ, j) &&
 							!a.reachable(goJ, j, goI, i) &&
-							!a.lockSetsIntersect(insSlice[0], insSlice[1]) &&
 							!a.bothAtomic(insSlice[0], insSlice[1]) &&
 							!a.selectMutEx(insSlice[0], insSlice[1]) {
 							a.reportedAddr = append(a.reportedAddr, addressPair[0])
@@ -112,16 +116,16 @@ func (a *analysis) sameAddress2(addr1 ssa.Value, goI ssa.Instruction, goID1 int,
 	// check points-to set to see if they can point to the same object
 	if a.useNewPTA { //return type: []PointerWCtx
 		goInstr1 := a.getGoInstrForGoID(goID1)
-		pts1 := a.result.PointsTo2(goI, goInstr1, goI.Parent())
+		pts1 := a.result.PointsTo2(addr1, goInstr1, goI.Parent())
 		goInstr2 := a.getGoInstrForGoID(goID2)
-		pts2 := a.result.PointsTo2(goJ, goInstr2, goJ.Parent())
+		pts2 := a.result.PointsTo2(addr2, goInstr2, goJ.Parent())
 
 		if pts1.IsNil() || pts2.IsNil() {
 			return false
 		}
 		return pts1.MayAlias(pts2)
 	} else {
-		panic("Use default pta: WRONG PATH !!! @ a.sameAddress()")
+		panic("Use default pta: WRONG PATH !!! @ a.sameAddress2()")
 		//ptset := a.result.Queries
 		//return ptset[addr1].PointsTo().Intersects(ptset[addr2].PointsTo())
 	}
@@ -209,6 +213,34 @@ func sliceContainsNode(slice []graph.Node, node graph.Node) bool {
 	for _, n := range slice {
 		if n.Value == node.Value {
 			return true
+		}
+	}
+	return false
+}
+
+//bz: update
+func (a *analysis) lockSetsIntersect2(insA ssa.Instruction, goID1 int, insB ssa.Instruction, goID2 int) bool {
+	setA := a.lockMap[insA] // lockset of instruction-A
+	if a.isReadIns(insA) {
+		setA = append(setA, a.RlockMap[insA]...)
+	}
+	setB := a.lockMap[insB] // lockset of instruction-B
+	if a.isReadIns(insB) {
+		setB = append(setB, a.RlockMap[insB]...)
+	}
+	for _, addrA := range setA {
+		for _, addrB := range setB {
+			//bz: should be both be *ssa.Gobal (wrapped in a closure), so its belonging function/goID should not be important
+			//or it is local, which has the same everything with insA/insB
+			if a.sameAddress2(addrA, insA, goID1, addrB, insB, goID2) {
+				return true
+			} else {
+				posA := getSrcPos(addrA)
+				posB := getSrcPos(addrB)
+				if posA == posB {
+					return true
+				}
+			}
 		}
 	}
 	return false
