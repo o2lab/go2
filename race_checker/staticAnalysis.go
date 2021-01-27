@@ -166,6 +166,9 @@ func (runner *AnalysisRunner) Run(args []string) error {
 	if err != nil {
 		return err
 	}
+	if len(initial) == 0 {
+		log.Fatal("No Go files detected.")
+	}
 	fromPath = initial[0].ID
 	t := time.Now()
 	elapsedLoad := t.Sub(startLoad)
