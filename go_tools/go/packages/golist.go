@@ -202,23 +202,37 @@ extractQueries:
 		}
 		response.addAll(dr)
 
-		//TODO: bz: tmp condition filter to do the list all main entry points
-		cmd := exec.Command("find", ".", "-type", "d") //bz: list this subdir recursively until none
-		cmd.Dir = cfg.Dir                              //set cmd dir
-		var stdout, stderr bytes.Buffer
-		cmd.Stdout = &stdout
-		cmd.Stderr = &stderr
-		cmderr := cmd.Run()
-		if err != nil {
-			fmt.Printf("!!! cmd.Run() failed with %s\n", cmderr)
-			return nil, err
+		skip := false
+		//bz: EXCPETION: we will not traverse under proj dir if input is a specific go file
+		if len(restPatterns) == 1 && len(patterns) == 1 {
+			restPattern := restPatterns[0]
+			pattern := patterns[0]
+			if restPattern == pattern { //both point to the go file
+				if strings.LastIndex(pattern, ".go") == len(pattern) - 3 {
+					skip = true
+				}
+			}
 		}
-		outStr, _ := string(stdout.Bytes()), string(stderr.Bytes())
-		//fmt.Printf("run ls cmd. out:\n%s\nerr:\n%s\n", outStr, errStr) //bz: for me to debug
-		subdirs := strings.Split(outStr, "\n") //bz: record the future dir we need to traverse
-		size := len(subdirs) - 2
-		if size > 0 {
-			goListDriverRecursive(subdirs, size, response, cfg, ctx, restPatterns)
+
+		if !skip {
+			//TODO: bz: tmp condition filter to do the list all main entry points
+			cmd := exec.Command("find", ".", "-type", "d") //bz: list this subdir recursively until none
+			cmd.Dir = cfg.Dir                              //set cmd dir
+			var stdout, stderr bytes.Buffer
+			cmd.Stdout = &stdout
+			cmd.Stderr = &stderr
+			cmderr := cmd.Run()
+			if err != nil {
+				fmt.Printf("!!! cmd.Run() failed with %s\n", cmderr)
+				return nil, err
+			}
+			outStr, _ := string(stdout.Bytes()), string(stderr.Bytes())
+			//fmt.Printf("run ls cmd. out:\n%s\nerr:\n%s\n", outStr, errStr) //bz: for me to debug
+			subdirs := strings.Split(outStr, "\n") //bz: record the future dir we need to traverse
+			size := len(subdirs) - 2
+			if size > 0 {
+				goListDriverRecursive(subdirs, size, response, cfg, ctx, restPatterns)
+			}
 		}
 	}
 
@@ -274,12 +288,33 @@ extractQueries:
 	return response.dr, nil
 }
 
+//bz:
+func removeDuplicateValues(subdirs []string) []string {
+	keys := make(map[string]bool)
+	list := []string{}
+
+	// If the key(values of the slice) is not equal
+	// to the already present value in new slice (list)
+	// then we append it. else we jump on another element.
+	for _, entry := range subdirs {
+		if entry == "" {
+			continue
+		}
+		if _, value := keys[entry]; !value {
+			keys[entry] = true
+			list = append(list, entry)
+		}
+	}
+	return list
+}
+
 //bz: do main search
 func goListDriverRecursive(subdirs []string, size int, response *responseDeduper, cfg *Config,
 	ctx context.Context, restPatterns []string) {
+	subdirs = removeDuplicateValues(subdirs)
 	var _wg sync.WaitGroup
 	results := make([]*driverResponse, size) //all results
-	for i := 1; i < len(subdirs)-1; i++ {              //bz: 1st element is ".", the last element is "", skip them
+	for i := 1; i < len(subdirs)-1; i++ {    //bz: 1st element is ".", the last element is "", skip them
 		subdir := subdirs[i]
 		_cfg := &Config{
 			Mode:    LoadAllSyntax,
@@ -314,7 +349,6 @@ func goListDriverRecursive(subdirs []string, size int, response *responseDeduper
 		}
 	}
 }
-
 
 func (state *golistState) addNeededOverlayPackages(response *responseDeduper, pkgs []string) error {
 	if len(pkgs) == 0 {

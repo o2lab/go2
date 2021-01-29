@@ -1017,12 +1017,32 @@ func (a *analysis) isInLoop(fn *ssa.Function, inst ssa.Instruction) bool {
 	return false
 }
 
+//bz: which level of lib/app calls we consider: true -> create func/cgnode; false -> do not create
+// see a.config.Level
+func (a *analysis) whichlevel(caller *ssa.Function, callee *ssa.Function) bool {
+	if a.config.Level == 1 {//bz: caller in app, callee in lib
+		if !a.withinScope(callee.String()) && !a.withinScope(caller.String()) {
+			return false
+		}
+	}else if a.config.Level == 2 { //bz: caller in lib, callee also in lib
+		//parentcaller -> app; caller -> lib; callee -> lib
+		parentCaller := caller.Parent()
+		if parentCaller == nil { //bz: pkg initializer, no parent
+			return true
+		}
+		if !a.withinScope(parentCaller.String()) {
+			return false
+		}
+	}
+	return true
+}
+
 //  ------------- bz : the following several functions generate constraints for different method calls --------------
 // genStaticCall generates constraints for a statically dispatched function call.
 // bz: force call site here
 func (a *analysis) genStaticCall(caller *cgnode, instr ssa.CallInstruction, site *callsite, call *ssa.CallCommon, result nodeid) {
 	fn := call.StaticCallee()
-	if !a.withinScope(fn.String()) && !a.withinScope(caller.fn.String()) {
+	if !a.whichlevel(caller.fn, fn){
 		return
 	}
 
@@ -1274,7 +1294,7 @@ func (a *analysis) genInvoke(caller *cgnode, site *callsite, call *ssa.CallCommo
 func (a *analysis) genInvokeReflectType(caller *cgnode, site *callsite, call *ssa.CallCommon, result nodeid) {
 	// Look up the concrete method.
 	fn := a.prog.LookupMethod(a.reflectRtypePtr, call.Method.Pkg(), call.Method.Name())
-	if !a.withinScope(fn.String()) && !a.withinScope(caller.fn.String()) {
+	if !a.whichlevel(caller.fn, fn){
 		return
 	}
 

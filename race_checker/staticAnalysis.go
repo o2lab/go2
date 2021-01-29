@@ -27,14 +27,14 @@ func (a *analysis) fromPkgsOfInterest(fn *ssa.Function) bool {
 	if fn.Pkg.Pkg.Name() == "main" || fn.Pkg.Pkg.Name() == "cli" {
 		return true
 	}
-	for _, excluded := range excludedPkgs {
-		if fn.Pkg.Pkg.Name() == excluded {
-			return false
-		}
-	}
 	for _, included := range a.includePkgs { // bz: update to include necessary functions in traversal
 		if fn.Pkg.Pkg.Name() == included {
 			return true
+		}
+	}
+	for _, excluded := range excludedPkgs {
+		if fn.Pkg.Pkg.Name() == excluded {
+			return false
 		}
 	}
 	if !strings.HasPrefix(fn.Pkg.Pkg.Path(), fromPath) { // path is dependent on tested program
@@ -77,15 +77,19 @@ func pkgSelection(initial []*packages.Package) ([]*ssa.Package, *ssa.Program, []
 	if efficiency && len(initial) > 0 {
 		errSize, errPkgs := packages.PrintErrorsAndMore(initial) //bz: errPkg will be nil in initial
 		if errSize > 0 {
-			//log.Info("Excluded the following packages contain errors, due to the above errors. ")
-			//for i, errPkg := range errPkgs {
-			//	log.Info(i, " ", errPkg.ID)
-			//}
-			//log.Info("Continue   -- ")
+			if doDebugPTA {
+				log.Info("Excluded the following packages contain errors, due to the above errors. ")
+				for i, errPkg := range errPkgs {
+					log.Info(i, " ", errPkg.ID)
+				}
+				log.Info("Continue   -- ")
+			}
 			_ = errPkgs
 		}
 	} else if len(initial) == 0 {
 		log.Panic("package list empty")
+	}else if initial[0] == nil {
+		log.Panic("nil initial package")
 	}
 
 	var prog *ssa.Program
@@ -175,6 +179,10 @@ func (runner *AnalysisRunner) Run(args []string) error {
 	log.Info("Done  -- Using ", elapsedLoad.String())
 	mains, prog, pkgs := pkgSelection(initial)
 
+	if mains == nil {
+		log.Info("NO MAIN PKG, RETURN")
+	}
+
 	for _, m := range mains {
 		log.Info("Solving for " + m.String() + "... ")
 		result := runner.runEachMainBaseline(m)
@@ -215,6 +223,11 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		//bz: update includedPkg to be used for future fromPkgsOfInterest()
 		for _, scope := range runner.ptaconfig.Scope {
 			runner.Analysis.includePkgs = append(runner.Analysis.includePkgs, scope)
+		}
+		if runner.ptaconfig.Level == 2 { //bz: also traverse lib calls
+			for _, _import := range runner.ptaconfig.GetImports() {
+				runner.Analysis.includePkgs = append(runner.Analysis.includePkgs, _import)
+			}
 		}
 
 		log.Info("Compiling stack trace for every Goroutine... ")
@@ -269,6 +282,8 @@ func (runner *AnalysisRunner) runEachMainBaseline(main *ssa.Package) *pointer.Re
 	if fromPath != "" {
 		scope = []string{fromPath}
 	}
+	scope = append(scope, "istio.io/istio/")
+	scope = append(scope, "google.golang.org/grpc")
 	var mains []*ssa.Package
 	mains = append(mains, main)
 	// Configure pointer analysis to build call-graph
@@ -287,6 +302,7 @@ func (runner *AnalysisRunner) runEachMainBaseline(main *ssa.Package) *pointer.Re
 		Scope:      scope,        //bz: analyze scope, default is "command-line-arguments"
 		Exclusion: excludedPkgs, //excludedPkgs here
 		DiscardQueries: !useQueries, //bz: new flag -> if we use queries
+		Level:      2, //bz: see pointer.Config
 	}
 
 	start := time.Now()

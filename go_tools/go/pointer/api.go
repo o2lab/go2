@@ -14,6 +14,7 @@ import (
 	"go/token"
 	"io"
 	"strconv"
+	"strings"
 )
 
 // A Config formulates a pointer analysis problem for Analyze. It is
@@ -82,7 +83,14 @@ type Config struct {
 	DiscardQueries bool     //bz: do not use queries, but keep every pts info in *cgnode
 
 	imports        []string //bz: internal use: store all import pkgs in a main
+	Level          int      //bz: level == 1: traverse 1 level lib call; level == 2: traverse 2 leve lib calls; no other option now
 }
+
+//bz: user API: race checker, added when ptaconfig.Level == 2
+func (c *Config) GetImports() []string {
+	return c.imports
+}
+
 
 type track uint32
 
@@ -217,6 +225,9 @@ func (r *ResultWCtx) getCGNodebyFuncGoInstr(fn *ssa.Function, goInstr *ssa.Go) *
 //we find the instr.register (instead of the things on the rhs) in this fn under this goInstr routine
 //most of time used in sameAddress(from race_checker)
 func (r *ResultWCtx) PointsTo2(v ssa.Value, goInstr *ssa.Go, fn *ssa.Function) PointerWCtx {
+	if strings.Contains("&t0.mu [#0]", v.String()) {
+		fmt.Print()
+	}
 	cgn := r.getCGNodebyFuncGoInstr(fn, goInstr)
 	if cgn == nil {
 		if r.DEBUG {

@@ -103,7 +103,7 @@ var (
 
 var useNewPTA = true //bz: default value for this branch
 var useQueries = false //bz: whether we use Queries in pointer analysis
-var doDebugPTA = false //bz: default value for this branch
+var doDebugPTA = true //bz: default value for this branch
 var doPTALog = false //bz: default value for this branch
 
 var trieLimit = 2      // set as user config option later, an integer that dictates how many times a function can be called under identical context
@@ -143,56 +143,6 @@ func init() {
 		"runtime",
 		"reflect",
 		"os",
-	}
-	nonMainPkgs = []string{
-		"runtime",
-		"fmt",
-		"reflect",
-		"encoding",
-		"errors",
-		"bytes",
-		"strconv",
-		"strings",
-		"bytealg",
-		"race",
-		"syscall",
-		"poll",
-		"trace",
-		"logging",
-		"os",
-		"builtin",
-		"pflag",
-		"log",
-		"reflect",
-		"internal",
-		"impl",
-		"transport", // grpc
-		"version",
-		"sort",
-		"filepath",
-		"time",//bz: added
-		"sync",
-		"unsafe",
-		"unicode",
-		"math",
-		"io",
-		"context",
-		"flag",
-		"net",
-		"regexp",
-		"text",
-		"compress",
-		"crypto",
-		"mime",
-		"path",
-		"vendor",
-		"hash",
-		"go/",
-		"google.golang.org/protobuf/",//protobuf
-		"github.com/golang/protobuf/",
-		"golang.org/x/",
-		"html",
-		"container",
 	}
 }
 

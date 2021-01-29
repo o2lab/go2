@@ -141,6 +141,7 @@ func doEachMain(i int, main *ssa.Package) {
 		Scope:      scope, //bz: analyze scope + include + import
 		Exclusion:  excludedPkgs, //bz: copied from race_checker
 		DiscardQueries: true, //bz: do not use query any more
+		Level:      2, //bz: see pointer.Config
 	}
 
 	//*** compute pta here
