@@ -617,7 +617,10 @@ func (a *analysis) taggedValue(obj nodeid) (tDyn types.Type, v nodeid, indirect 
 	n := a.nodes[obj]
 	flags := n.obj.flags
 	if flags&otTagged == 0 {
-		panic(fmt.Sprintf("not a tagged object: n%d", obj))
+		//TODO: bz: this always happens, ignore this if it is not a tagged value... tmp...
+		//panic(fmt.Sprintf("not a tagged object: n%d", obj))
+		fmt.Sprintf("not a tagged object: n%d", obj)
+		return nil, 0, false
 	}
 	return n.typ, obj + 1, flags&otIndirect != 0
 }

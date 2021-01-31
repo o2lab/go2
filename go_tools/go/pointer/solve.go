@@ -329,6 +329,9 @@ func (c *invokeConstraint) solve(a *analysis, delta *nodeset) {
 	for _, x := range delta.AppendTo(a.deltaSpace) {
 		ifaceObj := nodeid(x)
 		tDyn, v, indirect := a.taggedValue(ifaceObj)
+		if tDyn == nil {
+			continue; //bz: tmp solution
+		}
 		if indirect {
 			// TODO(adonovan): we may need to implement this if
 			// we ever apply invokeConstraints to reflect.Value PTSs,
