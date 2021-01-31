@@ -617,10 +617,7 @@ func (a *analysis) taggedValue(obj nodeid) (tDyn types.Type, v nodeid, indirect 
 	n := a.nodes[obj]
 	flags := n.obj.flags
 	if flags&otTagged == 0 {
-		//TODO: bz: this always happens, ignore this if it is not a tagged value... tmp...
-		//panic(fmt.Sprintf("not a tagged object: n%d", obj))
-		fmt.Sprintf("not a tagged object: n%d", obj)
-		return nil, 0, false
+		panic(fmt.Sprintf("not a tagged object: n%d", obj))
 	}
 	return n.typ, obj + 1, flags&otIndirect != 0
 }
@@ -1024,10 +1021,19 @@ func (a *analysis) isInLoop(fn *ssa.Function, inst ssa.Instruction) bool {
 // see a.config.Level
 func (a *analysis) whichlevel(caller *ssa.Function, callee *ssa.Function) bool {
 	if a.config.Level == 1 {//bz: caller in app, callee in lib
+		if caller == nil {
+			return false //is shared contour
+		}
 		if !a.withinScope(callee.String()) && !a.withinScope(caller.String()) {
 			return false
 		}
 	}else if a.config.Level == 2 { //bz: caller in lib, callee also in lib
+		if caller == nil {
+			if a.withinScope(callee.String()) {
+				return true //bz: as long as callee is app/path func, we do it
+			}
+			return false
+		}
 		//parentcaller -> app; caller -> lib; callee -> lib
 		parentCaller := caller.Parent()
 		if parentCaller == nil { //bz: pkg initializer, no parent
@@ -1036,6 +1042,9 @@ func (a *analysis) whichlevel(caller *ssa.Function, callee *ssa.Function) bool {
 		if !a.withinScope(parentCaller.String()) {
 			return false
 		}
+		//if !a.withinScope(callee.String()) { //bz: as long as callee is app/path func, we do it
+		//	return false
+		//}
 	}
 	return true
 }

@@ -329,9 +329,6 @@ func (c *invokeConstraint) solve(a *analysis, delta *nodeset) {
 	for _, x := range delta.AppendTo(a.deltaSpace) {
 		ifaceObj := nodeid(x)
 		tDyn, v, indirect := a.taggedValue(ifaceObj)
-		if tDyn == nil {
-			continue; //bz: tmp solution
-		}
 		if indirect {
 			// TODO(adonovan): we may need to implement this if
 			// we ever apply invokeConstraints to reflect.Value PTSs,
@@ -366,6 +363,9 @@ func (c *invokeConstraint) solve(a *analysis, delta *nodeset) {
 				}
 				fnObj = a.genOnline(c.caller, c.site, fn)
 			} else { //newly created app func invokes lib func: use share contour
+				if !a.whichlevel(nil, fn) {
+					return
+				}
 				fnObj = a.genOnline(nil, nil, fn)
 			}
 			isOnline = true

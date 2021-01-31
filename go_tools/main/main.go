@@ -124,6 +124,10 @@ func doEachMain(i int, main *ssa.Package) {
 	if projPath != "" {
 		scope = []string {projPath}
 	}
+
+	scope = append(scope, "istio.io/istio/")
+	scope = append(scope, "google.golang.org/grpc")
+
  	var mains []*ssa.Package
 	mains = append(mains, main)
 	// Configure pointer analysis to build call-graph
@@ -137,7 +141,7 @@ func doEachMain(i int, main *ssa.Package) {
 		//shared config
 		K:          1,
 		LimitScope: true, //bz: only consider app methods now -> no import will be considered
-		DEBUG:      false, //bz: rm all printed out info in console
+		DEBUG:      true, //bz: rm all printed out info in console
 		Scope:      scope, //bz: analyze scope + include + import
 		Exclusion:  excludedPkgs, //bz: copied from race_checker
 		DiscardQueries: true, //bz: do not use query any more
