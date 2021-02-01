@@ -88,7 +88,9 @@ func pkgSelection(initial []*packages.Package) ([]*ssa.Package, *ssa.Program, []
 		}
 	} else if len(initial) == 0 {
 		log.Panic("package list empty")
-	}else if initial[0] == nil {
+	}
+
+	if initial[0] == nil { //bz: no matter what ...
 		log.Panic("nil initial package")
 	}
 
