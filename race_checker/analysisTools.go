@@ -555,7 +555,7 @@ func (a *analysis) exploredFunction(fn *ssa.Function, goID int, theIns ssa.Instr
 	if efficiency && !a.fromPkgsOfInterest(fn) { // for temporary debugging purposes only
 		return true
 	}
-	if sliceContainsInsAt(a.RWIns[goID], theIns) >= 0 {
+	if sliceContainsInsAt(a.RWIns[goID], theIns) >= 0 { //bz:
 		return true
 	}
 	if efficiency && sliceContainsStr(a.storeIns, fn.Name()) { // for temporary debugging purposes only

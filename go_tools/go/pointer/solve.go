@@ -363,7 +363,7 @@ func (c *invokeConstraint) solve(a *analysis, delta *nodeset) {
 				}
 				fnObj = a.genOnline(c.caller, c.site, fn)
 			} else { //newly created app func invokes lib func: use share contour
-				if !a.whichlevel(nil, fn) {
+				if !a.createForLevel(nil, fn) {
 					return
 				}
 				fnObj = a.genOnline(nil, nil, fn)

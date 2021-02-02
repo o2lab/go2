@@ -103,7 +103,7 @@ var (
 
 var useNewPTA = true //bz: default value for this branch
 var useQueries = false //bz: whether we use Queries in pointer analysis
-var doDebugPTA = true //bz: default value for this branch
+var doDebugPTA = false //bz: default value for this branch
 var doPTALog = false //bz: default value for this branch
 
 var trieLimit = 2      // set as user config option later, an integer that dictates how many times a function can be called under identical context

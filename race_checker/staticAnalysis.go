@@ -226,10 +226,9 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		for _, scope := range runner.ptaconfig.Scope {
 			runner.Analysis.includePkgs = append(runner.Analysis.includePkgs, scope)
 		}
-		if runner.ptaconfig.Level == 2 { //bz: also traverse lib calls
-			for _, _import := range runner.ptaconfig.GetImports() {
-				runner.Analysis.includePkgs = append(runner.Analysis.includePkgs, _import)
-			}
+		//bz: also traverse lib calls
+		for _, _import := range runner.ptaconfig.GetImports() {
+			runner.Analysis.includePkgs = append(runner.Analysis.includePkgs, _import)
 		}
 
 		log.Info("Compiling stack trace for every Goroutine... ")
@@ -284,8 +283,8 @@ func (runner *AnalysisRunner) runEachMainBaseline(main *ssa.Package) *pointer.Re
 	if fromPath != "" {
 		scope = []string{fromPath}
 	}
-	scope = append(scope, "istio.io/istio/")
-	scope = append(scope, "google.golang.org/grpc")
+	//scope = append(scope, "istio.io/istio/")
+	//scope = append(scope, "google.golang.org/grpc")
 	var mains []*ssa.Package
 	mains = append(mains, main)
 	// Configure pointer analysis to build call-graph
@@ -304,7 +303,8 @@ func (runner *AnalysisRunner) runEachMainBaseline(main *ssa.Package) *pointer.Re
 		Scope:      scope,        //bz: analyze scope, default is "command-line-arguments"
 		Exclusion: excludedPkgs, //excludedPkgs here
 		DiscardQueries: !useQueries, //bz: new flag -> if we use queries
-		Level:      2, //bz: see pointer.Config
+		Level:      0, //bz: level == 0: traverse all app and lib, but with different ctx; level == 1: traverse 1 level lib call; level == 2: traverse 2 leve lib calls; no other option now
+		//when you do "go test", set level == 0; when you reproduce races in large programs, try level == 1 or 2.
 	}
 
 	start := time.Now()

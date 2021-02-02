@@ -1019,8 +1019,10 @@ func (a *analysis) isInLoop(fn *ssa.Function, inst ssa.Instruction) bool {
 
 //bz: which level of lib/app calls we consider: true -> create func/cgnode; false -> do not create
 // see a.config.Level
-func (a *analysis) whichlevel(caller *ssa.Function, callee *ssa.Function) bool {
-	if a.config.Level == 1 {//bz: caller in app, callee in lib
+func (a *analysis) createForLevel(caller *ssa.Function, callee *ssa.Function) bool {
+	if a.config.Level == 0 { //bz: traverse all func
+		return true
+	}else if a.config.Level == 1 {//bz: caller in app, callee in lib
 		if caller == nil {
 			return false //is shared contour
 		}
@@ -1054,7 +1056,7 @@ func (a *analysis) whichlevel(caller *ssa.Function, callee *ssa.Function) bool {
 // bz: force call site here
 func (a *analysis) genStaticCall(caller *cgnode, instr ssa.CallInstruction, site *callsite, call *ssa.CallCommon, result nodeid) {
 	fn := call.StaticCallee()
-	if !a.whichlevel(caller.fn, fn){
+	if !a.createForLevel(caller.fn, fn){
 		return
 	}
 
@@ -1306,7 +1308,7 @@ func (a *analysis) genInvoke(caller *cgnode, site *callsite, call *ssa.CallCommo
 func (a *analysis) genInvokeReflectType(caller *cgnode, site *callsite, call *ssa.CallCommon, result nodeid) {
 	// Look up the concrete method.
 	fn := a.prog.LookupMethod(a.reflectRtypePtr, call.Method.Pkg(), call.Method.Name())
-	if !a.whichlevel(caller.fn, fn){
+	if !a.createForLevel(caller.fn, fn){
 		return
 	}
 

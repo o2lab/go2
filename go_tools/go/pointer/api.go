@@ -83,7 +83,7 @@ type Config struct {
 	DiscardQueries bool     //bz: do not use queries, but keep every pts info in *cgnode
 
 	imports        []string //bz: internal use: store all import pkgs in a main
-	Level          int      //bz: level == 1: traverse 1 level lib call; level == 2: traverse 2 leve lib calls; no other option now
+	Level          int      //bz: level == 0: traverse all app and lib, but with different ctx; level == 1: traverse 1 level lib call; level == 2: traverse 2 leve lib calls; no other option now
 }
 
 //bz: user API: race checker, added when ptaconfig.Level == 2
@@ -216,7 +216,11 @@ func (r *ResultWCtx) getCGNodebyFuncGoInstr(fn *ssa.Function, goInstr *ssa.Go) *
 		}
 	}
 	if r.DEBUG {
-		fmt.Println(" **** no match *cgnode for " + fn.String() + " goID: " + goInstr.String() + " **** ")
+		if goInstr == nil {
+			fmt.Println(" **** no match *cgnode for " + fn.String() + " goID: main **** ")
+		}else{
+			fmt.Println(" **** no match *cgnode for " + fn.String() + " goID: " + goInstr.String() + " **** ")
+		}
 	}
 	return nil
 }
@@ -226,12 +230,12 @@ func (r *ResultWCtx) getCGNodebyFuncGoInstr(fn *ssa.Function, goInstr *ssa.Go) *
 //most of time used in sameAddress(from race_checker)
 func (r *ResultWCtx) PointsTo2(v ssa.Value, goInstr *ssa.Go, fn *ssa.Function) PointerWCtx {
 	if strings.Contains("&t0.mu [#0]", v.String()) {
-		fmt.Print()
+		fmt.Print() //TODO: bz: lock problem
 	}
 	cgn := r.getCGNodebyFuncGoInstr(fn, goInstr)
 	if cgn == nil {
 		if r.DEBUG {
-			fmt.Println(" ****  Pointer Analysis: " + v.String() + " has no match *cgnode **** ")
+			fmt.Println(" ****  Pointer Analysis: " + v.String() + " has no match *cgnode (" + fn.String() + ") **** ")
 		}
 	}else{
 		nodeid := cgn.localval[v]
@@ -268,6 +272,12 @@ func (r *ResultWCtx) PointsTo2(v ssa.Value, goInstr *ssa.Go, fn *ssa.Function) P
 //bz: whether goID is match with the contexts in this cgn
 //TODO: this does not match parent context if callsite.length > 1 (k > 1)
 func matchMyContext(cgn *cgnode, go_instr *ssa.Go) bool {
+	if go_instr == nil {
+		//bz: check shared contour
+		if cgn.callersite != nil && cgn.callersite[0] == nil {
+			return true
+		}
+	}
 	if cgn.callersite == nil || cgn.callersite[0] == nil {
 		return false
 	}
@@ -279,6 +289,9 @@ func matchMyContext(cgn *cgnode, go_instr *ssa.Go) bool {
 	}
 	//double check actualCallerSite
 	for _, actualCS := range cgn.actualCallerSite {
+		if actualCS[0] == nil {
+			return false
+		}
 		if actualCS[0].goInstr == go_instr {
 			return true
 		}
