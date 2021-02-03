@@ -111,6 +111,7 @@ var efficiency = false // configuration setting to avoid recursion in tested pro
 var channelComm = true // analyze channel communication
 var fromPath = ""      // interested packages are those located at this path
 var entryFn = "main"
+var allEntries = false
 
 func init() {
 	//excludedPkgs = []string{ //bz: see if this is still useful
@@ -158,6 +159,7 @@ func main() {//default: -useNewPTA
 	help := flag.Bool("help", false, "Show all command-line options.")
 	withoutComm := flag.Bool("withoutComm", false, "Show analysis results without communication consideration.")
 	withComm := flag.Bool("withComm", false, "Show analysis results with communication consideration.")
+	analyzeAll := flag.Bool("analyzeAll", false, "Analyze all main() entry-points. ")
 	flag.Parse()
 	if *help {
 		flag.PrintDefaults()
@@ -190,6 +192,9 @@ func main() {//default: -useNewPTA
 		//trieLimit = 1
 		efficiency = true
 		channelComm = true
+	}
+	if *analyzeAll {
+		allEntries = true
 	}
 
 	log.SetFormatter(&log.TextFormatter{
