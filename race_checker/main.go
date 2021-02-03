@@ -143,6 +143,7 @@ func init() {
 		"runtime",
 		"reflect",
 		"os",
+		"reflect2", //bz: evil reflection...
 	}
 }
 

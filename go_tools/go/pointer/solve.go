@@ -353,15 +353,16 @@ func (c *invokeConstraint) solve(a *analysis, delta *nodeset) {
 			if a.considerMyContext(fn.String()) {
 				if c.caller == nil && c.site == nil {
 					if a.config.DEBUG {
-						fmt.Println("!! Nil caller & site: " + fn.String() + " SKIP GENERATING INVOKE FUNC.")
+						fmt.Println("!! GENERATING INVOKE FUNC HERE (share contour): " + fn.String())
 					}
-					continue
+					fnObj = a.genOnline(nil, nil, fn)
+				}else{
+					//bz: special handling of invoke targets, create here
+					if a.config.DEBUG {
+						fmt.Println("!! GENERATING INVOKE FUNC HERE (c-sensitive): " + fn.String())
+					}
+					fnObj = a.genOnline(c.caller, c.site, fn)
 				}
-				//bz: special handling of invoke targets, create here
-				if a.config.DEBUG {
-					fmt.Println("!! GENERATING INVOKE FUNC HERE: " + fn.String())
-				}
-				fnObj = a.genOnline(c.caller, c.site, fn)
 			} else { //newly created app func invokes lib func: use share contour
 				if !a.createForLevel(nil, fn) {
 					return

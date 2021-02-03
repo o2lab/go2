@@ -285,6 +285,9 @@ func (runner *AnalysisRunner) runEachMainBaseline(main *ssa.Package) *pointer.Re
 	}
 	//scope = append(scope, "istio.io/istio/")
 	//scope = append(scope, "google.golang.org/grpc")
+	//scope = append(scope, "github.com/pingcap/tidb")
+	//scope = append(scope, main.String()) //default ??
+
 	var mains []*ssa.Package
 	mains = append(mains, main)
 	// Configure pointer analysis to build call-graph
@@ -293,8 +296,7 @@ func (runner *AnalysisRunner) runEachMainBaseline(main *ssa.Package) *pointer.Re
 		Reflection:     false,
 		BuildCallGraph: true,
 		Log:            logfile,
-		//kcfa
-		//CallSiteSensitive: true,
+		//CallSiteSensitive: true, //kcfa
 		Origin: true, //origin
 		//shared config
 		K:          1,

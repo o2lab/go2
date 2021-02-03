@@ -958,6 +958,13 @@ func (a *analysis) withinScope(method string) bool {
 		if strings.Contains(method, "command-line-arguments") { //default scope
 			return true
 		} else {
+			if len(a.config.Exclusion) > 0 { //user assigned exclusion -> bz: want to exclude all reflection ...
+				for _, pkg := range a.config.Exclusion {
+					if strings.Contains(method, pkg) {
+						return false
+					}
+				}
+			}
 			if len(a.config.Scope) > 0 { //user assigned scope
 				for _, pkg := range a.config.Scope {
 					if strings.Contains(method, pkg) && !strings.Contains(method, "google.golang.org/grpc/grpclog") {
@@ -976,6 +983,21 @@ func (a *analysis) fromImports(method string) bool {
 	if a.config.LimitScope {
 		if len(a.config.imports) > 0 { //user assigned scope
 			for _, pkg := range a.config.imports {
+				if strings.Contains(method, pkg) {
+					return true
+				}
+			}
+		}
+		return false
+	}
+	return true
+}
+
+//bz: whether a func is from a.config.Exclusion
+func (a *analysis) fromExclusion(method string) bool {
+	if a.config.LimitScope {
+		if len(a.config.Exclusion) > 0 { //user assigned scope
+			for _, pkg := range a.config.Exclusion {
 				if strings.Contains(method, pkg) {
 					return true
 				}
@@ -1020,6 +1042,8 @@ func (a *analysis) isInLoop(fn *ssa.Function, inst ssa.Instruction) bool {
 //bz: which level of lib/app calls we consider: true -> create func/cgnode; false -> do not create
 // see a.config.Level
 func (a *analysis) createForLevel(caller *ssa.Function, callee *ssa.Function) bool {
+
+
 	if a.config.Level == 0 { //bz: traverse all func
 		return true
 	}else if a.config.Level == 1 {//bz: caller in app, callee in lib
@@ -1109,7 +1133,7 @@ func (a *analysis) genStaticCall(caller *cgnode, instr ssa.CallInstruction, site
 		obj, _ = a.makeFunctionObjectWithContext(caller, fn, site, nil, -1)
 	} else {
 		//default: context-insensitive
-		if a.shouldUseContext(fn) {
+		if a.shouldUseContext(fn) {// default
 			obj = a.makeFunctionObject(fn, site) // new contour
 		} else {
 			obj = a.objectNode(nil, fn) // shared contour
@@ -1945,6 +1969,11 @@ func (a *analysis) genRootCalls() *cgnode {
 // genFunc generates constraints for function fn.
 func (a *analysis) genFunc(cgn *cgnode) {
 	fn := cgn.fn
+
+	//bz: we do not want to anlayze excluded pkgs
+	if a.fromExclusion(fn.String()) {
+		return
+	}
 
 	impl := a.findIntrinsic(fn)
 

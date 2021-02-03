@@ -17,6 +17,7 @@ var excludedPkgs = []string{//bz: excluded a lot of default constraints
 	"runtime",
 	"reflect",
 	"os",
+	"reflect2", //bz: github.com/modern-go/reflect2
 }
 var projPath = ""   // interested packages are those located at this path
 var maxTime time.Duration

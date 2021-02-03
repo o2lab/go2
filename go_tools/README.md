@@ -54,3 +54,73 @@ the make closure has been treated with origin-sensitive and its origin context h
 ```go (*ccBalancerWrapper).watcher(t0)```
 
 same as Case 1.
+
+
+### Panic due to pointer.(*analysis).taggedValue()
+- where: package github.com/pingcap/tidb/cmd/benchraw
+- problem: t6 in github.com/pingcap/tidb/statistics.NewQueryFeedback(as the IR shown below) has no makeinterface IR statement
+created after the object initialization. 
+```
+==== Generating constraints for cg1824201:github.com/pingcap/tidb/statistics.NewQueryFeedback@[0:shared contour; ], shared contour
+# Name: github.com/pingcap/tidb/statistics.NewQueryFeedback
+# Package: github.com/pingcap/tidb/statistics
+func NewQueryFeedback(physicalID int64, hist *Histogram, expected int64, desc bool) *QueryFeedback:
+0:                                                                entry P:0 S:2
+...
+5:                                                              if.done P:3 S:0
+	t5 = phi [2: 1:int, 6: 1:int, 4: 0:int] #tp                         int
+	t6 = new QueryFeedback (complit)                         *QueryFeedback
+	t7 = &t6.PhysicalID [#0]                                         *int64
+	t8 = &t6.Valid [#6]                                               *bool
+	t9 = &t6.Tp [#2]                                                   *int
+	t10 = &t6.Hist [#1]                                         **Histogram
+	t11 = &t6.Expected [#4]                                          *int64
+	t12 = &t6.desc [#7]                                               *bool
+	*t7 = physicalID
+	*t8 = true:bool
+	*t9 = t5
+	*t10 = t1
+	*t11 = expected
+	*t12 = desc
+	return t6
+```
+When there is a method invoke with pts(t6) as the base variable, since the 
+object is not tagged, go pointer analysis will panic. E.g., the call invoke n172159.Type1(n940498 ...) shown below:
+```
+==== Generating constraints for cg172157:(*github.com/modern-go/reflect2.safeType).AssignableTo@[0:shared contour; ], shared contour
+# Name: (*github.com/modern-go/reflect2.safeType).AssignableTo
+# Package: github.com/modern-go/reflect2
+func (type2 *safeType) AssignableTo(anotherType Type) bool:
+0:                                                                entry P:0 S:0
+...
+; t1 = invoke anotherType.Type1()
+	create n940498 func() reflect.Type for invoke.targets
+	create n940499 reflect.Type for invoke.results
+	copy n940493 <- n940499
+	invoke n172159.Type1(n940498 ...)
+	invoke anotherType.Type1()@(*github.com/modern-go/reflect2.safeType).AssignableTo to targets n940498 from cg172157:(*github.com/modern-go/reflect2.safeType).AssignableTo@[0:shared contour; ]
+```
+- reason: 1. due to the return type of github.com/pingcap/tidb/statistics.NewQueryFeedback is a pointer, no make interface
+IR stmt generated; 2. the panic constraint is from reflection, which will not consider to create make interface stmt.  
+
+- solution: 1. we identify this reflect pkg and skip it analysis; 2. we do something similar below, but should not be like this.
+```
+==== Generating constraints for cg1190:(*go.etcd.io/etcd/client.httpMembersAPI).Remove@[0:shared contour; ], shared contour
+# Name: (*go.etcd.io/etcd/client.httpMembersAPI).Remove
+# Package: go.etcd.io/etcd/client
+# Location: /Users/bozhen/go/pkg/mod/go.etcd.io/etcd@v0.5.0-alpha.5.0.20200824191128-ae9734ed278b/client/members.go:195:26
+func (m *httpMembersAPI) Remove(ctx context.Context, memberID string) error:
+0:                                                                entry P:0 S:2
+	t0 = new membersAPIActionRemove (complit)       *membersAPIActionRemove
+	t1 = &t0.memberID [#0]                                          *string
+	*t1 = memberID
+	t2 = &m.client [#0]                                         *httpClient
+	t3 = *t2                                                     httpClient
+	t4 = make httpAction <- *membersAPIActionRemove (t0)         httpAction
+	t5 = invoke t3.Do(ctx, t4)          (*net/http.Response, []byte, error)
+	t6 = extract t5 #0                                   *net/http.Response
+	t7 = extract t5 #1                                               []byte
+	t8 = extract t5 #2                                                error
+	t9 = t8 != nil:error                                               bool
+	if t9 goto 1 else 2
+```
