@@ -180,7 +180,6 @@ func (a *analysis) insStore(examIns *ssa.Store, goID int, theIns ssa.Instruction
 // insUnOp ???
 func (a *analysis) insUnOp(examIns *ssa.UnOp, goID int, theIns ssa.Instruction) {
 	stats.IncStat(stats.NUnOp)
-	a.RWIns[goID] = append(a.RWIns[goID], theIns)
 	if examIns.Op == token.MUL && !isLocalAddr(examIns.X) { // read op
 		a.updateLockMap(goID, theIns)
 		a.updateRLockMap(goID, theIns)
@@ -205,6 +204,7 @@ func (a *analysis) insUnOp(examIns *ssa.UnOp, goID int, theIns ssa.Instruction) 
 				}
 			}
 		}
+		a.RWIns[goID] = append(a.RWIns[goID], theIns)
 	} else if examIns.Op == token.ARROW { // channel receive op (not waited on by select)
 		stats.IncStat(stats.NChanRecv)
 		ch := examIns.X.Name()
@@ -233,6 +233,7 @@ func (a *analysis) insUnOp(examIns *ssa.UnOp, goID int, theIns ssa.Instruction) 
 		} else {
 			a.chanRcvs[ch] = append(a.chanRcvs[ch], examIns)
 		}
+		a.RWIns[goID] = append(a.RWIns[goID], theIns)
 	}
 }
 

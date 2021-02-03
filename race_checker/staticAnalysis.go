@@ -115,43 +115,50 @@ func pkgSelection(initial []*packages.Package) ([]*ssa.Package, *ssa.Program, []
 		for i, ep := range mainPkgs {
 			fmt.Println("Option", i+1, ": ", ep.String())
 		}
-		fmt.Print("Enter option number of choice: (or enter \"-\" for other desired entry point)\n")
-		fmt.Scan(&mainInd)
-		if mainInd == "-" {
-			fmt.Print("Enter function name to begin analysis from: ")
-			fmt.Scan(&enterAt)
-			for _ , p := range pkgs {
-				//if len(p.Members) == 0 {
-				//	continue //bz: skip the panic if no function in *ssa.Package
-				//}
+		if allEntries {
+			for pInd := 0; pInd < len(mainPkgs); pInd++ {
+				mains = append(mains, mainPkgs[pInd])
+			}
+			log.Info("Iterating through all options...")
+		} else {
+			fmt.Print("Enter option number of choice: (or enter \"-\" for other desired entry point)\n")
+			fmt.Scan(&mainInd)
+			if mainInd == "-" {
+				fmt.Print("Enter function name to begin analysis from: ")
+				fmt.Scan(&enterAt)
+				for _ , p := range pkgs {
+					//if len(p.Members) == 0 {
+					//	continue //bz: skip the panic if no function in *ssa.Package
+					//}
 
-				if p != nil {
-					if fnMem, okf := p.Members[enterAt]; okf { // package contains function to enter at
-						userEP = true
-						mains = append(mainPkgs, p)
-						entryFn = enterAt // start analysis at user specified function
-						_ = fnMem
+					if p != nil {
+						if fnMem, okf := p.Members[enterAt]; okf { // package contains function to enter at
+							userEP = true
+							mains = append(mainPkgs, p)
+							entryFn = enterAt // start analysis at user specified function
+							_ = fnMem
+						}
 					}
 				}
-			}
-			if !userEP {
-				fmt.Print("Function not found. ") // TODO: request input again
-			}
-		} else if strings.Contains(mainInd, ",") { // multiple selections
-			selection := strings.Split(mainInd, ",")
-			for _, s := range selection {
-				i, _ := strconv.Atoi(s) // convert to integer
+				if !userEP {
+					fmt.Print("Function not found. ") // TODO: request input again
+				}
+			} else if strings.Contains(mainInd, ",") { // multiple selections
+				selection := strings.Split(mainInd, ",")
+				for _, s := range selection {
+					i, _ := strconv.Atoi(s) // convert to integer
+					mains = append(mains, mainPkgs[i-1])
+				}
+			} else if strings.Contains(mainInd, "-") { // selected range
+				selection := strings.Split(mainInd, "-")
+				begin, _ := strconv.Atoi(selection[0])
+				end, _ := strconv.Atoi(selection[1])
+				for i := begin; i <= end; i++ {
+					mains = append(mains, mainPkgs[i-1])
+				}
+			} else if i, err0 := strconv.Atoi(mainInd); err0 == nil {
 				mains = append(mains, mainPkgs[i-1])
 			}
-		} else if strings.Contains(mainInd, "-") { // selected range
-			selection := strings.Split(mainInd, "-")
-			begin, _ := strconv.Atoi(selection[0])
-			end, _ := strconv.Atoi(selection[1])
-			for i := begin; i <= end; i++ {
-				mains = append(mains, mainPkgs[i-1])
-			}
-		} else if i, err0 := strconv.Atoi(mainInd); err0 == nil {
-			mains = append(mains, mainPkgs[i-1])
 		}
 	} else {
 		mains = mainPkgs
