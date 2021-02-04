@@ -193,7 +193,9 @@ func (runner *AnalysisRunner) Run(args []string) error {
 
 	for _, m := range mains {
 		log.Info("Solving for " + m.String() + "... ")
-		fromPath = m.Pkg.Path()
+		if !efficiency {
+			fromPath = m.Pkg.Path()
+		}
 		result := runner.runEachMainBaseline(m)
 		runner.Analysis = &analysis{
 			useNewPTA:       true,
