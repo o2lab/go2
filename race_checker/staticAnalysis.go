@@ -182,7 +182,6 @@ func (runner *AnalysisRunner) Run(args []string) error {
 	if len(initial) == 0 {
 		log.Fatal("No Go files detected.")
 	}
-	//fromPath = initial[0].ID
 	t := time.Now()
 	elapsedLoad := t.Sub(startLoad)
 	log.Info("Done  -- Using ", elapsedLoad.String())
@@ -194,6 +193,9 @@ func (runner *AnalysisRunner) Run(args []string) error {
 
 	for _, m := range mains {
 		log.Info("Solving for " + m.String() + "... ")
+		if !efficiency {
+			fromPath = m.Pkg.Path()
+		}
 		result := runner.runEachMainBaseline(m)
 		runner.Analysis = &analysis{
 			useNewPTA:       true,
