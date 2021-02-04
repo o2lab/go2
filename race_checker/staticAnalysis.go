@@ -182,7 +182,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 	if len(initial) == 0 {
 		log.Fatal("No Go files detected.")
 	}
-	fromPath = initial[0].ID
+	//fromPath = initial[0].ID
 	t := time.Now()
 	elapsedLoad := t.Sub(startLoad)
 	log.Info("Done  -- Using ", elapsedLoad.String())
@@ -293,7 +293,7 @@ func (runner *AnalysisRunner) runEachMainBaseline(main *ssa.Package) *pointer.Re
 	//scope = append(scope, "istio.io/istio/")
 	//scope = append(scope, "google.golang.org/grpc")
 	//scope = append(scope, "github.com/pingcap/tidb")
-	//scope = append(scope, main.String()) //default ??
+	scope = append(scope, main.String()) //default
 
 	var mains []*ssa.Package
 	mains = append(mains, main)
