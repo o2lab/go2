@@ -293,7 +293,11 @@ func (runner *AnalysisRunner) runEachMainBaseline(main *ssa.Package) *pointer.Re
 	//scope = append(scope, "istio.io/istio/")
 	//scope = append(scope, "google.golang.org/grpc")
 	//scope = append(scope, "github.com/pingcap/tidb")
-	scope = append(scope, main.String()) //default
+	if strings.EqualFold(main.String(), "package command-line-arguments") {//default
+		scope = append(scope, "command-line-arguments")
+	}else{
+		scope = append(scope, main.String())
+	}
 
 	var mains []*ssa.Package
 	mains = append(mains, main)

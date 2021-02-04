@@ -994,11 +994,14 @@ func (a *analysis) fromImports(method string) bool {
 }
 
 //bz: whether a func is from a.config.Exclusion
-func (a *analysis) fromExclusion(method string) bool {
+func (a *analysis) fromExclusion(fn *ssa.Function) bool {
 	if a.config.LimitScope {
 		if len(a.config.Exclusion) > 0 { //user assigned scope
+			if fn.Pkg == nil || fn.Pkg.Pkg == nil {
+				return false
+			}
 			for _, pkg := range a.config.Exclusion {
-				if strings.Contains(method, pkg) {
+				if strings.Contains(fn.Pkg.Pkg.Path(), pkg) {
 					return true
 				}
 			}
@@ -1971,7 +1974,7 @@ func (a *analysis) genFunc(cgn *cgnode) {
 	fn := cgn.fn
 
 	//bz: we do not want to anlayze excluded pkgs
-	if a.fromExclusion(fn.String()) {
+	if a.fromExclusion(fn) {
 		return
 	}
 
