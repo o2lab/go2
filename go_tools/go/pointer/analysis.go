@@ -469,7 +469,13 @@ func AnalyzeWCtx(config *Config) (result *ResultWCtx, err error) { //Result
 			fmt.Println(" - " + pkg)
 		}
 	}
-	//fmt.Println(" - command-line-arguments (default)")
+	fmt.Println(" *********************************** ")
+	fmt.Println(" *** Import Libs ******************* ")
+	if len(a.config.imports) > 0 {
+		for _, pkg := range a.config.imports {
+			fmt.Println(" - " + pkg)
+		}
+	}
 	fmt.Println(" *********************************** ")
 	if len(a.config.Mains) > 1 {
 	    fmt.Println(" *** Multiple Mains **************** ")

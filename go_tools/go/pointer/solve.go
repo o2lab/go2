@@ -359,12 +359,15 @@ func (c *invokeConstraint) solve(a *analysis, delta *nodeset) {
 				}else{
 					//bz: special handling of invoke targets, create here
 					if a.config.DEBUG {
-						fmt.Println("!! GENERATING INVOKE FUNC HERE (c-sensitive): " + fn.String())
+						fmt.Println("!! GENERATING INVOKE FUNC HERE (ctx-sensitive): " + fn.String())
 					}
 					fnObj = a.genOnline(c.caller, c.site, fn)
 				}
 			} else { //newly created app func invokes lib func: use share contour
 				if !a.createForLevel(nil, fn) {
+					if a.config.DEBUG {
+						fmt.Println("Level excluded: " + fn.String())
+					}
 					return
 				}
 				fnObj = a.genOnline(nil, nil, fn)
@@ -379,9 +382,6 @@ func (c *invokeConstraint) solve(a *analysis, delta *nodeset) {
 			}
 		}
 
-		// bz: back to normal workflow -> context-insensitive
-		c.eachSolve(a, fnObj, sig, v)
-
 		// bz: we continue our Online process
 		if isOnline {
 			if a.log != nil { //debug
@@ -394,6 +394,9 @@ func (c *invokeConstraint) solve(a *analysis, delta *nodeset) {
 				fmt.Fprintf(a.log, "------------------------------ ------------------------------ ---------------------------- \n")
 			}
 		}
+		// bz: back to normal workflow -> context-insensitive
+		c.eachSolve(a, fnObj, sig, v)
+
 	}
 }
 

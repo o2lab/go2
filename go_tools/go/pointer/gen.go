@@ -953,6 +953,7 @@ func (a *analysis) considerKCFA(fn string) bool {
 }
 
 //bz:  currently compare string, already considered LimitScope
+// !!!!!! manually excluded pkg google.golang.org/grpc/grpclog ...
 func (a *analysis) withinScope(method string) bool {
 	if a.config.LimitScope {
 		if strings.Contains(method, "command-line-arguments") { //default scope
@@ -965,13 +966,20 @@ func (a *analysis) withinScope(method string) bool {
 					}
 				}
 			}
-			if len(a.config.Scope) > 0 { //user assigned scope
+			if len(a.config.Scope) > 0 { //project scope
 				for _, pkg := range a.config.Scope {
 					if strings.Contains(method, pkg) && !strings.Contains(method, "google.golang.org/grpc/grpclog") {
 						return true
 					}
 				}
 			}
+			//if len(a.config.imports) > 0 { //user assigned scope
+			//	for _, pkg := range a.config.imports {
+			//		if strings.Contains(method, pkg) && !strings.Contains(method, "google.golang.org/grpc/grpclog") {
+			//			return true
+			//		}
+			//	}
+			//}
 		}
 		return false
 	}
@@ -1045,37 +1053,35 @@ func (a *analysis) isInLoop(fn *ssa.Function, inst ssa.Instruction) bool {
 //bz: which level of lib/app calls we consider: true -> create func/cgnode; false -> do not create
 // see a.config.Level
 func (a *analysis) createForLevel(caller *ssa.Function, callee *ssa.Function) bool {
-
-
-	if a.config.Level == 0 { //bz: traverse all func
-		return true
-	}else if a.config.Level == 1 {//bz: caller in app, callee in lib
+	if a.config.Level == 0 { //bz: if callee is from app or import, we do it
+		if a.withinScope(callee.String()) || a.fromImports(callee.String()) {
+			return true
+		}
+	} else if a.config.Level == 1 { //bz: caller in app, callee in lib || caller in app, callee in app || caller in lib, callee in app
 		if caller == nil {
-			return false //is shared contour
+			return true //is shared contour
 		}
-		if !a.withinScope(callee.String()) && !a.withinScope(caller.String()) {
-			return false
+		if a.withinScope(caller.String()) || a.withinScope(callee.String()) {
+			return true
 		}
-	}else if a.config.Level == 2 { //bz: caller in lib, callee also in lib
+	} else if a.config.Level == 2 { //bz: caller in lib, callee also in lib, but parent of caller in app
+		// || parent in lib, caller in app, callee in lib || parent in lib, caller in lib, callee in app
 		if caller == nil {
 			if a.withinScope(callee.String()) {
 				return true //bz: as long as callee is app/path func, we do it
 			}
-			return false
+			return true
 		}
-		//parentcaller -> app; caller -> lib; callee -> lib
+		//parentcaller -> app; caller -> lib; callee -> lib  => 2 level
 		parentCaller := caller.Parent()
 		if parentCaller == nil { //bz: pkg initializer, no parent
 			return true
 		}
-		if !a.withinScope(parentCaller.String()) {
-			return false
+		if a.withinScope(parentCaller.String()) || a.withinScope(caller.String()) || a.withinScope(callee.String()) {
+			return true
 		}
-		//if !a.withinScope(callee.String()) { //bz: as long as callee is app/path func, we do it
-		//	return false
-		//}
 	}
-	return true
+	return false
 }
 
 //  ------------- bz : the following several functions generate constraints for different method calls --------------
@@ -1083,7 +1089,10 @@ func (a *analysis) createForLevel(caller *ssa.Function, callee *ssa.Function) bo
 // bz: force call site here
 func (a *analysis) genStaticCall(caller *cgnode, instr ssa.CallInstruction, site *callsite, call *ssa.CallCommon, result nodeid) {
 	fn := call.StaticCallee()
-	if !a.createForLevel(caller.fn, fn){
+	if !a.createForLevel(caller.fn, fn) {
+		if a.config.DEBUG {
+			fmt.Println("Level excluded: " + fn.String())
+		}
 		return
 	}
 
@@ -1136,7 +1145,7 @@ func (a *analysis) genStaticCall(caller *cgnode, instr ssa.CallInstruction, site
 		obj, _ = a.makeFunctionObjectWithContext(caller, fn, site, nil, -1)
 	} else {
 		//default: context-insensitive
-		if a.shouldUseContext(fn) {// default
+		if a.shouldUseContext(fn) { // default
 			obj = a.makeFunctionObject(fn, site) // new contour
 		} else {
 			obj = a.objectNode(nil, fn) // shared contour
@@ -1335,7 +1344,10 @@ func (a *analysis) genInvoke(caller *cgnode, site *callsite, call *ssa.CallCommo
 func (a *analysis) genInvokeReflectType(caller *cgnode, site *callsite, call *ssa.CallCommon, result nodeid) {
 	// Look up the concrete method.
 	fn := a.prog.LookupMethod(a.reflectRtypePtr, call.Method.Pkg(), call.Method.Name())
-	if !a.createForLevel(caller.fn, fn){
+	if !a.createForLevel(caller.fn, fn) {
+		if a.config.DEBUG {
+			fmt.Println("Level excluded: " + fn.String())
+		}
 		return
 	}
 
@@ -2131,7 +2143,7 @@ func (a *analysis) generate() {
 		if a.considerMyContext(_type) {
 			//bz: we want to make function (called by interfaces) later for kcfa, here uses share contour
 			if a.log != nil {
-				fmt.Fprintf(a.log,"SKIP genMethodsOf() offline for type: " + T.String() + "\n")
+				fmt.Fprintf(a.log, "SKIP genMethodsOf() offline for type: "+T.String()+"\n")
 			}
 			continue
 		}
@@ -2140,12 +2152,12 @@ func (a *analysis) generate() {
 			a.genMethodsOf(T)
 		} else {
 			if a.log != nil {
-				fmt.Fprintf(a.log, "EXCLUDE genMethodsOf() offline for type: " + T.String() + "\n")
+				fmt.Fprintf(a.log, "EXCLUDE genMethodsOf() offline for type: "+T.String()+"\n")
 			}
 		}
 	}
-	if a.config.DEBUG {
-		fmt.Fprintf(a.log,"\n Done genMethodsOf() offline. \n")
+	if a.log != nil {
+		fmt.Fprintf(a.log, "\n Done genMethodsOf() offline. \n")
 	}
 	// Generate constraints for functions as they become reachable
 	// from the roots.  (No constraints are generated for functions

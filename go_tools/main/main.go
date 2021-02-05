@@ -10,6 +10,7 @@ import (
 	"github.tamu.edu/April1989/go_tools/go/ssa/ssautil"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -125,9 +126,14 @@ func doEachMain(i int, main *ssa.Package) {
 	if projPath != "" {
 		scope = []string {projPath}
 	}
-
-	scope = append(scope, "istio.io/istio/")
-	scope = append(scope, "google.golang.org/grpc")
+	//scope = append(scope, "istio.io/istio/")
+	//scope = append(scope, "google.golang.org/grpc")
+	//scope = append(scope, "github.com/pingcap/tidb")
+	if strings.EqualFold(main.String(), "package command-line-arguments") {//default
+		scope = append(scope, "command-line-arguments")
+	}else{
+		scope = append(scope, main.String())
+	}
 
  	var mains []*ssa.Package
 	mains = append(mains, main)
@@ -146,7 +152,7 @@ func doEachMain(i int, main *ssa.Package) {
 		Scope:      scope, //bz: analyze scope + include + import
 		Exclusion:  excludedPkgs, //bz: copied from race_checker
 		DiscardQueries: true, //bz: do not use query any more
-		Level:      2, //bz: see pointer.Config
+		Level:      0, //bz: see pointer.Config
 	}
 
 	//*** compute pta here
