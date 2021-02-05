@@ -1064,8 +1064,10 @@ func (a *analysis) createForLevel(caller *ssa.Function, callee *ssa.Function) bo
 		if a.withinScope(caller.String()) || a.withinScope(callee.String()) {
 			return true
 		}
-	} else if a.config.Level == 2 { //bz: caller in lib, callee also in lib, but parent of caller in app
+	} else if a.config.Level == 2 {
+		//bz: caller in lib, callee also in lib, but parent of caller in app
 		// || parent in lib, caller in app, callee in lib || parent in lib, caller in lib, callee in app
+		// *** this analyzes the most among 012
 		if caller == nil {
 			if a.withinScope(callee.String()) {
 				return true //bz: as long as callee is app/path func, we do it
@@ -1081,7 +1083,9 @@ func (a *analysis) createForLevel(caller *ssa.Function, callee *ssa.Function) bo
 			return true
 		}
 	}
-	return false
+
+	//bz: this is really considering all, including lib's lib, etc.
+	return true
 }
 
 //  ------------- bz : the following several functions generate constraints for different method calls --------------

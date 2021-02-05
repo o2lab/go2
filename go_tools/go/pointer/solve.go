@@ -23,7 +23,9 @@ var num_constraints int
 
 func (a *analysis) solve() {
 	num_constraints = 0
+	//bz: dump info
 	fmt.Println("#constraints (before solve()): ", len(a.constraints)) //bz: performance test of optRenumber
+	fmt.Println("#cgnodes (before solve()): ", len(a.cgnodes)) //bz: performance test of optRenumber
 
 	start("Solving")
 	if a.log != nil {
@@ -80,8 +82,10 @@ func (a *analysis) solve() {
 		n.solve.prevPTS.Clear()
 	}
 
-	fmt.Println("#pts: ", len(a.nodes))                        //bz: performance test of optRenumber
-	fmt.Println("#constraints (totol num): ", num_constraints) //bz: performance test of optRenumber
+	//bz: performance test of optRenumber; dump info
+	fmt.Println("#pts: ", len(a.nodes))
+	fmt.Println("#constraints (totol num): ", num_constraints)
+	fmt.Println("#cgnodes (totol num): ", len(a.cgnodes))
 
 	if a.log != nil {
 		fmt.Fprintf(a.log, "Solver done\n")

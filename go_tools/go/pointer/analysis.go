@@ -473,8 +473,9 @@ func AnalyzeWCtx(config *Config) (result *ResultWCtx, err error) { //Result
 	fmt.Println(" *** Import Libs ******************* ")
 	if len(a.config.imports) > 0 {
 		for _, pkg := range a.config.imports {
-			fmt.Println(" - " + pkg)
+			fmt.Print(pkg + ", ")
 		}
+		fmt.Println()
 	}
 	fmt.Println(" *********************************** ")
 	if len(a.config.Mains) > 1 {
@@ -484,6 +485,7 @@ func AnalyzeWCtx(config *Config) (result *ResultWCtx, err error) { //Result
 		}
 		fmt.Println(" *********************************** ")
 	}
+	fmt.Println(" *** Level: " + strconv.Itoa(a.config.Level) + " *** ")
 	if a.config.DiscardQueries {
 		fmt.Println(" *** No Queries *** ")
 	}else{

@@ -101,9 +101,9 @@ func main() {
 	//baseline: foreach
 	start := time.Now()   //performance
 	for i, main := range mains {
-		if i == 16 {
-			continue  //TODO: bz: panic for grpc
-		}
+		//if i != 16 {
+		//	continue  //TODO: bz: panic for grpc
+		//}
  		fmt.Println(i, " ", main.String())
 		doEachMain(i, main)
 		fmt.Println("=============================================================================")
@@ -152,7 +152,7 @@ func doEachMain(i int, main *ssa.Package) {
 		Scope:      scope, //bz: analyze scope + include + import
 		Exclusion:  excludedPkgs, //bz: copied from race_checker
 		DiscardQueries: true, //bz: do not use query any more
-		Level:      0, //bz: see pointer.Config
+		Level:      3, //bz: see pointer.Config
 	}
 
 	//*** compute pta here
