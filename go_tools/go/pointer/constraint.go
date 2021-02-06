@@ -128,6 +128,7 @@ type untagConstraint struct {
 	dst   nodeid
 	src   nodeid // (ptr)
 	exact bool
+	tagme bool //bz: debug
 }
 
 func (c *untagConstraint) ptr() nodeid { return c.src }

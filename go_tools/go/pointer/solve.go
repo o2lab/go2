@@ -19,7 +19,7 @@ type solverState struct {
 	prevPTS nodeset      // pts(n) in previous iteration (for difference propagation)
 }
 
-var num_constraints int
+var num_constraints int //bz: debug + performance
 
 func (a *analysis) solve() {
 	num_constraints = 0
@@ -303,6 +303,9 @@ func (c *typeFilterConstraint) solve(a *analysis, delta *nodeset) {
 }
 
 func (c *untagConstraint) solve(a *analysis, delta *nodeset) {
+	if c.tagme {
+		fmt.Print()
+	}
 	predicate := types.AssignableTo
 	if c.exact {
 		predicate = types.Identical
@@ -368,7 +371,7 @@ func (c *invokeConstraint) solve(a *analysis, delta *nodeset) {
 					fnObj = a.genOnline(c.caller, c.site, fn)
 				}
 			} else { //newly created app func invokes lib func: use share contour
-				if !a.createForLevel(nil, fn) {
+				if !a.createForLevelX(nil, fn) {
 					if a.config.DEBUG {
 						fmt.Println("Level excluded: " + fn.String())
 					}

@@ -759,7 +759,12 @@ func (a *analysis) typeAssert(T types.Type, dst, src nodeid, exact bool) {
 	if isInterface(T) {
 		a.addConstraint(&typeFilterConstraint{T, dst, src})
 	} else {
-		a.addConstraint(&untagConstraint{T, dst, src, exact})
+		if TagME {
+			a.addConstraint(&untagConstraint{T, dst, src, exact, true})
+			TagME = false
+		}else{
+			a.addConstraint(&untagConstraint{T, dst, src, exact, false})
+		}
 	}
 }
 
@@ -1051,8 +1056,7 @@ func (a *analysis) isInLoop(fn *ssa.Function, inst ssa.Instruction) bool {
 }
 
 //bz: which level of lib/app calls we consider: true -> create func/cgnode; false -> do not create
-// see a.config.Level
-func (a *analysis) createForLevel(caller *ssa.Function, callee *ssa.Function) bool {
+func (a *analysis) createForLevelX(caller *ssa.Function, callee *ssa.Function) bool {
 	if a.config.Level == 0 { //bz: if callee is from app or import, we do it
 		if a.withinScope(callee.String()) || a.fromImports(callee.String()) {
 			return true
@@ -1065,7 +1069,7 @@ func (a *analysis) createForLevel(caller *ssa.Function, callee *ssa.Function) bo
 			return true
 		}
 	} else if a.config.Level == 2 {
-		//bz: caller in lib, callee also in lib, but parent of caller in app
+		//bz: caller in lib, callee also in lib, parent of caller in app
 		// || parent in lib, caller in app, callee in lib || parent in lib, caller in lib, callee in app
 		// *** this analyzes the most among 012
 		if caller == nil {
@@ -1082,6 +1086,16 @@ func (a *analysis) createForLevel(caller *ssa.Function, callee *ssa.Function) bo
 		if a.withinScope(parentCaller.String()) || a.withinScope(caller.String()) || a.withinScope(callee.String()) {
 			return true
 		}
+	} else if a.config.Level == 4 {
+		if caller == nil {
+			if a.withinScope(callee.String()) || a.fromImports(callee.String()) {
+				return true
+			}
+			return false
+		}
+		if a.withinScope(callee.String()) || a.fromImports(callee.String()) || a.withinScope(caller.String()) || a.fromImports(caller.String()){
+			return true
+		}
 	}
 
 	//bz: this is really considering all, including lib's lib, etc.
@@ -1093,7 +1107,7 @@ func (a *analysis) createForLevel(caller *ssa.Function, callee *ssa.Function) bo
 // bz: force call site here
 func (a *analysis) genStaticCall(caller *cgnode, instr ssa.CallInstruction, site *callsite, call *ssa.CallCommon, result nodeid) {
 	fn := call.StaticCallee()
-	if !a.createForLevel(caller.fn, fn) {
+	if !a.createForLevelX(caller.fn, fn) {
 		if a.config.DEBUG {
 			fmt.Println("Level excluded: " + fn.String())
 		}
@@ -1348,7 +1362,7 @@ func (a *analysis) genInvoke(caller *cgnode, site *callsite, call *ssa.CallCommo
 func (a *analysis) genInvokeReflectType(caller *cgnode, site *callsite, call *ssa.CallCommon, result nodeid) {
 	// Look up the concrete method.
 	fn := a.prog.LookupMethod(a.reflectRtypePtr, call.Method.Pkg(), call.Method.Name())
-	if !a.createForLevel(caller.fn, fn) {
+	if !a.createForLevelX(caller.fn, fn) {
 		if a.config.DEBUG {
 			fmt.Println("Level excluded: " + fn.String())
 		}
@@ -1693,6 +1707,8 @@ func (a *analysis) genStore(cgn *cgnode, ptr ssa.Value, val nodeid, offset, size
 	}
 }
 
+var TagME bool
+
 // genInstr generates constraints for instruction instr in context cgn.
 func (a *analysis) genInstr(cgn *cgnode, instr ssa.Instruction) {
 	if a.log != nil {
@@ -1701,6 +1717,10 @@ func (a *analysis) genInstr(cgn *cgnode, instr ssa.Instruction) {
 			prefix = val.Name() + " = "
 		}
 		fmt.Fprintf(a.log, "; %s%s\n", prefix, instr)
+	}
+
+	if strings.Contains(instr.String(), "typeassert,ok arg.(bool)") && strings.Contains(instr.(ssa.Value).Name(), "18") {
+		TagME = true
 	}
 
 	switch instr := instr.(type) {
