@@ -303,9 +303,6 @@ func (c *typeFilterConstraint) solve(a *analysis, delta *nodeset) {
 }
 
 func (c *untagConstraint) solve(a *analysis, delta *nodeset) {
-	if c.tagme {
-		fmt.Print()
-	}
 	predicate := types.AssignableTo
 	if c.exact {
 		predicate = types.Identical
@@ -375,7 +372,7 @@ func (c *invokeConstraint) solve(a *analysis, delta *nodeset) {
 					if a.config.DEBUG {
 						fmt.Println("Level excluded: " + fn.String())
 					}
-					return
+					continue
 				}
 				fnObj = a.genOnline(nil, nil, fn)
 			}
@@ -388,6 +385,8 @@ func (c *invokeConstraint) solve(a *analysis, delta *nodeset) {
 				fmt.Fprintf(a.log, "!! ALREADY EXIST INVOKE FUNC: "+fn.String()+"\n")
 			}
 		}
+		// bz: back to normal workflow -> context-insensitive
+		c.eachSolve(a, fnObj, sig, v)
 
 		// bz: we continue our Online process
 		if isOnline {
@@ -401,9 +400,6 @@ func (c *invokeConstraint) solve(a *analysis, delta *nodeset) {
 				fmt.Fprintf(a.log, "------------------------------ ------------------------------ ---------------------------- \n")
 			}
 		}
-		// bz: back to normal workflow -> context-insensitive
-		c.eachSolve(a, fnObj, sig, v)
-
 	}
 }
 

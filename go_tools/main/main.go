@@ -18,7 +18,8 @@ var excludedPkgs = []string{//bz: excluded a lot of default constraints
 	"runtime",
 	"reflect",
 	"os",
-	"reflect2", //bz: github.com/modern-go/reflect2
+	"github.com/modern-go/reflect2", //bz: i forget this causes which benchmark's untag obj panic
+	"google.golang.org/protobuf/reflect", //bz: this causes grpc untag obj panic
 }
 var projPath = ""   // interested packages are those located at this path
 var maxTime time.Duration
@@ -142,7 +143,7 @@ func doEachMain(i int, main *ssa.Package) {
 		Mains:          mains, //bz: NOW assume only one main
 		Reflection:     false,
 		BuildCallGraph: true,
-		Log:            nil,//logfile,
+		Log:            logfile,
 		//CallSiteSensitive: true, //kcfa
 		Origin:     true, //origin
 		//shared config
@@ -152,7 +153,7 @@ func doEachMain(i int, main *ssa.Package) {
 		Scope:      scope, //bz: analyze scope + include + import
 		Exclusion:  excludedPkgs, //bz: copied from race_checker
 		DiscardQueries: true, //bz: do not use query any more
-		Level:      4, //bz: see pointer.Config
+		Level:      0, //bz: see pointer.Config
 	}
 
 	//*** compute pta here

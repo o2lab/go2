@@ -43,6 +43,7 @@ type cgnode struct {
 
 	localval   map[ssa.Value]nodeid  //bz: going to store things here and take away to get rid of queries
 	localobj   map[ssa.Value]nodeid  //bz: same as above
+	done       bool      //bz: whether it already done genFunc() when generate constraints offline
 }
 
 //bz: going to replace and store (borrow them a pointer) a.localval and a.localobj here when calling genFunc() (gen.go)

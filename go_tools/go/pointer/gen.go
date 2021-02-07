@@ -759,12 +759,7 @@ func (a *analysis) typeAssert(T types.Type, dst, src nodeid, exact bool) {
 	if isInterface(T) {
 		a.addConstraint(&typeFilterConstraint{T, dst, src})
 	} else {
-		if TagME {
-			a.addConstraint(&untagConstraint{T, dst, src, exact, true})
-			TagME = false
-		}else{
-			a.addConstraint(&untagConstraint{T, dst, src, exact, false})
-		}
+		a.addConstraint(&untagConstraint{T, dst, src, exact})
 	}
 }
 
@@ -1056,6 +1051,7 @@ func (a *analysis) isInLoop(fn *ssa.Function, inst ssa.Instruction) bool {
 }
 
 //bz: which level of lib/app calls we consider: true -> create func/cgnode; false -> do not create
+//scope: 0 < 1 < 3 < 2
 func (a *analysis) createForLevelX(caller *ssa.Function, callee *ssa.Function) bool {
 	if a.config.Level == 0 { //bz: if callee is from app or import, we do it
 		if a.withinScope(callee.String()) || a.fromImports(callee.String()) {
@@ -1086,14 +1082,15 @@ func (a *analysis) createForLevelX(caller *ssa.Function, callee *ssa.Function) b
 		if a.withinScope(parentCaller.String()) || a.withinScope(caller.String()) || a.withinScope(callee.String()) {
 			return true
 		}
-	} else if a.config.Level == 4 {
+	} else if a.config.Level == 3 {
+		//bz: this analyze lib's import
 		if caller == nil {
 			if a.withinScope(callee.String()) || a.fromImports(callee.String()) {
 				return true
 			}
 			return false
 		}
-		if a.withinScope(callee.String()) || a.fromImports(callee.String()) || a.withinScope(caller.String()) || a.fromImports(caller.String()){
+		if a.withinScope(callee.String()) || a.fromImports(callee.String()) || a.withinScope(caller.String()) || a.fromImports(caller.String()) {
 			return true
 		}
 	}
@@ -1582,10 +1579,8 @@ func (a *analysis) objectNode(cgn *cgnode, v ssa.Value) nodeid {
 				//bz: this has NO ssa.CallInstruction as callsite;
 				//v should not be make closure, we handle it in a different function for both kcfa and origin, panic!
 				isClosure := a.isFromMakeClosure(v)
-				if a.considerMyContext(v.String()) {
-					if isClosure {
-						panic("WRONG PATH @objectNode() FOR MAKE CLOSURE: " + v.String())
-					}
+				if isClosure && a.considerMyContext(v.String()) {
+					panic("WRONG PATH @objectNode() FOR MAKE CLOSURE: " + v.String())
 				} else { //normal case
 					obj = a.makeFunctionObject(v, nil)
 				}
@@ -1707,8 +1702,6 @@ func (a *analysis) genStore(cgn *cgnode, ptr ssa.Value, val nodeid, offset, size
 	}
 }
 
-var TagME bool
-
 // genInstr generates constraints for instruction instr in context cgn.
 func (a *analysis) genInstr(cgn *cgnode, instr ssa.Instruction) {
 	if a.log != nil {
@@ -1717,10 +1710,6 @@ func (a *analysis) genInstr(cgn *cgnode, instr ssa.Instruction) {
 			prefix = val.Name() + " = "
 		}
 		fmt.Fprintf(a.log, "; %s%s\n", prefix, instr)
-	}
-
-	if strings.Contains(instr.String(), "typeassert,ok arg.(bool)") && strings.Contains(instr.(ssa.Value).Name(), "18") {
-		TagME = true
 	}
 
 	switch instr := instr.(type) {
@@ -2172,7 +2161,10 @@ func (a *analysis) generate() {
 			continue
 		}
 
-		if a.withinScope(_type) || a.fromImports(_type) { //bz: generate for both
+		//bz: generate for both  || a.fromImports(_type)
+		//update: we change back to only genMenthodsOf for methods in app, since too much panic when including lib pkgs,
+		//        meanwhile, we will analyze unreachable paths.
+		if a.withinScope(_type) {
 			a.genMethodsOf(T)
 		} else {
 			if a.log != nil {
@@ -2185,11 +2177,15 @@ func (a *analysis) generate() {
 	}
 	// Generate constraints for functions as they become reachable
 	// from the roots.  (No constraints are generated for functions
-	// that are dead in this analysis scope.)  ---> bz: want to generate cgn called by interfaces here, so it can have kcfa not shared contour
+	// that are dead in this analysis scope.)
+	//---> bz: want to generate cgn called by interfaces here, so it can have kcfa not shared contour
+	//Update: bz: only generate if it is in app scope, since we have a lot of untagged obj panics happens
+	//if we create constraints for some lib function here
 	for len(a.genq) > 0 {
 		cgn := a.genq[0]
 		a.genq = a.genq[1:]
 		a.genFunc(cgn)
+		cgn.done = true
 	}
 
 	// The runtime magically allocates os.Args; so should we.
