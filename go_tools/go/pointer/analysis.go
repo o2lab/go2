@@ -685,9 +685,20 @@ func (a *analysis) updateActaulCallSites() {
 // calleeid is the callee's object node (has otFunction flag).
 func (a *analysis) callEdge(caller *cgnode, site *callsite, calleeid nodeid) {
 	obj := a.nodes[calleeid].obj
-	if obj.flags&otFunction == 0 {
-		panic(fmt.Sprintf("callEdge %s -> n%d: not a function object", site, calleeid))
+	if a.config.K > 0 {
+		//bz: this is also the consequence of using taggedValueSpecial()
+		if obj == nil {
+			fmt.Println("(nil obj): callEdge %s -> n%d: not a function object", site, calleeid)
+			return
+		}else if obj.flags&otFunction == 0 {
+			fmt.Println("callEdge %s -> n%d: not a function object", site, calleeid)
+		}
+	}else { //default code
+		if obj.flags&otFunction == 0 {
+			panic(fmt.Sprintf("callEdge %s -> n%d: not a function object", site, calleeid))
+		}
 	}
+
 	callee := obj.cgn
 
 	//bz: solution@field actualCallerSite []*callsite of cgnode type

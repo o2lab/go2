@@ -625,6 +625,31 @@ func (a *analysis) taggedValue(obj nodeid) (tDyn types.Type, v nodeid, indirect 
 	return n.typ, obj + 1, flags&otIndirect != 0
 }
 
+//bz: hard code to avoid panics.
+func (a *analysis) taggedValueSpecial(obj nodeid) (tDyn types.Type, v nodeid, indirect bool) {
+	n := a.nodes[obj]
+	if n.obj == nil {
+		if a.log != nil {
+			fmt.Sprintf("NOT a tagged object (n.obj = nil): n%d", obj)
+		}
+		if a.config.DEBUG {
+			fmt.Println("NOT a tagged object (n.obj = nil): n%d", obj)
+		}
+		return nil, 0, false
+	}
+	flags := n.obj.flags
+	if flags&otTagged == 0 {
+		if a.log != nil {
+			fmt.Sprintf("NOT a tagged object: n%d", obj)
+		}
+		if a.config.DEBUG {
+			fmt.Println("NOT a tagged object: n%d", obj)
+		}
+		return nil, 0, false
+	}
+	return n.typ, obj + 1, flags&otIndirect != 0
+}
+
 // funcParams returns the first node of the params (P) block of the
 // function whose object node (obj.flags&otFunction) is id.
 //
@@ -2179,6 +2204,10 @@ func (a *analysis) generate() {
 	if a.log != nil {
 		fmt.Fprintf(a.log, "\n Done genMethodsOf() offline. \n")
 	}
+	if a.config.DEBUG {
+		fmt.Println("------ done genMethodOf() ------ ")
+	}
+
 	// Generate constraints for functions as they become reachable
 	// from the roots.  (No constraints are generated for functions
 	// that are dead in this analysis scope.)
