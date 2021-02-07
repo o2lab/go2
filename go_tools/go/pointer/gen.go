@@ -1051,33 +1051,30 @@ func (a *analysis) isInLoop(fn *ssa.Function, inst ssa.Instruction) bool {
 }
 
 //bz: which level of lib/app calls we consider: true -> create func/cgnode; false -> do not create
-//scope: 0 < 1 < 3 < 2
+//scope: 1<2<3<0
 func (a *analysis) createForLevelX(caller *ssa.Function, callee *ssa.Function) bool {
-	if a.config.Level == 0 { //bz: if callee is from app or import, we do it
+	if a.config.Level == 1 {
+		//bz: if callee is from app or import => 1 level
+		//caller in app, callee in lib || caller in app, callee in app || caller in lib, callee in app
 		if a.withinScope(callee.String()) || a.fromImports(callee.String()) {
 			return true
 		}
-	} else if a.config.Level == 1 { //bz: caller in app, callee in lib || caller in app, callee in app || caller in lib, callee in app
-		if caller == nil {
-			return true //is shared contour
-		}
-		if a.withinScope(caller.String()) || a.withinScope(callee.String()) {
-			return true
-		}
 	} else if a.config.Level == 2 {
-		//bz: caller in lib, callee also in lib, parent of caller in app
+		//bz: parent of caller in app, caller in lib, callee also in lib
 		// || parent in lib, caller in app, callee in lib || parent in lib, caller in lib, callee in app
-		// *** this analyzes the most among 012
 		if caller == nil {
-			if a.withinScope(callee.String()) {
+			if a.withinScope(callee.String()) || a.fromImports(callee.String()) {
 				return true //bz: as long as callee is app/path func, we do it
 			}
 			return true
 		}
 		//parentcaller -> app; caller -> lib; callee -> lib  => 2 level
 		parentCaller := caller.Parent()
-		if parentCaller == nil { //bz: pkg initializer, no parent
-			return true
+		if parentCaller == nil { //bz: pkg initializer, no parent or other cases
+			if a.withinScope(callee.String()) || a.fromImports(callee.String()) {
+				return true
+			}
+			return false
 		}
 		if a.withinScope(parentCaller.String()) || a.withinScope(caller.String()) || a.withinScope(callee.String()) {
 			return true
@@ -1095,7 +1092,7 @@ func (a *analysis) createForLevelX(caller *ssa.Function, callee *ssa.Function) b
 		}
 	}
 
-	//bz: this is really considering all, including lib's lib, etc.
+	//bz: this is really considering all, including lib's lib, lib's lib's lib, etc.
 	return true
 }
 
