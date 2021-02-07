@@ -233,6 +233,9 @@ func (a *analysis) makeFunctionObject(fn *ssa.Function, callersite *callsite) no
 	if a.log != nil {
 		fmt.Fprintf(a.log, "\t---- makeFunctionObject %s\n", fn)
 	}
+	if a.config.DEBUG {
+		fmt.Println("\t---- makeFunctionObject for " + fn.String())
+	}
 
 	// obj is the function object (identity, params, results).
 	obj := a.nextNode()
@@ -1053,6 +1056,7 @@ func (a *analysis) isInLoop(fn *ssa.Function, inst ssa.Instruction) bool {
 //bz: which level of lib/app calls we consider: true -> create func/cgnode; false -> do not create
 //scope: 1<2<3<0
 func (a *analysis) createForLevelX(caller *ssa.Function, callee *ssa.Function) bool {
+	if a.fromExclusion(callee) {return false}
 	if a.config.Level == 1 {
 		//bz: if callee is from app or import => 1 level
 		//caller in app, callee in lib || caller in app, callee in app || caller in lib, callee in app
@@ -1071,7 +1075,7 @@ func (a *analysis) createForLevelX(caller *ssa.Function, callee *ssa.Function) b
 		//parentcaller -> app; caller -> lib; callee -> lib  => 2 level
 		parentCaller := caller.Parent()
 		if parentCaller == nil { //bz: pkg initializer, no parent or other cases
-			if a.withinScope(callee.String()) || a.fromImports(callee.String()) {
+			if a.withinScope(callee.String()) || a.fromImports(callee.String()) || a.withinScope(caller.String()) || a.fromImports(caller.String()) {
 				return true
 			}
 			return false
@@ -1134,29 +1138,32 @@ func (a *analysis) genStaticCall(caller *cgnode, instr ssa.CallInstruction, site
 	var obj nodeid //bz: only used in some cases below
 	//var isNew bool //bz: whether obj is a new cgnode
 
-	//bz: for origin-sensitive, we have two cases:
-	//case 1: no closure, directly invoke static function: e.g., go Producer(t0, t1, t3), we create a new context for it
-	//case 2: has closure: make closure has been created earlier, here find the çreated obj and use its context
-	//case 3: no closure, but invoke virtual function: e.g., go (*ccBalancerWrapper).watcher(t0), we create a new context for it
-	if a.considerMyContext(fn.String()) {
-		//bz: simple brute force solution; start to be kcfa from main.main.go
-		if a.config.DEBUG {
-			fmt.Println("CAUGHT APP METHOD -- " + fn.String()) //debug
-		}
-		_, ok := site.instr.(*ssa.Go)
-		if ok { //bz: invoke a go routine --> detail check for different context-sensitivities
-			if a.config.DEBUG { //debug
-				fmt.Println("        BUT ssa.GO -- " + site.instr.String() + "   LET'S SEE.")
+	if a.config.K > 0 {
+		//bz: for origin-sensitive, we have two cases:
+		//case 1: no closure, directly invoke static function: e.g., go Producer(t0, t1, t3), we create a new context for it
+		//case 2: has closure: make closure has been created earlier, here find the çreated obj and use its context
+		//case 3: no closure, but invoke virtual function: e.g., go (*ccBalancerWrapper).watcher(t0), we create a new context for it
+		if a.considerMyContext(fn.String()) {
+			//bz: simple brute force solution; start to be kcfa from main.main.go
+			if a.config.DEBUG {
+				fmt.Println("CAUGHT APP METHOD -- " + fn.String()) //debug
 			}
-			a.genStaticCallForGoCall(caller, instr, site, call, result) //bz: direct the handling outside and return
-			return
-		}
+			_, ok := site.instr.(*ssa.Go)
+			if ok { //bz: invoke a go routine --> detail check for different context-sensitivities
+				if a.config.DEBUG { //debug
+					fmt.Println("        BUT ssa.GO -- " + site.instr.String() + "   LET'S SEE.")
+				}
+				a.genStaticCallForGoCall(caller, instr, site, call, result) //bz: direct the handling outside and return
+				return
+			}
 
-		//for kcfa: we need a new contour
-		//for origin: whatever left, we use caller context
-		obj, _ = a.makeFunctionObjectWithContext(caller, fn, site, nil, -1)
-	} else {
-		//default: context-insensitive
+			//for kcfa: we need a new contour
+			//for origin: whatever left, we use caller context
+			obj, _ = a.makeFunctionObjectWithContext(caller, fn, site, nil, -1)
+		}else{
+			obj = a.objectNode(nil, fn) // shared contour
+		}
+	}else { //default: context-insensitive
 		if a.shouldUseContext(fn) { // default
 			obj = a.makeFunctionObject(fn, site) // new contour
 		} else {
