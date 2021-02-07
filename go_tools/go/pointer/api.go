@@ -760,7 +760,10 @@ type PointerWCtx struct {
 
 //bz: we created an empty PointerWCTx to return
 func (p PointerWCtx) IsNil() bool {
-	return p.a == nil
+	if p.a == nil {
+		return true // this is we created since we cannot locate such a pointer
+	}
+	return p.a.nodes[p.n].solve.pts.IsEmpty() //this is the really empty pts
 }
 
 //bz: whether goID is match with the contexts in this pointer

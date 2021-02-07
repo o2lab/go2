@@ -97,6 +97,8 @@ func (a *analysis) pointerAnalysis_new(location ssa.Value, goID int, theIns ssa.
 		}
 		//log.Trace("***Executing target No.", rightLoc+1)
 	} else if len(pts_labels) == 0 {
+		pts_labels1 := pts.Labels()
+		fmt.Println(pts_labels1)
 		return
 	}
 	if a.ptaConfig.DiscardQueries { // bz: we are not using queries now

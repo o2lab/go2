@@ -104,7 +104,7 @@ var (
 var useNewPTA = true //bz: default value for this branch
 var useQueries = false //bz: whether we use Queries in pointer analysis
 var doDebugPTA = false //bz: default value for this branch
-var doPTALog = false //bz: default value for this branch
+var doPTALog = true //bz: default value for this branch
 
 var trieLimit = 2      // set as user config option later, an integer that dictates how many times a function can be called under identical context
 var efficiency = false // configuration setting to avoid recursion in tested program
@@ -114,37 +114,12 @@ var entryFn = "main"
 var allEntries = false
 
 func init() {
-	//excludedPkgs = []string{ //bz: see if this is still useful
-	//	"fmt",
-	//	"reflect",
-	//	"encoding",
-	//	"errors",
-	//	"bytes",
-	//	"strconv",
-	//	"strings",
-	//	"bytealg",
-	//	"race",
-	//	"syscall",
-	//	"poll",
-	//	"trace",
-	//	"logging",
-	//	"os",
-	//	"builtin",
-	//	"pflag",
-	//	"log",
-	//	"internal",
-	//	"impl",
-	//	"transport",
-	//	"version",
-	//	"sort",
-	//	"filepath",
-	//}
-
 	excludedPkgs = []string{//bz: excluded a lot of default constraints
 		"runtime",
 		"reflect",
 		"os",
-		"reflect2", //bz: evil reflection...
+		"github.com/modern-go/reflect2", //bz: i forget this causes which benchmark's untag obj panic
+		"google.golang.org/protobuf/reflect", //bz: this causes grpc untag obj panic
 	}
 }
 
