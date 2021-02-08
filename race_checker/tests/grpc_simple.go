@@ -19,10 +19,12 @@ func someFunc(cs1 grpc.ClientStream) int {
 }
 
 func main() {
-	var cs1 grpc.ClientStream
-	go someFunc(cs1)
-	var err24 = cs1.CloseSend()
-	if err24 != nil {
-		fmt.Println(err24)
+	var cs1 grpc.ClientConn
+	stream, err := cs1.NewStream()
+	_ = err
+	go someFunc(stream)
+	var err1 = stream.CloseSend()
+	if err1 != nil {
+		fmt.Println(err1)
 	}
 }
