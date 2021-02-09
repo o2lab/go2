@@ -34,7 +34,7 @@ func (a *analysis) checkRacyPairs() {
 						}
 						var theSame bool //bz: see different conditions from config
 						if a.ptaConfig.DiscardQueries {
-							theSame = a.sameAddress2(addressPair[0], goI, i, addressPair[1], goJ, j)
+							theSame = a.sameAddress2(addressPair[0], goI, i, addressPair[1], goJ, j) // yq: method needs revision?
 						} else {
 							theSame = a.sameAddress(addressPair[0], addressPair[1])
 						}
@@ -43,6 +43,9 @@ func (a *analysis) checkRacyPairs() {
 							sameLock = a.lockSetsIntersect2(insSlice[0], i, insSlice[1], j) //bz: i need goID
 						} else {
 							sameLock = a.lockSetsIntersect(insSlice[0], insSlice[1])
+						}
+						if addressPair[0].String() == "&t4.sentLast [#9]" && addressPair[1].String() == "&t4.sentLast [#9]" {
+							log.Debug(a.sameAddress(addressPair[0], addressPair[1]))
 						}
 						if theSame && !sameLock &&
 							!sliceContains(a.reportedAddr, addressPair[0]) &&
