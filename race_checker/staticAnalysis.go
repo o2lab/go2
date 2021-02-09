@@ -318,7 +318,7 @@ func (runner *AnalysisRunner) runEachMainBaseline(main *ssa.Package) *pointer.Re
 		Scope:      scope,        //bz: analyze scope, default is "command-line-arguments"
 		Exclusion: excludedPkgs, //excludedPkgs here
 		DiscardQueries: !useQueries, //bz: new flag -> if we use queries
-		Level:      1,
+		Level:      2,
 		//bz: Level = 1: if callee is from app or import
 		// Level = 2: parent of caller in app, caller in lib, callee also in lib || parent in lib, caller in app, callee in lib || parent in lib, caller in lib, callee in app
 		// Level = 3: this also analyze lib's import == lib's lib

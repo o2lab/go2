@@ -69,7 +69,7 @@ func (a *analysis) buildHB(HBgraph *graph.Graph) {
 					ifSuccEndN = append(ifSuccEndN, currN)
 				}
 				// edge manipulation:
-				if ch, ok := a.selectCaseBegin[anIns]; ok {
+				if ch, ok := a.selectCaseBegin[anIns]; ok && channelComm {
 					if ch == "defaultCase" || ch == "timeOut" {
 						err := HBgraph.MakeEdge(selectN[0], currN) // select node to default case
 						if err != nil {
@@ -88,7 +88,7 @@ func (a *analysis) buildHB(HBgraph *graph.Graph) {
 							}
 						}
 					}
-				} else if _, ok1 := a.selectDone[anIns]; ok1 {
+				} else if _, ok1 := a.selectDone[anIns]; ok1 && channelComm {
 					if len(selCaseEndN) > 1 { // more than one portal is ready
 						err := HBgraph.MakeEdge(selectN[0], currN) // select statement to select done
 						if err != nil {
@@ -103,7 +103,7 @@ func (a *analysis) buildHB(HBgraph *graph.Graph) {
 					if selectN != nil && len(selectN) > 1 {
 						selectN = selectN[1:]
 					} // completed analysis of one select statement
-				} else if ifInstr, ok2 := a.ifSuccBegin[anIns]; ok2 {
+				} else if ifInstr, ok2 := a.ifSuccBegin[anIns]; ok2 && channelComm {
 					skipSucc := false
 					for beginIns, ifIns := range a.ifSuccBegin {
 						if ifIns == ifInstr && beginIns != anIns && sliceContainsInsAt(a.commIfSucc, beginIns) != -1 && channelComm { // other succ contains channel communication
@@ -139,7 +139,7 @@ func (a *analysis) buildHB(HBgraph *graph.Graph) {
 					for wIns, wNode := range waitingN {
 						var theSame bool
 						if a.ptaConfig.DiscardQueries {
-							if v, ok := (*wNode.Value).(goIns); ok {
+							if v, ok1 := (*wNode.Value).(goIns); ok1 {
 								theSame = a.sameAddress2(callIns.Call.Args[0], callIns, nGo, wIns.Call.Args[0], wIns, v.goID)
 							}else{
 								theSame = false
@@ -160,7 +160,7 @@ func (a *analysis) buildHB(HBgraph *graph.Graph) {
 					for wIns, wNode := range waitingN {
 						var theSame bool
 						if a.ptaConfig.DiscardQueries {
-							if v, ok := (*wNode.Value).(goIns); ok {
+							if v, ok2 := (*wNode.Value).(goIns); ok2 {
 								theSame = a.sameAddress2(dIns.Call.Args[0], dIns, nGo, wIns.Call.Args[0], wIns, v.goID)
 							}else{
 								theSame = false
@@ -398,7 +398,11 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 							}
 						}
 					default:
-						a.insStore(examIns, goID, theIns)
+						if v, ok1 := examIns.Val.(*ssa.Alloc); ok1 && v.Comment == "complit" {
+							// var assign
+						} else {
+							a.insStore(examIns, goID, theIns)
+						}
 					}
 				} else {
 					a.insStore(examIns, goID, theIns)

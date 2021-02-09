@@ -161,7 +161,7 @@ func main() {//default: -useNewPTA
 	}
 	if *withoutComm {
 		//trieLimit = 1 //bz: we want trieLimit == 2, otherwise: missing function, e.g., TestIstio8214
-		efficiency = true
+		//efficiency = true
 		channelComm = false
 	}
 	if *withComm {
