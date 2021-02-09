@@ -45,7 +45,8 @@ func (a *analysis) checkRacyPairs() {
 							sameLock = a.lockSetsIntersect(insSlice[0], insSlice[1])
 						}
 						if addressPair[0].String() == "&t4.sentLast [#9]" && addressPair[1].String() == "&t4.sentLast [#9]" {
-							log.Debug(a.sameAddress(addressPair[0], addressPair[1]))
+							log.Debug(a.prog.Fset.Position(addressPair[0].Pos()))
+							log.Debug(a.prog.Fset.Position(addressPair[1].Pos()))
 						}
 						if theSame && !sameLock &&
 							!sliceContains(a.reportedAddr, addressPair[0]) &&
