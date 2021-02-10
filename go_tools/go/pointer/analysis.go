@@ -419,11 +419,16 @@ func AnalyzeWCtx(config *Config) (result *ResultWCtx, err error) { //Result
 	} else {
 		fmt.Println(" *** Use My API *** ")
 	}
-	if optRenumber {
-		fmt.Println(" *** optRenumber ON *** ")
+	if a.config.TrackMore {
+		fmt.Println(" *** Track Types in Scope *** ")
 	} else {
-		fmt.Println(" *** optRenumber OFF *** ")
+		fmt.Println(" *** Default Type Tracking *** ")
 	}
+	//if optRenumber {
+	//	fmt.Println(" *** optRenumber ON *** ")
+	//} else {
+	//	fmt.Println(" *** optRenumber OFF *** ")
+	//}
 
 	if a.log != nil {
 		fmt.Fprintln(a.log, "==== Starting analysis and logging: ")

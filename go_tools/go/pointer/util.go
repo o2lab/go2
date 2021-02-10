@@ -220,29 +220,29 @@ func (a *analysis) shouldTrack(T types.Type) bool {
 				break
 			}
 		}
-		//default
-		a.trackTypes[T] = track
-		if !track && a.log != nil {
-			fmt.Fprintf(a.log, "\ttype not tracked: %s\n", T)
-		}
 
-		//Update: bz: my previous code -> this is different from the default implementation:
-		//        default is not tracking the type byte[], so it will not create constraints for specific types inside lib;
-		//        while my implementation is tracking the type, and more constraints
-		//        NOW CHANGE BACK TO DEFAULT, NOW WE WILL START TO LOSE RACES
-		//// bz: here track == false --> this will topple the true assignment at the function beginning ...
-		//// BUT we track all types declared in app, since we cannot pre-populated them
-		//if a.withinScope(T.String()) {
-		//	a.trackTypes[T] = track
-		//	if !track && a.log != nil {
-		//		fmt.Fprintf(a.log, "\ttype not tracked: %s\n", T)
-		//	}
-		//} else { //bz: just log
-		//	if track && a.log != nil {
-		//		fmt.Fprintf(a.log, "\tforce type tracked: %s\n", T)
-		//	}
-		//	return true //bz: fake it to be true --> track it
-		//}
+		if a.config.TrackMore {
+			// bz: here track == false --> this will topple the true assignment at the function beginning ...
+			// BUT we track all types declared in app, since we cannot pre-populated them
+			if a.withinScope(T.String()) {
+				a.trackTypes[T] = true
+				if a.log != nil && !track {
+					fmt.Fprintf(a.log, "\tforce type tracked: %s\n", T)
+				}
+				return true
+			} else { //bz: skip T types in lib
+				if a.log != nil && !track {
+					fmt.Fprintf(a.log, "\tforce type tracked: %s\n", T)
+				}
+				return true //bz: fake it to be true --> track it
+			}
+		} else {
+			//default
+			a.trackTypes[T] = track
+			if !track && a.log != nil {
+				fmt.Fprintf(a.log, "\ttype not tracked: %s\n", T)
+			}
+		}
 	}
 	return track
 }

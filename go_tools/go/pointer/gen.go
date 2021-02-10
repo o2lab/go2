@@ -690,8 +690,15 @@ func (a *analysis) addressOf(T types.Type, id, obj nodeid) {
 	if obj == 0 {
 		panic("addressOf: zero obj")
 	}
-	if a.shouldTrack(T) { //withinScope ||
-		a.addConstraint(&addrConstraint{id, obj})
+
+	if a.config.TrackMore {
+		if withinScope || a.shouldTrack(T) {
+			a.addConstraint(&addrConstraint{id, obj})
+		}
+	}else{ //default
+		if a.shouldTrack(T) {
+			a.addConstraint(&addrConstraint{id, obj})
+		}
 	}
 }
 
@@ -742,9 +749,16 @@ func (a *analysis) store(dst, src nodeid, offset uint32, sizeof uint32) {
 // T is the type of the address.
 //
 func (a *analysis) offsetAddr(T types.Type, dst, src nodeid, offset uint32) {
-	if !a.shouldTrack(T) { // !withinScope &&
-		return
+	if a.config.TrackMore {
+		if !withinScope && !a.shouldTrack(T)  {
+			return
+		}
+	}else{ //default
+		if !a.shouldTrack(T)  {
+			return
+		}
 	}
+
 	if offset == 0 {
 		// Simplify  dst = &src->f0
 		//       to  dst = src

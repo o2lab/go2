@@ -82,6 +82,7 @@ type Config struct {
 	Exclusion      []string //excluded packages from this analysis -> from race_checker if any
 	DiscardQueries bool     //bz: do not use queries, but keep every pts info in *cgnode
 	UseQueriesAPI  bool     //bz: change the api the same as default pta
+	TrackMore      bool     //bz: track pointers with types declared in Analyze Scope
 
 	imports        []string //bz: internal use: store all import pkgs in a main
 	Level          int      //bz: level == 0: traverse all app and lib, but with different ctx; level == 1: traverse 1 level lib call; level == 2: traverse 2 leve lib calls; no other option now
