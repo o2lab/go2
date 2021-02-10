@@ -195,8 +195,6 @@ type Result struct {
 }
 
 
-
-
 //bz: same as default , but we want contexts
 type ResultWCtx struct {
 	a         *analysis  // bz: we need a lot from here...

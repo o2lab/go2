@@ -233,8 +233,11 @@ func (a *analysis) makeFunctionObject(fn *ssa.Function, callersite *callsite) no
 	if a.log != nil {
 		fmt.Fprintf(a.log, "\t---- makeFunctionObject %s\n", fn)
 	}
-	if a.config.DEBUG {
-		fmt.Println("\t---- makeFunctionObject for " + fn.String())
+	//if a.config.DEBUG {
+	//	fmt.Println("\t---- makeFunctionObject for " + fn.String())
+	//}
+	if strings.Contains(fn.String(), "(*fmt.pp).printArg") {
+		fmt.Println()
 	}
 
 	// obj is the function object (identity, params, results).
@@ -270,10 +273,9 @@ func (a *analysis) makeFunctionObjectWithContext(caller *cgnode, fn *ssa.Functio
 	if a.log != nil {
 		fmt.Fprintf(a.log, "\t---- makeFunctionObjectWithContext (kcfa) %s\n", fn)
 	}
-
-	if a.config.DEBUG {
-		fmt.Printf("\t---- makeFunctionObjectWithContext (kcfa) for %s\n", fn)
-	}
+	//if a.config.DEBUG {
+	//	fmt.Printf("\t---- makeFunctionObjectWithContext (kcfa) for %s\n", fn)
+	//}
 
 	if a.config.Origin && callersite == nil && closure != nil {
 		//origin: case 2: fn is make closure -> we checked before calling this, now needs to create it
@@ -620,32 +622,7 @@ func (a *analysis) taggedValue(obj nodeid) (tDyn types.Type, v nodeid, indirect 
 	n := a.nodes[obj]
 	flags := n.obj.flags
 	if flags&otTagged == 0 {
-		panic(fmt.Sprintf("not a tagged object: n%d", obj))
-	}
-	return n.typ, obj + 1, flags&otIndirect != 0
-}
-
-//bz: hard code to avoid panics.
-func (a *analysis) taggedValueSpecial(obj nodeid) (tDyn types.Type, v nodeid, indirect bool) {
-	n := a.nodes[obj]
-	if n.obj == nil {
-		if a.log != nil {
-			fmt.Sprintf("NOT a tagged object (n.obj = nil): n%d", obj)
-		}
-		if a.config.DEBUG {
-			fmt.Println("NOT a tagged object (n.obj = nil): n%d", obj)
-		}
-		return nil, 0, false
-	}
-	flags := n.obj.flags
-	if flags&otTagged == 0 {
-		if a.log != nil {
-			fmt.Sprintf("NOT a tagged object: n%d", obj)
-		}
-		if a.config.DEBUG {
-			fmt.Println("NOT a tagged object: n%d", obj)
-		}
-		return nil, 0, false
+		panic(fmt.Sprintf("not a tagged object: n%d = %s", obj, n))
 	}
 	return n.typ, obj + 1, flags&otIndirect != 0
 }
@@ -713,7 +690,7 @@ func (a *analysis) addressOf(T types.Type, id, obj nodeid) {
 	if obj == 0 {
 		panic("addressOf: zero obj")
 	}
-	if withinScope || a.shouldTrack(T) {
+	if a.shouldTrack(T) { //withinScope ||
 		a.addConstraint(&addrConstraint{id, obj})
 	}
 }
@@ -765,7 +742,7 @@ func (a *analysis) store(dst, src nodeid, offset uint32, sizeof uint32) {
 // T is the type of the address.
 //
 func (a *analysis) offsetAddr(T types.Type, dst, src nodeid, offset uint32) {
-	if !withinScope && !a.shouldTrack(T) {
+	if !a.shouldTrack(T) { // !withinScope &&
 		return
 	}
 	if offset == 0 {
@@ -1081,7 +1058,9 @@ func (a *analysis) isInLoop(fn *ssa.Function, inst ssa.Instruction) bool {
 //bz: which level of lib/app calls we consider: true -> create func/cgnode; false -> do not create
 //scope: 1<2<3<0
 func (a *analysis) createForLevelX(caller *ssa.Function, callee *ssa.Function) bool {
-	if a.fromExclusion(callee) {return false}
+	if strings.Contains(callee.String(), "(*fmt.pp).printArg") {
+		return false
+	}
 	if a.config.Level == 1 {
 		//bz: if callee is from app or import => 1 level
 		//caller in app, callee in lib || caller in app, callee in app || caller in lib, callee in app
@@ -1992,7 +1971,7 @@ func (a *analysis) makeCGNode(fn *ssa.Function, obj nodeid, callersite *callsite
 //
 func (a *analysis) genRootCalls() *cgnode {
 	r := a.prog.NewFunction("<root>", new(types.Signature), "root of callgraph")
-	root := a.makeCGNode(r, 0, nil)
+	root := a.makeCGNode(r, 0, nil) //bz: root is a fake node, like to all main.init and main.main
 
 	// TODO(adonovan): make an ssa utility to construct an actual
 	// root function so we don't need to special-case site-less
@@ -2026,11 +2005,6 @@ func (a *analysis) genRootCalls() *cgnode {
 // genFunc generates constraints for function fn.
 func (a *analysis) genFunc(cgn *cgnode) {
 	fn := cgn.fn
-
-	//bz: we do not want to anlayze excluded pkgs
-	if a.fromExclusion(fn) {
-		return
-	}
 
 	impl := a.findIntrinsic(fn)
 
@@ -2165,7 +2139,8 @@ func (a *analysis) generate() {
 	// Create the global node for panic values.
 	a.panicNode = a.addNodes(tEface, "panic")
 
-	// Create nodes and constraints for all methods of reflect.rtype.
+	// Create nodes and constraints
+	//for all methods of reflect.rtype.
 	// (Shared contours are used by dynamic calls to reflect.Type
 	// methods---typically just String().)
 	if rtype := a.reflectRtypePtr; rtype != nil {
@@ -2180,6 +2155,7 @@ func (a *analysis) generate() {
 
 	// Create nodes and constraints for all methods of all types
 	// that are dynamically accessible via reflection or interfaces.
+	skip := 0
 	for _, T := range a.prog.RuntimeTypes() {
 		_type := T.String()
 		if a.considerMyContext(_type) {
@@ -2190,17 +2166,17 @@ func (a *analysis) generate() {
 			continue
 		}
 
-		//bz: generate for both  || a.fromImports(_type)
-		//update: we change back to only genMenthodsOf for methods in app, since too much panic when including lib pkgs,
-		//        meanwhile, we will analyze unreachable paths.
+		//bz: generate for both || a.fromImports(_type)
 		if a.withinScope(_type) {
 			a.genMethodsOf(T)
 		} else {
 			if a.log != nil {
-				fmt.Fprintf(a.log, "EXCLUDE genMethodsOf() offline for type: "+T.String()+"\n")
+				fmt.Fprintf(a.log, "EXCLUDE genMethodsOf() offline for type: " + T.String()+"\n")
 			}
+			skip++
 		}
 	}
+	fmt.Println("#EXCLUDE genMethodsOf() offline: ", skip)
 	if a.log != nil {
 		fmt.Fprintf(a.log, "\n Done genMethodsOf() offline. \n")
 	}
@@ -2218,7 +2194,6 @@ func (a *analysis) generate() {
 		cgn := a.genq[0]
 		a.genq = a.genq[1:]
 		a.genFunc(cgn)
-		cgn.done = true
 	}
 
 	// The runtime magically allocates os.Args; so should we.

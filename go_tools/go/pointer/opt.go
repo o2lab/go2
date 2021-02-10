@@ -138,7 +138,7 @@ func (a *analysis) renumber() {
 
 	//bz: special options
 	if !a.config.DiscardQueries {
-		//bz: we are now using this, update for all recorded queries
+		//bz: if using queries (old), we are now using this, update for all recorded queries
 		// Renumber nodeids in queried Pointers.
 		for v, ptrs := range a.result.Queries {
 			tmp := make([]PointerWCtx, len(ptrs))

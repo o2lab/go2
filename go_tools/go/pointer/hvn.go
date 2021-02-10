@@ -166,6 +166,7 @@ import (
 	"go/types"
 	"io"
 	"reflect"
+	"strings"
 
 	"github.tamu.edu/April1989/go_tools/container/intsets"
 )
@@ -290,6 +291,9 @@ func (a *analysis) hvn() {
 	for _, c := range a.constraints {
 		if debugHVNVerbose && h.log != nil {
 			fmt.Fprintf(h.log, "; %s\n", c)
+		}
+		if strings.Contains(c.String(), "load n519801 <- n438581[0]") {
+			fmt.Println()
 		}
 		c.presolve(&h)
 	}
@@ -793,7 +797,6 @@ func (h *hvn) simplify() {
 			// id becomes the representative of the PE label.
 			canonID = id
 			canon[label] = canonID
-
 			if h.a.log != nil {
 				fmt.Fprintf(h.a.log, "\tpts(n%d) is canonical : \t(%s)\n",
 					id, h.a.nodes[id].typ)

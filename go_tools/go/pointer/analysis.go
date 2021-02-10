@@ -25,8 +25,10 @@ import (
 
 const (
 	// optimization options; enable all when committing
+	// TODO: bz: these optimizations are good ... but it mess up my constraints ...
+	//       tmp turn them off ....
 	optRenumber = false // enable renumbering optimization (makes logs hard to read)
-	optHVN      = true // enable pointer equivalence via Hash-Value Numbering
+	optHVN      = false // enable pointer equivalence via Hash-Value Numbering
 
 	// debugging options; disable all when committing
 	debugHVN           = false // enable assertions in HVN
@@ -119,8 +121,8 @@ type analysis struct {
 	flattenMemo map[types.Type][]*fieldInfo // memoization of flatten()
 	trackTypes  map[types.Type]bool         // memoization of shouldTrack()
 	constraints []constraint                // set of constraints
-	cgnodes     []*cgnode        // all cgnodes       --> bz: nodes in cg; will copy to callgraph.cg at the end
-	genq        []*cgnode        // queue of functions to generate constraints for
+	cgnodes     []*cgnode                   // all cgnodes       --> bz: nodes in cg; will copy to callgraph.cg at the end
+	genq        []*cgnode                   // queue of functions to generate constraints for
 	intrinsics  map[*ssa.Function]intrinsic // non-nil values are summaries for intrinsic fns
 	globalval   map[ssa.Value]nodeid        // node for each global ssa.Value          ---> bz: localval/globalval: only used in valueNode() and setValueNode() for each function, will be nil.
 	localval    map[ssa.Value]nodeid        // node for each local ssa.Value           ---> bz: BUT the key will be replaced if multiple ctx exist
@@ -130,8 +132,8 @@ type analysis struct {
 	mapValues   []nodeid                    // values of makemap objects (indirect in HVN)
 	work        nodeset                     // solver's worklist
 	//result      *Result                     // results of the analysis
-	track       track                       // pointerlike types whose aliasing we track
-	deltaSpace  []int                       // working space for iterating over PTS deltas
+	track      track // pointerlike types whose aliasing we track
+	deltaSpace []int // working space for iterating over PTS deltas
 
 	// Reflection & intrinsics:
 	hasher              typeutil.Hasher // cache of type hashes
@@ -145,13 +147,13 @@ type analysis struct {
 	runtimeSetFinalizer *ssa.Function   // runtime.SetFinalizer
 
 	//bz: my record
-	fn2cgnodeIdx        map[*ssa.Function][]int //bz: a map of fn with a set of its cgnodes represented by the indexes of cgnodes[]
+	fn2cgnodeIdx map[*ssa.Function][]int //bz: a map of fn with a set of its cgnodes represented by the indexes of cgnodes[]
 	// NOW also used for static and invoke calls TODO: may be should use nodeid not int (idx) ?
-	closures            map[*ssa.Function]*Ctx2nodeid //bz: solution for makeclosure
-    result              *ResultWCtx                   //bz: our result, dump all
-    closureWOGo         map[nodeid]nodeid             //bz: solution@field actualCallerSite []*callsite of cgnode type
+	closures    map[*ssa.Function]*Ctx2nodeid //bz: solution for makeclosure
+	result      *ResultWCtx                   //bz: our result, dump all
+	closureWOGo map[nodeid]nodeid             //bz: solution@field actualCallerSite []*callsite of cgnode type
 
-	considerReflect     bool //bz: whether we have reflect in exclusions
+	considerReflect bool //bz: whether we have reflect in exclusions
 }
 
 // enclosingObj returns the first node of the addressable memory
@@ -223,7 +225,6 @@ func (a *analysis) computeTrackBits() {
 	}
 }
 
-
 var main2Analysis map[*ssa.Package]*Result //bz: skip redo everytime calls Analyze()
 
 //bz: fill in the result
@@ -237,12 +238,12 @@ func translateQueries(val ssa.Value, id nodeid, cgn *cgnode, result *Result, _re
 				// First time?  Create the canonical query node.
 				ptrs = make([]PointerWCtx, 1)
 				ptrs[0] = ptr
-			}else {
+			} else {
 				ptrs = append(ptrs, ptr)
 			}
 			result.Queries[val] = ptrs
 		}
-	}else{ //indirect
+	} else { //indirect
 		if _, ok := result.IndirectQueries[val]; ok {
 			ptr := PointerWCtx{_result.a, id, cgn}
 			ptrs, ok := result.IndirectQueries[val]
@@ -250,7 +251,7 @@ func translateQueries(val ssa.Value, id nodeid, cgn *cgnode, result *Result, _re
 				// First time?  Create the canonical query node.
 				ptrs = make([]PointerWCtx, 1)
 				ptrs[0] = ptr
-			}else {
+			} else {
 				ptrs = append(ptrs, ptr)
 			}
 			result.IndirectQueries[val] = ptrs
@@ -294,7 +295,7 @@ func Analyze(config *Config) (result *Result, err error) {
 	fns := callgraph.Fn2CGNode
 	for _, cgns := range fns {
 		for _, cgn := range cgns {
-			for val, id := range  cgn.localval {
+			for val, id := range cgn.localval {
 				translateQueries(val, id, cgn, result, _result)
 			}
 
@@ -314,7 +315,6 @@ func Analyze(config *Config) (result *Result, err error) {
 	main2Analysis[main] = result
 	return result, nil
 }
-
 
 // bz: lazy way
 // AnalyzeWCtx runs the pointer analysis with the scope and options
@@ -402,8 +402,8 @@ func AnalyzeWCtx(config *Config) (result *ResultWCtx, err error) { //Result
 	}
 	fmt.Println(" *********************************** ")
 	if len(a.config.Mains) > 1 {
-	    fmt.Println(" *** Multiple Mains **************** ")
-	    for i, main := range a.config.Mains {
+		fmt.Println(" *** Multiple Mains **************** ")
+		for i, main := range a.config.Mains {
 			fmt.Println(strconv.Itoa(i) + ": " + main.String())
 		}
 		fmt.Println(" *********************************** ")
@@ -411,17 +411,17 @@ func AnalyzeWCtx(config *Config) (result *ResultWCtx, err error) { //Result
 	fmt.Println(" *** Level: " + strconv.Itoa(a.config.Level) + " *** ")
 	if a.config.DiscardQueries && !a.config.UseQueriesAPI {
 		fmt.Println(" *** No Queries *** ")
-	}else{
-		fmt.Println(" *** Use Queries/IndirectQueries/ExtendedQueries *** ")
+	} else {
+		fmt.Println(" *** Use Queries/IndirectQueries *** ")
 	}
 	if a.config.UseQueriesAPI {
 		fmt.Println(" *** Use Default Queries API *** ")
-	}else{
+	} else {
 		fmt.Println(" *** Use My API *** ")
 	}
 	if optRenumber {
 		fmt.Println(" *** optRenumber ON *** ")
-	}else{
+	} else {
 		fmt.Println(" *** optRenumber OFF *** ")
 	}
 
@@ -462,7 +462,7 @@ func AnalyzeWCtx(config *Config) (result *ResultWCtx, err error) { //Result
 			a.rtypes.SetHasher(a.hasher)
 			a.reflectZeros.SetHasher(a.hasher)
 		}
-	}else{
+	} else {
 		a.considerReflect = false //update -> do not consider 'reflect'
 	}
 	if !ContainString(a.config.Exclusion, "runtime") { //bz: only do if race checker considers
@@ -555,7 +555,7 @@ func AnalyzeWCtx(config *Config) (result *ResultWCtx, err error) { //Result
 	}
 
 	a.result.CallGraph.computeFn2CGNode() //bz: update Fn2CGNode for user API
-	a.result.a = a //bz: update
+	a.result.a = a                        //bz: update
 
 	return a.result, nil
 }
@@ -588,7 +588,7 @@ func (a *analysis) updateActaulCallSites() {
 	waiting := a.closureWOGo
 	for _, nid := range waiting {
 		cgn := a.nodes[nid].obj.cgn
-		total.Insert(cgn.idx)//record
+		total.Insert(cgn.idx) //record
 
 		node := cg.GetNodeWCtx(cgn)
 		for _, outEdge := range node.Out {
@@ -613,18 +613,8 @@ func (a *analysis) updateActaulCallSites() {
 // calleeid is the callee's object node (has otFunction flag).
 func (a *analysis) callEdge(caller *cgnode, site *callsite, calleeid nodeid) {
 	obj := a.nodes[calleeid].obj
-	if a.config.K > 0 {
-		//bz: this is also the consequence of using taggedValueSpecial()
-		if obj == nil {
-			fmt.Println("(nil obj): callEdge %s -> n%d: not a function object", site, calleeid)
-			return
-		}else if obj.flags&otFunction == 0 {
-			fmt.Println("callEdge %s -> n%d: not a function object", site, calleeid)
-		}
-	}else { //default code
-		if obj.flags&otFunction == 0 {
-			panic(fmt.Sprintf("callEdge %s -> n%d: not a function object", site, calleeid))
-		}
+	if obj.flags&otFunction == 0 {
+		panic(fmt.Sprintf("callEdge %s -> n%d: not a function object", site, calleeid))
 	}
 
 	callee := obj.cgn
@@ -723,7 +713,6 @@ func (a *analysis) showCounts() {
 		fmt.Fprintf(a.log, "# ptsets:\t%d\n", len(m))
 	}
 }
-
 
 //bz: stay here as a reference
 //// Analyze runs the pointer analysis with the scope and options

@@ -25,7 +25,7 @@ func (a *analysis) solve() {
 	num_constraints = 0
 	//bz: dump info
 	fmt.Println("#constraints (before solve()): ", len(a.constraints)) //bz: performance test of optRenumber
-	fmt.Println("#cgnodes (before solve()): ", len(a.cgnodes)) //bz: performance test of optRenumber
+	fmt.Println("#cgnodes (before solve()): ", len(a.cgnodes))         //bz: performance test of optRenumber
 
 	start("Solving")
 	if a.log != nil {
@@ -58,8 +58,8 @@ func (a *analysis) solve() {
 			continue
 		}
 		if a.log != nil {
-			fmt.Fprintf(a.log, "\t\tpts(n%d : %s) = %s + %s\n",
-				id, n.typ, &delta, &n.solve.prevPTS)
+			//fmt.Fprintf(a.log, "\t\tpts(n%d : %s) = %s + %s\n", id, n.typ, &delta, &n.solve.prevPTS)  //bz: too verbose
+			fmt.Fprintf(a.log, "\t\tpts(n%d : %s) = %s + ... \n", id, n.typ, &delta)
 		}
 		n.solve.prevPTS.Copy(&n.solve.pts.Sparse)
 
@@ -72,12 +72,7 @@ func (a *analysis) solve() {
 	}
 
 	if !a.nodes[0].solve.pts.IsEmpty() {
-		//bz: this is the consequence of using taggedValueSpecial()
-		if a.config.K > 0 {
-			fmt.Println("PANIC (consequence of taggedValueSpecial()): pts(0) is nonempty: %s", &a.nodes[0].solve.pts)
-		}else{ //default code
-			panic(fmt.Sprintf("pts(0) is nonempty: %s", &a.nodes[0].solve.pts))
-		}
+		panic(fmt.Sprintf("pts(0) is nonempty: %s", &a.nodes[0].solve.pts))
 	}
 
 	// Release working state (but keep final PTS).
@@ -88,6 +83,7 @@ func (a *analysis) solve() {
 	}
 
 	//bz: performance test of optRenumber; dump info
+	fmt.Println("---------------------------------------------")
 	fmt.Println("#pts: ", len(a.nodes))
 	fmt.Println("#constraints (totol num): ", num_constraints)
 	fmt.Println("#cgnodes (totol num): ", len(a.cgnodes))
@@ -119,6 +115,9 @@ func (a *analysis) processNewConstraints() {
 	constraints := a.constraints
 	a.constraints = nil
 
+	if a.config.Log != nil {
+		fmt.Fprintf(a.log, "\t\tnew constraints...........\n")
+	}
 	// Initialize points-to sets from addr-of (base) constraints.
 	for _, c := range constraints {
 		if c, ok := c.(*addrConstraint); ok {
@@ -161,10 +160,17 @@ func (a *analysis) processNewConstraints() {
 			a.addWork(id)
 		}
 	}
+	if a.config.Log != nil {
+		fmt.Fprintf(a.log, "\t\t......................\n")
+	}
+
 	// Apply new constraints to pre-existing PTS labels.
 	var space [50]int
 	for _, id := range stale.AppendTo(space[:0]) {
 		n := a.nodes[nodeid(id)]
+		if a.config.Log != nil {
+			fmt.Fprintf(a.log, "\t\tstale %d: pts(%s) = %s + %s\n", id, n.typ, &n.solve.prevPTS, &n.solve.prevPTS)
+		}
 		a.solveConstraints(n, &n.solve.prevPTS)
 	}
 }
@@ -292,20 +298,11 @@ func (c *offsetAddrConstraint) solve(a *analysis, delta *nodeset) {
 func (c *typeFilterConstraint) solve(a *analysis, delta *nodeset) {
 	for _, x := range delta.AppendTo(a.deltaSpace) {
 		ifaceObj := nodeid(x)
-		var tDyn types.Type
-		var indirect bool
-		if a.config.K > 0 {
-			tDyn, _, indirect = a.taggedValueSpecial(ifaceObj)
-			if tDyn == nil {
-				continue //bz: hard code return ... not sure about the consequence ...
-			}
-		}else{ //default code
-			tDyn, _, indirect = a.taggedValue(ifaceObj)
-			if indirect {
-				// TODO(adonovan): we'll need to implement this
-				// when we start creating indirect tagged objects.
-				panic("indirect tagged object")
-			}
+		tDyn, _, indirect := a.taggedValue(ifaceObj)
+		if indirect {
+			// TODO(adonovan): we'll need to implement this
+			// when we start creating indirect tagged objects.
+			panic("indirect tagged object")
 		}
 
 		if types.AssignableTo(tDyn, c.typ) {
@@ -324,21 +321,11 @@ func (c *untagConstraint) solve(a *analysis, delta *nodeset) {
 	}
 	for _, x := range delta.AppendTo(a.deltaSpace) {
 		ifaceObj := nodeid(x)
-		var tDyn types.Type
-		var v nodeid
-		var indirect bool
-		if a.config.K > 0 {
-			tDyn, v, indirect = a.taggedValueSpecial(ifaceObj)
-			if tDyn == nil {
-				continue //bz: hard code return ... not sure about the consequence ...
-			}
-		}else{ //default code
-			tDyn, v, indirect = a.taggedValue(ifaceObj)
-			if indirect {
-				// TODO(adonovan): we'll need to implement this
-				// when we start creating indirect tagged objects.
-				panic("indirect tagged object")
-			}
+		tDyn, v, indirect := a.taggedValue(ifaceObj)
+		if indirect {
+			// TODO(adonovan): we'll need to implement this
+			// when we start creating indirect tagged objects.
+			panic("indirect tagged object")
 		}
 
 		if predicate(tDyn, c.typ) {
@@ -357,23 +344,12 @@ func (c *untagConstraint) solve(a *analysis, delta *nodeset) {
 func (c *invokeConstraint) solve(a *analysis, delta *nodeset) {
 	for _, x := range delta.AppendTo(a.deltaSpace) {
 		ifaceObj := nodeid(x)
-		var tDyn types.Type
-		var v nodeid
-		var indirect bool
-		if a.config.K > 0 {
-			tDyn, v, indirect = a.taggedValueSpecial(ifaceObj)
-			if tDyn == nil {
-				continue //bz: hard code return ... not sure about the consequence ...
-			}
-		}else{ //default code
-			tDyn, v, indirect = a.taggedValue(ifaceObj)
-			if indirect {
-				// TODO(adonovan): we'll need to implement this
-				// when we start creating indirect tagged objects.
-				panic("indirect tagged object")
-			}
+		tDyn, v, indirect := a.taggedValue(ifaceObj)
+		if indirect {
+			// TODO(adonovan): we'll need to implement this
+			// when we start creating indirect tagged objects.
+			panic("indirect tagged object")
 		}
-
 
 		// Look up the concrete method.
 		fn := a.prog.LookupMethod(tDyn, c.method.Pkg(), c.method.Name())
@@ -395,7 +371,7 @@ func (c *invokeConstraint) solve(a *analysis, delta *nodeset) {
 						fmt.Println("!! GENERATING INVOKE FUNC HERE (share contour): " + fn.String())
 					}
 					fnObj = a.genOnline(nil, nil, fn)
-				}else{
+				} else {
 					//bz: special handling of invoke targets, create here
 					if a.config.DEBUG {
 						fmt.Println("!! GENERATING INVOKE FUNC HERE (ctx-sensitive): " + fn.String())

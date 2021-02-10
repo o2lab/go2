@@ -195,7 +195,7 @@ func doEachMainDefaultAPI(i int, main *ssa.Package) {
 		scope = []string {projPath}
 	}
 	//scope = append(scope, "istio.io/istio/")
-	//scope = append(scope, "google.golang.org/grpc")
+	scope = append(scope, "google.golang.org/grpc")
 	//scope = append(scope, "github.com/pingcap/tidb")
 	if strings.EqualFold(main.String(), "package command-line-arguments") {//default
 		scope = append(scope, "command-line-arguments")
@@ -221,7 +221,7 @@ func doEachMainDefaultAPI(i int, main *ssa.Package) {
 		Exclusion:  excludedPkgs, //bz: copied from race_checker
 		DiscardQueries: true, //bz: do not use query any more
 		UseQueriesAPI:  true, //bz: change the api the same as default pta
-		Level:      0, //bz: see pointer.Config
+		Level:      0,    //bz: see pointer.Config
 	}
 
 	//*** compute pta here
