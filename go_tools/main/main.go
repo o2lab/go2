@@ -18,8 +18,10 @@ var excludedPkgs = []string{ //bz: excluded a lot of default constraints
 	"runtime",
 	"reflect",
 	"os",
-	"github.com/modern-go/reflect2", //bz: i forget this causes which benchmark's untag obj panic
-	"google.golang.org/protobuf", //bz: this causes grpc untag obj panic
+	//bz: i forget this causes which benchmark's untag obj panic
+	//"github.com/modern-go/reflect2",
+	//"google.golang.org/protobuf/reflect",
+	//"(*fmt.pp).printArg"
 }
 var projPath = ""   // interested packages are those located at this path
 var maxTime time.Duration
@@ -106,7 +108,8 @@ func main() {
 		//	continue  //TODO: bz: panic for grpc
 		//}
  		fmt.Println(i, " ", main.String())
-		doEachMain(i, main)
+		//doEachMain(i, main)
+ 		doEachMainDefaultAPI(i, main)
 		fmt.Println("=============================================================================")
 	}
 	t := time.Now()
@@ -143,17 +146,18 @@ func doEachMain(i int, main *ssa.Package) {
 		Mains:          mains, //bz: NOW assume only one main
 		Reflection:     false,
 		BuildCallGraph: true,
-		Log:            nil,//logfile,
+		Log:            logfile,
 		//CallSiteSensitive: true, //kcfa
 		Origin:     true, //origin
 		//shared config
 		K:          1,
 		LimitScope: true, //bz: only consider app methods now -> no import will be considered
-		DEBUG:      true, //bz: rm all printed out info in console
+		DEBUG:      false, //bz: rm all printed out info in console
 		Scope:      scope, //bz: analyze scope + include + import
 		Exclusion:  excludedPkgs, //bz: copied from race_checker
 		DiscardQueries: true, //bz: do not use query any more
-		Level:      3, //bz: see pointer.Config
+		UseQueriesAPI:  true, //bz: change the api the same as default pta
+		Level:      0, //bz: see pointer.Config
 	}
 
 	//*** compute pta here
@@ -177,5 +181,81 @@ func doEachMain(i int, main *ssa.Package) {
 
 	if ptaConfig.DEBUG {
 		result.DumpAll()
+	}
+}
+
+func doEachMainDefaultAPI(i int, main *ssa.Package) {
+	//create my log file
+	logfile, err := os.Create("/Users/bozhen/Documents/GO2/go2/go_tools/_logs/full_log_" + strconv.Itoa(i))
+	log.SetFormatter(&log.TextFormatter{
+		FullTimestamp: true,
+	})
+	var scope []string
+	if projPath != "" {
+		scope = []string {projPath}
+	}
+	//scope = append(scope, "istio.io/istio/")
+	//scope = append(scope, "google.golang.org/grpc")
+	//scope = append(scope, "github.com/pingcap/tidb")
+	if strings.EqualFold(main.String(), "package command-line-arguments") {//default
+		scope = append(scope, "command-line-arguments")
+	}else{
+		scope = append(scope, main.String())
+	}
+
+	var mains []*ssa.Package
+	mains = append(mains, main)
+	// Configure pointer analysis to build call-graph
+	ptaConfig := &pointer.Config{
+		Mains:          mains, //bz: NOW assume only one main
+		Reflection:     false,
+		BuildCallGraph: true,
+		Log:            logfile,
+		//CallSiteSensitive: true, //kcfa
+		Origin:     true, //origin
+		//shared config
+		K:          1,
+		LimitScope: true, //bz: only consider app methods now -> no import will be considered
+		DEBUG:      false, //bz: rm all printed out info in console
+		Scope:      scope, //bz: analyze scope + include + import
+		Exclusion:  excludedPkgs, //bz: copied from race_checker
+		DiscardQueries: true, //bz: do not use query any more
+		UseQueriesAPI:  true, //bz: change the api the same as default pta
+		Level:      0, //bz: see pointer.Config
+	}
+
+	//*** compute pta here
+	start := time.Now()                           //performance
+	result, err := pointer.Analyze(ptaConfig) // conduct pointer analysis
+	t := time.Now()
+	elapsed := t.Sub(start)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer logfile.Close()
+	log.SetOutput(logfile)
+	fmt.Println("\nDone  -- PTA/CG Build; Using " + elapsed.String() + ". \nGo check gologfile for detail. ")
+
+	if maxTime < elapsed {
+		maxTime = elapsed
+	}
+	if minTime > elapsed {
+		minTime = elapsed
+	}
+
+	if ptaConfig.DEBUG {
+		result.DumpQueries()
+	}
+
+	start2 := time.Now()
+	result2, err2 := pointer.Analyze(ptaConfig) // conduct pointer analysis
+	t2 := time.Now()
+	elapsed2 := t2.Sub(start2)
+	if err2 != nil {
+		log.Fatal(err2)
+	}
+	fmt.Println("\nDone  -- Retrieve Result " + elapsed2.String() + ".")
+	if result == result2 {
+		fmt.Println("\nChecked  -- Same Result Returned. ")
 	}
 }

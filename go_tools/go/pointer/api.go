@@ -81,6 +81,7 @@ type Config struct {
 	Scope          []string //analyzed scope -> from user input: -path
 	Exclusion      []string //excluded packages from this analysis -> from race_checker if any
 	DiscardQueries bool     //bz: do not use queries, but keep every pts info in *cgnode
+	UseQueriesAPI  bool     //bz: change the api the same as default pta
 
 	imports        []string //bz: internal use: store all import pkgs in a main
 	Level          int      //bz: level == 0: traverse all app and lib, but with different ctx; level == 1: traverse 1 level lib call; level == 2: traverse 2 leve lib calls; no other option now
@@ -90,7 +91,6 @@ type Config struct {
 func (c *Config) GetImports() []string {
 	return c.imports
 }
-
 
 type track uint32
 
@@ -185,12 +185,19 @@ type Warning struct {
 //
 type Result struct {
 	CallGraph       *callgraph.Graph      // discovered call graph
-	Queries         map[ssa.Value]Pointer // pts(v) for each v in Config.Queries.
-	IndirectQueries map[ssa.Value]Pointer // pts(*v) for each v in Config.IndirectQueries.
+	////bz: default
+	//Queries         map[ssa.Value]Pointer // pts(v) for each v in Config.Queries.
+	//IndirectQueries map[ssa.Value]Pointer // pts(*v) for each v in Config.IndirectQueries.
+	//bz: we replaced default to include context
+	Queries         map[ssa.Value][]PointerWCtx // pts(v) for each v in setValueNode().
+	IndirectQueries map[ssa.Value][]PointerWCtx // pts(*v) for each v in setValueNode().
 	Warnings        []Warning             // warnings of unsoundness
 }
 
-//bz: same as above, but we want contexts
+
+
+
+//bz: same as default , but we want contexts
 type ResultWCtx struct {
 	a         *analysis  // bz: we need a lot from here...
 	main      *cgnode    // bz: the cgnode for main method
@@ -205,6 +212,7 @@ type ResultWCtx struct {
 
 	DEBUG          bool // bz: print out debug info ...
 	DiscardQueries bool // bz: do not use queries, but keep every pts info in *cgnode
+	UseQueriesAPI  bool  //bz: change the api the same as default pta
 }
 
 //bz:
@@ -556,29 +564,12 @@ func (r *ResultWCtx) DumpAll() {
 	fmt.Println("#Queries: " + strconv.Itoa(len(queries)) + "  #Indirect Queries: " + strconv.Itoa(len(inQueries)) +
 		"  #Extended Queries: " + strconv.Itoa(len(exQueries)) +
 		"  #Global Queries: " + strconv.Itoa(len(globalQueries)))
-	////testing only
-	//var p1 pointer.PointerWCtx
-	//var p2 pointer.PointerWCtx
-	//done := false
 
-	testAPI := false //bz: check for testing new api
 	fmt.Println("Queries Detail: ")
 	for v, ps := range queries {
 		for _, p := range ps { //p -> types.Pointer: includes its context
 			//SSA here is your *ssa.Value
 			fmt.Println(p.String() + " (SSA:" + v.String() + "): {" + p.PointsTo().String() + "}")
-			//if strings.Contains(v.String(), "new bool (abort)") {
-			//	p1 = p
-			//}
-			//if strings.Contains(v.String(), "abort : *bool") {
-			//	p2 = p
-			//}
-		}
-		if testAPI {
-			check := r.PointsTo(v)
-			for _, p := range check { //p -> types.Pointer: includes its context
-				fmt.Println(p.String() + " (SSA:" + v.String() + "): {" + p.PointsTo().String() + "}")
-			}
 		}
 	}
 
@@ -587,12 +578,6 @@ func (r *ResultWCtx) DumpAll() {
 		for _, p := range ps { //p -> types.Pointer: includes its context
 			fmt.Println(p.String() + " (SSA:" + v.String() + "): {" + p.PointsTo().String() + "}")
 		}
-		if testAPI {
-			check := r.PointsTo(v)
-			for _, p := range check { //p -> types.Pointer: includes its context
-				fmt.Println(p.String() + " (SSA:" + v.String() + "): {" + p.PointsTo().String() + "}")
-			}
-		}
 	}
 
 	fmt.Println("\nExtended Queries Detail: ")
@@ -600,34 +585,37 @@ func (r *ResultWCtx) DumpAll() {
 		for _, p := range ps { //p -> types.Pointer: includes its context
 			fmt.Println(p.String() + " (SSA:" + v.String() + "): {" + p.PointsTo().String() + "}")
 		}
-		if testAPI {
-			check := r.PointsTo(v)
-			for _, p := range check { //p -> types.Pointer: includes its context
-				fmt.Println(p.String() + " (SSA:" + v.String() + "): {" + p.PointsTo().String() + "}")
-			}
-		}
 	}
 
 	fmt.Println("\nGlobal Queries Detail: ")
 	for v, ps := range globalQueries {
 		for _, p := range ps { //p -> types.Pointer: includes its context
 			fmt.Println(p.String() + " (SSA:" + v.String() + "): {" + p.PointsTo().String() + "}")
-			//if strings.Contains(v.String(), "abort : *bool") {
-			//	p2 = p
-			//}
-		}
-		if testAPI {
-			check := r.PointsTo(v)
-			for _, p := range check { //p -> types.Pointer: includes its context
-				fmt.Println(p.String() + " (SSA:" + v.String() + "): {" + p.PointsTo().String() + "}")
-			}
 		}
 	}
-	////testing only
-	//yes := p1.PointsTo().Intersects(p2.PointsTo())
-	//if yes {
-	//	fmt.Println(" @@@@ they intersect @@@@ ")
-	//}
+}
+
+//bz: user API: for debug to dump all queries out
+func (r *Result) DumpQueries() {
+	fmt.Println("\nWe are going to print out queries. If not desired, turn off DEBUG.")
+	queries := r.Queries
+	inQueries := r.IndirectQueries
+	fmt.Println("#Queries: " + strconv.Itoa(len(queries)) + "  #Indirect Queries: " + strconv.Itoa(len(inQueries)))
+
+	fmt.Println("Queries Detail: ")
+	for v, ps := range queries {
+		for _, p := range ps { //p -> types.Pointer: includes its context
+			//SSA here is your *ssa.Value
+			fmt.Println(p.String() + " (SSA:" + v.String() + "): {" + p.PointsTo().String() + "}")
+		}
+	}
+
+	fmt.Println("\nIndirect Queries Detail: ")
+	for v, ps := range inQueries {
+		for _, p := range ps { //p -> types.Pointer: includes its context
+			fmt.Println(p.String() + " (SSA:" + v.String() + "): {" + p.PointsTo().String() + "}")
+		}
+	}
 }
 
 // A Pointer is an equivalence class of pointer-like values.
@@ -758,14 +746,6 @@ type PointerWCtx struct {
 	cgn *cgnode
 }
 
-//bz: we created an empty PointerWCTx to return
-func (p PointerWCtx) IsNil() bool {
-	if p.a == nil {
-		return true // this is we created since we cannot locate such a pointer
-	}
-	return p.a.nodes[p.n].solve.pts.IsEmpty() //this is the really empty pts
-}
-
 //bz: whether goID is match with the contexts in this pointer
 //TODO: this does not match parent context if callsite.length > 1 (k > 1)
 func (p PointerWCtx) MatchMyContext(go_instr *ssa.Go) bool {
@@ -792,11 +772,6 @@ func (p PointerWCtx) MatchMyContext(go_instr *ssa.Go) bool {
 //bz: return the context of cgn which calls setValueNode() to record this pointer;
 func (p PointerWCtx) GetMyContext() []*callsite {
 	return p.cgn.callersite
-}
-
-//bz: return the cgn which calls setValueNode(); ctx is inside
-func (p PointerWCtx) Parent() *cgnode {
-	return p.cgn
 }
 
 //bz: add ctx
@@ -828,19 +803,4 @@ func (p PointerWCtx) MayAlias(q PointerWCtx) bool {
 // DynamicTypes returns p.PointsTo().DynamicTypes().
 func (p PointerWCtx) DynamicTypes() *typeutil.Map {
 	return p.PointsTo().DynamicTypes()
-}
-
-// PointsTo returns the set of labels that this points-to set
-// contains.
-func (p PointerWCtx) Labels() []*Label {
-	var labels []*Label
-	var pp = p.PointsTo()
-	var pts = pp.pts
-	if pts != nil {
-		var space [50]int
-		for _, l := range pts.AppendTo(space[:0]) {
-			labels = append(labels, pp.a.labelFor(nodeid(l)))
-		}
-	}
-	return labels
 }
