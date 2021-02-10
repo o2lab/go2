@@ -318,11 +318,15 @@ func (runner *AnalysisRunner) runEachMainBaseline(main *ssa.Package) *pointer.Re
 		Scope:      scope,        //bz: analyze scope, default is "command-line-arguments"
 		Exclusion: excludedPkgs, //excludedPkgs here
 		DiscardQueries: !useQueries, //bz: new flag -> if we use queries
-		Level:      2,
+		Level:      0,
 		//bz: Level = 1: if callee is from app or import
 		// Level = 2: parent of caller in app, caller in lib, callee also in lib || parent in lib, caller in app, callee in lib || parent in lib, caller in lib, callee in app
 		// Level = 3: this also analyze lib's import == lib's lib
 		// Level = 0: analyze all
+
+		//bz: new api
+		UseQueriesAPI:  true, //bz: change the api the same as default pta
+		TrackMore:      true, //bz: track pointers with types declared in Analyze Scope; cannot guarantee all basic types, e.g., []bytes, etc.
 	}
 
 	start := time.Now()

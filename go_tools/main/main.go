@@ -221,7 +221,7 @@ func doEachMainDefaultAPI(i int, main *ssa.Package) {
 		Exclusion:  excludedPkgs, //bz: copied from race_checker
 		DiscardQueries: true, //bz: do not use query any more
 		UseQueriesAPI:  true, //bz: change the api the same as default pta
-		TrackMore:      true, //bz: track pointers with basic types, e.g., []int, string, byte, etc.
+		TrackMore:      true, //bz: track pointers with types declared in Analyze Scope
 		Level:      0,    //bz: see pointer.Config
 	}
 
