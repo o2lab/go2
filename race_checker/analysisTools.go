@@ -139,8 +139,8 @@ func (a *analysis) buildHB(HBgraph *graph.Graph) {
 					for wIns, wNode := range waitingN {
 						var theSame bool
 						if a.ptaConfig.DiscardQueries {
-							if v, ok1 := (*wNode.Value).(goIns); ok1 {
-								theSame = a.sameAddress2(callIns.Call.Args[0], callIns, nGo, wIns.Call.Args[0], wIns, v.goID)
+							if _, ok1 := (*wNode.Value).(goIns); ok1 {
+								theSame = a.sameAddress(callIns.Call.Args[0], wIns.Call.Args[0])
 							}else{
 								theSame = false
 							}
@@ -160,8 +160,8 @@ func (a *analysis) buildHB(HBgraph *graph.Graph) {
 					for wIns, wNode := range waitingN {
 						var theSame bool
 						if a.ptaConfig.DiscardQueries {
-							if v, ok2 := (*wNode.Value).(goIns); ok2 {
-								theSame = a.sameAddress2(dIns.Call.Args[0], dIns, nGo, wIns.Call.Args[0], wIns, v.goID)
+							if _, ok2 := (*wNode.Value).(goIns); ok2 {
+								theSame = a.sameAddress(dIns.Call.Args[0], wIns.Call.Args[0])
 							}else{
 								theSame = false
 							}
