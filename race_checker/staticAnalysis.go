@@ -279,7 +279,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 }
 
 //bz: do each main one by one -> performance base line
-func (runner *AnalysisRunner) runEachMainBaseline(main *ssa.Package) *pointer.ResultWCtx {
+func (runner *AnalysisRunner) runEachMainBaseline(main *ssa.Package) *pointer.Result {
 	logfile, err := os.Create("go_pta_log") //bz: for me ...
 	if err != nil {
 		log.Fatal(err)
@@ -330,16 +330,16 @@ func (runner *AnalysisRunner) runEachMainBaseline(main *ssa.Package) *pointer.Re
 	}
 
 	start := time.Now()
-	result, err2 := pointer.AnalyzeWCtx(runner.ptaconfig) // conduct pointer analysis
+	result, err2 := pointer.Analyze(runner.ptaconfig) // conduct pointer analysis
 	if err2 != nil {
 		log.Fatal(err2)
 	}
 	t := time.Now()
 	elapsed := t.Sub(start)
 	log.Info("Done -- PTA/CG Build; Using " + elapsed.String() + ". Go check go_pta_log for detail. ")
-	if runner.ptaconfig.DEBUG {
-		result.DumpAll()
-	}
+	//if runner.ptaconfig.DEBUG {
+	//	result.DumpAll()
+	//}
 
 	return result
 }

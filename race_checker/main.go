@@ -12,7 +12,7 @@ import (
 
 type analysis struct {
 	useNewPTA    bool //useNewPTA the new pta
-	result       *pointer.ResultWCtx //one time
+	result       *pointer.Result //one time
 	ptaConfig    *pointer.Config
 	goID2info    map[int]goroutineInfo //goID -> goroutinInfo
 	includePkgs  []string // bz: we only include these pkgs from path + project import -> project specific
