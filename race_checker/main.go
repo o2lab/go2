@@ -19,6 +19,7 @@ type analysis struct {
 	//"google.golang.org/grpc",
 	//"github.com/pingcap/tidb",
 
+	useDefaultPTA	bool
 	prog            *ssa.Program
 	pkgs            []*ssa.Package
 	mains           []*ssa.Package
@@ -112,6 +113,7 @@ var channelComm = true // analyze channel communication
 var fromPath = ""      // interested packages are those located at this path
 var entryFn = "main"
 var allEntries = false
+var useDefaultPTA = false
 
 func init() {
 	excludedPkgs = []string{//bz: excluded a lot of default constraints
@@ -127,6 +129,7 @@ func init() {
 func main() {//default: -useNewPTA
 	newPTA := flag.Bool("useNewPTA", true, "Use the new pointer analysis in go_tools.")
 	setUseQueries := flag.Bool("useQueries", false, "Use the new pointer analysis in go_tools.")
+	builtinPTA := flag.Bool("useDefaultPTA", false, "Use the built-in pointer analysis.")
 	debugPTA := flag.Bool("debugPTA", false, "Prints all PTA debug messages in console.")
 	keepPTALog := flag.Bool("keepPTALog", false, "Create a log file for all details in PTA.")
 	debug := flag.Bool("debug", false, "Prints log.Debug messages.")
@@ -146,6 +149,10 @@ func main() {//default: -useNewPTA
 	}
 	if *setUseQueries {
 		useQueries = true
+	}
+	if *builtinPTA {
+		useDefaultPTA = true
+		useNewPTA = false
 	}
 	if *debugPTA {
 		doDebugPTA = true

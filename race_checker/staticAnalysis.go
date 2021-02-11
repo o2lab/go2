@@ -198,8 +198,9 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		}
 		result := runner.runEachMainBaseline(m)
 		runner.Analysis = &analysis{
-			useNewPTA:       true,
+			useNewPTA:       useNewPTA,
 			result: 		 result,
+			useDefaultPTA: 	 useDefaultPTA,
 			prog:            prog,
 			pkgs:            pkgs,
 			mains:           []*ssa.Package{m},
@@ -303,31 +304,39 @@ func (runner *AnalysisRunner) runEachMainBaseline(main *ssa.Package) *pointer.Re
 
 	var mains []*ssa.Package
 	mains = append(mains, main)
-	// Configure pointer analysis to build call-graph
-	runner.ptaconfig = &pointer.Config{
-		Mains:          mains, //bz: NOW assume only one main
-		Reflection:     false,
-		BuildCallGraph: true,
-		Log:            logfile,
-		//CallSiteSensitive: true, //kcfa
-		Origin: true, //origin
-		//shared config
-		K:          1,
-		LimitScope: true,         //bz: only consider app methods now
-		DEBUG:      doDebugPTA,   //bz: do all printed out info in console --> turn off to avoid internal nil reference panic
-		Scope:      scope,        //bz: analyze scope, default is "command-line-arguments"
-		Exclusion: excludedPkgs, //excludedPkgs here
-		DiscardQueries: !useQueries, //bz: new flag -> if we use queries
-		Level:      0,
-		//bz: Level = 1: if callee is from app or import
-		// Level = 2: parent of caller in app, caller in lib, callee also in lib || parent in lib, caller in app, callee in lib || parent in lib, caller in lib, callee in app
-		// Level = 3: this also analyze lib's import == lib's lib
-		// Level = 0: analyze all
+	if !useDefaultPTA {
+		// Configure pointer analysis to build call-graph
+		runner.ptaconfig = &pointer.Config{
+			Mains:          mains, //bz: NOW assume only one main
+			Reflection:     false,
+			BuildCallGraph: true,
+			Log:            logfile,
+			//CallSiteSensitive: true, //kcfa
+			Origin: true, //origin
+			//shared config
+			K:          1,
+			LimitScope: true,         //bz: only consider app methods now
+			DEBUG:      doDebugPTA,   //bz: do all printed out info in console --> turn off to avoid internal nil reference panic
+			Scope:      scope,        //bz: analyze scope, default is "command-line-arguments"
+			Exclusion: excludedPkgs, //excludedPkgs here
+			DiscardQueries: !useQueries, //bz: new flag -> if we use queries
+			Level:      0,
+			//bz: Level = 1: if callee is from app or import
+			// Level = 2: parent of caller in app, caller in lib, callee also in lib || parent in lib, caller in app, callee in lib || parent in lib, caller in lib, callee in app
+			// Level = 3: this also analyze lib's import == lib's lib
+			// Level = 0: analyze all
 
-		//bz: new api
-		UseQueriesAPI:  true, //bz: change the api the same as default pta
-		TrackMore:      true, //bz: track pointers with types declared in Analyze Scope; cannot guarantee all basic types, e.g., []bytes, etc.
+			//bz: new api
+			UseQueriesAPI:  true, //bz: change the api the same as default pta
+			TrackMore:      true, //bz: track pointers with types declared in Analyze Scope; cannot guarantee all basic types, e.g., []bytes, etc.
+		}
+	} else {
+		runner.ptaconfig = &pointer.Config{
+			Mains:          mains,
+			BuildCallGraph: false,
+		}
 	}
+
 
 	start := time.Now()
 	result, err2 := pointer.Analyze(runner.ptaconfig) // conduct pointer analysis
