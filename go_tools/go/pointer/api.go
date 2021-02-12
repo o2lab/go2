@@ -84,8 +84,8 @@ type Config struct {
 	UseQueriesAPI  bool     //bz: change the api the same as default pta
 	TrackMore      bool     //bz: track pointers with types declared in Analyze Scope
 
-	imports        []string //bz: internal use: store all import pkgs in a main
-	Level          int      //bz: level == 0: traverse all app and lib, but with different ctx; level == 1: traverse 1 level lib call; level == 2: traverse 2 leve lib calls; no other option now
+	imports []string //bz: internal use: store all import pkgs in a main
+	Level   int      //bz: level == 0: traverse all app and lib, but with different ctx; level == 1: traverse 1 level lib call; level == 2: traverse 2 leve lib calls; no other option now
 }
 
 //bz: user API: race checker, added when ptaconfig.Level == 2
@@ -185,17 +185,16 @@ type Warning struct {
 // See Config for how to request the various Result components.
 //
 type Result struct {
-	a               *analysis  // bz: for debug
-	CallGraph       *callgraph.Graph      // discovered call graph
+	a         *analysis        // bz: for debug
+	CallGraph *callgraph.Graph // discovered call graph
 	////bz: default
 	//Queries         map[ssa.Value]Pointer // pts(v) for each v in Config.Queries.
 	//IndirectQueries map[ssa.Value]Pointer // pts(*v) for each v in Config.IndirectQueries.
 	//bz: we replaced default to include context
 	Queries         map[ssa.Value][]PointerWCtx // pts(v) for each v in setValueNode().
 	IndirectQueries map[ssa.Value][]PointerWCtx // pts(*v) for each v in setValueNode().
-	Warnings        []Warning             // warnings of unsoundness
+	Warnings        []Warning                   // warnings of unsoundness
 }
-
 
 //bz: same as default , but we want contexts
 type ResultWCtx struct {
@@ -212,12 +211,12 @@ type ResultWCtx struct {
 
 	DEBUG          bool // bz: print out debug info ...
 	DiscardQueries bool // bz: do not use queries, but keep every pts info in *cgnode
-	UseQueriesAPI  bool  //bz: change the api the same as default pta
+	UseQueriesAPI  bool //bz: change the api the same as default pta
 }
 
 //bz:
 func (r *ResultWCtx) getCGNodebyFuncGoInstr(fn *ssa.Function, goInstr *ssa.Go) *cgnode {
-	cgns := r.GetCGNodebyFunc(fn)
+	cgns := r.getCGNodebyFunc(fn)
 	for _, cgn := range cgns {
 		if matchMyContext(cgn, goInstr) {
 			return cgn
@@ -226,7 +225,7 @@ func (r *ResultWCtx) getCGNodebyFuncGoInstr(fn *ssa.Function, goInstr *ssa.Go) *
 	if r.DEBUG {
 		if goInstr == nil {
 			fmt.Println(" **** no match *cgnode for " + fn.String() + " goID: main **** ")
-		}else{
+		} else {
 			fmt.Println(" **** no match *cgnode for " + fn.String() + " goID: " + goInstr.String() + " **** ")
 		}
 	}
@@ -236,7 +235,7 @@ func (r *ResultWCtx) getCGNodebyFuncGoInstr(fn *ssa.Function, goInstr *ssa.Go) *
 //bz: user API (DiscardQueries = true):
 //we find the instr.register (instead of the things on the rhs) in this fn under this goInstr routine
 //most of time used in sameAddress(from race_checker)
-func (r *ResultWCtx) PointsTo2(v ssa.Value, goInstr *ssa.Go, fn *ssa.Function) PointerWCtx {
+func (r *ResultWCtx) pointsTo2(v ssa.Value, goInstr *ssa.Go, fn *ssa.Function) PointerWCtx {
 	if strings.Contains("&t0.mu [#0]", v.String()) {
 		fmt.Print() //TODO: bz: lock problem
 	}
@@ -245,7 +244,7 @@ func (r *ResultWCtx) PointsTo2(v ssa.Value, goInstr *ssa.Go, fn *ssa.Function) P
 		if r.DEBUG {
 			fmt.Println(" ****  Pointer Analysis: " + v.String() + " has no match *cgnode (" + fn.String() + ") **** ")
 		}
-	}else{
+	} else {
 		nodeid := cgn.localval[v]
 		if nodeid != 0 {
 			return PointerWCtx{a: r.a, n: nodeid, cgn: cgn}
@@ -308,7 +307,7 @@ func matchMyContext(cgn *cgnode, go_instr *ssa.Go) bool {
 }
 
 //bz: user API: used when DiscardQueries == true
-func (r *ResultWCtx) GetFunc2(pointer PointerWCtx) *ssa.Function {
+func (r *ResultWCtx) getFunc2(pointer PointerWCtx) *ssa.Function {
 	pts := pointer.PointsTo()
 	if pts.pts.Len() > 1 {
 		if r.DEBUG {
@@ -325,7 +324,7 @@ func (r *ResultWCtx) GetFunc2(pointer PointerWCtx) *ssa.Function {
 
 //bz: user API: used when DiscardQueries == true
 //from call graph
-func (r *ResultWCtx) GetInvokeFunc(call *ssa.Call, pointer PointerWCtx, goInstr *ssa.Go) *ssa.Function {
+func (r *ResultWCtx) getInvokeFunc(call *ssa.Call, pointer PointerWCtx, goInstr *ssa.Go) *ssa.Function {
 	fn := call.Parent()
 	cgn := r.getCGNodebyFuncGoInstr(fn, goInstr)
 	if cgn == nil {
@@ -342,10 +341,10 @@ func (r *ResultWCtx) GetInvokeFunc(call *ssa.Call, pointer PointerWCtx, goInstr 
 
 //bz: user API: tmp solution for missing invoke callee target if func wrapped in parameters
 //alloc should be a freevar
-func (r *ResultWCtx) GetFreeVarFunc(alloc *ssa.Alloc, call *ssa.Call, goInstr *ssa.Go) *ssa.Function {
+func (r *ResultWCtx) getFreeVarFunc(alloc *ssa.Alloc, call *ssa.Call, goInstr *ssa.Go) *ssa.Function {
 	val, _ := call.Common().Value.(*ssa.UnOp)
 	freeV := val.X //this should be the free var of func
-	pointers := r.PointsToFreeVar(freeV)
+	pointers := r.pointsToFreeVar(freeV)
 	p := pointers[0].PointsTo() //here should be only one element
 	a := p.a
 	pts := p.pts
@@ -368,9 +367,9 @@ func (r *ResultWCtx) GetFreeVarFunc(alloc *ssa.Alloc, call *ssa.Call, goInstr *s
 }
 
 //bz: user API: to handle special case -> extract target (cgn) from call graph
-func (r *ResultWCtx) GetFunc(p ssa.Value, call *ssa.Call, goInstr *ssa.Go) *ssa.Function {
+func (r *ResultWCtx) getFunc(p ssa.Value, call *ssa.Call, goInstr *ssa.Go) *ssa.Function {
 	parentFn := p.Parent()
-	parent_cgns := r.GetCGNodebyFunc(parentFn)
+	parent_cgns := r.getCGNodebyFunc(parentFn)
 	//match the ctx
 	var parent_cgn *cgnode
 	for _, cand := range parent_cgns {
@@ -406,12 +405,12 @@ func (r *ResultWCtx) GetFunc(p ssa.Value, call *ssa.Call, goInstr *ssa.Go) *ssa.
 }
 
 //bz: user API: return *cgnode by *ssa.Function
-func (r *ResultWCtx) GetCGNodebyFunc(fn *ssa.Function) []*cgnode {
+func (r *ResultWCtx) getCGNodebyFunc(fn *ssa.Function) []*cgnode {
 	return r.CallGraph.Fn2CGNode[fn]
 }
 
 //bz: user API: return the main method with type *Node
-func (r *ResultWCtx) GetMain() *Node {
+func (r *ResultWCtx) getMain() *Node {
 	return r.CallGraph.Nodes[r.main]
 }
 
@@ -420,12 +419,12 @@ func (r *ResultWCtx) GetMain() *Node {
 //input: ssa.Value;
 //output: PointerWCtx
 //panic: if no record for such input
-func (r *ResultWCtx) PointsTo(v ssa.Value) []PointerWCtx {
-	pointers := r.PointsToFreeVar(v)
+func (r *ResultWCtx) pointsTo(v ssa.Value) []PointerWCtx {
+	pointers := r.pointsToFreeVar(v)
 	if pointers != nil {
 		return pointers
 	}
-	pointers = r.PointsToRegular(v)
+	pointers = r.pointsToRegular(v)
 	if pointers != nil {
 		return pointers
 	}
@@ -438,15 +437,15 @@ func (r *ResultWCtx) PointsTo(v ssa.Value) []PointerWCtx {
 //bz: user API: return PointerWCtx for a ssa.Value used under context of *ssa.GO,
 //input: ssa.Value, *ssa.GO;
 //output: PointerWCtx; this can be empty with nothing if we cannot match any
-func (r *ResultWCtx) PointsToByGo(v ssa.Value, goInstr *ssa.Go) PointerWCtx {
-	ptss := r.PointsToFreeVar(v)
+func (r *ResultWCtx) pointsToByGo(v ssa.Value, goInstr *ssa.Go) PointerWCtx {
+	ptss := r.pointsToFreeVar(v)
 	if ptss != nil {
 		return ptss[0] //bz: should only have one value
 	}
 	if goInstr == nil {
-		return r.PointsToByMain(v)
+		return r.pointsToByMain(v)
 	}
-	ptss = r.PointsToRegular(v) //return type: []PointerWCtx
+	ptss = r.pointsToRegular(v) //return type: []PointerWCtx
 	for _, pts := range ptss {
 		if pts.MatchMyContext(goInstr) {
 			return pts
@@ -459,12 +458,12 @@ func (r *ResultWCtx) PointsToByGo(v ssa.Value, goInstr *ssa.Go) PointerWCtx {
 }
 
 //bz: user API: return PointerWCtx for a ssa.Value used under the main context
-func (r *ResultWCtx) PointsToByMain(v ssa.Value) PointerWCtx {
-	ptss := r.PointsToFreeVar(v)
+func (r *ResultWCtx) pointsToByMain(v ssa.Value) PointerWCtx {
+	ptss := r.pointsToFreeVar(v)
 	if ptss != nil {
 		return ptss[0] //bz: should only have one value
 	}
-	ptss = r.PointsToRegular(v) //return type: []PointerWCtx
+	ptss = r.pointsToRegular(v) //return type: []PointerWCtx
 	for _, pts := range ptss {
 		if pts.cgn == nil || pts.cgn.callersite == nil || pts.cgn.callersite[0] == nil {
 			continue //from extended query or shared contour
@@ -480,7 +479,7 @@ func (r *ResultWCtx) PointsToByMain(v ssa.Value) PointerWCtx {
 }
 
 //bz: return []PointerWCtx for query and indirect query and extended query
-func (r *ResultWCtx) PointsToRegular(v ssa.Value) []PointerWCtx {
+func (r *ResultWCtx) pointsToRegular(v ssa.Value) []PointerWCtx {
 	pointers := r.Queries[v]
 	if pointers != nil {
 		return pointers
@@ -498,7 +497,7 @@ func (r *ResultWCtx) PointsToRegular(v ssa.Value) []PointerWCtx {
 }
 
 //bz: return []PointerWCtx for a free var,
-func (r *ResultWCtx) PointsToFreeVar(v ssa.Value) []PointerWCtx {
+func (r *ResultWCtx) pointsToFreeVar(v ssa.Value) []PointerWCtx {
 	if globalv, ok := v.(*ssa.Global); ok {
 		pointers := r.GlobalQueries[globalv]
 		if pointers != nil {
@@ -521,7 +520,7 @@ func (r *ResultWCtx) PointsToFreeVar(v ssa.Value) []PointerWCtx {
 
 //bz: just in case we did not record for v
 //TODO: (incomplete) iterate all a.nodes to find it ....
-func (r *ResultWCtx) PointsToFurther(v ssa.Value) []PointerWCtx {
+func (r *ResultWCtx) pointsToFurther(v ssa.Value) []PointerWCtx {
 	for _, p := range r.a.nodes {
 		if p.solve.pts.IsEmpty() {
 			continue //not a pointer or empty pts
@@ -535,7 +534,7 @@ func (r *ResultWCtx) DumpAll() {
 	fmt.Println("\nWe are going to dump all results. If not desired, turn off DEBUG.")
 
 	//bz: also a reference of how to use new APIs here
-	main := r.GetMain()
+	main := r.getMain()
 	fmt.Println("Main CGNode: " + main.String())
 
 	fmt.Println("\nWe are going to print out call graph. If not desired, turn off DEBUG.")
@@ -595,13 +594,25 @@ func (r *ResultWCtx) DumpAll() {
 	}
 }
 
+//bz: user API, return nil if cannot find corresponding pts for v
+func (r *Result) Query(v ssa.Value) []PointerWCtx {
+	if pts, ok := r.Queries[v]; ok {
+		return pts
+	} else if _pts, ok := r.IndirectQueries[v]; ok {
+		return _pts
+	} else {
+		fmt.Println(" ****  Pointer Analysis: " + v.String() + " has no match in Queries/IndirectQueries **** ")
+		return nil
+	}
+}
+
 //bz: user API: for debug to dump all queries out
 func (r *Result) DumpAll() {
 	fmt.Println("\nWe are going to dump all results. If not desired, turn off DEBUG.")
 
 	//bz: also a reference of how to use new APIs here
 	_result := r.a.result
-	main := _result.GetMain()
+	main := _result.getMain()
 	fmt.Println("Main CGNode: " + main.String())
 
 	fmt.Println("\nWe are going to print out call graph. If not desired, turn off DEBUG.")
@@ -686,7 +697,7 @@ func (s PointsToSet) Labels() []*Label {
 			labels = append(labels, s.a.labelFor(nodeid(l)))
 		}
 	}
- 	return labels
+	return labels
 }
 
 // If this PointsToSet came from a Pointer of interface kind

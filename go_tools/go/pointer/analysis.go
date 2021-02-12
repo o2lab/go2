@@ -383,7 +383,6 @@ func AnalyzeWCtx(config *Config) (result *ResultWCtx, err error) { //Result
 			a.config.imports = append(a.config.imports, _import.Name())
 		}
 	}
-	fmt.Println(" *** INITIAL POINTER ANALYSIS *** ")
 	fmt.Println(" *** MODE: " + mode + " *** ")
 	fmt.Println(" *** Analyze Scope ***************** ")
 	if len(a.config.Scope) > 0 {
