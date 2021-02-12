@@ -10,6 +10,8 @@ import (
 	"github.tamu.edu/April1989/go_tools/go/ssa/ssautil"
 	"go/token"
 	"go/types"
+	"golang.org/x/tools/go/pointer"
+	"golang.org/x/tools/go/ssa"
 	"os"
 	"strconv"
 	"strings"
