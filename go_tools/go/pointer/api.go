@@ -686,7 +686,7 @@ func (s PointsToSet) Labels() []*Label {
 			labels = append(labels, s.a.labelFor(nodeid(l)))
 		}
 	}
-	return labels
+ 	return labels
 }
 
 // If this PointsToSet came from a Pointer of interface kind

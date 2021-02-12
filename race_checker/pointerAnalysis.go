@@ -87,10 +87,19 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 		}
 		//log.Trace("***Executing target No.", rightLoc+1)
 	} else if len(ptrSet) == 0 {
-		log.Debug("Points-to set is empty")
+		log.Debug("Points-to set is empty: " + location.String() + " @ " + theIns.String())
 		return
 	}
-	switch theFunc := ptrSet[rightLoc].PointsTo().Labels()[rightCtx].Value().(type) {
+	labels := ptrSet[rightLoc].PointsTo().Labels()
+	if labels == nil {
+		//bz: if nil, probably from reflection, which we excluded from analysis;
+		// meanwhile, most benchmarks do not use reflection, this is probably infeasible path
+		// add a log just in case we need this later
+		log.Debug("Nil Labels: " + location.String() + " @ " + theIns.String())
+		return
+	}
+
+	switch theFunc := labels[rightCtx].Value().(type) {
 	case *ssa.Function:
 		fnName = theFunc.Name()
 		if !a.exploredFunction(theFunc, goID, theIns) {
