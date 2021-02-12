@@ -32,27 +32,28 @@ func (a *analysis) checkRacyPairs() {
 						if len(addressPair) == 1 {
 							continue
 						}
-						var theSame bool //bz: see different conditions from config
+						//var theSame bool //bz: see different conditions from config
 						//if a.ptaConfig.DiscardQueries {
 						//	theSame = a.sameAddress2(addressPair[0], goI, i, addressPair[1], goJ, j) // yq: method needs revision?
 						//} else {
-							theSame = a.sameAddress(addressPair[0], addressPair[1])
+						//	theSame = a.sameAddress(addressPair[0], addressPair[1])
 						//}
-						var sameLock bool
-						if a.ptaConfig.DiscardQueries {
-							sameLock = a.lockSetsIntersect2(insSlice[0], i, insSlice[1], j) //bz: i need goID
-						} else {
-							sameLock = a.lockSetsIntersect(insSlice[0], insSlice[1])
-						}
+						//var sameLock bool
+						//if a.ptaConfig.DiscardQueries {
+						//	sameLock = a.lockSetsIntersect(insSlice[0], insSlice[1])
+						//} else {
+						//	sameLock = a.lockSetsIntersect(insSlice[0], insSlice[1])
+						//}
 						if addressPair[0].String() == "&t4.sentLast [#9]" && addressPair[1].String() == "&t4.sentLast [#9]" {
 							log.Debug(a.prog.Fset.Position(addressPair[0].Pos()))
 							log.Debug(a.prog.Fset.Position(addressPair[1].Pos()))
 						}
-						if theSame && !sameLock &&
+						if a.sameAddress(addressPair[0], addressPair[1]) &&
 							!sliceContains(a.reportedAddr, addressPair[0]) &&
 							!a.reachable(goI, i, goJ, j) &&
 							!a.reachable(goJ, j, goI, i) &&
 							!a.bothAtomic(insSlice[0], insSlice[1]) &&
+							!a.lockSetsIntersect(insSlice[0], insSlice[1]) &&
 							!a.selectMutEx(insSlice[0], insSlice[1]) {
 							a.reportedAddr = append(a.reportedAddr, addressPair[0])
 							a.printRace(len(a.reportedAddr), insSlice, addressPair, []int{i, j}, []int{ii, jj})
@@ -231,32 +232,32 @@ func sliceContainsNode(slice []graph.Node, node graph.Node) bool {
 }
 
 //bz: update
-func (a *analysis) lockSetsIntersect2(insA ssa.Instruction, goID1 int, insB ssa.Instruction, goID2 int) bool {
-	setA := a.lockMap[insA] // lockset of instruction-A
-	if a.isReadIns(insA) {
-		setA = append(setA, a.RlockMap[insA]...)
-	}
-	setB := a.lockMap[insB] // lockset of instruction-B
-	if a.isReadIns(insB) {
-		setB = append(setB, a.RlockMap[insB]...)
-	}
-	for _, addrA := range setA {
-		for _, addrB := range setB {
-			//bz: should be both be *ssa.Gobal (wrapped in a closure), so its belonging function/goID should not be important
-			//or it is local, which has the same everything with insA/insB
-			if a.sameAddress(addrA, addrB) {
-				return true
-			} else {
-				posA := getSrcPos(addrA)
-				posB := getSrcPos(addrB)
-				if posA == posB {
-					return true
-				}
-			}
-		}
-	}
-	return false
-}
+//func (a *analysis) lockSetsIntersect2(insA ssa.Instruction, goID1 int, insB ssa.Instruction, goID2 int) bool {
+//	setA := a.lockMap[insA] // lockset of instruction-A
+//	if a.isReadIns(insA) {
+//		setA = append(setA, a.RlockMap[insA]...)
+//	}
+//	setB := a.lockMap[insB] // lockset of instruction-B
+//	if a.isReadIns(insB) {
+//		setB = append(setB, a.RlockMap[insB]...)
+//	}
+//	for _, addrA := range setA {
+//		for _, addrB := range setB {
+//			//bz: should be both be *ssa.Gobal (wrapped in a closure), so its belonging function/goID should not be important
+//			//or it is local, which has the same everything with insA/insB
+//			if a.sameAddress(addrA, addrB) {
+//				return true
+//			} else {
+//				posA := getSrcPos(addrA)
+//				posB := getSrcPos(addrB)
+//				if posA == posB {
+//					return true
+//				}
+//			}
+//		}
+//	}
+//	return false
+//}
 
 // lockSetsIntersect determines if two input instructions are trying to access a variable that is protected by the same set of locks
 func (a *analysis) lockSetsIntersect(insA ssa.Instruction, insB ssa.Instruction) bool {
