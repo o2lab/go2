@@ -245,7 +245,7 @@ func doEachMainDefaultAPI(i int, main *ssa.Package) {
 	}
 
 	if ptaConfig.DEBUG {
-		result.DumpQueries()
+		result.DumpAll()
 	}
 
 	start2 := time.Now()

@@ -185,6 +185,7 @@ type Warning struct {
 // See Config for how to request the various Result components.
 //
 type Result struct {
+	a               *analysis  // bz: for debug
 	CallGraph       *callgraph.Graph      // discovered call graph
 	////bz: default
 	//Queries         map[ssa.Value]Pointer // pts(v) for each v in Config.Queries.
@@ -595,7 +596,28 @@ func (r *ResultWCtx) DumpAll() {
 }
 
 //bz: user API: for debug to dump all queries out
-func (r *Result) DumpQueries() {
+func (r *Result) DumpAll() {
+	fmt.Println("\nWe are going to dump all results. If not desired, turn off DEBUG.")
+
+	//bz: also a reference of how to use new APIs here
+	_result := r.a.result
+	main := _result.GetMain()
+	fmt.Println("Main CGNode: " + main.String())
+
+	fmt.Println("\nWe are going to print out call graph. If not desired, turn off DEBUG.")
+	callers := _result.CallGraph.Nodes
+	fmt.Println("#CGNode: " + strconv.Itoa(len(callers)))
+	for _, caller := range callers {
+		//if !strings.Contains(caller.GetFunc().String(), "command-line-arguments.") {
+		//	continue //we only want the app call edges
+		//}
+		fmt.Println(caller.String()) //bz: with context
+		outs := caller.Out           // caller --> callee
+		for _, out := range outs {   //callees
+			fmt.Println("  -> " + out.Callee.String()) //bz: with context
+		}
+	}
+
 	fmt.Println("\nWe are going to print out queries. If not desired, turn off DEBUG.")
 	queries := r.Queries
 	inQueries := r.IndirectQueries

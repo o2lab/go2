@@ -346,9 +346,9 @@ func (runner *AnalysisRunner) runEachMainBaseline(main *ssa.Package) *pointer.Re
 	t := time.Now()
 	elapsed := t.Sub(start)
 	log.Info("Done -- PTA/CG Build; Using " + elapsed.String() + ". Go check go_pta_log for detail. ")
-	//if runner.ptaconfig.DEBUG {
-	//	result.DumpAll()
-	//}
+	if runner.ptaconfig.DEBUG {
+		result.DumpAll()
+	}
 
 	return result
 }

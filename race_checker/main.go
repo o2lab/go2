@@ -12,14 +12,14 @@ import (
 
 type analysis struct {
 	useNewPTA    bool //useNewPTA the new pta
-	result       *pointer.Result //one time
+	result       *pointer.Result //now can reuse the result
 	ptaConfig    *pointer.Config
 	goID2info    map[int]goroutineInfo //goID -> goroutinInfo
 	includePkgs  []string // bz: we only include these pkgs from path + project import -> project specific
 	//"google.golang.org/grpc",
 	//"github.com/pingcap/tidb",
 
-	useDefaultPTA	bool
+	useDefaultPTA	bool //use default go pta
 	prog            *ssa.Program
 	pkgs            []*ssa.Package
 	mains           []*ssa.Package
@@ -104,7 +104,7 @@ var (
 
 var useNewPTA = true //bz: default value for this branch
 var useQueries = false //bz: whether we use Queries in pointer analysis
-var doDebugPTA = false //bz: default value for this branch
+var doDebugPTA = true //bz: default value for this branch
 var doPTALog = false //bz: default value for this branch
 
 var trieLimit = 2      // set as user config option later, an integer that dictates how many times a function can be called under identical context
@@ -113,7 +113,7 @@ var channelComm = true // analyze channel communication
 var fromPath = ""      // interested packages are those located at this path
 var entryFn = "main"
 var allEntries = false
-var useDefaultPTA = false
+var useDefaultPTA = false //bz: default value for this branch
 
 func init() {
 	excludedPkgs = []string{//bz: excluded a lot of default constraints

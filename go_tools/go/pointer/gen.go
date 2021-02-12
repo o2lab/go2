@@ -236,9 +236,6 @@ func (a *analysis) makeFunctionObject(fn *ssa.Function, callersite *callsite) no
 	//if a.config.DEBUG {
 	//	fmt.Println("\t---- makeFunctionObject for " + fn.String())
 	//}
-	if strings.Contains(fn.String(), "(*fmt.pp).printArg") {
-		fmt.Println()
-	}
 
 	// obj is the function object (identity, params, results).
 	obj := a.nextNode()

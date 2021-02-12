@@ -231,31 +231,27 @@ var main2Analysis map[*ssa.Package]*Result //bz: skip redo everytime calls Analy
 func translateQueries(val ssa.Value, id nodeid, cgn *cgnode, result *Result, _result *ResultWCtx) {
 	t := val.Type()
 	if CanPoint(t) {
-		if _, ok := result.Queries[val]; ok {
-			ptr := PointerWCtx{_result.a, id, cgn}
-			ptrs, ok := result.Queries[val]
-			if !ok {
-				// First time?  Create the canonical query node.
-				ptrs = make([]PointerWCtx, 1)
-				ptrs[0] = ptr
-			} else {
-				ptrs = append(ptrs, ptr)
-			}
-			result.Queries[val] = ptrs
+		ptr := PointerWCtx{_result.a, id, cgn}
+		ptrs, ok := result.Queries[val]
+		if !ok {
+			// First time?  Create the canonical query node.
+			ptrs = make([]PointerWCtx, 1)
+			ptrs[0] = ptr
+		} else {
+			ptrs = append(ptrs, ptr)
 		}
+		result.Queries[val] = ptrs
 	} else { //indirect
-		if _, ok := result.IndirectQueries[val]; ok {
-			ptr := PointerWCtx{_result.a, id, cgn}
-			ptrs, ok := result.IndirectQueries[val]
-			if !ok {
-				// First time?  Create the canonical query node.
-				ptrs = make([]PointerWCtx, 1)
-				ptrs[0] = ptr
-			} else {
-				ptrs = append(ptrs, ptr)
-			}
-			result.IndirectQueries[val] = ptrs
+		ptr := PointerWCtx{_result.a, id, cgn}
+		ptrs, ok := result.IndirectQueries[val]
+		if !ok {
+			// First time?  Create the canonical query node.
+			ptrs = make([]PointerWCtx, 1)
+			ptrs[0] = ptr
+		} else {
+			ptrs = append(ptrs, ptr)
 		}
+		result.IndirectQueries[val] = ptrs
 	}
 }
 
@@ -291,6 +287,7 @@ func Analyze(config *Config) (result *Result, err error) {
 		IndirectQueries: make(map[ssa.Value][]PointerWCtx),
 	}
 
+	//go through each cgnode
 	callgraph := _result.CallGraph
 	fns := callgraph.Fn2CGNode
 	for _, cgns := range fns {
@@ -313,6 +310,8 @@ func Analyze(config *Config) (result *Result, err error) {
 
 	main2Analysis = make(map[*ssa.Package]*Result)
 	main2Analysis[main] = result
+	result.a = _result.a
+
 	return result, nil
 }
 
