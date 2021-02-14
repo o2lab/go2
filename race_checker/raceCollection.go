@@ -16,37 +16,18 @@ func (a *analysis) checkRacyPairs() {
 	for i := 0; i < len(a.RWIns); i++ {
 		for j := i + 1; j < len(a.RWIns); j++ { // must be in different goroutines, j always greater than i
 			for ii, goI := range a.RWIns[i] {
-				//bz: i is goID
 				if (i == 0 && ii < a.insDRA) || (channelComm && sliceContainsBloc(a.omitComm, goI.Block())) {
 					continue
 				} // do not check race-free instructions in main goroutine
 				for jj, goJ := range a.RWIns[j] {
-					//bz: j is goID
 					if channelComm && sliceContainsBloc(a.omitComm, goJ.Block()) {
 						continue
 					}
 					if (isWriteIns(goI) && isWriteIns(goJ)) || (isWriteIns(goI) && a.isReadIns(goJ)) || (a.isReadIns(goI) && isWriteIns(goJ)) { // only read and write instructions
-						//fmt.Println(goI.String() + "\n" + goJ.String() + "\n ---------------------------") //bz: debug -> missing fn
 						insSlice := []ssa.Instruction{goI, goJ}
 						addressPair := a.insAddress(insSlice) // one instruction from each goroutine
 						if len(addressPair) == 1 {
 							continue
-						}
-						//var theSame bool //bz: see different conditions from config
-						//if a.ptaConfig.DiscardQueries {
-						//	theSame = a.sameAddress2(addressPair[0], goI, i, addressPair[1], goJ, j) // yq: method needs revision?
-						//} else {
-						//	theSame = a.sameAddress(addressPair[0], addressPair[1])
-						//}
-						//var sameLock bool
-						//if a.ptaConfig.DiscardQueries {
-						//	sameLock = a.lockSetsIntersect(insSlice[0], insSlice[1])
-						//} else {
-						//	sameLock = a.lockSetsIntersect(insSlice[0], insSlice[1])
-						//}
-						if addressPair[0].String() == "&t4.sentLast [#9]" && addressPair[1].String() == "&t4.sentLast [#9]" {
-							log.Debug(a.prog.Fset.Position(addressPair[0].Pos()))
-							log.Debug(a.prog.Fset.Position(addressPair[1].Pos()))
 						}
 						if a.sameAddress(addressPair[0], addressPair[1]) &&
 							!sliceContains(a.reportedAddr, addressPair[0]) &&
@@ -106,36 +87,6 @@ func (a *analysis) insAddress(insSlice []ssa.Instruction) []ssa.Value { // obtai
 	return theAddrs
 }
 
-// bz: update
-//func (a *analysis) sameAddress2(addr1 ssa.Value, goI ssa.Instruction, goID1 int, addr2 ssa.Value, goJ ssa.Instruction, goID2 int) bool {
-//	if global1, ok1 := addr1.(*ssa.Global); ok1 {
-//		if global2, ok2 := addr2.(*ssa.Global); ok2 {
-//			return global1.Pos() == global2.Pos() // compare position of identifiers
-//		}
-//	} else if freevar1, ok := addr1.(*ssa.FreeVar); ok {
-//		if freevar2, ok2 := addr2.(*ssa.FreeVar); ok2 {
-//			return freevar1.Pos() == freevar2.Pos() // compare position of identifiers
-//		}
-//	}
-//
-//	// check points-to set to see if they can point to the same object
-//	if a.useNewPTA { //return type: []PointerWCtx
-//		goInstr1 := a.getGoInstrForGoID(goID1)
-//		pts1 := a.result.PointsTo2(addr1, goInstr1, goI.Parent())
-//		goInstr2 := a.getGoInstrForGoID(goID2)
-//		pts2 := a.result.PointsTo2(addr2, goInstr2, goJ.Parent())
-//
-//		if pts1.IsNil() || pts2.IsNil() {
-//			return false
-//		}
-//		return pts1.MayAlias(pts2)
-//	} else {
-//		panic("Use default pta: WRONG PATH !!! @ a.sameAddress2()")
-//		//ptset := a.result.Queries
-//		//return ptset[addr1].PointsTo().Intersects(ptset[addr2].PointsTo())
-//	}
-//}
-
 // sameAddress determines if two addresses have the same global address(for package-level variables only)
 func (a *analysis) sameAddress(addr1 ssa.Value, addr2 ssa.Value) bool {
 	if global1, ok1 := addr1.(*ssa.Global); ok1 {
@@ -147,33 +98,11 @@ func (a *analysis) sameAddress(addr1 ssa.Value, addr2 ssa.Value) bool {
 			return freevar1.Pos() == freevar2.Pos() // compare position of identifiers
 		}
 	}
-
 	// check points-to set to see if they can point to the same object
-	//if a.useNewPTA { //return type: []PointerWCtx
-	//	pts1 := a.result.PointsTo(addr1)
-	//	pts2 := a.result.PointsTo(addr2)
-	//
-	//	if pts1 == nil || pts2 == nil {
-	//		return false
-	//	}
-	//	if len(pts1) > 1 || len(pts2) > 1 {
-	//		//TODO:bz: I cannot retrieve any context information here
-	//		//    hence, use aggressive way: if any pts1/pts2 is different, return false -> not the same
-	//		if a.useNewPTA && a.ptaConfig.DEBUG { //bz: useNewPTA ...
-	//			fmt.Println(" *** contexts > 1: *** (mostly due to loops)")
-	//		}
-	//		same := true
-	//		for _, _pts1 := range pts1 {
-	//			for _, _pts2 := range pts2 {
-	//				same = same && _pts1.MayAlias(_pts2)
-	//			}
-	//		}
-	//		//bz: TODO: this is probably too strict ...
-	//		return same //if any is different, return false -> not the same
-	//	}
-	//	return pts1[0].MayAlias(pts2[0])
-	//} else {
-	//	panic("Use default pta: WRONG PATH !!! @ a.sameAddress()")
+	//if useDefaultPTA { // TODO: need to add default option in pointer package
+	//	ptsets := a.result.Queries
+	//	return ptsets[addr1].PointsTo().Intersects(ptsets[addr2].PointsTo())
+	//} else if useNewPTA {
 		ptset1 := a.result.Queries[addr1]
 		ptset2 := a.result.Queries[addr2]
 		for _, ptrCtx1 := range ptset1 {
@@ -183,8 +112,8 @@ func (a *analysis) sameAddress(addr1 ssa.Value, addr2 ssa.Value) bool {
 				}
 			}
 		}
-		return false
 	//}
+	return false
 }
 
 // reachable determines if 2 input instructions are connected in the Happens-Before Graph
@@ -231,34 +160,6 @@ func sliceContainsNode(slice []graph.Node, node graph.Node) bool {
 	return false
 }
 
-//bz: update
-//func (a *analysis) lockSetsIntersect2(insA ssa.Instruction, goID1 int, insB ssa.Instruction, goID2 int) bool {
-//	setA := a.lockMap[insA] // lockset of instruction-A
-//	if a.isReadIns(insA) {
-//		setA = append(setA, a.RlockMap[insA]...)
-//	}
-//	setB := a.lockMap[insB] // lockset of instruction-B
-//	if a.isReadIns(insB) {
-//		setB = append(setB, a.RlockMap[insB]...)
-//	}
-//	for _, addrA := range setA {
-//		for _, addrB := range setB {
-//			//bz: should be both be *ssa.Gobal (wrapped in a closure), so its belonging function/goID should not be important
-//			//or it is local, which has the same everything with insA/insB
-//			if a.sameAddress(addrA, addrB) {
-//				return true
-//			} else {
-//				posA := getSrcPos(addrA)
-//				posB := getSrcPos(addrB)
-//				if posA == posB {
-//					return true
-//				}
-//			}
-//		}
-//	}
-//	return false
-//}
-
 // lockSetsIntersect determines if two input instructions are trying to access a variable that is protected by the same set of locks
 func (a *analysis) lockSetsIntersect(insA ssa.Instruction, insB ssa.Instruction) bool {
 	setA := a.lockMap[insA] // lockset of instruction-A
@@ -286,8 +187,8 @@ func (a *analysis) lockSetsIntersect(insA ssa.Instruction, insB ssa.Instruction)
 }
 
 func (a *analysis) bothAtomic(insA ssa.Instruction, insB ssa.Instruction) bool {
-	if aCall, ok := insA.(*ssa.Call); ok {
-		if bCall, ok0 := insB.(*ssa.Call); ok0 {
+	if aCall, ok := insA.(*ssa.Call); ok && aCall.Call.StaticCallee() != nil {
+		if bCall, ok0 := insB.(*ssa.Call); ok0 && bCall.Call.StaticCallee() != nil{
 			if aCall.Call.StaticCallee().Pkg.Pkg.Name() == "atomic" && bCall.Call.StaticCallee().Pkg.Pkg.Name() == "atomic" {
 				return true
 			}

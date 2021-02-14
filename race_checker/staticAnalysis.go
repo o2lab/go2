@@ -10,8 +10,8 @@ import (
 	"github.tamu.edu/April1989/go_tools/go/ssa/ssautil"
 	"go/token"
 	"go/types"
-	"golang.org/x/tools/go/pointer"
-	"golang.org/x/tools/go/ssa"
+	//"golang.org/x/tools/go/pointer"
+	//"golang.org/x/tools/go/ssa"
 	"os"
 	"strconv"
 	"strings"
@@ -129,10 +129,6 @@ func pkgSelection(initial []*packages.Package) ([]*ssa.Package, *ssa.Program, []
 				fmt.Print("Enter function name to begin analysis from: ")
 				fmt.Scan(&enterAt)
 				for _ , p := range pkgs {
-					//if len(p.Members) == 0 {
-					//	continue //bz: skip the panic if no function in *ssa.Package
-					//}
-
 					if p != nil {
 						if fnMem, okf := p.Members[enterAt]; okf { // package contains function to enter at
 							userEP = true
@@ -341,7 +337,14 @@ func (runner *AnalysisRunner) runEachMainBaseline(main *ssa.Package) *pointer.Re
 
 
 	start := time.Now()
-	result, err2 := pointer.Analyze(runner.ptaconfig) // conduct pointer analysis
+	var result *pointer.Result
+	var err2 error
+	// TODO: need to differentiate imported packages for PTA
+	if useDefaultPTA {
+		result, err2 = pointer.Analyze(runner.ptaconfig) // conduct pointer analysis (default version)
+	} else if useNewPTA {
+		result, err2 = pointer.Analyze(runner.ptaconfig) // conduct pointer analysis (customized version)
+	}
 	if err2 != nil {
 		log.Fatal(err2)
 	}

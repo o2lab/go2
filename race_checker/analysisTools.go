@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	log "github.com/sirupsen/logrus"
 	"github.com/twmb/algoimpl/go/graph"
 	"github.tamu.edu/April1989/go_tools/go/ssa"
@@ -158,17 +157,7 @@ func (a *analysis) buildHB(HBgraph *graph.Graph) {
 			} else if dIns, ok1 := anIns.(*ssa.Defer); ok1 {
 				if dIns.Call.Value.Name() == "Done" {
 					for wIns, wNode := range waitingN {
-						var theSame bool
-						if a.ptaConfig.DiscardQueries {
-							if _, ok2 := (*wNode.Value).(goIns); ok2 {
-								theSame = a.sameAddress(dIns.Call.Args[0], wIns.Call.Args[0])
-							}else{
-								theSame = false
-							}
-						} else {
-							theSame = a.sameAddress(dIns.Call.Args[0], wIns.Call.Args[0])
-						}
-						if theSame { //bz: freevar /ssa.alloc
+						if a.sameAddress(dIns.Call.Args[0], wIns.Call.Args[0]) {
 							err := HBgraph.MakeEdge(prevN, wNode) // create edge from Done node to Wait node
 							if err != nil {
 								log.Fatal(err)
@@ -223,9 +212,6 @@ func (a *analysis) buildHB(HBgraph *graph.Graph) {
 
 // visitAllInstructions visits each line and calls the corresponding helper function to drive the tool
 func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
-	if a.useNewPTA && a.ptaConfig.DEBUG { //bz: useNewPTA ...
-		fmt.Println(".... " + fn.String())
-	}
 	a.analysisStat.nGoroutine = goID + 1 // keep count of goroutine quantity
 	if fn == nil {
 		return
@@ -559,7 +545,7 @@ func (a *analysis) exploredFunction(fn *ssa.Function, goID int, theIns ssa.Instr
 	if efficiency && !a.fromPkgsOfInterest(fn) { // for temporary debugging purposes only
 		return true
 	}
-	if sliceContainsInsAt(a.RWIns[goID], theIns) >= 0 { //bz:
+	if sliceContainsInsAt(a.RWIns[goID], theIns) >= 0 {
 		return true
 	}
 	if efficiency && sliceContainsStr(a.storeIns, fn.Name()) { // for temporary debugging purposes only
