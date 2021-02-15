@@ -29,7 +29,7 @@ func (a *analysis) checkRacyPairs() {
 						if len(addressPair) == 1 {
 							continue
 						}
-						if a.sameAddress(addressPair[0], addressPair[1]) &&
+						if a.sameAddress(addressPair[0], addressPair[1]) && /*goI.Parent().Name() == "CloseSend" && isWriteIns(goI) &&*/
 							!sliceContains(a.reportedAddr, addressPair[0]) &&
 							!a.reachable(goI, i, goJ, j) &&
 							!a.reachable(goJ, j, goI, i) &&
