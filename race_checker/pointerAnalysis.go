@@ -7,8 +7,6 @@ import (
 	"strings"
 
 	//"go/types"
-	log "github.com/sirupsen/logrus"
-	//"go/types"
 	//"golang.org/x/tools/go/pointer"
 	//"golang.org/x/tools/go/ssa"
 	//"strings"
@@ -53,10 +51,9 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 		//log.Trace("***Pointer Analysis revealed ", len(PTSet), " targets for location - ", a.prog.Fset.Position(location.Pos()))
 		var fns []string
 		for ind, eachPtr := range ptrSet { // check each pointer (with context)
-			log.Debug(eachPtr.GetMyContext())
+			//log.Debug(eachPtr.GetMyContext())
 			ptsLabels := eachPtr.PointsTo().Labels() // set of labels for locations that the pointer (with context) points to
-			for indCtx, eachLabel := range ptsLabels {
-				log.Debug(indCtx)
+			for _, eachLabel := range ptsLabels {
 				if eachLabel.Value().Parent() != nil {
 					fns = append(fns, eachLabel.Value().Parent().Name())
 					//log.Trace("*****target No.", ind+1, " - ", eachPtr.Value().Name(), " from function ", eachPtr.Value().Parent().Name())
@@ -71,7 +68,7 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 		}
 		//log.Trace("***Executing target No.", rightLoc+1)
 	} else if len(ptrSet) == 0 {
-		log.Debug("Points-to set is empty: " + location.String() + " @ " + theIns.String())
+		//log.Debug("Points-to set is empty: " + location.String() + " @ " + theIns.String())
 		return
 	}
 	labels := ptrSet[rightLoc].PointsTo().Labels()
@@ -79,7 +76,7 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 		//bz: if nil, probably from reflection, which we excluded from analysis;
 		// meanwhile, most benchmarks do not use reflection, this is probably infeasible path
 		// add a log just in case we need this later
-		log.Debug("Nil Labels: " + location.String() + " @ " + theIns.String())
+		//log.Debug("Nil Labels: " + location.String() + " @ " + theIns.String())
 		return
 	}
 
