@@ -128,10 +128,10 @@ func init() {
 // main sets up arguments and calls staticAnalysis function
 func main() {//default: -useNewPTA
 	newPTA := flag.Bool("useNewPTA", true, "Use the new pointer analysis in go_tools.")
-	setUseQueries := flag.Bool("useQueries", false, "Use the new pointer analysis in go_tools.")
+	//setUseQueries := flag.Bool("useQueries", false, "Use the new pointer analysis in go_tools.")
 	builtinPTA := flag.Bool("useDefaultPTA", false, "Use the built-in pointer analysis.")
-	debugPTA := flag.Bool("debugPTA", false, "Prints all PTA debug messages in console.")
-	keepPTALog := flag.Bool("keepPTALog", false, "Create a log file for all details in PTA.")
+	//debugPTA := flag.Bool("debugPTA", false, "Prints all PTA debug messages in console.")
+	//keepPTALog := flag.Bool("keepPTALog", false, "Create a log file for all details in PTA.")
 	debug := flag.Bool("debug", false, "Prints log.Debug messages.")
 	lockOps := flag.Bool("lockOps", false, "Prints lock and unlock operations. ")
 	flag.BoolVar(&stats.CollectStats, "collectStats", false, "Collect analysis statistics.")
@@ -167,12 +167,12 @@ func main() {//default: -useNewPTA
 		log.SetLevel(log.TraceLevel)
 	}
 	if *withoutComm {
-		//trieLimit = 1 //bz: we want trieLimit == 2, otherwise: missing function, e.g., TestIstio8214
-		//efficiency = true
+		trieLimit = 1
+		efficiency = true
 		channelComm = false
 	}
 	if *withComm {
-		//trieLimit = 1
+		trieLimit = 1
 		efficiency = true
 		channelComm = true
 	}
