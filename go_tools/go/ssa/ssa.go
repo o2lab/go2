@@ -322,6 +322,7 @@ type Function struct {
 	lblocks      map[*ast.Object]*lblock // labelled blocks
 
 	IsFromApp bool // bz: whether this fn is invoked by main method from the analyzed app
+	               // !! this is the only change in this file, all others are my comments
 }
 
 // BasicBlock represents an SSA basic block.

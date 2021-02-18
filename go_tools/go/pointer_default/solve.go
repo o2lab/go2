@@ -20,12 +20,6 @@ type solverState struct {
 }
 
 func (a *analysis) solve() {
-	if a.config.DoPerformance { //bz: performance dump info
-		a.num_constraints = 0
-		fmt.Println("#constraints (before solve()): ", len(a.constraints))
-		fmt.Println("#cgnodes (before solve()): ", len(a.cgnodes))
-	}
-
 	start("Solving")
 	if a.log != nil {
 		fmt.Fprintf(a.log, "\n\n==== Solving constraints\n\n")
@@ -41,9 +35,8 @@ func (a *analysis) solve() {
 
 		var x int
 		if !a.work.TakeMin(&x) {
-			break // empty worklist
+			break // empty
 		}
-
 		id := nodeid(x)
 		if a.log != nil {
 			fmt.Fprintf(a.log, "\tnode n%d\n", id)
@@ -57,8 +50,8 @@ func (a *analysis) solve() {
 			continue
 		}
 		if a.log != nil {
-			//fmt.Fprintf(a.log, "\t\tpts(n%d : %s) = %s + %s\n", id, n.typ, &delta, &n.solve.prevPTS)  //bz: too verbose
-			fmt.Fprintf(a.log, "\t\tpts(n%d : %s) = %s + ... \n", id, n.typ, &delta)
+			fmt.Fprintf(a.log, "\t\tpts(n%d : %s) = %s + %s\n",
+				id, n.typ, &delta, &n.solve.prevPTS)
 		}
 		n.solve.prevPTS.Copy(&n.solve.pts.Sparse)
 
@@ -100,17 +93,14 @@ func (a *analysis) solve() {
 // that pre-existing constraints are applied to new labels.
 //
 func (a *analysis) processNewConstraints() {
+	if a.config.DoPerformance && len(a.constraints) > 0 { //bz: performance
+		num_constraints = num_constraints + len(a.constraints)
+	}
 	// Take the slice of new constraints.
 	// (May grow during call to solveConstraints.)
-	if a.config.DoPerformance && len(a.constraints) > 0 {
-		a.num_constraints = a.num_constraints + len(a.constraints)
-	}
 	constraints := a.constraints
 	a.constraints = nil
 
-	if a.config.Log != nil {
-		fmt.Fprintf(a.log, "\t\tnew constraints...........\n")
-	}
 	// Initialize points-to sets from addr-of (base) constraints.
 	for _, c := range constraints {
 		if c, ok := c.(*addrConstraint); ok {
@@ -122,7 +112,7 @@ func (a *analysis) processNewConstraints() {
 			// have other constraints attached.
 			// (A no-op in round 1.)
 			if !dst.solve.copyTo.IsEmpty() || len(dst.solve.complex) > 0 {
-				a.addWork(c.dst) //bz: original code: add to worklist
+				a.addWork(c.dst)
 			}
 		}
 	}
@@ -153,17 +143,10 @@ func (a *analysis) processNewConstraints() {
 			a.addWork(id)
 		}
 	}
-	if a.config.Log != nil {
-		fmt.Fprintf(a.log, "\t\t......................\n")
-	}
-
 	// Apply new constraints to pre-existing PTS labels.
 	var space [50]int
 	for _, id := range stale.AppendTo(space[:0]) {
 		n := a.nodes[nodeid(id)]
-		if a.config.Log != nil {
-			fmt.Fprintf(a.log, "\t\tstale %d: pts(%s) = %s + %s\n", id, n.typ, &n.solve.prevPTS, &n.solve.prevPTS)
-		}
 		a.solveConstraints(n, &n.solve.prevPTS)
 	}
 }
@@ -209,11 +192,11 @@ func (a *analysis) addLabel(ptr, label nodeid) bool {
 func (a *analysis) addWork(id nodeid) {
 	a.work.Insert(int(id))
 	if a.log != nil {
-		fmt.Fprintf(a.log, "\t\tadd to work: n%d\n", id)
+		fmt.Fprintf(a.log, "\t\twork: n%d\n", id)
 	}
 }
 
-// onlineCopy adds a copy edge.  It is called Online, i.e. during
+// onlineCopy adds a copy edge.  It is called online, i.e. during
 // solving, so it adds edges and pts members directly rather than by
 // instantiating a 'constraint'.
 //
@@ -253,7 +236,6 @@ func (a *analysis) onlineCopyN(dst, src nodeid, sizeof uint32) uint32 {
 	return sizeof
 }
 
-//bz: different solves for complex instructions
 func (c *loadConstraint) solve(a *analysis, delta *nodeset) {
 	var changed bool
 	for _, x := range delta.AppendTo(a.deltaSpace) {
@@ -306,7 +288,6 @@ func (c *typeFilterConstraint) solve(a *analysis, delta *nodeset) {
 	}
 }
 
-//bz: panic always happens; hardcode to avoid this ...
 func (c *untagConstraint) solve(a *analysis, delta *nodeset) {
 	predicate := types.AssignableTo
 	if c.exact {
@@ -333,14 +314,14 @@ func (c *untagConstraint) solve(a *analysis, delta *nodeset) {
 	}
 }
 
-//bz: this solves for invoke calls, needs to be updated for kcfa
 func (c *invokeConstraint) solve(a *analysis, delta *nodeset) {
 	for _, x := range delta.AppendTo(a.deltaSpace) {
 		ifaceObj := nodeid(x)
 		tDyn, v, indirect := a.taggedValue(ifaceObj)
 		if indirect {
-			// TODO(adonovan): we'll need to implement this
-			// when we start creating indirect tagged objects.
+			// TODO(adonovan): we may need to implement this if
+			// we ever apply invokeConstraints to reflect.Value PTSs,
+			// e.g. for (reflect.Value).Call.
 			panic("indirect tagged object")
 		}
 
@@ -350,84 +331,37 @@ func (c *invokeConstraint) solve(a *analysis, delta *nodeset) {
 			panic(fmt.Sprintf("n%d: no ssa.Function for %s", c.iface, c.method))
 		}
 		sig := fn.Signature
-		fnObj := a.globalobj[fn] // dynamic calls use shared contour  ---> bz: fnObj is nodeid
 
-		if fnObj == 0 {//bz: because a.objectNode(fn) was not called during gen phase.
-			if a.log != nil { //debug
-				fmt.Fprintf(a.log, "\n\n------------- GENERATING INVOKE FUNC HERE: "+fn.String()+" ------------------------------ \n")
-			}
-
-			if a.considerMyContext(fn.String()) {
-				if c.caller == nil && c.site == nil {
-					if a.config.DEBUG {
-						fmt.Println("!! GENERATING INVOKE FUNC ONLINE (share contour): " + fn.String())
-					}
-					fnObj = a.genInvokeOnline(nil, nil, fn)
-				} else { 	//bz: special handling of invoke targets, create here
-					if a.config.DEBUG {
-						fmt.Println("!! GENERATING INVOKE FUNC ONLINE (ctx-sensitive): " + fn.String())
-					}
-					fnObj = a.genInvokeOnline(c.caller, c.site, fn)
-				}
-			} else { //newly created app func invokes lib func: use share contour
-				if !a.createForLevelX(nil, fn) {
-					if a.config.DEBUG {
-						fmt.Println("Level excluded: " + fn.String())
-					}
-					continue
-				}
-				fnObj = a.genInvokeOnline(nil, nil, fn)
-			}
-			if a.log != nil { //debug
-				fmt.Fprintf(a.log, "------------------------------ ------------------------------ ---------------------------- \n")
-			}
-
-			// bz: we continue our Online process
-			if a.log != nil { //debug
-				fmt.Fprintf(a.log, "\n\n----------- GENERATING CONSTRAINTS HERE -------------------------- ----------------------- ")
-			}
-
-			a.genConstraintsOnline()
-
-			if a.log != nil { //debug
-				fmt.Fprintf(a.log, "------------------------------ ------------------------------ ---------------------------- \n")
-			}
-		} else {
-			if a.log != nil { //debug
-				fmt.Fprintf(a.log, "!! ALREADY EXIST INVOKE FUNC: " + fn.String()+"\n")
-			}
+		fnObj := a.globalobj[fn] // dynamic calls use shared contour
+		if fnObj == 0 {
+			// a.objectNode(fn) was not called during gen phase.
+			panic(fmt.Sprintf("a.globalobj[%s]==nil", fn))
 		}
-		// bz: back to normal workflow -> context-insensitive
-		c.eachSolve(a, fnObj, sig, v)
+
+		// Make callsite's fn variable point to identity of
+		// concrete method.  (There's no need to add it to
+		// worklist since it never has attached constraints.)
+		a.addLabel(c.params, fnObj)
+
+		// Extract value and connect to method's receiver.
+		// Copy payload to method's receiver param (arg0).
+		arg0 := a.funcParams(fnObj)
+		recvSize := a.sizeof(sig.Recv().Type())
+		a.onlineCopyN(arg0, v, recvSize)
+
+		src := c.params + 1 // skip past identity
+		dst := arg0 + nodeid(recvSize)
+
+		// Copy caller's argument block to method formal parameters.
+		paramsSize := a.sizeof(sig.Params())
+		a.onlineCopyN(dst, src, paramsSize)
+		src += nodeid(paramsSize)
+		dst += nodeid(paramsSize)
+
+		// Copy method results to caller's result block.
+		resultsSize := a.sizeof(sig.Results())
+		a.onlineCopyN(src, dst, resultsSize)
 	}
-}
-
-//bz: no need to match context for caller/callee, everything is created unique for each context,
-//if a constraint exists, it is correct
-func (c *invokeConstraint) eachSolve(a *analysis, fnObj nodeid, sig *types.Signature, v nodeid) {
-	// Make callsite's fn variable point to identity of
-	// concrete method.  (There's no need to add it to
-	// worklist since it never has attached constraints.)
-	a.addLabel(c.params, fnObj)
-
-	// Extract value and connect to method's receiver.
-	// Copy payload to method's receiver param (arg0).
-	arg0 := a.funcParams(fnObj)
-	recvSize := a.sizeof(sig.Recv().Type())
-	a.onlineCopyN(arg0, v, recvSize)
-
-	src := c.params + 1 // skip past identity
-	dst := arg0 + nodeid(recvSize)
-
-	// Copy caller's argument block to method formal parameters.
-	paramsSize := a.sizeof(sig.Params())
-	a.onlineCopyN(dst, src, paramsSize)
-	src += nodeid(paramsSize)
-	dst += nodeid(paramsSize)
-
-	// Copy method results to caller's result block.
-	resultsSize := a.sizeof(sig.Results())
-	a.onlineCopyN(src, dst, resultsSize)
 }
 
 func (c *addrConstraint) solve(a *analysis, delta *nodeset) {

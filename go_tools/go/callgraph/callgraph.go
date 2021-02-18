@@ -75,12 +75,9 @@ func (g *Graph) CreateNode(fn *ssa.Function) *Node {
 }
 
 // A Node represents a node in a call graph.
-// bz: add uint32 type here (copied from analysis.go.nodeid type, since cannot share),
-// use this for context-sensitive to retrieve cgn
-// also updated the related functions in this file, skip their comments
 type Node struct {
 	Func *ssa.Function // the function this node represents
-	ID   int           // 0-based sequence number  ----> bz: useful ??
+	ID   int           // 0-based sequence number
 	In   []*Edge       // unordered set of incoming call edges (n.In[*].Callee == n)
 	Out  []*Edge       // unordered set of outgoing call edges (n.Out[*].Caller == n)
 }
@@ -129,4 +126,10 @@ func AddEdge(caller *Node, site ssa.CallInstruction, callee *Node) {
 	e := &Edge{caller, site, callee}
 	callee.In = append(callee.In, e)
 	caller.Out = append(caller.Out, e)
+	numEdges++
+}
+
+var numEdges = 0 //bz: perforamnce, number of edges
+func GetNumEdges() int {
+	return numEdges
 }

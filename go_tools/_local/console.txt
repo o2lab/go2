@@ -1,0 +1,28 @@
+Loading input packages...
+Done  -- 1 packages loaded
+Building SSA code for entire program...
+Done  -- SSA code built
+#TOTAL MAIN: 1
+
+0   package command-line-arguments
+ *** MODE: 1-ORIGIN-SENSITIVE *** 
+ *** Analyze Scope ***************** 
+ - command-line-arguments
+ *********************************** 
+ *** Import Libs ******************* 
+fmt, grpc, 
+ *********************************** 
+ *** Level: 0 *** 
+ *** No Queries *** 
+ *** optRenumber OFF *** 
+	---- makeFunctionObjectWithContext (kcfa) for command-line-arguments.init
+     K-CALLSITE -- [0:shared contour; ]
+	---- makeFunctionObjectWithContext (kcfa) for command-line-arguments.main
+     K-CALLSITE -- [0:root call to command-line-arguments.main; ]
+CAUGHT APP METHOD -- command-line-arguments.someFunc
+        BUT ssa.GO -- go someFunc(nil:google.golang.org/grpc.ClientStream)   LET'S SEE.
+	---- makeFunctionObjectWithContext (kcfa) for command-line-arguments.someFunc
+     K-CALLSITE -- [0:go someFunc(nil:google.golang.org/grpc.ClientStream)@command-line-arguments.main; ]
+CAUGHT APP METHOD -- command-line-arguments.someStream
+	---- makeFunctionObjectWithContext (kcfa) for command-line-arguments.someStream
+     K-CALLSITE -- [0:go someFunc(nil:google.golang.org/grpc.ClientStream)@command-line-arguments.main; ]

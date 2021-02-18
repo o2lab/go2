@@ -154,6 +154,7 @@ type analysis struct {
 	closureWOGo map[nodeid]nodeid             //bz: solution@field actualCallerSite []*callsite of cgnode type
 
 	considerReflect bool //bz: whether we have reflect in exclusions
+	num_constraints int //bz:  performance
 }
 
 // enclosingObj returns the first node of the addressable memory
@@ -558,7 +559,25 @@ func AnalyzeWCtx(config *Config) (result *ResultWCtx, err error) { //Result
 	}
 
 	a.result.CallGraph.computeFn2CGNode() //bz: update Fn2CGNode for user API
-	a.result.a = a                        //bz: update
+	a.result.a = a    //bz: update
+
+	if a.config.DoPerformance { //bz: performance test; dump info
+		fmt.Println("--------------------- Performance ------------------------")
+		fmt.Println("#pts: ", len(a.nodes))
+		fmt.Println("#constraints (totol num): ", a.num_constraints)
+		fmt.Println("#cgnodes (totol num): ", len(a.cgnodes))
+		//fmt.Println("#func (totol num): ", len(a.fn2cgnodeIdx))
+		numTyp := 0
+		for _, track := range a.trackTypes {
+			if track {
+				numTyp++
+			}
+		}
+		fmt.Println("#tracked types (totol num): ", numTyp)
+		fmt.Println("#origins (totol num): ", len(a.closures))
+		fmt.Println("\nCall Graph: \n#Nodes: ", len(a.result.CallGraph.Nodes))
+		fmt.Println("#Edges: ", GetNumEdges())
+	}
 
 	return a.result, nil
 }

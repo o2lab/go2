@@ -4,6 +4,7 @@ race_checker/race_checker
 .DS_STORE
 .idea
 
+go_tools/_local/
 go_tools/_logs/
 go_tools/_mytestresult/
 go_tools/_mytests/

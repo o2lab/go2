@@ -196,44 +196,14 @@ extractQueries:
 	// !! bz: when run race_checker under proj dir, it goes to here
 	//        hence we are going to make this recursively traverse the subdir under the initial cfg.Dir
 	if len(restPatterns) > 0 || len(patterns) == 0 {
-		dr, err := state.createDriverResponse(restPatterns...) //bz: go list
+		dr, err := state.createDriverResponse(restPatterns...) //bz: run go list cmd
 		if err != nil {
 			return nil, err
 		}
 		response.addAll(dr)
 
-		skip := false
-		//bz: EXCPETION: we will not traverse under proj dir if input is a specific go file
-		if len(restPatterns) == 1 && len(patterns) == 1 {
-			restPattern := restPatterns[0]
-			pattern := patterns[0]
-			if restPattern == pattern { //both point to the go file
-				if strings.LastIndex(pattern, ".go") == len(pattern) - 3 {
-					skip = true
-				}
-			}
-		}
-
-		if !skip {
-			//TODO: bz: tmp condition filter to do the list all main entry points
-			cmd := exec.Command("find", ".", "-type", "d") //bz: list this subdir recursively until none
-			cmd.Dir = cfg.Dir                              //set cmd dir
-			var stdout, stderr bytes.Buffer
-			cmd.Stdout = &stdout
-			cmd.Stderr = &stderr
-			cmderr := cmd.Run()
-			if err != nil {
-				fmt.Printf("!!! cmd.Run() failed with %s\n", cmderr)
-				return nil, err
-			}
-			outStr, _ := string(stdout.Bytes()), string(stderr.Bytes())
-			//fmt.Printf("run ls cmd. out:\n%s\nerr:\n%s\n", outStr, errStr) //bz: for me to debug
-			subdirs := strings.Split(outStr, "\n") //bz: record the future dir we need to traverse
-			size := len(subdirs) - 2
-			if size > 0 {
-				goListDriverRecursive(subdirs, size, response, cfg, ctx, restPatterns)
-			}
-		}
+		//bz: when run under proj dir, find all mains
+		handleDriverUnderDir(restPatterns, patterns, response, cfg, ctx)
 	}
 
 	if len(containFiles) != 0 { //bz: another option ？ not used now
@@ -288,24 +258,40 @@ extractQueries:
 	return response.dr, nil
 }
 
-//bz:
-func removeDuplicateValues(subdirs []string) []string {
-	keys := make(map[string]bool)
-	list := []string{}
-
-	// If the key(values of the slice) is not equal
-	// to the already present value in new slice (list)
-	// then we append it. else we jump on another element.
-	for _, entry := range subdirs {
-		if entry == "" {
-			continue
-		}
-		if _, value := keys[entry]; !value {
-			keys[entry] = true
-			list = append(list, entry)
+//bz: when run under proj dir, find all mains
+func handleDriverUnderDir(restPatterns []string, patterns []string, response *responseDeduper, cfg *Config,
+	ctx context.Context) {
+	skip := false
+	//bz: EXCPETION: we will not traverse under proj dir if input is a specific go file
+	if len(restPatterns) == 1 && len(patterns) == 1 {
+		restPattern := restPatterns[0]
+		pattern := patterns[0]
+		if restPattern == pattern { //both point to the go file
+			if strings.LastIndex(pattern, ".go") == len(pattern) - 3 {
+				skip = true
+			}
 		}
 	}
-	return list
+
+	if !skip {
+		//TODO: bz: tmp condition filter to do the list all main entry points
+		cmd := exec.Command("find", ".", "-type", "d") //bz: list this subdir recursively until none
+		cmd.Dir = cfg.Dir                              //set cmd dir
+		var stdout, stderr bytes.Buffer
+		cmd.Stdout = &stdout
+		cmd.Stderr = &stderr
+		cmderr := cmd.Run()
+		if cmderr != nil { //bz: change to panic
+			panic(fmt.Sprintf("!!! cmd.Run() failed with %s\n", cmderr))
+		}
+		outStr, _ := string(stdout.Bytes()), string(stderr.Bytes())
+		//fmt.Printf("run ls cmd. out:\n%s\nerr:\n%s\n", outStr, errStr) //bz: for me to debug
+		subdirs := strings.Split(outStr, "\n") //bz: record the future dir we need to traverse
+		size := len(subdirs) - 2
+		if size > 0 {
+			goListDriverRecursive(subdirs, size, response, cfg, ctx, restPatterns)
+		}
+	}
 }
 
 //bz: do main search
@@ -348,6 +334,26 @@ func goListDriverRecursive(subdirs []string, size int, response *responseDeduper
 			response.addAll(ret)
 		}
 	}
+}
+
+//bz:
+func removeDuplicateValues(subdirs []string) []string {
+	keys := make(map[string]bool)
+	list := []string{}
+
+	// If the key(values of the slice) is not equal
+	// to the already present value in new slice (list)
+	// then we append it. else we jump on another element.
+	for _, entry := range subdirs {
+		if entry == "" {
+			continue
+		}
+		if _, value := keys[entry]; !value {
+			keys[entry] = true
+			list = append(list, entry)
+		}
+	}
+	return list
 }
 
 func (state *golistState) addNeededOverlayPackages(response *responseDeduper, pkgs []string) error {

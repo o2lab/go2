@@ -111,7 +111,7 @@ type rta struct {
 	// concreteTypes maps each concrete type to the set of interfaces that it implements.
 	// Keys are types.Type, values are unordered []*types.Interface.
 	// Only concrete types used as MakeInterface operands are included.
-	concreteTypes typeutil.Map  //bz: helpful?
+	concreteTypes typeutil.Map
 
 	// interfaceTypes maps each interface type to
 	// the set of concrete types that implement it.

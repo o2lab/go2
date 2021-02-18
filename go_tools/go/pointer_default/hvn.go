@@ -69,7 +69,7 @@ package pointer
 // CROSS-CHECK below).  In particular, both linear and cyclic chains of
 // copies are each replaced by a single node.
 //
-// Nodes and constraints created "Online" (e.g. while solving reflection
+// Nodes and constraints created "online" (e.g. while solving reflection
 // constraints) are not subject to this optimization.
 //
 // PERFORMANCE
@@ -166,7 +166,6 @@ import (
 	"go/types"
 	"io"
 	"reflect"
-	"strings"
 
 	"github.tamu.edu/April1989/go_tools/container/intsets"
 )
@@ -292,9 +291,6 @@ func (a *analysis) hvn() {
 		if debugHVNVerbose && h.log != nil {
 			fmt.Fprintf(h.log, "; %s\n", c)
 		}
-		if strings.Contains(c.String(), "load n519801 <- n438581[0]") {
-			fmt.Println()
-		}
 		c.presolve(&h)
 	}
 
@@ -338,10 +334,6 @@ func (a *analysis) hvn() {
 	h.simplify()
 
 	a.showCounts()
-
-	if h.log != nil {
-		fmt.Fprintf(h.log, "\n==== Pointer equivalence optimization is Done\n")
-	}
 
 	stop("HVN")
 }
@@ -797,6 +789,7 @@ func (h *hvn) simplify() {
 			// id becomes the representative of the PE label.
 			canonID = id
 			canon[label] = canonID
+
 			if h.a.log != nil {
 				fmt.Fprintf(h.a.log, "\tpts(n%d) is canonical : \t(%s)\n",
 					id, h.a.nodes[id].typ)
@@ -947,62 +940,6 @@ func (h *hvn) simplify() {
 		cc = append(cc, c)
 	}
 	h.a.constraints = cc
-
-	// bz: this above part sneakily renumbers constraints, if they renumbered constraints
-	// they also needs to renumber others things in mapping as opt.go does
-	// I AM GOING TO RENUMBER THEM >>>
-	a := h.a
-	for v, id := range a.globalobj {
-		nid := mapping[id]
-		if nid == 0 || nid == id {  //bz: not updated or not re-mapped
-			continue
-		}
-		a.globalobj[v] = nid
-	}
-	for v, id := range a.globalval {
-		nid := mapping[id]
-		if nid == 0 || nid == id { //bz: not updated or not re-mapped
-			continue
-		}
-		a.globalval[v] = nid
-	}
-	for _, cgn := range a.cgnodes {
-		nid := mapping[cgn.obj]
-		if nid != 0 && nid != cgn.obj { //bz: not updated or not re-mapped
-			cgn.obj = nid
-		}
-		for _, site := range cgn.sites {
-			tid := mapping[site.targets]
-			if tid != 0 && tid != site.targets {
-				site.targets = tid
-			}
-		}
-		if a.config.DiscardQueries {
-			cgn.renumberHVN(mapping)
-		}
-	}
-	tmp := make(map[nodeid]nodeid)
-	for key, val := range a.closureWOGo {
-		kid := mapping[key]
-		vid := mapping[val]
-		if kid == 0 && vid == 0 { //not re-mapped
-			tmp[key] = val
-		}else if kid == 0 && vid != val {
-			tmp[key] = vid
-		}else if vid == 0 && kid != key {
-			tmp[kid] = val
-		}else if kid != key && vid != val { //neither is 0
-			tmp[kid] = vid
-		}else {
-			tmp[key] = val
-		}
-	}
-	a.closureWOGo = tmp
-
-	for _, val := range a.closures {
-		val.renumberHVN(mapping)
-	}
-	//bz: my renumbering is done
 
 	if h.log != nil {
 		fmt.Fprintf(h.log, "#constraints: was %d, now %d\n", nbefore, len(h.a.constraints))

@@ -13,6 +13,7 @@ import (
 	"github.tamu.edu/April1989/go_tools/go/types/typeutil"
 	"go/token"
 	"io"
+	"os"
 	"strconv"
 	"strings"
 )
@@ -86,6 +87,7 @@ type Config struct {
 
 	imports []string //bz: internal use: store all import pkgs in a main
 	Level   int      //bz: level == 0: traverse all app and lib, but with different ctx; level == 1: traverse 1 level lib call; level == 2: traverse 2 leve lib calls; no other option now
+	DoPerformance  bool //bz: if we output performance related info
 }
 
 //bz: user API: race checker, added when ptaconfig.Level == 2
@@ -646,6 +648,44 @@ func (r *Result) DumpAll() {
 	for v, ps := range inQueries {
 		for _, p := range ps { //p -> types.Pointer: includes its context
 			fmt.Println(p.String() + " (SSA:" + v.String() + "): {" + p.PointsTo().String() + "}")
+		}
+	}
+}
+
+//bz: do comparison with default
+func (r *Result) GetResult() *ResultWCtx {
+	return r.a.result
+}
+
+//bz: do comparison with default
+func (r *Result) DumpToCompare(cgfile *os.File, queryfile *os.File) {
+	_result := r.a.result
+
+	fmt.Println("\nWe are going to dump call graph for comparison. If not desired, turn off doCompare.")
+	callers := _result.CallGraph.Nodes
+	for _, caller := range callers {
+		fmt.Fprintln(cgfile, caller.String()) //bz: with context
+		outs := caller.Out           // caller --> callee
+		for _, out := range outs {   //callees
+			fmt.Fprintln(cgfile, "  -> " + out.Callee.String()) //bz: with context
+		}
+	}
+
+	fmt.Println("\nWe are going to dump queries for comparison. If not desired, turn off doCompare.")
+	queries := r.Queries
+	inQueries := r.IndirectQueries
+	fmt.Fprintln(queryfile, "Queries Detail: ")
+	for v, ps := range queries {
+		for _, p := range ps { //p -> types.Pointer: includes its context
+			//SSA here is your *ssa.Value
+			fmt.Fprintln(queryfile,"(SSA:" + v.String() + "): {" + p.PointsTo().String() + "}")
+		}
+	}
+
+	fmt.Fprintln(queryfile,"Indirect Queries Detail: ")
+	for v, ps := range inQueries {
+		for _, p := range ps { //p -> types.Pointer: includes its context
+			fmt.Fprintln(queryfile, "(SSA:" + v.String() + "): {" + p.PointsTo().String() + "}")
 		}
 	}
 }
