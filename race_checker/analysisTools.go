@@ -137,7 +137,7 @@ func (a *analysis) buildHB(HBgraph *graph.Graph) {
 				} else if callIns.Call.Value.Name() == "Done" {
 					for wIns, wNode := range waitingN {
 						var theSame bool
-						if a.ptaConfig.DiscardQueries {
+						if a.useNewPTA && a.ptaConfig.DiscardQueries {
 							if _, ok1 := (*wNode.Value).(goIns); ok1 {
 								theSame = a.sameAddress(callIns.Call.Args[0], wIns.Call.Args[0])
 							}else{
@@ -264,12 +264,6 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 		}
 		k++
 	}
-	//if fn.Name() == "main" {
-	//	fmt.Println(bVisit)
-	//	for _, ind := range bVisit {
-	//		fmt.Println(fnBlocks[ind].Comment)
-	//	}
-	//}
 
 	var toDefer []ssa.Instruction // stack storing deferred calls
 	var toUnlock []ssa.Value
@@ -332,19 +326,19 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 					} else if deferIns.Call.StaticCallee().Name() == "Unlock" {
 						lockLoc := deferIns.Call.Args[0]
 						if !a.useNewPTA {
-							a.ptaConfig.AddQuery(lockLoc)
+							a.pta0Cfg.AddQuery(lockLoc)
 						}
 						toUnlock = append(toUnlock, lockLoc)
 					} else if deferIns.Call.StaticCallee().Name() == "RUnlock" {
 						RlockLoc := deferIns.Call.Args[0]
 						if !a.useNewPTA {
-							a.ptaConfig.AddQuery(RlockLoc)
+							a.pta0Cfg.AddQuery(RlockLoc)
 						}
 						toRUnlock = append(toRUnlock, RlockLoc)
 					} else if deferIns.Call.Value.Name() == "Done" {
 						a.RWIns[goID] = append(a.RWIns[goID], dIns)
 						if !a.useNewPTA {
-							a.ptaConfig.AddQuery(deferIns.Call.Args[0])
+							a.pta0Cfg.AddQuery(deferIns.Call.Args[0])
 						}
 					}
 				}
@@ -353,6 +347,9 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				if !isSynthetic(fn) && ex == theIns.Parent().Pkg.Pkg.Name() {
 					return
 				}
+			}
+			if fn.Name() == "main" {
+				log.Debug("e")
 			}
 			switch examIns := theIns.(type) {
 			case *ssa.MakeChan: // channel creation op
