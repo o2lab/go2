@@ -136,17 +136,7 @@ func (a *analysis) buildHB(HBgraph *graph.Graph) {
 					waitingN[callIns] = prevN // store Wait node for later edge creation TO this node
 				} else if callIns.Call.Value.Name() == "Done" {
 					for wIns, wNode := range waitingN {
-						var theSame bool
-						if a.useNewPTA && a.ptaConfig.DiscardQueries {
-							if _, ok1 := (*wNode.Value).(goIns); ok1 {
-								theSame = a.sameAddress(callIns.Call.Args[0], wIns.Call.Args[0])
-							}else{
-								theSame = false
-							}
-						} else {
-							theSame = a.sameAddress(callIns.Call.Args[0], wIns.Call.Args[0])
-						}
-						if theSame {
+						if a.sameAddress(callIns.Call.Args[0], wIns.Call.Args[0]) {
 							err := HBgraph.MakeEdge(prevN, wNode) // create edge from Done node to Wait node
 							if err != nil {
 								log.Fatal(err)
@@ -347,9 +337,6 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				if !isSynthetic(fn) && ex == theIns.Parent().Pkg.Pkg.Name() {
 					return
 				}
-			}
-			if fn.Name() == "main" {
-				log.Debug("e")
 			}
 			switch examIns := theIns.(type) {
 			case *ssa.MakeChan: // channel creation op

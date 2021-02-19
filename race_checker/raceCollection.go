@@ -11,7 +11,7 @@ import (
 	"strings"
 )
 
-// checkRacyPairs determines how many data races are present(race must access variable in at least 2 goroutines and one instruction must be a write)
+// checkRacyPairs checks accesses among two concurrent goroutines
 func (a *analysis) checkRacyPairs() {
 	for i := 0; i < len(a.RWIns); i++ {
 		for j := i + 1; j < len(a.RWIns); j++ { // must be in different goroutines, j always greater than i

@@ -22,18 +22,10 @@ import (
 // fromPkgsOfInterest determines if a function is from a package of interest
 func (a *analysis) fromPkgsOfInterest(fn *ssa.Function) bool {
 	if fn.Pkg == nil || fn.Pkg.Pkg == nil {
-		if fn.IsFromApp {
-			return true //bz: otherwise missing func ...
-		}
 		return false
 	}
 	if fn.Pkg.Pkg.Name() == "main" || fn.Pkg.Pkg.Name() == "cli" {
 		return true
-	}
-	for _, included := range a.includePkgs { // bz: update to include necessary functions in traversal
-		if fn.Pkg.Pkg.Name() == included {
-			return true
-		}
 	}
 	for _, excluded := range excludedPkgs {
 		if fn.Pkg.Pkg.Name() == excluded {
@@ -41,6 +33,7 @@ func (a *analysis) fromPkgsOfInterest(fn *ssa.Function) bool {
 		}
 	}
 	if !strings.HasPrefix(fn.Pkg.Pkg.Path(), fromPath) { // path is dependent on tested program
+		fmt.Println(fromPath)
 		return false
 	}
 	return true
@@ -192,7 +185,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 
 	for _, m := range mains {
 		log.Info("Solving for " + m.String() + "... ")
-		if !efficiency {
+		if efficiency {
 			fromPath = m.Pkg.Path()
 		}
 		result, ptaResult := runner.runEachMainBaseline(m)
@@ -267,6 +260,12 @@ func (runner *AnalysisRunner) Run(args []string) error {
 				}
 			}
 		}
+
+		finResult, err9 := pta0.Analyze(runner.Analysis.pta0Cfg) // all queries have been added, conduct pointer analysis
+		if err9 != nil {
+			log.Fatal(err)
+		}
+		runner.Analysis.pta0Result = finResult
 
 		log.Info("Building Happens-Before graph... ")
 		runner.Analysis.HBgraph = graph.New(graph.Directed)

@@ -122,6 +122,7 @@ var useDefaultPTA = true //bz: default value for this branch
 func init() {
 	excludedPkgs = []string{//bz: excluded a lot of default constraints
 		"runtime",
+		"fmt",
 		"reflect",
 		"os",
 		"github.com/modern-go/reflect2", //bz: i forget this causes which benchmark's untag obj panic
