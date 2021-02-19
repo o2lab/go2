@@ -181,9 +181,6 @@ func (a *analysis) makeFunctionObject(fn *ssa.Function, callersite *callsite) no
 	if a.log != nil {
 		fmt.Fprintf(a.log, "\t---- makeFunctionObject %s\n", fn)
 	}
-	if strings.Contains(fn.String(), "(*errors.errorString).Error") {
-		fmt.Println()
-	}
 	// obj is the function object (identity, params, results).
 	obj := a.nextNode()
 	cgn := a.makeCGNode(fn, obj, callersite)
