@@ -117,10 +117,10 @@ var useDefaultPTA = true
 
 func init() {
 	excludedPkgs = []string{
-		"fmt",
-		"reflect",
-		"github.com/modern-go/reflect2", //bz: i forget this causes which benchmark's untag obj panic
-		"google.golang.org/protobuf/reflect", //bz: this causes grpc untag obj panic
+		//"fmt",
+		//"reflect",
+		//"github.com/modern-go/reflect2", //bz: i forget this causes which benchmark's untag obj panic
+		//"google.golang.org/protobuf/reflect", //bz: this causes grpc untag obj panic
 	}
 }
 
