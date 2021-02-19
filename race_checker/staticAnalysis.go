@@ -33,7 +33,6 @@ func (a *analysis) fromPkgsOfInterest(fn *ssa.Function) bool {
 		}
 	}
 	if !strings.HasPrefix(fn.Pkg.Pkg.Path(), fromPath) { // path is dependent on tested program
-		fmt.Println(fromPath)
 		return false
 	}
 	return true
@@ -73,13 +72,11 @@ func pkgSelection(initial []*packages.Package) ([]*ssa.Package, *ssa.Program, []
 	if efficiency && len(initial) > 0 {
 		errSize, errPkgs := packages.PrintErrorsAndMore(initial) //bz: errPkg will be nil in initial
 		if errSize > 0 {
-			if doDebugPTA {
-				log.Info("Excluded the following packages contain errors, due to the above errors. ")
-				for i, errPkg := range errPkgs {
-					log.Info(i, " ", errPkg.ID)
-				}
-				log.Info("Continue   -- ")
+			log.Info("Excluded the following packages contain errors, due to the above errors. ")
+			for i, errPkg := range errPkgs {
+				log.Info(i, " ", errPkg.ID)
 			}
+			log.Info("Continue   -- ")
 			_ = errPkgs
 		}
 	} else if len(initial) == 0 {
@@ -261,11 +258,13 @@ func (runner *AnalysisRunner) Run(args []string) error {
 			}
 		}
 
-		finResult, err9 := pta0.Analyze(runner.Analysis.pta0Cfg) // all queries have been added, conduct pointer analysis
-		if err9 != nil {
-			log.Fatal(err)
+		if useDefaultPTA {
+			finResult, err9 := pta0.Analyze(runner.Analysis.pta0Cfg) // all queries have been added, conduct pointer analysis
+			if err9 != nil {
+				log.Fatal(err)
+			}
+			runner.Analysis.pta0Result = finResult
 		}
-		runner.Analysis.pta0Result = finResult
 
 		log.Info("Building Happens-Before graph... ")
 		runner.Analysis.HBgraph = graph.New(graph.Directed)
@@ -285,9 +284,6 @@ func (runner *AnalysisRunner) runEachMainBaseline(main *ssa.Package) (*pointer.R
 	logfile, err := os.Create("go_pta_log") //bz: for me ...
 	if err != nil {
 		log.Fatal(err)
-	}
-	if !doPTALog {
-		logfile = nil
 	}
 
 	var scope []string
@@ -317,10 +313,10 @@ func (runner *AnalysisRunner) runEachMainBaseline(main *ssa.Package) (*pointer.R
 			//shared config
 			K:          1,
 			LimitScope: true,         //bz: only consider app methods now
-			DEBUG:      doDebugPTA,   //bz: do all printed out info in console --> turn off to avoid internal nil reference panic
+			DEBUG:      false,   //bz: do all printed out info in console --> turn off to avoid internal nil reference panic
 			Scope:      scope,        //bz: analyze scope, default is "command-line-arguments"
 			Exclusion: excludedPkgs, //excludedPkgs here
-			DiscardQueries: !useQueries, //bz: new flag -> if we use queries
+			DiscardQueries: true, //bz: new flag -> if we use queries
 			Level:      0,
 			//bz: Level = 1: if callee is from app or import
 			// Level = 2: parent of caller in app, caller in lib, callee also in lib || parent in lib, caller in app, callee in lib || parent in lib, caller in lib, callee in app

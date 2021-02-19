@@ -225,7 +225,13 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 		a.RWIns = append(a.RWIns, []ssa.Instruction{})
 	}
 	fnBlocks := fn.Blocks
-	bVisit := make([]int, 1, len(fnBlocks)) // create ordering at which blocks are visited
+	bCap := 1
+	if len(fnBlocks) > 1 {
+		bCap = len(fnBlocks)
+	} else if len(fnBlocks) == 0 {
+		return
+	}
+	bVisit := make([]int, 1, bCap) // create ordering at which blocks are visited
 	k := 0
 	b := fnBlocks[0]
 	bVisit[k] = 0

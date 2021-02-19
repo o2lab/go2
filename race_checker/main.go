@@ -107,24 +107,18 @@ var (
 )
 
 var useNewPTA = false //bz: default value for this branch
-var useQueries = false //bz: whether we use Queries in pointer analysis
-var doDebugPTA = false //bz: default value for this branch
-var doPTALog = false //bz: default value for this branch
-
 var trieLimit = 2      // set as user config option later, an integer that dictates how many times a function can be called under identical context
 var efficiency = false // configuration setting to avoid recursion in tested program
 var channelComm = true // analyze channel communication
 var fromPath = ""      // interested packages are those located at this path
 var entryFn = "main"
 var allEntries = false
-var useDefaultPTA = true //bz: default value for this branch
+var useDefaultPTA = true
 
 func init() {
-	excludedPkgs = []string{//bz: excluded a lot of default constraints
-		"runtime",
+	excludedPkgs = []string{
 		"fmt",
 		"reflect",
-		"os",
 		"github.com/modern-go/reflect2", //bz: i forget this causes which benchmark's untag obj panic
 		"google.golang.org/protobuf/reflect", //bz: this causes grpc untag obj panic
 	}
@@ -151,6 +145,7 @@ func main() {//default: -useNewPTA
 	}
 	if *newPTA {
 		useNewPTA = true
+		useDefaultPTA = false
 	}
 	//if *setUseQueries {
 	//	useQueries = true
