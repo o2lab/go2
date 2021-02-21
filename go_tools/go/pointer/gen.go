@@ -26,8 +26,11 @@ var (
 	tInvalid   = types.Typ[types.Invalid]
 	tUnsafePtr = types.Typ[types.UnsafePointer]
 
-	withinScope = false //bz: whether the current genInstr() is working on a method within our scope
-	Online      = false //bz: whether a constraint is from genInvokeOnline()
+	withinScope  = false                    //bz: whether the current genInstr() is working on a method within our scope
+	Online       = false                    //bz: whether a constraint is from genInvokeOnline()
+	numOrigins   = 0                        //bz: number of origins
+	recordPreGen = false                    //bz: when to record preGens
+	preGens      = make([]*ssa.Function, 0) //bz: number of pregenerated functions/cgs/constraints for reflection, os, runtime
 )
 
 // ---------- Node creation ----------
@@ -236,6 +239,9 @@ func (a *analysis) makeFunctionObject(fn *ssa.Function, callersite *callsite) no
 	//if a.config.DEBUG {
 	//	fmt.Println("\t---- makeFunctionObject for " + fn.String())
 	//}
+	if strings.Contains(fn.String(), "internal/reflectlite.Swapper$6") {
+		fmt.Println()
+	}
 
 	// obj is the function object (identity, params, results).
 	obj := a.nextNode()
@@ -406,7 +412,7 @@ func (a *analysis) makeCGNodeAndRelated(fn *ssa.Function, caller *cgnode, caller
 		single := a.createSingleCallSite(callersite)
 		cgn = &cgnode{fn: fn, obj: obj, callersite: single}
 
-	} else {                 // other functions
+	} else {    // other functions
 		if a.config.Origin { //bz: for origin-sensitive
 			if callersite == nil { //we only create new context for make closure and go instruction
 				var fnkcs []*callsite
@@ -417,6 +423,8 @@ func (a *analysis) makeCGNodeAndRelated(fn *ssa.Function, caller *cgnode, caller
 						special = &callsite{targets: obj, loopID: loopID, goInstr: goInstr}
 					}
 					fnkcs = a.createKCallSite(caller.callersite, special)
+
+					numOrigins++
 				} else { // use parent context, since no go invoke afterwards (currently reachable);
 					//update: we will update the parent ctx (including loopID) later
 					a.closureWOGo[obj] = obj //record
@@ -431,6 +439,8 @@ func (a *analysis) makeCGNodeAndRelated(fn *ssa.Function, caller *cgnode, caller
 				}
 				fnkcs := a.createKCallSite(caller.callersite, special)
 				cgn = &cgnode{fn: fn, obj: obj, callersite: fnkcs}
+
+				numOrigins++
 			} else { //use caller context
 				cgn = &cgnode{fn: fn, obj: obj, callersite: caller.callersite}
 			}
@@ -1321,9 +1331,9 @@ func (a *analysis) valueNodeInvoke(caller *cgnode, site *callsite, fn *ssa.Funct
 			a.atFuncs[fn] = true // Methods of concrete types are address-taken functions.
 		}
 
-		return obj + 1
+		return id
 	}
-	return obj + 1
+	return obj - 1 //fn
 }
 
 // genInvoke generates constraints for a dynamic method invocation.
@@ -1853,9 +1863,10 @@ func (a *analysis) genInstr(cgn *cgnode, instr ssa.Instruction) {
 			for _, c := range cs { // bz: updated for []nodeid
 				a.copy(a.valueNode(instr), c, 1)
 			}
-		} else { //context-insensitive
+		} else { //default: context-insensitive
 			a.copy(a.valueNode(instr), a.valueNode(fn), 1)
 		}
+
 		// Free variables are treated like global variables.
 		for i, b := range instr.Bindings {
 			a.copy(a.valueNode(fn.FreeVars[i]), a.valueNode(b), a.sizeof(b.Type()))
@@ -2011,7 +2022,7 @@ func (a *analysis) genRootCalls() *cgnode {
 			if a.log != nil {
 				fmt.Fprintf(a.log, "\troot call to %s:\n", fn)
 			}
-			if a.considerMyContext(fn.String()) { //bz: give the main method a context, instead of using shared contour
+			if a.considerMyContext(fn.String()) { //bz: give the init/main method a context, instead of using shared contour
 				a.copy(targets, a.valueNodeInvoke(root, site, fn), 1)
 			} else {
 				a.copy(targets, a.valueNode(fn), 1)
@@ -2138,6 +2149,10 @@ func (a *analysis) genMethodsOf(T types.Type) {
 		m := a.prog.MethodValue(mset.At(i))
 		a.valueNode(m)
 
+		if recordPreGen {
+			preGens = append(preGens, m)
+		}
+
 		if !itf {
 			// Methods of concrete types are address-taken functions.
 			a.atFuncs[m] = true
@@ -2163,9 +2178,13 @@ func (a *analysis) generate() {
 	//for all methods of reflect.rtype.
 	// (Shared contours are used by dynamic calls to reflect.Type
 	// methods---typically just String().)
+	if a.config.DoPerformance {
+		recordPreGen = true
+	}
 	if rtype := a.reflectRtypePtr; rtype != nil {
 		a.genMethodsOf(rtype)
 	}
+	recordPreGen = false
 
 	root := a.genRootCalls()
 
@@ -2175,11 +2194,11 @@ func (a *analysis) generate() {
 
 	// Create nodes and constraints for all methods of all types
 	// that are dynamically accessible via reflection or interfaces.
-	skip := 0
+	skip := 0 //bz: data
 	for _, T := range a.prog.RuntimeTypes() {
 		_type := T.String()
 		if a.considerMyContext(_type) {
-			//bz: we want to make function (called by interfaces) later for kcfa, here uses share contour
+			//bz: we want to make function (called by interfaces) later for context. here uses share contour
 			if a.log != nil {
 				fmt.Fprintf(a.log, "SKIP genMethodsOf() offline for type: "+T.String()+"\n")
 			}
@@ -2214,15 +2233,13 @@ func (a *analysis) generate() {
 	}
 
 	// The runtime magically allocates os.Args; so should we.
-	if !(ContainString(a.config.Exclusion, "os") && ContainString(a.config.Exclusion, "runtime")) {
-		//bz: we are trying to skip this iff "runtime" and "os" are both in exclusions
-		if os := a.prog.ImportedPackage("os"); os != nil {
-			// In effect:  os.Args = new([1]string)[:]
-			T := types.NewSlice(types.Typ[types.String])
-			obj := a.addNodes(sliceToArray(T), "<command-line args>")
-			a.endObject(obj, nil, "<command-line args>")
-			a.addressOf(T, a.objectNode(nil, os.Var("Args")), obj)
-		}
+	//bz: we are trying to skip this iff "runtime" and "os" are both in exclusions
+	if os := a.prog.ImportedPackage("os"); os != nil {
+		// In effect:  os.Args = new([1]string)[:]
+		T := types.NewSlice(types.Typ[types.String])
+		obj := a.addNodes(sliceToArray(T), "<command-line args>")
+		a.endObject(obj, nil, "<command-line args>")
+		a.addressOf(T, a.objectNode(nil, os.Var("Args")), obj)
 	}
 
 	// Discard generation state, to avoid confusion after node renumbering.

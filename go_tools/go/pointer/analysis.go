@@ -153,7 +153,6 @@ type analysis struct {
 	result      *ResultWCtx                   //bz: our result, dump all
 	closureWOGo map[nodeid]nodeid             //bz: solution@field actualCallerSite []*callsite of cgnode type
 
-	considerReflect bool //bz: whether we have reflect in exclusions
 	num_constraints int //bz:  performance
 }
 
@@ -443,36 +442,28 @@ func AnalyzeWCtx(config *Config) (result *ResultWCtx, err error) { //Result
 		}
 	}
 
-	if !ContainString(a.config.Exclusion, "reflect") { //bz: only do if race checker considers
-		a.considerReflect = true //update
+	if reflect := a.prog.ImportedPackage("reflect"); reflect != nil {
+		rV := reflect.Pkg.Scope().Lookup("Value")
+		a.reflectValueObj = rV
+		a.reflectValueCall = a.prog.LookupMethod(rV.Type(), nil, "Call")
+		a.reflectType = reflect.Pkg.Scope().Lookup("Type").Type().(*types.Named)
+		a.reflectRtypeObj = reflect.Pkg.Scope().Lookup("rtype")
+		a.reflectRtypePtr = types.NewPointer(a.reflectRtypeObj.Type())
 
-		if reflect := a.prog.ImportedPackage("reflect"); reflect != nil {
-			rV := reflect.Pkg.Scope().Lookup("Value")
-			a.reflectValueObj = rV
-			a.reflectValueCall = a.prog.LookupMethod(rV.Type(), nil, "Call")
-			a.reflectType = reflect.Pkg.Scope().Lookup("Type").Type().(*types.Named)
-			a.reflectRtypeObj = reflect.Pkg.Scope().Lookup("rtype")
-			a.reflectRtypePtr = types.NewPointer(a.reflectRtypeObj.Type())
+		// Override flattening of reflect.Value, treating it like a basic type.
+		tReflectValue := a.reflectValueObj.Type()
+		a.flattenMemo[tReflectValue] = []*fieldInfo{{typ: tReflectValue}}
 
-			// Override flattening of reflect.Value, treating it like a basic type.
-			tReflectValue := a.reflectValueObj.Type()
-			a.flattenMemo[tReflectValue] = []*fieldInfo{{typ: tReflectValue}}
+		// Override shouldTrack of reflect.Value and *reflect.rtype.
+		// Always track pointers of these types.
+		a.trackTypes[tReflectValue] = true
+		a.trackTypes[a.reflectRtypePtr] = true
 
-			// Override shouldTrack of reflect.Value and *reflect.rtype.
-			// Always track pointers of these types.
-			a.trackTypes[tReflectValue] = true
-			a.trackTypes[a.reflectRtypePtr] = true
-
-			a.rtypes.SetHasher(a.hasher)
-			a.reflectZeros.SetHasher(a.hasher)
-		}
-	} else {
-		a.considerReflect = false //update -> do not consider 'reflect'
+		a.rtypes.SetHasher(a.hasher)
+		a.reflectZeros.SetHasher(a.hasher)
 	}
-	if !ContainString(a.config.Exclusion, "runtime") { //bz: only do if race checker considers
-		if runtime := a.prog.ImportedPackage("runtime"); runtime != nil {
-			a.runtimeSetFinalizer = runtime.Func("SetFinalizer")
-		}
+	if runtime := a.prog.ImportedPackage("runtime"); runtime != nil {
+		a.runtimeSetFinalizer = runtime.Func("SetFinalizer")
 	}
 	a.computeTrackBits() //bz: use when there is input queries before running this analysis; we do not need this for now?
 
@@ -559,10 +550,11 @@ func AnalyzeWCtx(config *Config) (result *ResultWCtx, err error) { //Result
 	}
 
 	a.result.CallGraph.computeFn2CGNode() //bz: update Fn2CGNode for user API
-	a.result.a = a    //bz: update
+	a.result.a = a                        //bz: update
 
 	if a.config.DoPerformance { //bz: performance test; dump info
 		fmt.Println("--------------------- Performance ------------------------")
+		fmt.Println("#Pre-generated cgnodes: ", len(preGens))
 		fmt.Println("#pts: ", len(a.nodes))
 		fmt.Println("#constraints (totol num): ", a.num_constraints)
 		fmt.Println("#cgnodes (totol num): ", len(a.cgnodes))
@@ -574,22 +566,12 @@ func AnalyzeWCtx(config *Config) (result *ResultWCtx, err error) { //Result
 			}
 		}
 		fmt.Println("#tracked types (totol num): ", numTyp)
-		fmt.Println("#origins (totol num): ", len(a.closures))
-		fmt.Println("\nCall Graph: \n#Nodes: ", len(a.result.CallGraph.Nodes))
+		fmt.Println("#origins (totol num): ", numOrigins+1) //bz: main is not included here
+		fmt.Println("\nCall Graph: (cgnode based: function + context) \n#Nodes: ", len(a.result.CallGraph.Nodes))
 		fmt.Println("#Edges: ", GetNumEdges())
 	}
 
 	return a.result, nil
-}
-
-//bz: used by me
-func ContainString(s []string, e string) bool {
-	for _, a := range s {
-		if a == e {
-			return true
-		}
-	}
-	return false
 }
 
 //bz: used in race_checker

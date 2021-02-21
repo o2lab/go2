@@ -85,9 +85,9 @@ type Config struct {
 	UseQueriesAPI  bool     //bz: change the api the same as default pta
 	TrackMore      bool     //bz: track pointers with types declared in Analyze Scope
 
-	imports []string //bz: internal use: store all import pkgs in a main
-	Level   int      //bz: level == 0: traverse all app and lib, but with different ctx; level == 1: traverse 1 level lib call; level == 2: traverse 2 leve lib calls; no other option now
-	DoPerformance  bool //bz: if we output performance related info
+	imports       []string //bz: internal use: store all import pkgs in a main
+	Level         int      //bz: level == 0: traverse all app and lib, but with different ctx; level == 1: traverse 1 level lib call; level == 2: traverse 2 leve lib calls; no other option now
+	DoPerformance bool     //bz: if we output performance related info
 }
 
 //bz: user API: race checker, added when ptaconfig.Level == 2
@@ -531,6 +531,103 @@ func (r *ResultWCtx) pointsToFurther(v ssa.Value) []PointerWCtx {
 	return nil
 }
 
+//bz: for mine data
+func (r *ResultWCtx) CountMyReachUnreachFunctions(doDetail bool) (map[*ssa.Function]*ssa.Function, map[*ssa.Function]*ssa.Function,
+	map[int]int, map[int]int, map[*ssa.Function]*ssa.Function) {
+	//cgns
+	reachCGs := make(map[int]int)
+	//fn
+	reaches := make(map[*ssa.Function]*ssa.Function)
+	implicits := make(map[*ssa.Function]*ssa.Function)
+
+	var checks []*Edge
+	//start from root
+	root := r.CallGraph.Root
+	reaches[root.GetFunc()] = root.GetFunc()
+	reachCGs[root.ID] = root.ID
+	for _, out := range root.Out {
+		checks = append(checks, out)
+	}
+
+	for len(checks) > 0 {
+		var tmp []*Edge
+		for _, check := range checks {
+			if _, ok := reachCGs[check.Callee.ID]; ok {
+				continue //checked already
+			}
+
+			reachCGs[check.Callee.ID] = check.Callee.ID
+			for _, out := range check.Callee.Out {
+				tmp = append(tmp, out)
+			}
+		}
+		checks = tmp
+	}
+
+	//collect implicits
+	for _, node := range r.CallGraph.Nodes {
+		if _, ok := reachCGs[node.ID]; ok { //reached
+			if _, ok2 := reaches[node.GetFunc()]; ok2 {
+				continue //already stored
+			}
+			reaches[node.GetFunc()] = node.GetFunc()
+			continue
+		} else {
+			//these functions in implicits, but are actually reached.
+			//HOWEVER, it is not direct function call,
+			//e.g.
+			//; *t43 = init$2
+			//	create n367 func() interface{} for fmt.init$2
+			//	---- makeFunctionObject fmt.init$2
+			//	create n368 func() interface{} for func.cgnode
+			//	create n369 interface{} for func.results
+			//	----
+			//	globalobj[fmt.init$2] = n368
+			//	addr n367 <- {&n368}
+			//	val[init$2] = n367  (*ssa.Function)
+			//	copy n366 <- n367
+			//===>>>> no call edge created for this ...
+			if _, ok2 := implicits[node.GetFunc()]; ok2 {
+				continue //already stored
+			}
+			implicits[node.GetFunc()] = node.GetFunc()
+		}
+	}
+
+	//how many of implicits are from preGens?
+	cg := r.CallGraph
+	prenodes := make(map[int]int)
+	preFuncs := make(map[*ssa.Function]*ssa.Function) //& how many of functions are there in prenodes?
+	for _, preGen := range preGens {
+		precgnodes := cg.Fn2CGNode[preGen]
+		for _, precgn := range precgnodes {
+			if precgn.callersite[0] != nil { //this is not shared contour, not from pregen, but from origin call chain
+				continue
+			}
+			node := cg.GetNodeWCtx(precgn)
+			prenodes[node.ID] = node.ID
+			preFuncs[node.GetFunc()] = node.GetFunc()
+			for _, out := range node.Out {
+				checks = append(checks, out)
+			}
+		}
+	}
+
+	if doDetail { //bz: print out all details
+		//fmt.Println("\n\nImplicit Functions: ")
+		//for _, unreach := range implicits {
+		//	fmt.Println(unreach)
+		//}
+
+		fmt.Println("\n\nPre Generated Functions: ")
+		for _, prefunc := range preFuncs {
+			fmt.Println(prefunc)
+		}
+	}
+
+	return reaches, implicits, reachCGs, prenodes, preFuncs
+}
+
 //bz: user API: for debug to dump all result out
 func (r *ResultWCtx) DumpAll() {
 	fmt.Println("\nWe are going to dump all results. If not desired, turn off DEBUG.")
@@ -665,9 +762,9 @@ func (r *Result) DumpToCompare(cgfile *os.File, queryfile *os.File) {
 	callers := _result.CallGraph.Nodes
 	for _, caller := range callers {
 		fmt.Fprintln(cgfile, caller.String()) //bz: with context
-		outs := caller.Out           // caller --> callee
-		for _, out := range outs {   //callees
-			fmt.Fprintln(cgfile, "  -> " + out.Callee.String()) //bz: with context
+		outs := caller.Out                    // caller --> callee
+		for _, out := range outs {            //callees
+			fmt.Fprintln(cgfile, "  -> "+out.Callee.String()) //bz: with context
 		}
 	}
 
@@ -678,14 +775,14 @@ func (r *Result) DumpToCompare(cgfile *os.File, queryfile *os.File) {
 	for v, ps := range queries {
 		for _, p := range ps { //p -> types.Pointer: includes its context
 			//SSA here is your *ssa.Value
-			fmt.Fprintln(queryfile,"(SSA:" + v.String() + "): {" + p.PointsTo().String() + "}")
+			fmt.Fprintln(queryfile, "(SSA:"+v.String()+"): {"+p.PointsTo().String()+"}")
 		}
 	}
 
-	fmt.Fprintln(queryfile,"Indirect Queries Detail: ")
+	fmt.Fprintln(queryfile, "Indirect Queries Detail: ")
 	for v, ps := range inQueries {
 		for _, p := range ps { //p -> types.Pointer: includes its context
-			fmt.Fprintln(queryfile, "(SSA:" + v.String() + "): {" + p.PointsTo().String() + "}")
+			fmt.Fprintln(queryfile, "(SSA:"+v.String()+"): {"+p.PointsTo().String()+"}")
 		}
 	}
 }

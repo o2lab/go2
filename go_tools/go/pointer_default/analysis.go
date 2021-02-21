@@ -24,8 +24,8 @@ import (
 
 const (
 	// optimization options; enable all when committing
-	optRenumber = true // enable renumbering optimization (makes logs hard to read)
-	optHVN      = true // enable pointer equivalence via Hash-Value Numbering
+	optRenumber = false // enable renumbering optimization (makes logs hard to read)
+	optHVN      = false // enable pointer equivalence via Hash-Value Numbering
 
 	// debugging options; disable all when committing
 	debugHVN           = false // enable assertions in HVN
@@ -372,7 +372,7 @@ func Analyze(config *Config) (result *Result, err error) {
 			}
 		}
 		fmt.Println("#tracked types (totol num): ", numTyp)
-		fmt.Println("\nCall Graph: \n#Nodes: ", len(a.result.CallGraph.Nodes), "  (#unreachable: ", len(a.cgnodes) - len(a.result.CallGraph.Nodes), ")")
+		fmt.Println("\nCall Graph: (function based) \n#Nodes: ", len(a.result.CallGraph.Nodes)) //bz: this might be n cgnode <-> 1 callgraph.Node
 		fmt.Println("#Edges: ", callgraph.GetNumEdges())
 	}
 

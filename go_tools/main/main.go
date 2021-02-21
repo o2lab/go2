@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"github.tamu.edu/April1989/go_tools/compare"
+	"github.tamu.edu/April1989/go_tools/go/callgraph"
 	"github.tamu.edu/April1989/go_tools/go/packages"
 	"github.tamu.edu/April1989/go_tools/go/pointer"
 	default_algo "github.tamu.edu/April1989/go_tools/go/pointer_default"
@@ -15,10 +16,10 @@ import (
 	"time"
 )
 
-
 var doLog = false
 var doPerforamnce = true
-var doCompare = true
+var doCompare = false //bz: this is super long
+var doDetail = false //bz: print out all data from countReachUnreachXXX
 
 var excludedPkgs = []string{ //bz: excluded a lot of default constraints
 	//"runtime",
@@ -34,13 +35,21 @@ var default_maxTime time.Duration
 var default_minTime time.Duration
 var default_elapsed time.Duration
 
-
 func main() {
 	path := flag.String("path", "", "Designated project filepath. ")
+	_doLog := flag.Bool("doLog", false, "Do log. ")
+	_doComp := flag.Bool("doCompare", false, "Do compare with default pta. ")
 	flag.Parse()
 	if *path != "" {
 		projPath = *path
 	}
+	if *_doLog {
+		doLog = true
+	}
+	if *_doComp {
+		doCompare = true
+	}
+
 	args := flag.Args()
 	cfg := &packages.Config{
 		Mode:  packages.LoadAllSyntax, // the level of information returned for each package
@@ -98,15 +107,19 @@ func main() {
 			t := time.Now()
 			default_elapsed = default_elapsed + t.Sub(start)
 			start = time.Now()
-			fmt.Println("........................................")
+			fmt.Println("........................................\n........................................")
 		}
 		fmt.Println("My Algo: ")
-		r_my := doEachMainMy(i, main)      //mypta
+		r_my := doEachMainMy(i, main) //mypta
 		t := time.Now()
 		my_elapsed = my_elapsed + t.Sub(start)
 
 		if doCompare {
+			start = time.Now()
 			compare.Compare(r_default, r_my)
+			t := time.Now()
+			comp_elapsed := t.Sub(start)
+			fmt.Println("Compare Total Time: ", comp_elapsed.String()+".")
 		}
 		fmt.Println("=============================================================================")
 	}
@@ -118,23 +131,29 @@ func main() {
 		fmt.Println("Total: ", default_elapsed.String()+".")
 		fmt.Println("Max: ", default_maxTime.String()+".")
 		fmt.Println("Min: ", default_minTime.String()+".")
-		fmt.Println("Avg: ", (float32(default_elapsed.Milliseconds()) / float32(len(mains)-1) / float32(1000)), "s.")
+		fmt.Println("Avg: ", float32(default_elapsed.Milliseconds())/float32(len(mains)-1)/float32(1000), "s.")
 	}
 
 	fmt.Println("My Algo:")
 	fmt.Println("Total: ", my_elapsed.String()+".")
 	fmt.Println("Max: ", my_maxTime.String()+".")
 	fmt.Println("Min: ", my_minTime.String()+".")
-	fmt.Println("Avg: ", (float32(my_elapsed.Milliseconds()) / float32(len(mains)-1) / float32(1000)), "s.")
+	fmt.Println("Avg: ", float32(my_elapsed.Milliseconds())/float32(len(mains)-1)/float32(1000), "s.")
 }
 
 func doEachMainMy(i int, main *ssa.Package) *pointer.ResultWCtx {
 	var logfile *os.File
+	var err error
 	if doLog { //create my log file
-		logfile, _ = os.Create("/Users/Bozhen/Documents/GO2/go_tools/_logs/full_log_" + strconv.Itoa(i))
+		logfile, err = os.Create("/Users/bozhen/Documents/GO2/go_tools/_logs/my_log_" + strconv.Itoa(i))
 	} else {
 		logfile = nil
 	}
+
+	if err != nil {
+		panic(fmt.Sprintln(err))
+	}
+
 	var scope []string
 	if projPath != "" {
 		scope = []string{projPath}
@@ -180,6 +199,18 @@ func doEachMainMy(i int, main *ssa.Package) *pointer.ResultWCtx {
 		fmt.Println(err)
 	}
 	defer logfile.Close()
+
+	if doPerforamnce {
+		_, _, _, preNodes, preFuncs := result.GetResult().CountMyReachUnreachFunctions(doDetail)
+		fmt.Println("#Unreach Nodes: ", len(preNodes))
+		fmt.Println("#Reach Nodes: ", len(result.GetResult().CallGraph.Nodes)-len(preNodes))
+		fmt.Println("#Unreach Functions: ", len(preNodes))
+		fmt.Println("#Reach Functions: ", len(result.GetResult().CallGraph.Nodes)-len(preFuncs))
+		fmt.Println("\n#Unreach Nodes from Pre-Gen Nodes: ", len(preNodes))
+		fmt.Println("#Unreach Functions from Pre-Gen Nodes: ", len(preFuncs))
+		fmt.Println("#(Pre-Gen are created for reflections)")
+	}
+
 	fmt.Println("\nDone  -- PTA/CG Build; Using " + elapsed.String() + ". \nGo check gologfile for detail. ")
 
 	if my_maxTime < elapsed {
@@ -193,15 +224,27 @@ func doEachMainMy(i int, main *ssa.Package) *pointer.ResultWCtx {
 		result.DumpAll()
 	}
 
-	return result.GetResult()
+	if doCompare {
+		_r := result.GetResult()
+		_r.Queries = result.Queries
+		_r.IndirectQueries = result.IndirectQueries
+		return _r //bz: we only need this when comparing results
+	}
+
+	return nil
 }
 
 func doEachMainDefault(i int, main *ssa.Package) *default_algo.Result {
 	var logfile *os.File
+	var err error
 	if doLog { //create my log file
-		logfile, _ = os.Create("/Users/Bozhen/Documents/GO2/tools/_logs/full_log_" + strconv.Itoa(i))
+		logfile, err = os.Create("/Users/bozhen/Documents/GO2/go_tools/_logs/default_log_" + strconv.Itoa(i))
 	} else {
 		logfile = nil
+	}
+
+	if err != nil {
+		panic(fmt.Sprintln(err))
 	}
 
 	var mains []*ssa.Package
@@ -225,6 +268,15 @@ func doEachMainDefault(i int, main *ssa.Package) *default_algo.Result {
 		fmt.Println(err)
 	}
 	defer logfile.Close()
+
+	if doPerforamnce {
+		reaches, unreaches := countReachUnreachFunctions(result)
+		fmt.Println("#Unreach Nodes: ", len(unreaches)) //bz: exclude root, init and main has root as caller
+		fmt.Println("#Reach Nodes: ", len(reaches))     //bz: exclude root, init and main has root as caller
+		fmt.Println("#Unreach Functions: ", len(unreaches))
+		fmt.Println("#Reach Functions: ", len(reaches))
+	}
+
 	fmt.Println("\nDone  -- PTA/CG Build; Using ", elapsed.String(), ". \nGo check gologfile for detail. ")
 
 	if default_maxTime < elapsed {
@@ -254,4 +306,48 @@ func findMainPackages(pkgs []*ssa.Package) ([]*ssa.Package, error) {
 		return nil, fmt.Errorf("no main packages")
 	}
 	return mains, nil
+}
+
+//bz: for default
+func countReachUnreachFunctions(result *default_algo.Result) (map[*ssa.Function]*ssa.Function, map[*ssa.Function]*ssa.Function) {
+	r := result
+	//fn
+	reaches := make(map[*ssa.Function]*ssa.Function)
+	unreaches := make(map[*ssa.Function]*ssa.Function)
+
+	var checks []*callgraph.Edge
+	//start from main and init
+	root := r.CallGraph.Root
+	reaches[root.Func] = root.Func
+	for _, out := range root.Out {
+		checks = append(checks, out)
+	}
+
+	for len(checks) > 0 {
+		var tmp []*callgraph.Edge
+		for _, check := range checks {
+			if _, ok := reaches[check.Callee.Func]; ok {
+				continue //checked already
+			}
+
+			reaches[check.Callee.Func] = check.Callee.Func
+			for _, out := range check.Callee.Out {
+				tmp = append(tmp, out)
+			}
+		}
+		checks = tmp
+	}
+
+	//collect unreaches
+	for _, node := range r.CallGraph.Nodes {
+		if _, ok := reaches[node.Func]; !ok {  //unreached
+			if _, ok2 := unreaches[node.Func]; ok2 {
+				continue //already stored
+			}
+			unreaches[node.Func] = node.Func
+		}
+	}
+
+	//preGen and preFuncs are supposed to be the same with mine
+	return reaches, unreaches
 }

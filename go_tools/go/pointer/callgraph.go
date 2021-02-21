@@ -378,3 +378,58 @@ func AddEdge(caller *Node, site ssa.CallInstruction, callee *Node) {
 	numEdges++
 }
 
+// DeleteNode removes node n and its edges from the graph g.
+// (NB: not efficient for batch deletion.)
+func (g *GraphWCtx) DeleteNode(n *Node) {
+	n.deleteIns()
+	n.deleteOuts()
+	delete(g.Nodes, n.GetCGNode())
+}
+
+// deleteIns deletes all incoming edges to n.
+func (n *Node) deleteIns() {
+	for _, e := range n.In {
+		removeOutEdge(e)
+	}
+	n.In = nil
+}
+
+// deleteOuts deletes all outgoing edges from n.
+func (n *Node) deleteOuts() {
+	for _, e := range n.Out {
+		removeInEdge(e)
+	}
+	n.Out = nil
+}
+
+// removeOutEdge removes edge.Caller's outgoing edge 'edge'.
+func removeOutEdge(edge *Edge) {
+	caller := edge.Caller
+	n := len(caller.Out)
+	for i, e := range caller.Out {
+		if e == edge {
+			// Replace it with the final element and shrink the slice.
+			caller.Out[i] = caller.Out[n-1]
+			caller.Out[n-1] = nil // aid GC
+			caller.Out = caller.Out[:n-1]
+			return
+		}
+	}
+	panic("edge not found: " + edge.String())
+}
+
+// removeInEdge removes edge.Callee's incoming edge 'edge'.
+func removeInEdge(edge *Edge) {
+	caller := edge.Callee
+	n := len(caller.In)
+	for i, e := range caller.In {
+		if e == edge {
+			// Replace it with the final element and shrink the slice.
+			caller.In[i] = caller.In[n-1]
+			caller.In[n-1] = nil // aid GC
+			caller.In = caller.In[:n-1]
+			return
+		}
+	}
+	panic("edge not found: " + edge.String())
+}

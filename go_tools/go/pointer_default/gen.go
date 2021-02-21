@@ -12,12 +12,10 @@ package pointer
 
 import (
 	"fmt"
-	"go/token"
-	"go/types"
-	"strings"
-
 	"github.tamu.edu/April1989/go_tools/go/callgraph"
 	"github.tamu.edu/April1989/go_tools/go/ssa"
+	"go/token"
+	"go/types"
 )
 
 var (
@@ -180,9 +178,6 @@ func (a *analysis) endObject(obj nodeid, cgn *cgnode, data interface{}) *object 
 func (a *analysis) makeFunctionObject(fn *ssa.Function, callersite *callsite) nodeid {
 	if a.log != nil {
 		fmt.Fprintf(a.log, "\t---- makeFunctionObject %s\n", fn)
-	}
-	if strings.Contains(fn.String(), "(*errors.errorString).Error") {
-		fmt.Println()
 	}
 	// obj is the function object (identity, params, results).
 	obj := a.nextNode()
