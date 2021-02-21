@@ -69,19 +69,17 @@ func isSynthetic(fn *ssa.Function) bool { // ignore functions that are NOT true 
 }
 
 func pkgSelection(initial []*packages.Package) ([]*ssa.Package, *ssa.Program, []*ssa.Package) {
-	if efficiency && len(initial) > 0 {
-		errSize, errPkgs := packages.PrintErrorsAndMore(initial) //bz: errPkg will be nil in initial
-		if errSize > 0 {
-			log.Info("Excluded the following packages contain errors, due to the above errors. ")
-			for i, errPkg := range errPkgs {
-				log.Info(i, " ", errPkg.ID)
-			}
-			log.Info("Continue   -- ")
-			_ = errPkgs
-		}
-	} else if len(initial) == 0 {
-		log.Panic("package list empty")
-	}
+	//if efficiency && len(initial) > 0 {
+	//	errSize, errPkgs := packages.PrintErrorsAndMore(initial) //bz: errPkg will be nil in initial
+	//	if errSize > 0 {
+	//		log.Info("Excluded the following packages contain errors, due to the above errors. ")
+	//		for i, errPkg := range errPkgs {
+	//			log.Info(i, " ", errPkg.ID)
+	//		}
+	//		log.Info("Continue   -- ")
+	//		_ = errPkgs
+	//	}
+	//}
 
 	if initial[0] == nil { //bz: no matter what ...
 		log.Panic("nil initial package")
@@ -162,29 +160,27 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		Tests: false,                  // setting Tests will include related test packages
 	}
 	log.Info("Loading input packages...")
-	startLoad := time.Now()
+
 	os.Stderr = nil // No need to output package errors for now. Delete this line to view package errors
 	initial, err := packages.Load(cfg, args...)
 	if err != nil {
 		return err
 	}
-	if len(initial) == 0 {
-		log.Fatal("No Go files detected.")
+	if len(initial) > 0 && packages.PrintErrors(initial) > 0 {
+		return fmt.Errorf("packages contain errors")
+	} else if len(initial) == 0 {
+		return fmt.Errorf("No Go files detected. ")
 	}
-	t := time.Now()
-	elapsedLoad := t.Sub(startLoad)
-	log.Info("Done  -- Using ", elapsedLoad.String())
+
+	if efficiency {
+		fromPath = initial[0].PkgPath
+	}
+	log.Info("Done  -- ", len(initial), " packages detected. ")
+
 	mains, prog, pkgs := pkgSelection(initial)
 
-	if mains == nil {
-		log.Info("NO MAIN PKG, RETURN")
-	}
-
 	for _, m := range mains {
-		log.Info("Solving for " + m.String() + "... ")
-		if efficiency {
-			fromPath = m.Pkg.Path()
-		}
+		log.Info("Solving for entry at " + m.Pkg.Path())
 		result, ptaResult := runner.runEachMainBaseline(m)
 		runner.Analysis = &analysis{
 			useNewPTA:       useNewPTA,
@@ -274,7 +270,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		log.Info("Checking for data races... ")
 		runner.Analysis.checkRacyPairs()
 
-		log.Info("Done for " + m.String() + "... \n\n")
+		log.Info("Done for entry at " + m.Pkg.Path())
 	}
 	return nil
 }
