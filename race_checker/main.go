@@ -145,19 +145,10 @@ func main() {//default: -useNewPTA
 		useNewPTA = true
 		useDefaultPTA = false
 	}
-	//if *setUseQueries {
-	//	useQueries = true
-	//}
 	if *builtinPTA {
 		useDefaultPTA = true
 		useNewPTA = false
 	}
-	//if *debugPTA {
-	//	doDebugPTA = true
-	//}
-	//if *keepPTALog {
-	//	doPTALog = true
-	//}
 	if *debug {
 		log.SetLevel(log.DebugLevel)
 	}
