@@ -91,9 +91,15 @@ func pkgSelection(initial []*packages.Package) ([]*ssa.Package, *ssa.Program, []
 
 	log.Info("Building SSA code for entire program...")
 	prog, pkgs = ssautil.AllPackages(initial, 0)
+	if len(pkgs) == 0 {
+		log.Errorf("SSA code could not be constructed due to type errors. ")
+	}
 	prog.Build()
 	noFunc := len(ssautil.AllFunctions(prog))
 	mainPkgs = ssautil.MainPackages(pkgs)
+	if len(mainPkgs) == 0 {
+		log.Errorf("No main function detected. ")
+	}
 	log.Info("Done  -- SSA code built. ", len(pkgs), " packages and ", noFunc, " functions detected. ")
 
 	var mainInd string
@@ -166,9 +172,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 	if err != nil {
 		return err
 	}
-	if len(initial) > 0 && packages.PrintErrors(initial) > 0 {
-		return fmt.Errorf("packages contain errors")
-	} else if len(initial) == 0 {
+	if len(initial) == 0 {
 		return fmt.Errorf("No Go files detected. ")
 	}
 
@@ -330,22 +334,21 @@ func (runner *AnalysisRunner) runEachMainBaseline(main *ssa.Package) (*pointer.R
 		}
 	}
 
-
-	start := time.Now()
 	var result *pointer.Result
 	var ptaResult *pta0.Result
 	var err2 error
 	if useDefaultPTA {
 		ptaResult, err2 = pta0.Analyze(runner.pta0Cfg) // conduct pointer analysis (default version)
 	} else if useNewPTA {
+		start := time.Now()
 		result, err2 = pointer.Analyze(runner.ptaconfig) // conduct pointer analysis (customized version)
+		t := time.Now()
+		elapsed := t.Sub(start)
+		log.Info("Done -- PTA/CG Built; Using " + elapsed.String() + ". Go check go_pta_log for detail. ")
 	}
 	if err2 != nil {
 		log.Fatal(err2)
 	}
-	t := time.Now()
-	elapsed := t.Sub(start)
-	log.Info("Done -- PTA/CG Build; Using " + elapsed.String() + ". Go check go_pta_log for detail. ")
 	if useNewPTA && runner.ptaconfig.DEBUG {
 		result.DumpAll()
 	}

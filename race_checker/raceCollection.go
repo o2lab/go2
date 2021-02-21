@@ -26,7 +26,7 @@ func (a *analysis) checkRacyPairs() {
 					if (isWriteIns(goI) && isWriteIns(goJ)) || (isWriteIns(goI) && a.isReadIns(goJ)) || (a.isReadIns(goI) && isWriteIns(goJ)) { // only read and write instructions
 						insSlice := []ssa.Instruction{goI, goJ}
 						addressPair := a.insAddress(insSlice) // one instruction from each goroutine
-						if len(addressPair) == 1 {
+						if len(addressPair) < 2 {
 							continue
 						}
 						if a.sameAddress(addressPair[0], addressPair[1]) &&
