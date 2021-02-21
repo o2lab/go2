@@ -239,9 +239,6 @@ func (a *analysis) makeFunctionObject(fn *ssa.Function, callersite *callsite) no
 	//if a.config.DEBUG {
 	//	fmt.Println("\t---- makeFunctionObject for " + fn.String())
 	//}
-	if strings.Contains(fn.String(), "internal/reflectlite.Swapper$6") {
-		fmt.Println()
-	}
 
 	// obj is the function object (identity, params, results).
 	obj := a.nextNode()
@@ -1309,8 +1306,12 @@ func (a *analysis) genConstraintsOnline() {
 //must be global
 func (a *analysis) valueNodeInvoke(caller *cgnode, site *callsite, fn *ssa.Function) nodeid {
 	if caller == nil && site == nil { //requires shared contour
-		obj := a.valueNode(fn)
-		return obj + 1 //addr vs obj
+		id := a.valueNode(fn)
+		if Online {
+			return id + 1 //addr vs obj
+		}else{
+			return id
+		}
 	}
 
 	//similar with valueNode(), created on demand. Instead of a.globalval[], we use a.fn2cgnodeid[]
@@ -1331,9 +1332,17 @@ func (a *analysis) valueNodeInvoke(caller *cgnode, site *callsite, fn *ssa.Funct
 			a.atFuncs[fn] = true // Methods of concrete types are address-taken functions.
 		}
 
-		return id
+		if Online {
+			return obj
+		}else{
+			return id
+		}
 	}
-	return obj - 1 //fn
+	if Online {
+		return obj
+	}else{
+		return obj - 1 //== id : fn
+	}
 }
 
 // genInvoke generates constraints for a dynamic method invocation.
