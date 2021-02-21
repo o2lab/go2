@@ -136,17 +136,7 @@ func (a *analysis) buildHB(HBgraph *graph.Graph) {
 					waitingN[callIns] = prevN // store Wait node for later edge creation TO this node
 				} else if callIns.Call.Value.Name() == "Done" {
 					for wIns, wNode := range waitingN {
-						var theSame bool
-						if a.ptaConfig.DiscardQueries {
-							if _, ok1 := (*wNode.Value).(goIns); ok1 {
-								theSame = a.sameAddress(callIns.Call.Args[0], wIns.Call.Args[0])
-							}else{
-								theSame = false
-							}
-						} else {
-							theSame = a.sameAddress(callIns.Call.Args[0], wIns.Call.Args[0])
-						}
-						if theSame {
+						if a.sameAddress(callIns.Call.Args[0], wIns.Call.Args[0]) {
 							err := HBgraph.MakeEdge(prevN, wNode) // create edge from Done node to Wait node
 							if err != nil {
 								log.Fatal(err)
@@ -235,7 +225,13 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 		a.RWIns = append(a.RWIns, []ssa.Instruction{})
 	}
 	fnBlocks := fn.Blocks
-	bVisit := make([]int, 1, len(fnBlocks)) // create ordering at which blocks are visited
+	bCap := 1
+	if len(fnBlocks) > 1 {
+		bCap = len(fnBlocks)
+	} else if len(fnBlocks) == 0 {
+		return
+	}
+	bVisit := make([]int, 1, bCap) // create ordering at which blocks are visited
 	k := 0
 	b := fnBlocks[0]
 	bVisit[k] = 0
@@ -264,12 +260,6 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 		}
 		k++
 	}
-	//if fn.Name() == "main" {
-	//	fmt.Println(bVisit)
-	//	for _, ind := range bVisit {
-	//		fmt.Println(fnBlocks[ind].Comment)
-	//	}
-	//}
 
 	var toDefer []ssa.Instruction // stack storing deferred calls
 	var toUnlock []ssa.Value
@@ -332,19 +322,19 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 					} else if deferIns.Call.StaticCallee().Name() == "Unlock" {
 						lockLoc := deferIns.Call.Args[0]
 						if !a.useNewPTA {
-							a.ptaConfig.AddQuery(lockLoc)
+							a.pta0Cfg.AddQuery(lockLoc)
 						}
 						toUnlock = append(toUnlock, lockLoc)
 					} else if deferIns.Call.StaticCallee().Name() == "RUnlock" {
 						RlockLoc := deferIns.Call.Args[0]
 						if !a.useNewPTA {
-							a.ptaConfig.AddQuery(RlockLoc)
+							a.pta0Cfg.AddQuery(RlockLoc)
 						}
 						toRUnlock = append(toRUnlock, RlockLoc)
 					} else if deferIns.Call.Value.Name() == "Done" {
 						a.RWIns[goID] = append(a.RWIns[goID], dIns)
 						if !a.useNewPTA {
-							a.ptaConfig.AddQuery(deferIns.Call.Args[0])
+							a.pta0Cfg.AddQuery(deferIns.Call.Args[0])
 						}
 					}
 				}

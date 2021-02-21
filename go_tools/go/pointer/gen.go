@@ -980,7 +980,6 @@ func (a *analysis) considerKCFA(fn string) bool {
 }
 
 //bz:  currently compare string, already considered LimitScope
-// !!!!!! manually excluded pkg google.golang.org/grpc/grpclog ...
 func (a *analysis) withinScope(method string) bool {
 	if a.config.LimitScope {
 		if strings.Contains(method, "command-line-arguments") { //default scope
@@ -994,8 +993,8 @@ func (a *analysis) withinScope(method string) bool {
 				}
 			}
 			if len(a.config.Scope) > 0 { //project scope
-				for _, pkg := range a.config.Scope {
-					if strings.Contains(method, pkg) && !strings.Contains(method, "google.golang.org/grpc/grpclog") {
+				for _, pkg := range a.config.Scope { // && !strings.Contains(method, "google.golang.org/grpc/grpclog")
+					if strings.Contains(method, pkg) {
 						return true
 					}
 				}

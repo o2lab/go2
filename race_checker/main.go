@@ -6,20 +6,23 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/twmb/algoimpl/go/graph"
 	"github.tamu.edu/April1989/go_tools/go/pointer"
+	pta0 "github.tamu.edu/April1989/go_tools/go/pointer_default"
 	//"golang.org/x/tools/go/pointer"
 	"github.tamu.edu/April1989/go_tools/go/ssa"
 )
 
 type analysis struct {
-	useNewPTA    bool //useNewPTA the new pta
-	result       *pointer.Result //now can reuse the result
-	ptaConfig    *pointer.Config
-	goID2info    map[int]goroutineInfo //goID -> goroutinInfo
-	includePkgs  []string // bz: we only include these pkgs from path + project import -> project specific
+	useNewPTA    	bool //useNewPTA the new pta
+	useDefaultPTA	bool //use default go pta
+	result       	*pointer.Result //now can reuse the result
+	pta0Result 		*pta0.Result
+	ptaConfig    	*pointer.Config
+	pta0Cfg			*pta0.Config
+	goID2info    	map[int]goroutineInfo //goID -> goroutinInfo
+	includePkgs  	[]string // bz: we only include these pkgs from path + project import -> project specific
 	//"google.golang.org/grpc",
 	//"github.com/pingcap/tidb",
 
-	useDefaultPTA	bool //use default go pta
 	prog            *ssa.Program
 	pkgs            []*ssa.Package
 	mains           []*ssa.Package
@@ -65,8 +68,9 @@ type analysis struct {
 }
 
 type AnalysisRunner struct {
-	Analysis *analysis
-	ptaconfig *pointer.Config
+	Analysis 		*analysis
+	ptaconfig 		*pointer.Config
+	pta0Cfg			*pta0.Config
 }
 
 type fnInfo struct { // all fields must be comparable for fnInfo to be used as key to trieMap
@@ -103,25 +107,18 @@ var (
 )
 
 var useNewPTA = true //bz: default value for this branch
-var useQueries = false //bz: whether we use Queries in pointer analysis
-var doDebugPTA = false //bz: default value for this branch
-var doPTALog = false //bz: default value for this branch
-
 var trieLimit = 2      // set as user config option later, an integer that dictates how many times a function can be called under identical context
 var efficiency = false // configuration setting to avoid recursion in tested program
 var channelComm = true // analyze channel communication
 var fromPath = ""      // interested packages are those located at this path
 var entryFn = "main"
 var allEntries = false
-var useDefaultPTA = false //bz: default value for this branch
+var useDefaultPTA = false
 
 func init() {
-	excludedPkgs = []string{//bz: excluded a lot of default constraints
-		"runtime",
+	excludedPkgs = []string{
+		"fmt",
 		"reflect",
-		"os",
-		"github.com/modern-go/reflect2", //bz: i forget this causes which benchmark's untag obj panic
-		"google.golang.org/protobuf/reflect", //bz: this causes grpc untag obj panic
 	}
 }
 
@@ -146,6 +143,7 @@ func main() {//default: -useNewPTA
 	}
 	if *newPTA {
 		useNewPTA = true
+		useDefaultPTA = false
 	}
 	//if *setUseQueries {
 	//	useQueries = true

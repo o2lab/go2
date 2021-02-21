@@ -6,6 +6,7 @@ import (
 	"github.com/twmb/algoimpl/go/graph"
 	"github.tamu.edu/April1989/go_tools/go/packages"
 	"github.tamu.edu/April1989/go_tools/go/pointer"
+	pta0 "github.tamu.edu/April1989/go_tools/go/pointer_default"
 	"github.tamu.edu/April1989/go_tools/go/ssa"
 	"github.tamu.edu/April1989/go_tools/go/ssa/ssautil"
 	"go/token"
@@ -21,18 +22,10 @@ import (
 // fromPkgsOfInterest determines if a function is from a package of interest
 func (a *analysis) fromPkgsOfInterest(fn *ssa.Function) bool {
 	if fn.Pkg == nil || fn.Pkg.Pkg == nil {
-		if fn.IsFromApp {
-			return true //bz: otherwise missing func ...
-		}
 		return false
 	}
 	if fn.Pkg.Pkg.Name() == "main" || fn.Pkg.Pkg.Name() == "cli" {
 		return true
-	}
-	for _, included := range a.includePkgs { // bz: update to include necessary functions in traversal
-		if fn.Pkg.Pkg.Name() == included {
-			return true
-		}
 	}
 	for _, excluded := range excludedPkgs {
 		if fn.Pkg.Pkg.Name() == excluded {
@@ -79,13 +72,11 @@ func pkgSelection(initial []*packages.Package) ([]*ssa.Package, *ssa.Program, []
 	if efficiency && len(initial) > 0 {
 		errSize, errPkgs := packages.PrintErrorsAndMore(initial) //bz: errPkg will be nil in initial
 		if errSize > 0 {
-			if doDebugPTA {
-				log.Info("Excluded the following packages contain errors, due to the above errors. ")
-				for i, errPkg := range errPkgs {
-					log.Info(i, " ", errPkg.ID)
-				}
-				log.Info("Continue   -- ")
+			log.Info("Excluded the following packages contain errors, due to the above errors. ")
+			for i, errPkg := range errPkgs {
+				log.Info(i, " ", errPkg.ID)
 			}
+			log.Info("Continue   -- ")
 			_ = errPkgs
 		}
 	} else if len(initial) == 0 {
@@ -191,18 +182,20 @@ func (runner *AnalysisRunner) Run(args []string) error {
 
 	for _, m := range mains {
 		log.Info("Solving for " + m.String() + "... ")
-		if !efficiency {
+		if efficiency {
 			fromPath = m.Pkg.Path()
 		}
-		result := runner.runEachMainBaseline(m)
+		result, ptaResult := runner.runEachMainBaseline(m)
 		runner.Analysis = &analysis{
 			useNewPTA:       useNewPTA,
 			result: 		 result,
+			pta0Result:      ptaResult,
 			useDefaultPTA: 	 useDefaultPTA,
 			prog:            prog,
 			pkgs:            pkgs,
 			mains:           []*ssa.Package{m},
 			ptaConfig:       runner.ptaconfig,
+			pta0Cfg:         runner.pta0Cfg,
 			goID2info:       make(map[int]goroutineInfo),
 			RWinsMap:        make(map[goIns]graph.Node),
 			insDRA:          0,
@@ -229,14 +222,15 @@ func (runner *AnalysisRunner) Run(args []string) error {
 			ifFnReturn:      make(map[*ssa.Function]*ssa.Return),
 			ifSuccEnd:       make(map[ssa.Instruction]*ssa.Return),
 		}
-
-		//bz: update includedPkg to be used for future fromPkgsOfInterest()
-		for _, scope := range runner.ptaconfig.Scope {
-			runner.Analysis.includePkgs = append(runner.Analysis.includePkgs, scope)
-		}
-		//bz: also traverse lib calls
-		for _, _import := range runner.ptaconfig.GetImports() {
-			runner.Analysis.includePkgs = append(runner.Analysis.includePkgs, _import)
+		if useNewPTA {
+			//bz: update includedPkg to be used for future fromPkgsOfInterest()
+			for _, scope := range runner.ptaconfig.Scope {
+				runner.Analysis.includePkgs = append(runner.Analysis.includePkgs, scope)
+			}
+			//bz: also traverse lib calls
+			for _, _import := range runner.ptaconfig.GetImports() {
+				runner.Analysis.includePkgs = append(runner.Analysis.includePkgs, _import)
+			}
 		}
 
 		log.Info("Compiling stack trace for every Goroutine... ")
@@ -264,6 +258,14 @@ func (runner *AnalysisRunner) Run(args []string) error {
 			}
 		}
 
+		if useDefaultPTA {
+			finResult, err9 := pta0.Analyze(runner.Analysis.pta0Cfg) // all queries have been added, conduct pointer analysis
+			if err9 != nil {
+				log.Fatal(err)
+			}
+			runner.Analysis.pta0Result = finResult
+		}
+
 		log.Info("Building Happens-Before graph... ")
 		runner.Analysis.HBgraph = graph.New(graph.Directed)
 		runner.Analysis.buildHB(runner.Analysis.HBgraph)
@@ -278,13 +280,10 @@ func (runner *AnalysisRunner) Run(args []string) error {
 }
 
 //bz: do each main one by one -> performance base line
-func (runner *AnalysisRunner) runEachMainBaseline(main *ssa.Package) *pointer.Result {
+func (runner *AnalysisRunner) runEachMainBaseline(main *ssa.Package) (*pointer.Result, *pta0.Result) {
 	logfile, err := os.Create("go_pta_log") //bz: for me ...
 	if err != nil {
 		log.Fatal(err)
-	}
-	if !doPTALog {
-		logfile = nil
 	}
 
 	var scope []string
@@ -314,10 +313,10 @@ func (runner *AnalysisRunner) runEachMainBaseline(main *ssa.Package) *pointer.Re
 			//shared config
 			K:          1,
 			LimitScope: true,         //bz: only consider app methods now
-			DEBUG:      doDebugPTA,   //bz: do all printed out info in console --> turn off to avoid internal nil reference panic
+			DEBUG:      false,   //bz: do all printed out info in console --> turn off to avoid internal nil reference panic
 			Scope:      scope,        //bz: analyze scope, default is "command-line-arguments"
 			Exclusion: excludedPkgs, //excludedPkgs here
-			DiscardQueries: !useQueries, //bz: new flag -> if we use queries
+			DiscardQueries: true, //bz: new flag -> if we use queries
 			Level:      0,
 			//bz: Level = 1: if callee is from app or import
 			// Level = 2: parent of caller in app, caller in lib, callee also in lib || parent in lib, caller in app, callee in lib || parent in lib, caller in lib, callee in app
@@ -329,7 +328,7 @@ func (runner *AnalysisRunner) runEachMainBaseline(main *ssa.Package) *pointer.Re
 			TrackMore:      true, //bz: track pointers with types declared in Analyze Scope; cannot guarantee all basic types, e.g., []bytes, etc.
 		}
 	} else {
-		runner.ptaconfig = &pointer.Config{
+		runner.pta0Cfg = &pta0.Config{
 			Mains:          mains,
 			BuildCallGraph: false,
 		}
@@ -338,10 +337,10 @@ func (runner *AnalysisRunner) runEachMainBaseline(main *ssa.Package) *pointer.Re
 
 	start := time.Now()
 	var result *pointer.Result
+	var ptaResult *pta0.Result
 	var err2 error
-	// TODO: need to differentiate imported packages for PTA
 	if useDefaultPTA {
-		result, err2 = pointer.Analyze(runner.ptaconfig) // conduct pointer analysis (default version)
+		ptaResult, err2 = pta0.Analyze(runner.pta0Cfg) // conduct pointer analysis (default version)
 	} else if useNewPTA {
 		result, err2 = pointer.Analyze(runner.ptaconfig) // conduct pointer analysis (customized version)
 	}
@@ -351,10 +350,10 @@ func (runner *AnalysisRunner) runEachMainBaseline(main *ssa.Package) *pointer.Re
 	t := time.Now()
 	elapsed := t.Sub(start)
 	log.Info("Done -- PTA/CG Build; Using " + elapsed.String() + ". Go check go_pta_log for detail. ")
-	if runner.ptaconfig.DEBUG {
+	if useNewPTA && runner.ptaconfig.DEBUG {
 		result.DumpAll()
 	}
 
-	return result
+	return result, ptaResult
 }
 

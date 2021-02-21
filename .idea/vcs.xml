@@ -2,12 +2,5 @@
 <project version="4">
   <component name="VcsDirectoryMappings">
     <mapping directory="$PROJECT_DIR$" vcs="Git" />
-<<<<<<< Updated upstream
-    <mapping directory="$PROJECT_DIR$/grpc-go" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/istio" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/runc" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/tidb" vcs="Git" />
-=======
->>>>>>> Stashed changes
   </component>
 </project>

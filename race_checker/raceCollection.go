@@ -11,7 +11,7 @@ import (
 	"strings"
 )
 
-// checkRacyPairs determines how many data races are present(race must access variable in at least 2 goroutines and one instruction must be a write)
+// checkRacyPairs checks accesses among two concurrent goroutines
 func (a *analysis) checkRacyPairs() {
 	for i := 0; i < len(a.RWIns); i++ {
 		for j := i + 1; j < len(a.RWIns); j++ { // must be in different goroutines, j always greater than i
@@ -29,7 +29,7 @@ func (a *analysis) checkRacyPairs() {
 						if len(addressPair) == 1 {
 							continue
 						}
-						if a.sameAddress(addressPair[0], addressPair[1]) && /*goI.Parent().Name() == "CloseSend" && isWriteIns(goI) &&*/
+						if a.sameAddress(addressPair[0], addressPair[1]) &&
 							!sliceContains(a.reportedAddr, addressPair[0]) &&
 							!a.reachable(goI, i, goJ, j) &&
 							!a.reachable(goJ, j, goI, i) &&
@@ -99,20 +99,19 @@ func (a *analysis) sameAddress(addr1 ssa.Value, addr2 ssa.Value) bool {
 		}
 	}
 	// check points-to set to see if they can point to the same object
-	//if useDefaultPTA { // TODO: need to add default option in pointer package
-	//	ptsets := a.result.Queries
-	//	return ptsets[addr1].PointsTo().Intersects(ptsets[addr2].PointsTo())
-	//} else if useNewPTA {
-		ptset1 := a.result.Queries[addr1]
-		ptset2 := a.result.Queries[addr2]
-		for _, ptrCtx1 := range ptset1 {
-			for _, ptrCtx2 := range ptset2 {
-				if ptrCtx1.PointsTo().Intersects(ptrCtx2.PointsTo()) {
-					return true
-				}
+	if useDefaultPTA {
+		ptsets := a.pta0Result.Queries
+		return ptsets[addr1].PointsTo().Intersects(ptsets[addr2].PointsTo())
+	}
+	ptset1 := a.result.Queries[addr1]
+	ptset2 := a.result.Queries[addr2]
+	for _, ptrCtx1 := range ptset1 {
+		for _, ptrCtx2 := range ptset2 {
+			if ptrCtx1.PointsTo().Intersects(ptrCtx2.PointsTo()) {
+				return true
 			}
 		}
-	//}
+	}
 	return false
 }
 
