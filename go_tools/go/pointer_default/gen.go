@@ -14,7 +14,6 @@ import (
 	"fmt"
 	"go/token"
 	"go/types"
-	"strings"
 
 	"github.tamu.edu/April1989/go_tools/go/callgraph"
 	"github.tamu.edu/April1989/go_tools/go/ssa"
