@@ -18,10 +18,7 @@ type analysis struct {
 	pta0Result 		*pta0.Result
 	ptaConfig    	*pointer.Config
 	pta0Cfg			*pta0.Config
-	goID2info    	map[int]goroutineInfo //goID -> goroutinInfo
-	includePkgs  	[]string // bz: we only include these pkgs from path + project import -> project specific
-	//"google.golang.org/grpc",
-	//"github.com/pingcap/tidb",
+	//goID2info    	map[int]goroutineInfo //goID -> goroutinInfo
 
 	prog            *ssa.Program
 	pkgs            []*ssa.Package
@@ -125,15 +122,12 @@ func init() {
 // main sets up arguments and calls staticAnalysis function
 func main() {//default: -useNewPTA
 	newPTA := flag.Bool("useNewPTA", true, "Use the new pointer analysis in go_tools.")
-	//setUseQueries := flag.Bool("useQueries", false, "Use the new pointer analysis in go_tools.")
 	builtinPTA := flag.Bool("useDefaultPTA", false, "Use the built-in pointer analysis.")
-	//debugPTA := flag.Bool("debugPTA", false, "Prints all PTA debug messages in console.")
-	//keepPTALog := flag.Bool("keepPTALog", false, "Create a log file for all details in PTA.")
-	debug := flag.Bool("debug", false, "Prints log.Debug messages.")
+	debug := flag.Bool("debug", true, "Prints log.Debug messages.")
 	lockOps := flag.Bool("lockOps", false, "Prints lock and unlock operations. ")
 	flag.BoolVar(&stats.CollectStats, "collectStats", false, "Collect analysis statistics.")
 	help := flag.Bool("help", false, "Show all command-line options.")
-	withoutComm := flag.Bool("withoutComm", false, "Show analysis results without communication consideration.")
+	withoutComm := flag.Bool("withoutComm", true, "Show analysis results without communication consideration.")
 	withComm := flag.Bool("withComm", false, "Show analysis results with communication consideration.")
 	analyzeAll := flag.Bool("analyzeAll", false, "Analyze all main() entry-points. ")
 	flag.Parse()

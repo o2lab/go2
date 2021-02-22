@@ -196,7 +196,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 			mains:           []*ssa.Package{m},
 			ptaConfig:       runner.ptaconfig,
 			pta0Cfg:         runner.pta0Cfg,
-			goID2info:       make(map[int]goroutineInfo),
+			//goID2info:       make(map[int]goroutineInfo),
 			RWinsMap:        make(map[goIns]graph.Node),
 			insDRA:          0,
 			levels:          make(map[int]int),
@@ -222,16 +222,16 @@ func (runner *AnalysisRunner) Run(args []string) error {
 			ifFnReturn:      make(map[*ssa.Function]*ssa.Return),
 			ifSuccEnd:       make(map[ssa.Instruction]*ssa.Return),
 		}
-		if useNewPTA {
-			//bz: update includedPkg to be used for future fromPkgsOfInterest()
-			for _, scope := range runner.ptaconfig.Scope {
-				runner.Analysis.includePkgs = append(runner.Analysis.includePkgs, scope)
-			}
-			//bz: also traverse lib calls
-			for _, _import := range runner.ptaconfig.GetImports() {
-				runner.Analysis.includePkgs = append(runner.Analysis.includePkgs, _import)
-			}
-		}
+		//if useNewPTA {
+		//	//bz: update includedPkg to be used for future fromPkgsOfInterest()
+		//	for _, scope := range runner.ptaconfig.Scope {
+		//		runner.Analysis.includePkgs = append(runner.Analysis.includePkgs, scope)
+		//	}
+		//	//bz: also traverse lib calls
+		//	for _, _import := range runner.ptaconfig.GetImports() {
+		//		runner.Analysis.includePkgs = append(runner.Analysis.includePkgs, _import)
+		//	}
+		//}
 
 		log.Info("Compiling stack trace for every Goroutine... ")
 		log.Debug(strings.Repeat("-", 35), "Stack trace begins", strings.Repeat("-", 35))
