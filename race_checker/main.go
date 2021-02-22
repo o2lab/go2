@@ -177,8 +177,8 @@ func main() {//default: -useNewPTA
 		fmt.Println("Error Getting Rlimit ", err)
 	}
 	fmt.Println(rLimit)
-	rLimit.Max = 999999
-	rLimit.Cur = 999999
+	rLimit.Max = 10240
+	rLimit.Cur = 10240
 	err = syscall.Setrlimit(syscall.RLIMIT_NOFILE, &rLimit)
 	if err != nil {
 		fmt.Println("Error Setting Rlimit ", err)
