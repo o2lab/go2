@@ -111,6 +111,7 @@ func (a *analysis) deleteFromLockSet(s []ssa.Value, k int) []ssa.Value {
 func (a *analysis) lockSetContainsAt(s []ssa.Value, e ssa.Value) int {
 	var aPos, bPos token.Pos
 	for i, k := range s {
+		var locA, locB ssa.Value
 		switch aType := k.(type) {
 		case *ssa.Global:
 			aPos = aType.Pos()
@@ -118,11 +119,15 @@ func (a *analysis) lockSetContainsAt(s []ssa.Value, e ssa.Value) int {
 			if aType1, ok1 := aType.X.(*ssa.UnOp); ok1 {
 				if aType2, ok2 := aType1.X.(*ssa.FieldAddr); ok2 {
 					aPos = aType2.X.Pos()
+					locA = aType2.X
 				} else {
 					aPos = aType1.X.Pos()
+					locA = aType1.X
 				}
+
 			} else {
 				aPos = aType.X.Pos()
+				locA = aType.X
 			}
 		}
 		switch eType := e.(type) {
@@ -132,14 +137,20 @@ func (a *analysis) lockSetContainsAt(s []ssa.Value, e ssa.Value) int {
 			if eType1, ok2 := eType.X.(*ssa.UnOp); ok2 {
 				if eType2, ok3 := eType1.X.(*ssa.FieldAddr); ok3 {
 					bPos = eType2.X.Pos()
+					locB = eType2.X
 				} else {
 					bPos = eType1.X.Pos()
+					locB = eType1.X
 				}
 			} else {
 				bPos = eType.X.Pos()
+				locB = eType.X
 			}
 		}
 		if aPos == bPos {
+			return i
+		}
+		if a.sameAddress(locA, locB) {
 			return i
 		}
 	}

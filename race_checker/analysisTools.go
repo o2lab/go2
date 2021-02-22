@@ -374,8 +374,8 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 							}
 						}
 					default:
-						if v, ok1 := examIns.Val.(*ssa.Alloc); ok1 && v.Comment == "complit" {
-							// var assign
+						if _, ok1 := examIns.Val.(*ssa.Alloc); ok1 /*&& v.Comment == "complit"*/ {
+							// declare&init
 						} else {
 							a.insStore(examIns, goID, theIns)
 						}

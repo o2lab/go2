@@ -5,6 +5,7 @@ import (
 	"github.com/logrusorgru/aurora"
 	log "github.com/sirupsen/logrus"
 	"github.com/twmb/algoimpl/go/graph"
+	pta0 "github.tamu.edu/April1989/go_tools/go/pointer_default"
 	"github.tamu.edu/April1989/go_tools/go/ssa"
 	"go/token"
 	"regexp"
@@ -91,15 +92,23 @@ func (a *analysis) insAddress(insSlice []ssa.Instruction) []ssa.Value { // obtai
 func (a *analysis) sameAddress(addr1 ssa.Value, addr2 ssa.Value) bool {
 	if global1, ok1 := addr1.(*ssa.Global); ok1 {
 		if global2, ok2 := addr2.(*ssa.Global); ok2 {
-			return global1.Pos() == global2.Pos() // compare position of identifiers
+			if global1.Pos() == global2.Pos() {// compare position of identifiers
+				return true
+			}
 		}
 	} else if freevar1, ok := addr1.(*ssa.FreeVar); ok {
 		if freevar2, ok2 := addr2.(*ssa.FreeVar); ok2 {
-			return freevar1.Pos() == freevar2.Pos() // compare position of identifiers
+			if freevar1.Pos() == freevar2.Pos() {// compare position of identifiers
+				return true
+			}
 		}
 	}
 	// check points-to set to see if they can point to the same object
 	if useDefaultPTA {
+		a.pta0Cfg.AddQuery(addr1)
+		a.pta0Cfg.AddQuery(addr2)
+		result, _ := pta0.Analyze(a.pta0Cfg)
+		a.pta0Result = result
 		ptsets := a.pta0Result.Queries
 		return ptsets[addr1].PointsTo().Intersects(ptsets[addr2].PointsTo())
 	}
