@@ -2,11 +2,14 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"github.com/o2lab/race-checker/stats"
 	log "github.com/sirupsen/logrus"
 	"github.com/twmb/algoimpl/go/graph"
 	"github.tamu.edu/April1989/go_tools/go/pointer"
 	pta0 "github.tamu.edu/April1989/go_tools/go/pointer_default"
+	"syscall"
+
 	//"golang.org/x/tools/go/pointer"
 	"github.tamu.edu/April1989/go_tools/go/ssa"
 )
@@ -167,12 +170,31 @@ func main() {//default: -useNewPTA
 		FullTimestamp:   true,
 		TimestampFormat: "15:04:05",
 	})
+
+	var rLimit syscall.Rlimit
+	err := syscall.Getrlimit(syscall.RLIMIT_NOFILE, &rLimit)
+	if err != nil {
+		fmt.Println("Error Getting Rlimit ", err)
+	}
+	fmt.Println(rLimit)
+	rLimit.Max = 999999
+	rLimit.Cur = 999999
+	err = syscall.Setrlimit(syscall.RLIMIT_NOFILE, &rLimit)
+	if err != nil {
+		fmt.Println("Error Setting Rlimit ", err)
+	}
+	err = syscall.Getrlimit(syscall.RLIMIT_NOFILE, &rLimit)
+	if err != nil {
+		fmt.Println("Error Getting Rlimit ", err)
+	}
+	fmt.Println("Rlimit Final", rLimit)
+
 	runner := &AnalysisRunner{}
-	err := runner.Run(flag.Args())
+	err0 := runner.Run(flag.Args())
 	if stats.CollectStats {
 		stats.ShowStats()
 	}
-	if err != nil {
+	if err0 != nil {
 		log.Fatal(err)
 	}
 }
