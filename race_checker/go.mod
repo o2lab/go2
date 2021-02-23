@@ -9,6 +9,8 @@ require (
 	github.com/coreos/etcd v3.3.25+incompatible // indirect
 	github.com/cznic/mathutil v0.0.0-20181122101859-297441e03548 // indirect
 	github.com/cznic/sortutil v0.0.0-20181122101858-f5f958428db8 // indirect
+	github.com/envoyproxy/go-control-plane v0.9.9-0.20210115003313-31f9241a16e6
+	github.com/golang/protobuf v1.4.3
 	github.com/grpc-ecosystem/go-grpc-middleware v1.2.2 // indirect
 	github.com/juju/errors v0.0.0-20200330140219-3fe23663418f // indirect
 	github.com/logrusorgru/aurora v0.0.0-20200102142835-e9ef32dff381
@@ -37,7 +39,8 @@ require (
 	golang.org/x/sys v0.0.0-20201221093633-bc327ba9c2f0
 	golang.org/x/tools v0.0.0-20210106214847-113979e3529a
 	google.golang.org/grpc v1.34.0
-	istio.io/istio v0.0.0-20210129100137-fc1367f5ecdb // indirect
-	k8s.io/api v0.20.2 // indirect
-	k8s.io/client-go v11.0.0+incompatible // indirect
+	istio.io/istio v0.0.0-20210129100137-fc1367f5ecdb
+	k8s.io/api v0.20.2
+	k8s.io/apimachinery v0.20.2
+	k8s.io/client-go v11.0.0+incompatible
 )

@@ -274,7 +274,7 @@ func (runner *AnalysisRunner) runEachMainBaseline(main *ssa.Package) (*pointer.R
 	if strings.EqualFold(main.String(), "package command-line-arguments") {//default
 		scope = append(scope, "command-line-arguments")
 	}else{
-		scope = append(scope, main.String())
+		scope = append(scope, main.Pkg.Path())
 	}
 
 	var mains []*ssa.Package
