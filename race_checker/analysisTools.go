@@ -506,6 +506,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 		nextGoInfo := a.workList[0] // get the goroutine info at head of workList
 		a.workList = a.workList[1:] // pop goroutine info from head of workList
 		a.newGoroutine(nextGoInfo)
+		//go a.newGoroutine(nextGoInfo)
 	}
 }
 

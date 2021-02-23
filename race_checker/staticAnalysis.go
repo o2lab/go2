@@ -69,18 +69,6 @@ func isSynthetic(fn *ssa.Function) bool { // ignore functions that are NOT true 
 }
 
 func pkgSelection(initial []*packages.Package) ([]*ssa.Package, *ssa.Program, []*ssa.Package) {
-	//if efficiency && len(initial) > 0 {
-	//	errSize, errPkgs := packages.PrintErrorsAndMore(initial) //bz: errPkg will be nil in initial
-	//	if errSize > 0 {
-	//		log.Info("Excluded the following packages contain errors, due to the above errors. ")
-	//		for i, errPkg := range errPkgs {
-	//			log.Info(i, " ", errPkg.ID)
-	//		}
-	//		log.Info("Continue   -- ")
-	//		_ = errPkgs
-	//	}
-	//}
-
 	if initial[0] == nil { //bz: no matter what ...
 		log.Panic("nil initial package")
 	}
@@ -168,10 +156,10 @@ func (runner *AnalysisRunner) Run(args []string) error {
 	log.Info("Loading input packages...")
 
 	os.Stderr = nil // No need to output package errors for now. Delete this line to view package errors
-	initial, err := packages.Load(cfg, args...)
-	if err != nil {
-		return err
-	}
+	initial, _ := packages.Load(cfg, args...)
+	//if err != nil {
+	//	return err
+	//}
 	if len(initial) == 0 {
 		return fmt.Errorf("No Go files detected. ")
 	}
@@ -183,7 +171,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 
 	mains, prog, pkgs := pkgSelection(initial)
 
-	for _, m := range mains {
+	for _, m := range mains { // TODO: parallelize this step
 		log.Info("Solving for entry at " + m.Pkg.Path())
 		result, ptaResult := runner.runEachMainBaseline(m)
 		runner.Analysis = &analysis{
@@ -196,7 +184,6 @@ func (runner *AnalysisRunner) Run(args []string) error {
 			mains:           []*ssa.Package{m},
 			ptaConfig:       runner.ptaconfig,
 			pta0Cfg:         runner.pta0Cfg,
-			//goID2info:       make(map[int]goroutineInfo),
 			RWinsMap:        make(map[goIns]graph.Node),
 			insDRA:          0,
 			levels:          make(map[int]int),
@@ -222,59 +209,50 @@ func (runner *AnalysisRunner) Run(args []string) error {
 			ifFnReturn:      make(map[*ssa.Function]*ssa.Return),
 			ifSuccEnd:       make(map[ssa.Instruction]*ssa.Return),
 		}
-		//if useNewPTA {
-		//	//bz: update includedPkg to be used for future fromPkgsOfInterest()
-		//	for _, scope := range runner.ptaconfig.Scope {
-		//		runner.Analysis.includePkgs = append(runner.Analysis.includePkgs, scope)
-		//	}
-		//	//bz: also traverse lib calls
-		//	for _, _import := range runner.ptaconfig.GetImports() {
-		//		runner.Analysis.includePkgs = append(runner.Analysis.includePkgs, _import)
-		//	}
-		//}
+		//go func() {
+			log.Info("Compiling stack trace for every Goroutine... ")
+			log.Debug(strings.Repeat("-", 35), "Stack trace begins", strings.Repeat("-", 35))
+			runner.Analysis.visitAllInstructions(mains[0].Func(entryFn), 0)
+			log.Debug(strings.Repeat("-", 35), "Stack trace ends", strings.Repeat("-", 35))
+			totalIns := 0
+			for g := range runner.Analysis.RWIns {
+				totalIns += len(runner.Analysis.RWIns[g])
+			}
+			log.Info("Done  -- ", len(runner.Analysis.RWIns), " goroutines analyzed! ", totalIns, " instructions of interest detected! ")
 
-		log.Info("Compiling stack trace for every Goroutine... ")
-		log.Debug(strings.Repeat("-", 35), "Stack trace begins", strings.Repeat("-", 35))
-		runner.Analysis.visitAllInstructions(mains[0].Func(entryFn), 0)
-		log.Debug(strings.Repeat("-", 35), "Stack trace ends", strings.Repeat("-", 35))
-		totalIns := 0
-		for g := range runner.Analysis.RWIns {
-			totalIns += len(runner.Analysis.RWIns[g])
-		}
-		log.Info("Done  -- ", len(runner.Analysis.RWIns), " goroutines analyzed! ", totalIns, " instructions of interest detected! ")
-
-		// confirm channel readiness for unknown select cases:
-		if len(runner.Analysis.selUnknown) > 0 {
-			for sel, chs := range runner.Analysis.selUnknown {
-				for i, ch := range chs {
-					if _, ready := runner.Analysis.chanSnds[ch]; !ready && ch != "" {
-						if _, ready0 := runner.Analysis.chanRcvs[ch]; !ready0 {
-							if _, ready1 := runner.Analysis.chanBuf[runner.Analysis.chanToken[ch]]; !ready1 {
-								runner.Analysis.selReady[sel][i] = ""
+			// confirm channel readiness for unknown select cases:
+			if len(runner.Analysis.selUnknown) > 0 {
+				for sel, chs := range runner.Analysis.selUnknown {
+					for i, ch := range chs {
+						if _, ready := runner.Analysis.chanSnds[ch]; !ready && ch != "" {
+							if _, ready0 := runner.Analysis.chanRcvs[ch]; !ready0 {
+								if _, ready1 := runner.Analysis.chanBuf[runner.Analysis.chanToken[ch]]; !ready1 {
+									runner.Analysis.selReady[sel][i] = ""
+								}
 							}
 						}
 					}
 				}
 			}
-		}
 
-		if useDefaultPTA {
-			finResult, err9 := pta0.Analyze(runner.Analysis.pta0Cfg) // all queries have been added, conduct pointer analysis
-			if err9 != nil {
-				log.Fatal(err)
+			if useDefaultPTA {
+				finResult, err9 := pta0.Analyze(runner.Analysis.pta0Cfg) // all queries have been added, conduct pointer analysis
+				if err9 != nil {
+					log.Fatal(err9)
+				}
+				runner.Analysis.pta0Result = finResult
 			}
-			runner.Analysis.pta0Result = finResult
-		}
 
-		log.Info("Building Happens-Before graph... ")
-		runner.Analysis.HBgraph = graph.New(graph.Directed)
-		runner.Analysis.buildHB(runner.Analysis.HBgraph)
-		log.Info("Done  -- Happens-Before graph built ")
+			log.Info("Building Happens-Before graph... ")
+			runner.Analysis.HBgraph = graph.New(graph.Directed)
+			runner.Analysis.buildHB(runner.Analysis.HBgraph)
+			log.Info("Done  -- Happens-Before graph built ")
 
-		log.Info("Checking for data races... ")
-		runner.Analysis.checkRacyPairs()
+			log.Info("Checking for data races... ")
+			runner.Analysis.checkRacyPairs()
 
-		log.Info("Done for entry at " + m.Pkg.Path())
+			log.Info("Done for entry at " + m.Pkg.Path())
+		//}()
 	}
 	return nil
 }
