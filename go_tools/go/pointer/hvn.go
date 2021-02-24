@@ -163,12 +163,10 @@ package pointer
 
 import (
 	"fmt"
+	"github.tamu.edu/April1989/go_tools/container/intsets"
 	"go/types"
 	"io"
 	"reflect"
-	"strings"
-
-	"github.tamu.edu/April1989/go_tools/container/intsets"
 )
 
 // A peLabel is a pointer-equivalence label: two nodes with the same
@@ -291,9 +289,6 @@ func (a *analysis) hvn() {
 	for _, c := range a.constraints {
 		if debugHVNVerbose && h.log != nil {
 			fmt.Fprintf(h.log, "; %s\n", c)
-		}
-		if strings.Contains(c.String(), "load n519801 <- n438581[0]") {
-			fmt.Println()
 		}
 		c.presolve(&h)
 	}
@@ -820,6 +815,14 @@ func (h *hvn) simplify() {
 		mapping[id] = canonID
 	}
 
+	//bz: Log the remapping table. verbose
+	if h.a.log != nil {
+		fmt.Fprintf(h.a.log, "HVN Renumbering nodes:\n")
+		for old, new := range mapping {
+			fmt.Fprintf(h.a.log, "\tn%d -> n%d\n", old, new)
+		}
+	}
+
 	// Renumber the constraints, eliminate duplicates, and eliminate
 	// any containing non-pointers (n0).
 	addrs := make(map[addrConstraint]bool)
@@ -948,61 +951,7 @@ func (h *hvn) simplify() {
 	}
 	h.a.constraints = cc
 
-	// bz: this above part sneakily renumbers constraints, if they renumbered constraints
-	// they also needs to renumber others things in mapping as opt.go does
-	// I AM GOING TO RENUMBER THEM >>>
-	a := h.a
-	for v, id := range a.globalobj {
-		nid := mapping[id]
-		if nid == 0 || nid == id {  //bz: not updated or not re-mapped
-			continue
-		}
-		a.globalobj[v] = nid
-	}
-	for v, id := range a.globalval {
-		nid := mapping[id]
-		if nid == 0 || nid == id { //bz: not updated or not re-mapped
-			continue
-		}
-		a.globalval[v] = nid
-	}
-	for _, cgn := range a.cgnodes {
-		nid := mapping[cgn.obj]
-		if nid != 0 && nid != cgn.obj { //bz: not updated or not re-mapped
-			cgn.obj = nid
-		}
-		for _, site := range cgn.sites {
-			tid := mapping[site.targets]
-			if tid != 0 && tid != site.targets {
-				site.targets = tid
-			}
-		}
-		if a.config.DiscardQueries {
-			cgn.renumberHVN(mapping)
-		}
-	}
-	tmp := make(map[nodeid]nodeid)
-	for key, val := range a.closureWOGo {
-		kid := mapping[key]
-		vid := mapping[val]
-		if kid == 0 && vid == 0 { //not re-mapped
-			tmp[key] = val
-		}else if kid == 0 && vid != val {
-			tmp[key] = vid
-		}else if vid == 0 && kid != key {
-			tmp[kid] = val
-		}else if kid != key && vid != val { //neither is 0
-			tmp[kid] = vid
-		}else {
-			tmp[key] = val
-		}
-	}
-	a.closureWOGo = tmp
-
-	for _, val := range a.closures {
-		val.renumberHVN(mapping)
-	}
-	//bz: my renumbering is done
+	//h.doMyRenumber(mapping)//bz: sneaky renumber
 
 	if h.log != nil {
 		fmt.Fprintf(h.log, "#constraints: was %d, now %d\n", nbefore, len(h.a.constraints))
@@ -1032,4 +981,60 @@ func assert(p bool, msg string) {
 	if debugHVN && !p {
 		panic("assertion failed: " + msg)
 	}
+}
+
+// bz: this above part sneakily renumbers constraints, if they renumbered constraints
+// they also needs to renumber others things in mapping as opt.go does
+// I AM GOING TO RENUMBER THEM >>>
+func (h *hvn) doMyRenumber(mapping []nodeid) {
+	a := h.a
+	for v, id := range a.globalobj {
+		nid := mapping[id]
+		if nid == 0 || nid == id { //bz: not updated or not re-mapped
+			continue
+		}
+		a.globalobj[v] = nid
+	}
+	for v, id := range a.globalval {
+		nid := mapping[id]
+		if nid == 0 || nid == id { //bz: not updated or not re-mapped
+			continue
+		}
+		a.globalval[v] = nid
+	}
+	for _, cgn := range a.cgnodes {
+		nid := mapping[cgn.obj]
+		if nid != 0 && nid != cgn.obj { //bz: not updated or not re-mapped
+			cgn.obj = nid
+		}
+		for _, site := range cgn.sites {
+			tid := mapping[site.targets]
+			if tid != 0 && tid != site.targets {
+				site.targets = tid
+			}
+		}
+		cgn.renumberHVN(mapping)
+	}
+	tmp := make(map[nodeid]nodeid)
+	for key, val := range a.closureWOGo {
+		kid := mapping[key]
+		vid := mapping[val]
+		if kid == 0 && vid == 0 { //not re-mapped
+			tmp[key] = val
+		} else if kid == 0 && vid != val {
+			tmp[key] = vid
+		} else if vid == 0 && kid != key {
+			tmp[kid] = val
+		} else if kid != key && vid != val { //neither is 0
+			tmp[kid] = vid
+		} else {
+			tmp[key] = val
+		}
+	}
+	a.closureWOGo = tmp
+
+	for _, val := range a.closures {
+		val.renumberHVN(mapping)
+	}
+	//bz: my renumbering is done
 }
