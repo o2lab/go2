@@ -171,12 +171,12 @@ func main() {//default: -useNewPTA
 		TimestampFormat: "15:04:05",
 	})
 
+	// set ulimit -n within the executed program
 	var rLimit syscall.Rlimit
 	err := syscall.Getrlimit(syscall.RLIMIT_NOFILE, &rLimit)
 	if err != nil {
 		fmt.Println("Error Getting Rlimit ", err)
 	}
-	fmt.Println(rLimit)
 	rLimit.Max = 10240
 	rLimit.Cur = 10240
 	err = syscall.Setrlimit(syscall.RLIMIT_NOFILE, &rLimit)
@@ -187,7 +187,6 @@ func main() {//default: -useNewPTA
 	if err != nil {
 		fmt.Println("Error Getting Rlimit ", err)
 	}
-	fmt.Println("Rlimit Final", rLimit)
 
 	runner := &AnalysisRunner{}
 	err0 := runner.Run(flag.Args())

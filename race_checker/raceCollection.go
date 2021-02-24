@@ -19,7 +19,7 @@ func (a *analysis) checkRacyPairs() {
 			for ii, goI := range a.RWIns[i] {
 				if (i == 0 && ii < a.insDRA) || (channelComm && sliceContainsBloc(a.omitComm, goI.Block())) {
 					continue
-				} // do not check race-free instructions in main goroutine
+				}
 				for jj, goJ := range a.RWIns[j] {
 					if channelComm && sliceContainsBloc(a.omitComm, goJ.Block()) {
 						continue
@@ -241,14 +241,14 @@ func (a *analysis) printRace(counter int, insPair []ssa.Instruction, addrPair []
 		if isWriteIns(anIns) {
 			access = " Write of "
 			if _, ok := anIns.(*ssa.Call); ok {
-				errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].String()), " in function ", aurora.BgBrightGreen(anIns.Parent().Name()), " at ", a.prog.Fset.Position(addrPair[i].Pos()))
+				errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].String()), " in function ", aurora.BrightGreen(anIns.Parent().Name()), " at ", a.prog.Fset.Position(addrPair[i].Pos()))
 			} else {
-				errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].String()), " in function ", aurora.BgBrightGreen(anIns.Parent().Name()), " at ", a.prog.Fset.Position(insPair[i].Pos()))
+				errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].String()), " in function ", aurora.BrightGreen(anIns.Parent().Name()), " at ", a.prog.Fset.Position(insPair[i].Pos()))
 			}
 			writeLocks = a.lockMap[anIns]
 		} else {
 			access = " Read of "
-			errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].String()), " in function ", aurora.BgBrightGreen(anIns.Parent().Name()), " at ", a.prog.Fset.Position(anIns.Pos()))
+			errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].String()), " in function ", aurora.BrightGreen(anIns.Parent().Name()), " at ", a.prog.Fset.Position(anIns.Pos()))
 			readLocks = append(a.lockMap[anIns], a.RlockMap[anIns]...)
 		}
 		if testMode {
