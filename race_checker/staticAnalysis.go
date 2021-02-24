@@ -19,6 +19,9 @@ import (
 	"time"
 )
 
+var scope []string //bz: now extract scope from pkgs
+
+
 // fromPkgsOfInterest determines if a function is from a package of interest
 func (a *analysis) fromPkgsOfInterest(fn *ssa.Function) bool {
 	if fn.Pkg == nil || fn.Pkg.Pkg == nil {
@@ -171,6 +174,11 @@ func (runner *AnalysisRunner) Run(args []string) error {
 
 	mains, prog, pkgs := pkgSelection(initial)
 
+	//extract scope from pkgs
+	if fromPath != "" {
+		scope = []string{fromPath}
+	}
+
 	for _, m := range mains { // TODO: parallelize this step
 		log.Info("Solving for entry at " + m.Pkg.Path())
 		result, ptaResult := runner.runEachMainBaseline(m)
@@ -264,19 +272,6 @@ func (runner *AnalysisRunner) runEachMainBaseline(main *ssa.Package) (*pointer.R
 		log.Fatal(err)
 	}
 
-	var scope []string
-	if fromPath != "" {
-		scope = []string{fromPath}
-	}
-	//scope = append(scope, "istio.io/istio/")
-	//scope = append(scope, "google.golang.org/grpc")
-	//scope = append(scope, "github.com/pingcap/tidb")
-	if strings.EqualFold(main.String(), "package command-line-arguments") {//default
-		scope = append(scope, "command-line-arguments")
-	}else{
-		scope = append(scope, main.String())
-	}
-
 	var mains []*ssa.Package
 	mains = append(mains, main)
 	if !useDefaultPTA {
@@ -294,15 +289,11 @@ func (runner *AnalysisRunner) runEachMainBaseline(main *ssa.Package) (*pointer.R
 			DEBUG:      false,   //bz: do all printed out info in console --> turn off to avoid internal nil reference panic
 			Scope:      scope,        //bz: analyze scope, default is "command-line-arguments"
 			Exclusion: excludedPkgs, //excludedPkgs here
-			DiscardQueries: true, //bz: new flag -> if we use queries
 			Level:      0,
 			//bz: Level = 1: if callee is from app or import
 			// Level = 2: parent of caller in app, caller in lib, callee also in lib || parent in lib, caller in app, callee in lib || parent in lib, caller in lib, callee in app
 			// Level = 3: this also analyze lib's import == lib's lib
 			// Level = 0: analyze all
-
-			//bz: new api
-			UseQueriesAPI:  true, //bz: change the api the same as default pta
 			TrackMore:      true, //bz: track pointers with types declared in Analyze Scope; cannot guarantee all basic types, e.g., []bytes, etc.
 		}
 	} else {

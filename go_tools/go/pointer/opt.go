@@ -121,9 +121,8 @@ func (a *analysis) renumber() {
 		for _, site := range cgn.sites {
 			site.targets = renumbering[site.targets]
 		}
-		if a.config.DiscardQueries { //bz: also update its local mapping
-			cgn.renumber(renumbering)
-		}
+		//bz: also update its local mapping
+		cgn.renumber(renumbering)
 	}
 
 	// Renumber nodeids in others
@@ -137,42 +136,42 @@ func (a *analysis) renumber() {
 		val.renumber(renumbering)
 	}
 
-	//bz: special options
-	if !a.config.DiscardQueries {
-		//bz: if using queries (old), we are now using this, update for all recorded queries
-		// Renumber nodeids in queried Pointers.
-		for v, ptrs := range a.result.Queries {
-			tmp := make([]PointerWCtx, len(ptrs))
-			for i, ptr := range ptrs {
-				ptr.n = renumbering[ptr.n]
-				tmp[i] = ptr
-			}
-			a.result.Queries[v] = tmp
-		}
-		for v, ptrs := range a.result.IndirectQueries {
-			tmp := make([]PointerWCtx, len(ptrs))
-			for i, ptr := range ptrs {
-				ptr.n = renumbering[ptr.n]
-				tmp[i] = ptr
-			}
-			a.result.IndirectQueries[v] = tmp
-		}
-		for v, ptrs := range a.result.GlobalQueries {
-			tmp := make([]PointerWCtx, len(ptrs))
-			for i, ptr := range ptrs {
-				ptr.n = renumbering[ptr.n]
-				tmp[i] = ptr
-			}
-			a.result.GlobalQueries[v] = tmp
-		}
-		for _, queries := range a.config.extendedQueries {
-			for _, query := range queries {
-				if query.ptr != nil {
-					query.ptr.n = renumbering[query.ptr.n]
-				}
-			}
-		}
-	}
+	////bz: special options -> discarded
+	//if !a.config.DiscardQueries {
+	//	//bz: if using queries (old), we are now using this, update for all recorded queries
+	//	// Renumber nodeids in queried Pointers.
+	//	for v, ptrs := range a.result.Queries {
+	//		tmp := make([]PointerWCtx, len(ptrs))
+	//		for i, ptr := range ptrs {
+	//			ptr.n = renumbering[ptr.n]
+	//			tmp[i] = ptr
+	//		}
+	//		a.result.Queries[v] = tmp
+	//	}
+	//	for v, ptrs := range a.result.IndirectQueries {
+	//		tmp := make([]PointerWCtx, len(ptrs))
+	//		for i, ptr := range ptrs {
+	//			ptr.n = renumbering[ptr.n]
+	//			tmp[i] = ptr
+	//		}
+	//		a.result.IndirectQueries[v] = tmp
+	//	}
+	//	for v, ptrs := range a.result.GlobalQueries {
+	//		tmp := make([]PointerWCtx, len(ptrs))
+	//		for i, ptr := range ptrs {
+	//			ptr.n = renumbering[ptr.n]
+	//			tmp[i] = ptr
+	//		}
+	//		a.result.GlobalQueries[v] = tmp
+	//	}
+	//	for _, queries := range a.config.extendedQueries {
+	//		for _, query := range queries {
+	//			if query.ptr != nil {
+	//				query.ptr.n = renumbering[query.ptr.n]
+	//			}
+	//		}
+	//	}
+	//}
 
 	a.nodes = newNodes
 	if a.log != nil {

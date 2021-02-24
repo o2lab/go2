@@ -290,7 +290,35 @@ func handleDriverUnderDir(restPatterns []string, patterns []string, response *re
 		size := len(subdirs) - 2
 		if size > 0 {
 			goListDriverRecursive(subdirs, size, response, cfg, ctx, restPatterns)
+			//goListDriverRecursiveSeq(subdirs, size, response, cfg, ctx, restPatterns)
 		}
+	}
+}
+
+//bz: let's do this sequentially ....
+func goListDriverRecursiveSeq(subdirs []string, size int, response *responseDeduper, cfg *Config,
+	ctx context.Context, restPatterns []string) {
+	subdirs = removeDuplicateValues(subdirs)
+	for i := 1; i < len(subdirs)-1; i++ {    //bz: 1st element is ".", the last element is "", skip them
+		subdir := subdirs[i]
+		_cfg := &Config{
+			Mode:    LoadAllSyntax,
+			Context: cfg.Context,
+			Logf:    cfg.Logf,
+			Dir:     cfg.Dir + subdir[1:], // bz: we update this. remove the "." in subdir
+			Env:     cfg.Env,
+			Tests:   false,
+		}
+		_state := &golistState{
+			cfg:        _cfg,
+			ctx:        ctx,
+			vendorDirs: map[string]bool{},
+		}
+		_dr, _err := _state.createDriverResponse(restPatterns...)
+		if _err != nil {
+			fmt.Println("ERROR from _state.createDriverResponse: %s", _err)
+		}
+		response.addAll(_dr)
 	}
 }
 
@@ -319,7 +347,7 @@ func goListDriverRecursive(subdirs []string, size int, response *responseDeduper
 		go func(i int, _state *golistState, restPatterns []string) {
 			_dr, _err := _state.createDriverResponse(restPatterns...)
 			if _err != nil {
-				fmt.Printf("ERROR from _state.createDriverResponse: %s", _err)
+				fmt.Println("ERROR from _state.createDriverResponse: %s", _err)
 				results[i-1] = nil
 			} else {
 				results[i-1] = _dr
@@ -328,6 +356,7 @@ func goListDriverRecursive(subdirs []string, size int, response *responseDeduper
 		}(i, _state, restPatterns)
 	}
 	_wg.Wait()
+
 	//bz: sum up
 	for _, ret := range results {
 		if ret != nil {
