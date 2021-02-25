@@ -21,7 +21,6 @@ type analysis struct {
 	pta0Result 		*pta0.Result
 	ptaConfig    	*pointer.Config
 	pta0Cfg			*pta0.Config
-	//goID2info    	map[int]goroutineInfo //goID -> goroutinInfo
 
 	prog            *ssa.Program
 	pkgs            []*ssa.Package
@@ -71,6 +70,8 @@ type AnalysisRunner struct {
 	Analysis 		*analysis
 	ptaconfig 		*pointer.Config
 	pta0Cfg			*pta0.Config
+	trieLimit		int      // set as user config option later, an integer that dictates how many times a function can be called under identical context
+	efficiency		bool // configuration setting to avoid recursion in tested program
 }
 
 type fnInfo struct { // all fields must be comparable for fnInfo to be used as key to trieMap
@@ -188,7 +189,10 @@ func main() {//default: -useNewPTA
 		fmt.Println("Error Getting Rlimit ", err)
 	}
 
-	runner := &AnalysisRunner{}
+	runner := &AnalysisRunner{
+		trieLimit: trieLimit,
+		efficiency: efficiency,
+	}
 	err0 := runner.Run(flag.Args())
 	if stats.CollectStats {
 		stats.ShowStats()
