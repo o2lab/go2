@@ -13,7 +13,9 @@ import (
 )
 
 // checkRacyPairs checks accesses among two concurrent goroutines
-func (a *analysis) checkRacyPairs() {
+func (a *analysis) checkRacyPairs() []*raceInfo {
+	var races []*raceInfo
+	var ri *raceInfo
 	for i := 0; i < len(a.RWIns); i++ {
 		for j := i + 1; j < len(a.RWIns); j++ { // must be in different goroutines, j always greater than i
 			for ii, goI := range a.RWIns[i] {
@@ -38,6 +40,13 @@ func (a *analysis) checkRacyPairs() {
 							!a.lockSetsIntersect(insSlice[0], insSlice[1]) &&
 							!a.selectMutEx(insSlice[0], insSlice[1]) {
 							a.reportedAddr = append(a.reportedAddr, addressPair[0])
+							ri = &raceInfo{
+								insPair: 	insSlice,
+								addrPair: 	addressPair,
+								goIDs: 		[]int{i, j},
+								insInd: 	[]int{ii, jj},
+								total: 		len(a.reportedAddr),
+							}
 							a.printRace(len(a.reportedAddr), insSlice, addressPair, []int{i, j}, []int{ii, jj})
 						}
 					}
@@ -45,11 +54,8 @@ func (a *analysis) checkRacyPairs() {
 			}
 		}
 	}
-	if len(a.reportedAddr) > 1 {
-		log.Println("Done  -- ", len(a.reportedAddr), "races found! ")
-	} else { // singular data race
-		log.Println("Done  -- ", len(a.reportedAddr), "race found! ")
-	}
+	races = append(races, ri)
+	return races
 }
 
 // insAddress takes a slice of ssa instructions and returns a slice of their corresponding addresses

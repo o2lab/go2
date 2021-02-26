@@ -207,7 +207,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 		return
 	}
 	if !isSynthetic(fn) { // if function is NOT synthetic
-		if !a.fromPkgsOfInterest(fn) {
+		if !fromPkgsOfInterest(fn) {
 			a.updateRecords(fn.Name(), goID, "POP  ")
 			return
 		}
@@ -311,7 +311,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 					}
 					if deferIns.Call.StaticCallee() == nil {
 						continue
-					} else if a.fromPkgsOfInterest(deferIns.Call.StaticCallee()) && deferIns.Call.StaticCallee().Pkg.Pkg.Name() != "sync" {
+					} else if fromPkgsOfInterest(deferIns.Call.StaticCallee()) && deferIns.Call.StaticCallee().Pkg.Pkg.Name() != "sync" {
 						fnName := deferIns.Call.Value.Name()
 						fnName = checkTokenNameDefer(fnName, deferIns)
 						if !a.exploredFunction(deferIns.Call.StaticCallee(), goID, theIns) {
@@ -533,7 +533,7 @@ func (a *analysis) newGoroutine(info goroutineInfo) {
 
 // exploredFunction determines if we already visited this function
 func (a *analysis) exploredFunction(fn *ssa.Function, goID int, theIns ssa.Instruction) bool {
-	if efficiency && !a.fromPkgsOfInterest(fn) { // for temporary debugging purposes only
+	if efficiency && !fromPkgsOfInterest(fn) { // for temporary debugging purposes only
 		return true
 	}
 	if sliceContainsInsAt(a.RWIns[goID], theIns) >= 0 {

@@ -8,6 +8,7 @@ import (
 	"github.com/twmb/algoimpl/go/graph"
 	"github.tamu.edu/April1989/go_tools/go/pointer"
 	pta0 "github.tamu.edu/April1989/go_tools/go/pointer_default"
+	"sync"
 	"syscall"
 
 	//"golang.org/x/tools/go/pointer"
@@ -15,6 +16,7 @@ import (
 )
 
 type analysis struct {
+	mu 				sync.Mutex
 	useNewPTA    	bool //useNewPTA the new pta
 	useDefaultPTA	bool //use default go pta
 	result       	*pointer.Result //now can reuse the result
@@ -67,7 +69,10 @@ type analysis struct {
 }
 
 type AnalysisRunner struct {
+	mu    			sync.Mutex
 	Analysis 		*analysis
+	prog 			*ssa.Program
+	pkgs 			[]*ssa.Package
 	ptaconfig 		*pointer.Config
 	pta0Cfg			*pta0.Config
 	trieLimit		int      // set as user config option later, an integer that dictates how many times a function can be called under identical context

@@ -277,7 +277,7 @@ func (a *analysis) insChangeType(examIns *ssa.ChangeType, goID int, theIns ssa.I
 	switch mc := examIns.X.(type) {
 	case *ssa.MakeClosure: // yield closure value for *Function and free variable values supplied by Bindings
 		theFn := mc.Fn.(*ssa.Function)
-		if a.fromPkgsOfInterest(theFn) {
+		if fromPkgsOfInterest(theFn) {
 			fnName := mc.Fn.Name()
 			if !a.exploredFunction(theFn, goID, theIns) {
 				a.updateRecords(fnName, goID, "PUSH ")
@@ -363,7 +363,7 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 	} else if examIns.Call.StaticCallee() == nil {
 		//log.Debug("***********************special case*****************************************")
 		return
-	} else if a.fromPkgsOfInterest(examIns.Call.StaticCallee()) && examIns.Call.StaticCallee().Pkg.Pkg.Name() != "sync" { // calling a function
+	} else if fromPkgsOfInterest(examIns.Call.StaticCallee()) && examIns.Call.StaticCallee().Pkg.Pkg.Name() != "sync" { // calling a function
 		if examIns.Call.Value.Name() == "AfterFunc" && examIns.Call.StaticCallee().Pkg.Pkg.Name() == "time" { // calling time.AfterFunc()
 			a.paramFunc = examIns.Call.Args[1]
 		}
@@ -496,7 +496,6 @@ func (a *analysis) insGo(examIns *ssa.Go, goID int, theIns ssa.Instruction) {
 	}
 
 	var info = goroutineInfo{examIns, fnName, newGoID}
-	//a.goID2info[newGoID] = info //record
 	a.goStack = append(a.goStack, []string{}) // initialize interior slice
 	a.goCaller[newGoID] = goID                // map caller goroutine
 	a.goStack[newGoID] = append(a.goStack[newGoID], a.storeIns...)
