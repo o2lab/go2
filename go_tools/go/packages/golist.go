@@ -328,7 +328,7 @@ func goListDriverRecursive(subdirs []string, size int, response *responseDeduper
 	subdirs = removeDuplicateValues(subdirs)
 	var _wg sync.WaitGroup
 	results := make([]*driverResponse, size) //all results
-	for i := 1; i < len(subdirs)-1; i++ {    //bz: 1st element is ".", the last element is "", skip them
+	for i := 1; i < len(subdirs); i++ {    //bz: 1st element is ".", the last element is "", skip them
 		subdir := subdirs[i]
 		_cfg := &Config{
 			Mode:    LoadAllSyntax,
