@@ -74,10 +74,6 @@ func isSynthetic(fn *ssa.Function) bool { // ignore functions that are NOT true 
 }
 
 func pkgSelection(initial []*packages.Package) ([]*ssa.Package, *ssa.Program, []*ssa.Package) {
-	if initial[0] == nil { //bz: no matter what ...
-		log.Panic("nil initial package")
-	}
-
 	var prog *ssa.Program
 	var pkgs []*ssa.Package
 	var mainPkgs []*ssa.Package
@@ -105,11 +101,11 @@ func pkgSelection(initial []*packages.Package) ([]*ssa.Package, *ssa.Program, []
 		for i, ep := range mainPkgs {
 			fmt.Println("Option", i+1, ": ", ep.String())
 		}
-		if allEntries {
+		if allEntries { // no selection from user required
 			for pInd := 0; pInd < len(mainPkgs); pInd++ {
 				mains = append(mains, mainPkgs[pInd])
 			}
-			log.Info("Iterating through all options...")
+			log.Info("Iterating through all entry point options...")
 		} else {
 			fmt.Print("Enter option number of choice: (or enter \"-\" for other desired entry point)\n")
 			fmt.Scan(&mainInd)
@@ -181,7 +177,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		return fmt.Errorf("No Go files detected. ")
 	}
 
-	if efficiency {
+	if efficiency && !allEntries { // an entry point was selected by user
 		fromPath = initial[0].PkgPath
 	}
 	log.Info("Done  -- ", len(initial), " packages detected. ")
@@ -190,29 +186,31 @@ func (runner *AnalysisRunner) Run(args []string) error {
 	runner.prog = prog
 	runner.pkgs = pkgs
 
-	// for new PTA: extract scope from pkgs
-	if fromPath != "" {
-		scope = []string{fromPath}
-	}
-
 	var wg sync.WaitGroup
 	var finalReport []*raceReport
 	for _, m := range mains {
 		wg.Add(1)
-		go func() {
-			goReport := runner.runWithEntryPoint(m, &wg)
+		go func(main *ssa.Package) {
+			goReport := runner.runWithEntryPoint(main)
 			finalReport = append(finalReport, goReport)
 			wg.Done()
-		}()
+		}(m)
 	}
 	wg.Wait()
 
 	return nil
 }
 
-func (runner *AnalysisRunner) runWithEntryPoint(main *ssa.Package, wg *sync.WaitGroup) *raceReport {
+func (runner *AnalysisRunner) runWithEntryPoint(main *ssa.Package) *raceReport {
 	rr := &raceReport{
 		entryInfo: main.Pkg.Path(),
+	}
+	if efficiency && allEntries {
+		fromPath = main.Pkg.Path()
+	}
+	// for new PTA: extract scope from pkgs
+	if fromPath != "" {
+		scope = []string{fromPath}
 	}
 	result, ptaResult := runner.runEachMainBaseline(main)
 	analysisData := &analysis{
@@ -250,15 +248,25 @@ func (runner *AnalysisRunner) runWithEntryPoint(main *ssa.Package, wg *sync.Wait
 		ifFnReturn:      make(map[*ssa.Function]*ssa.Return),
 		ifSuccEnd:       make(map[ssa.Instruction]*ssa.Return),
 	}
-	log.Info("Compiling stack trace for every Goroutine... ")
-	log.Debug(strings.Repeat("-", 35), "Stack trace begins", strings.Repeat("-", 35))
+	if !allEntries {
+		log.Info("Compiling stack trace for every Goroutine... ")
+		log.Debug(strings.Repeat("-", 35), "Stack trace begins", strings.Repeat("-", 35))
+	}
+
 	analysisData.visitAllInstructions(main.Func(entryFn), 0)
-	log.Debug(strings.Repeat("-", 35), "Stack trace ends", strings.Repeat("-", 35))
+	if !allEntries {
+		log.Debug(strings.Repeat("-", 35), "Stack trace ends", strings.Repeat("-", 35))
+	}
+
 	totalIns := 0
 	for g := range analysisData.RWIns {
 		totalIns += len(analysisData.RWIns[g])
 	}
-	log.Info("Done  -- ", len(analysisData.RWIns), " goroutines analyzed! ", totalIns, " instructions of interest detected! ")
+
+	if !allEntries {
+		log.Info("Done  -- ", len(analysisData.RWIns), " goroutines analyzed! ", totalIns, " instructions of interest detected! ")
+	}
+
 
 	// confirm channel readiness for unknown select cases:
 	if len(analysisData.selUnknown) > 0 {
@@ -283,15 +291,25 @@ func (runner *AnalysisRunner) runWithEntryPoint(main *ssa.Package, wg *sync.Wait
 		analysisData.pta0Result = finResult
 	}
 
-	log.Info("Building Happens-Before graph... ")
+	if !allEntries {
+		log.Info("Building Happens-Before graph... ")
+	}
+
 	analysisData.HBgraph = graph.New(graph.Directed)
 	analysisData.buildHB(analysisData.HBgraph)
-	log.Info("Done  -- Happens-Before graph built ")
 
-	log.Info("Checking for data races... ")
+	if !allEntries {
+		log.Info("Done  -- Happens-Before graph built ")
+
+		log.Info("Checking for data races... ")
+	}
+
 	rr.racePairs = analysisData.checkRacyPairs()
 
-	log.Info("Done for entry at " + main.Pkg.Path())
+	if !allEntries {
+		log.Info("Done for entry at " + main.Pkg.Path())
+	}
+
 	runner.Analysis = analysisData
 	return rr
 }

@@ -91,7 +91,9 @@ func (a *analysis) updateRecords(fnName string, goID int, pushPop string) {
 		a.storeIns = a.storeIns[:len(a.storeIns)-1]
 		a.levels[goID]--
 	}
-	log.Debug(strings.Repeat(" ", a.levels[goID]), pushPop, fnName, " at lvl ", a.levels[goID])
+	if !allEntries {
+		log.Debug(strings.Repeat(" ", a.levels[goID]), pushPop, fnName, " at lvl ", a.levels[goID])
+	}
 	if pushPop == "PUSH " {
 		a.storeIns = append(a.storeIns, fnName)
 		a.levels[goID]++
@@ -266,7 +268,9 @@ func (a *analysis) insLookUp(examIns *ssa.Lookup, goID int, theIns ssa.Instructi
 			a.RWIns[goID] = append(a.RWIns[goID], theIns)
 			a.updateLockMap(goID, theIns)
 			a.updateRLockMap(goID, theIns)
-			a.pta0Cfg.AddQuery(readIns)
+			if !a.useNewPTA {
+				a.pta0Cfg.AddQuery(readIns)
+			}
 		}
 	}
 }
@@ -500,7 +504,9 @@ func (a *analysis) insGo(examIns *ssa.Go, goID int, theIns ssa.Instruction) {
 	a.goCaller[newGoID] = goID                // map caller goroutine
 	a.goStack[newGoID] = append(a.goStack[newGoID], a.storeIns...)
 	a.workList = append(a.workList, info) // store encountered goroutines
-	log.Debug(strings.Repeat(" ", a.levels[goID]), "spawning Goroutine ----->  ", fnName)
+	if !allEntries {
+		log.Debug(strings.Repeat(" ", a.levels[goID]), "spawning Goroutine ----->  ", fnName)
+	}
 }
 
 func (a *analysis) insMapUpdate(examIns *ssa.MapUpdate, goID int, theIns ssa.Instruction) {
