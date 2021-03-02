@@ -16,13 +16,13 @@ import (
 func (a *analysis) checkRacyPairs() []*raceInfo {
 	var races []*raceInfo
 	var ri *raceInfo
-	for i := 0; i < len(a.RWIns); i++ {
-		for j := i + 1; j < len(a.RWIns); j++ { // must be in different goroutines, j always greater than i
-			for ii, goI := range a.RWIns[i] {
+	for i := 0; i < len(a.RWInsInd); i++ {
+		for j := i + 1; j < len(a.RWInsInd); j++ { // must be in different goroutines, j always greater than i
+			for ii, goI := range a.RWInsInd[i] {
 				if (i == 0 && ii < a.insDRA) || (channelComm && sliceContainsBloc(a.omitComm, goI.Block())) {
 					continue
 				}
-				for jj, goJ := range a.RWIns[j] {
+				for jj, goJ := range a.RWInsInd[j] {
 					if channelComm && sliceContainsBloc(a.omitComm, goJ.Block()) {
 						continue
 					}
@@ -47,7 +47,9 @@ func (a *analysis) checkRacyPairs() []*raceInfo {
 								insInd: 	[]int{ii, jj},
 								total: 		len(a.reportedAddr),
 							}
+							//a.mu.Lock()
 							a.printRace(len(a.reportedAddr), insSlice, addressPair, []int{i, j}, []int{ii, jj})
+							//a.mu.Unlock()
 						}
 					}
 				}
@@ -116,7 +118,10 @@ func (a *analysis) sameAddress(addr1 ssa.Value, addr2 ssa.Value) bool {
 		result, _ := pta0.Analyze(a.pta0Cfg)
 		a.pta0Result = result
 		ptsets := a.pta0Result.Queries
-		return ptsets[addr1].PointsTo().Intersects(ptsets[addr2].PointsTo())
+		//a.mu.Lock()
+		res := ptsets[addr1].PointsTo().Intersects(ptsets[addr2].PointsTo())
+		//a.mu.Unlock()
+		return res
 	}
 	ptset1 := a.result.Queries[addr1]
 	ptset2 := a.result.Queries[addr2]
@@ -235,6 +240,8 @@ func getSrcPos(address ssa.Value) token.Pos {
 	return position
 }
 
+//func (a *analysis) reportRace
+
 // printRace will print the details of a data race such as the write/read of a variable and other helpful information
 func (a *analysis) printRace(counter int, insPair []ssa.Instruction, addrPair []ssa.Value, goIDs []int, insInd []int) {
 	log.Printf("Data race #%d", counter)
@@ -260,11 +267,12 @@ func (a *analysis) printRace(counter int, insPair []ssa.Instruction, addrPair []
 		if testMode {
 			colorOutput := regexp.MustCompile(`\x1b\[\d+m`)
 			a.racyStackTops = append(a.racyStackTops, colorOutput.ReplaceAllString(errMsg, ""))
+			fmt.Println(a.racyStackTops)
 		}
 		log.Print(errMsg)
 		var printStack []string // store functions in stack and pop terminated functions
 		var printPos []token.Pos
-		for p, everyIns := range a.RWIns[goIDs[i]] {
+		for p, everyIns := range a.RWInsInd[goIDs[i]] {
 			if p < insInd[i]-1 {
 				if isFunc, ok := everyIns.(*ssa.Call); ok {
 					printName := isFunc.Call.Value.Name()

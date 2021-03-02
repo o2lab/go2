@@ -81,7 +81,7 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 			fnName = theFunc.Name()
 			if !a.exploredFunction(theFunc, goID, theIns) {
 				a.updateRecords(fnName, goID, "PUSH ")
-				a.RWIns[goID] = append(a.RWIns[goID], theIns)
+				a.RWIns[a.fromPath][goID] = append(a.RWIns[a.fromPath][goID], theIns)
 				a.visitAllInstructions(theFunc, goID)
 			}
 		case *ssa.MakeInterface:
@@ -93,7 +93,7 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 			fnName = check.Name()
 			if !a.exploredFunction(check, goID, theIns) {
 				a.updateRecords(fnName, goID, "PUSH ")
-				a.RWIns[goID] = append(a.RWIns[goID], theIns)
+				a.RWIns[a.fromPath][goID] = append(a.RWIns[a.fromPath][goID], theIns)
 				a.visitAllInstructions(check, goID)
 			}
 		case *ssa.MakeChan:
@@ -150,7 +150,7 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 			fnName = theFunc.Name()
 			if !a.exploredFunction(theFunc, goID, theIns) {
 				a.updateRecords(fnName, goID, "PUSH ")
-				a.RWIns[goID] = append(a.RWIns[goID], theIns)
+				a.RWIns[a.fromPath][goID] = append(a.RWIns[a.fromPath][goID], theIns)
 				a.visitAllInstructions(theFunc, goID)
 			}
 		case *ssa.MakeInterface:
@@ -162,7 +162,7 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 			fnName = check.Name()
 			if !a.exploredFunction(check, goID, theIns) {
 				a.updateRecords(fnName, goID, "PUSH ")
-				a.RWIns[goID] = append(a.RWIns[goID], theIns)
+				a.RWIns[a.fromPath][goID] = append(a.RWIns[a.fromPath][goID], theIns)
 				a.visitAllInstructions(check, goID)
 			}
 		case *ssa.MakeChan:

@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-func (a *analysis) buildHB(HBgraph *graph.Graph) {
+func (a *analysis) buildHB() {
 	var prevN graph.Node
 	var goCaller []graph.Node
 	var selectN []graph.Node
@@ -18,20 +18,20 @@ func (a *analysis) buildHB(HBgraph *graph.Graph) {
 	waitingN := make(map[*ssa.Call]graph.Node)
 	chanRecvs := make(map[string]graph.Node) // map channel name to graph node
 	chanSends := make(map[string]graph.Node) // map channel name to graph node
-	for nGo, insSlice := range a.RWIns {
+	for nGo, insSlice := range a.RWInsInd {
 		for i, anIns := range insSlice {
 			disjoin := false // detach select case statement from subsequent instruction
 			insKey := goIns{ins: anIns, goID: nGo}
 			if nGo == 0 && i == 0 { // main goroutine, first instruction
-				prevN = HBgraph.MakeNode() // initiate for future nodes
+				prevN = a.HBgraph.MakeNode() // initiate for future nodes
 				*prevN.Value = insKey
 				if _, ok := anIns.(*ssa.Go); ok {
 					goCaller = append(goCaller, prevN) // sequentially store go calls in the same goroutine
 				}
 			} else {
-				currN := HBgraph.MakeNode()
+				currN := a.HBgraph.MakeNode()
 				*currN.Value = insKey
-				if nGo != 0 && i == 0 { // worker goroutine, first instruction
+				if nGo != 0 && i == 0 && goCaller != nil { // worker goroutine, first instruction
 					prevN = goCaller[0] // first node in subroutine
 					goCaller = goCaller[1:]
 				} else if _, ok := anIns.(*ssa.Go); ok {
@@ -68,38 +68,38 @@ func (a *analysis) buildHB(HBgraph *graph.Graph) {
 					ifSuccEndN = append(ifSuccEndN, currN)
 				}
 				// edge manipulation:
-				if ch, ok := a.selectCaseBegin[anIns]; ok && channelComm {
+				if ch, ok := a.selectCaseBegin[anIns]; ok && channelComm && selectN != nil {
 					if ch == "defaultCase" || ch == "timeOut" {
-						err := HBgraph.MakeEdge(selectN[0], currN) // select node to default case
+						err := a.HBgraph.MakeEdge(selectN[0], currN) // select node to default case
 						if err != nil {
 							log.Fatal(err)
 						}
 					} else {
 						if _, ok1 := chanRecvs[ch]; ok1 {
-							err := HBgraph.MakeEdge(chanRecvs[ch], currN) // receive Op to ready case
+							err := a.HBgraph.MakeEdge(chanRecvs[ch], currN) // receive Op to ready case
 							if err != nil {
 								log.Fatal(err)
 							}
 						} else if sliceContainsStr(readyCh, ch) {
-							err := HBgraph.MakeEdge(selectN[0], currN) // select node to assumed ready cases
+							err := a.HBgraph.MakeEdge(selectN[0], currN) // select node to assumed ready cases
 							if err != nil {
 								log.Fatal(err)
 							}
 						}
 					}
-				} else if _, ok1 := a.selectDone[anIns]; ok1 && channelComm {
+				} else if _, ok1 := a.selectDone[anIns]; ok1 && channelComm && selectN != nil {
 					if len(selCaseEndN) > 1 { // more than one portal is ready
-						err := HBgraph.MakeEdge(selectN[0], currN) // select statement to select done
+						err := a.HBgraph.MakeEdge(selectN[0], currN) // select statement to select done
 						if err != nil {
 							log.Fatal(err)
 						}
 					} else if len(selCaseEndN) > 0 {
-						err := HBgraph.MakeEdge(selCaseEndN[0], currN) // ready case to select done
+						err := a.HBgraph.MakeEdge(selCaseEndN[0], currN) // ready case to select done
 						if err != nil {
 							log.Fatal(err)
 						}
 					}
-					if selectN != nil && len(selectN) > 1 {
+					if len(selectN) > 1 {
 						selectN = selectN[1:]
 					} // completed analysis of one select statement
 				} else if ifInstr, ok2 := a.ifSuccBegin[anIns]; ok2 && channelComm {
@@ -112,14 +112,14 @@ func (a *analysis) buildHB(HBgraph *graph.Graph) {
 							}
 						}
 					}
-					if !skipSucc {
-						err := HBgraph.MakeEdge(ifN[0], currN)
+					if !skipSucc && ifN != nil {
+						err := a.HBgraph.MakeEdge(ifN[0], currN)
 						if err != nil {
 							log.Fatal(err)
 						}
 					}
 				} else {
-					err := HBgraph.MakeEdge(prevN, currN)
+					err := a.HBgraph.MakeEdge(prevN, currN)
 					if err != nil {
 						log.Fatal(err)
 					}
@@ -137,7 +137,7 @@ func (a *analysis) buildHB(HBgraph *graph.Graph) {
 				} else if callIns.Call.Value.Name() == "Done" {
 					for wIns, wNode := range waitingN {
 						if a.sameAddress(callIns.Call.Args[0], wIns.Call.Args[0]) {
-							err := HBgraph.MakeEdge(prevN, wNode) // create edge from Done node to Wait node
+							err := a.HBgraph.MakeEdge(prevN, wNode) // create edge from Done node to Wait node
 							if err != nil {
 								log.Fatal(err)
 							}
@@ -148,7 +148,7 @@ func (a *analysis) buildHB(HBgraph *graph.Graph) {
 				if dIns.Call.Value.Name() == "Done" {
 					for wIns, wNode := range waitingN {
 						if a.sameAddress(dIns.Call.Args[0], wIns.Call.Args[0]) {
-							err := HBgraph.MakeEdge(prevN, wNode) // create edge from Done node to Wait node
+							err := a.HBgraph.MakeEdge(prevN, wNode) // create edge from Done node to Wait node
 							if err != nil {
 								log.Fatal(err)
 							}
@@ -159,11 +159,11 @@ func (a *analysis) buildHB(HBgraph *graph.Graph) {
 			if sendIns, ok := anIns.(*ssa.Send); ok && channelComm { // detect matching channel send operations
 				for ch, sIns := range a.chanSnds {
 					if rcvN, matching := chanRecvs[ch]; matching && sliceContainsSnd(sIns, sendIns) {
-						err := HBgraph.MakeEdge(prevN, rcvN) // create edge from Send node to Receive node
+						err := a.HBgraph.MakeEdge(prevN, rcvN) // create edge from Send node to Receive node
 						if err != nil {
 							log.Fatal(err)
 						}
-						err1 := HBgraph.MakeEdge(rcvN, prevN) // create edge from Send node to Receive node
+						err1 := a.HBgraph.MakeEdge(rcvN, prevN) // create edge from Send node to Receive node
 						if err1 != nil {
 							log.Fatal(err1)
 						}
@@ -172,11 +172,11 @@ func (a *analysis) buildHB(HBgraph *graph.Graph) {
 			} else if rcvIns, chR := anIns.(*ssa.UnOp); chR && channelComm {
 				if ch := a.getRcvChan(rcvIns); ch != "" {
 					if sndN, matching := chanSends[ch]; matching {
-						err := HBgraph.MakeEdge(sndN, prevN) // create edge from Send node to Receive node
+						err := a.HBgraph.MakeEdge(sndN, prevN) // create edge from Send node to Receive node
 						if err != nil {
 							log.Fatal(err)
 						}
-						err1 := HBgraph.MakeEdge(prevN, sndN) // create edge from Send node to Receive node
+						err1 := a.HBgraph.MakeEdge(prevN, sndN) // create edge from Send node to Receive node
 						if err1 != nil {
 							log.Fatal(err1)
 						}
@@ -187,7 +187,7 @@ func (a *analysis) buildHB(HBgraph *graph.Graph) {
 				if a.ifFnReturn[reIns.Parent()] == reIns { // this is final return
 					for r, ifEndN := range ifSuccEndN {
 						if r != len(ifSuccEndN)-1 {
-							err := HBgraph.MakeEdge(ifEndN, prevN)
+							err := a.HBgraph.MakeEdge(ifEndN, prevN)
 							if err != nil {
 								log.Fatal(err)
 							}
@@ -207,7 +207,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 		return
 	}
 	if !isSynthetic(fn) { // if function is NOT synthetic
-		if !fromPkgsOfInterest(fn) {
+		if !a.fromPkgsOfInterest(fn) {
 			a.updateRecords(fn.Name(), goID, "POP  ")
 			return
 		}
@@ -221,8 +221,8 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 	if _, ok := a.levels[goID]; !ok && goID > 0 { // initialize level counter for new goroutine
 		a.levels[goID] = 1
 	}
-	if goID >= len(a.RWIns) { // initialize interior slice for new goroutine
-		a.RWIns = append(a.RWIns, []ssa.Instruction{})
+	if goID >= len(a.RWIns[a.fromPath]) { // initialize interior slice for new goroutine
+		a.RWIns[a.fromPath] = append(a.RWIns[a.fromPath], []ssa.Instruction{})
 	}
 	fnBlocks := fn.Blocks
 	bCap := 1
@@ -311,12 +311,12 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 					}
 					if deferIns.Call.StaticCallee() == nil {
 						continue
-					} else if fromPkgsOfInterest(deferIns.Call.StaticCallee()) && deferIns.Call.StaticCallee().Pkg.Pkg.Name() != "sync" {
+					} else if a.fromPkgsOfInterest(deferIns.Call.StaticCallee()) && deferIns.Call.StaticCallee().Pkg.Pkg.Name() != "sync" {
 						fnName := deferIns.Call.Value.Name()
 						fnName = checkTokenNameDefer(fnName, deferIns)
 						if !a.exploredFunction(deferIns.Call.StaticCallee(), goID, theIns) {
 							a.updateRecords(fnName, goID, "PUSH ")
-							a.RWIns[goID] = append(a.RWIns[goID], dIns)
+							a.RWIns[a.fromPath][goID] = append(a.RWIns[a.fromPath][goID], dIns)
 							a.visitAllInstructions(deferIns.Call.StaticCallee(), goID)
 						}
 					} else if deferIns.Call.StaticCallee().Name() == "Unlock" {
@@ -332,7 +332,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 						}
 						toRUnlock = append(toRUnlock, RlockLoc)
 					} else if deferIns.Call.Value.Name() == "Done" {
-						a.RWIns[goID] = append(a.RWIns[goID], dIns)
+						a.RWIns[a.fromPath][goID] = append(a.RWIns[a.fromPath][goID], dIns)
 						if !a.useNewPTA {
 							a.pta0Cfg.AddQuery(deferIns.Call.Args[0])
 						}
@@ -392,7 +392,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 			case *ssa.ChangeType: // a value-preserving type change, write op
 				a.insChangeType(examIns, goID, theIns)
 			case *ssa.Defer:
-				a.RWIns[goID] = append(a.RWIns[goID], theIns)
+				a.RWIns[a.fromPath][goID] = append(a.RWIns[a.fromPath][goID], theIns)
 				toDefer = append([]ssa.Instruction{theIns}, toDefer...)
 			case *ssa.MakeInterface: // construct instance of interface type
 				a.insMakeInterface(examIns, goID, theIns)
@@ -403,7 +403,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 			case *ssa.Go: // for spawning of goroutines
 				a.insGo(examIns, goID, theIns)
 			case *ssa.Return:
-				a.RWIns[goID] = append(a.RWIns[goID], theIns)
+				a.RWIns[a.fromPath][goID] = append(a.RWIns[a.fromPath][goID], theIns)
 				if examIns.Block().Comment == "if.then" || examIns.Block().Comment == "if.else" || examIns.Block().Comment == "if.done" {
 					a.ifFnReturn[fn] = examIns // will be revised iteratively to eventually contain final return instruction
 				}
@@ -415,10 +415,10 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				selIns = examIns
 				a.selectBloc[bVisit[bInd]] = examIns
 			case *ssa.If:
-				a.RWIns[goID] = append(a.RWIns[goID], theIns)
+				a.RWIns[a.fromPath][goID] = append(a.RWIns[a.fromPath][goID], theIns)
 				ifIns = examIns
 			default:
-				a.RWIns[goID] = append(a.RWIns[goID], theIns) // TODO: consolidate
+				a.RWIns[a.fromPath][goID] = append(a.RWIns[a.fromPath][goID], theIns) // TODO: consolidate
 			}
 			if ii == len(aBlock.Instrs)-1 && a.mapFreeze { // TODO: this can happen too early
 				a.mapFreeze = false
@@ -426,14 +426,14 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 			if activeCase && readyChans[selCount] != "defaultCase" && readyChans[selCount] != "timeOut" {
 				if ii == 0 {
 					a.selectCaseBegin[theIns] = readyChans[selCount] // map first instruction in case to channel name
-					if a.RWIns[goID][len(a.RWIns[goID])-1] != theIns {
-						a.RWIns[goID] = append(a.RWIns[goID], theIns)
+					if a.RWIns[a.fromPath][goID][len(a.RWIns[a.fromPath][goID])-1] != theIns {
+						a.RWIns[a.fromPath][goID] = append(a.RWIns[a.fromPath][goID], theIns)
 					}
 					a.selectCaseBody[theIns] = selIns
 				} else if ii == len(aBlock.Instrs)-1 {
 					a.selectCaseEnd[theIns] = readyChans[selCount] // map last instruction in case to channel name
-					if a.RWIns[goID][len(a.RWIns[goID])-1] != theIns {
-						a.RWIns[goID] = append(a.RWIns[goID], theIns)
+					if a.RWIns[a.fromPath][goID][len(a.RWIns[a.fromPath][goID])-1] != theIns {
+						a.RWIns[a.fromPath][goID] = append(a.RWIns[a.fromPath][goID], theIns)
 					}
 					a.selectCaseBody[theIns] = selIns
 				} else {
@@ -444,8 +444,8 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				a.selectCaseBody[theIns] = selIns
 			}
 			if selDone && ii == 0 {
-				if sliceContainsInsAt(a.RWIns[goID], theIns) == -1 {
-					a.RWIns[goID] = append(a.RWIns[goID], theIns)
+				if sliceContainsInsAt(a.RWIns[a.fromPath][goID], theIns) == -1 {
+					a.RWIns[a.fromPath][goID] = append(a.RWIns[a.fromPath][goID], theIns)
 				}
 			}
 		}
@@ -513,10 +513,10 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 // newGoroutine goes through the goroutine, logs its info, and goes through the instructions within
 func (a *analysis) newGoroutine(info goroutineInfo) {
 	a.storeIns = append(a.storeIns, info.entryMethod)
-	if info.goID >= len(a.RWIns) { // initialize interior slice for new goroutine
-		a.RWIns = append(a.RWIns, []ssa.Instruction{})
+	if info.goID >= len(a.RWIns[a.fromPath]) { // initialize interior slice for new goroutine
+		a.RWIns[a.fromPath] = append(a.RWIns[a.fromPath], []ssa.Instruction{})
 	}
-	a.RWIns[info.goID] = append(a.RWIns[info.goID], info.goIns)
+	a.RWIns[a.fromPath][info.goID] = append(a.RWIns[a.fromPath][info.goID], info.goIns)
 	a.goNames[info.goID] = info.entryMethod
 	if !allEntries {
 		log.Debug(strings.Repeat("-", 35), "Goroutine ", info.entryMethod, strings.Repeat("-", 35), "[", info.goID, "]")
@@ -537,10 +537,10 @@ func (a *analysis) newGoroutine(info goroutineInfo) {
 
 // exploredFunction determines if we already visited this function
 func (a *analysis) exploredFunction(fn *ssa.Function, goID int, theIns ssa.Instruction) bool {
-	if efficiency && !fromPkgsOfInterest(fn) { // for temporary debugging purposes only
+	if efficiency && !a.fromPkgsOfInterest(fn) { // for temporary debugging purposes only
 		return true
 	}
-	if sliceContainsInsAt(a.RWIns[goID], theIns) >= 0 {
+	if sliceContainsInsAt(a.RWIns[a.fromPath][goID], theIns) >= 0 {
 		return true
 	}
 	if efficiency && sliceContainsStr(a.storeIns, fn.Name()) { // for temporary debugging purposes only
@@ -548,7 +548,7 @@ func (a *analysis) exploredFunction(fn *ssa.Function, goID int, theIns ssa.Instr
 	}
 	visitedIns := []ssa.Instruction{}
 	if len(a.RWIns) > 0 {
-		visitedIns = a.RWIns[goID]
+		visitedIns = a.RWIns[a.fromPath][goID]
 	}
 	csSlice, csStr := insToCallStack(visitedIns)
 	if sliceContainsStrCtr(csSlice, fn.Name()) > trieLimit {

@@ -125,7 +125,7 @@ func (a *analysis) insMakeChan(examIns *ssa.MakeChan, insInd int) {
 // insSend ???
 func (a *analysis) insSend(examIns *ssa.Send, goID int, theIns ssa.Instruction) string {
 	stats.IncStat(stats.NSend)
-	a.RWIns[goID] = append(a.RWIns[goID], theIns)
+	a.RWIns[a.fromPath][goID] = append(a.RWIns[a.fromPath][goID], theIns)
 	ch := examIns.Chan.Name()
 	if _, ok := a.chanBuf[ch]; !ok {
 		switch chN := examIns.Chan.(type) {
@@ -164,7 +164,7 @@ func (a *analysis) insStore(examIns *ssa.Store, goID int, theIns ssa.Instruction
 				return
 			}
 		}
-		a.RWIns[goID] = append(a.RWIns[goID], theIns)
+		a.RWIns[a.fromPath][goID] = append(a.RWIns[a.fromPath][goID], theIns)
 		a.updateLockMap(goID, theIns)
 		if !a.useNewPTA {
 			a.pta0Cfg.AddQuery(examIns.Addr)
@@ -173,7 +173,7 @@ func (a *analysis) insStore(examIns *ssa.Store, goID int, theIns ssa.Instruction
 	if theFunc, storeFn := examIns.Val.(*ssa.Function); storeFn {
 		if !a.exploredFunction(theFunc, goID, theIns) {
 			a.updateRecords(theFunc.Name(), goID, "PUSH ")
-			a.RWIns[goID] = append(a.RWIns[goID], theIns)
+			a.RWIns[a.fromPath][goID] = append(a.RWIns[a.fromPath][goID], theIns)
 			a.visitAllInstructions(theFunc, goID)
 		}
 	}
@@ -206,7 +206,7 @@ func (a *analysis) insUnOp(examIns *ssa.UnOp, goID int, theIns ssa.Instruction) 
 				}
 			}
 		}
-		a.RWIns[goID] = append(a.RWIns[goID], theIns)
+		a.RWIns[a.fromPath][goID] = append(a.RWIns[a.fromPath][goID], theIns)
 	} else if examIns.Op == token.ARROW { // channel receive op (not waited on by select)
 		stats.IncStat(stats.NChanRecv)
 		ch := examIns.X.Name()
@@ -235,7 +235,7 @@ func (a *analysis) insUnOp(examIns *ssa.UnOp, goID int, theIns ssa.Instruction) 
 		} else {
 			a.chanRcvs[ch] = append(a.chanRcvs[ch], examIns)
 		}
-		a.RWIns[goID] = append(a.RWIns[goID], theIns)
+		a.RWIns[a.fromPath][goID] = append(a.RWIns[a.fromPath][goID], theIns)
 	}
 }
 
@@ -243,7 +243,7 @@ func (a *analysis) insUnOp(examIns *ssa.UnOp, goID int, theIns ssa.Instruction) 
 func (a *analysis) insFieldAddr(examIns *ssa.FieldAddr, goID int, theIns ssa.Instruction) {
 	stats.IncStat(stats.NFieldAddr)
 	if !isLocalAddr(examIns.X) {
-		a.RWIns[goID] = append(a.RWIns[goID], theIns)
+		a.RWIns[a.fromPath][goID] = append(a.RWIns[a.fromPath][goID], theIns)
 		a.updateLockMap(goID, theIns)
 		a.updateRLockMap(goID, theIns)
 		if !a.useNewPTA {
@@ -258,14 +258,14 @@ func (a *analysis) insLookUp(examIns *ssa.Lookup, goID int, theIns ssa.Instructi
 	switch readIns := examIns.X.(type) {
 	case *ssa.UnOp:
 		if readIns.Op == token.MUL && !isLocalAddr(readIns.X) {
-			a.RWIns[goID] = append(a.RWIns[goID], theIns)
+			a.RWIns[a.fromPath][goID] = append(a.RWIns[a.fromPath][goID], theIns)
 			a.updateLockMap(goID, theIns)
 			a.updateRLockMap(goID, theIns)
 			//a.pta0Cfg.AddQuery(readIns.X)
 		}
 	case *ssa.Parameter:
 		if !isLocalAddr(readIns) {
-			a.RWIns[goID] = append(a.RWIns[goID], theIns)
+			a.RWIns[a.fromPath][goID] = append(a.RWIns[a.fromPath][goID], theIns)
 			a.updateLockMap(goID, theIns)
 			a.updateRLockMap(goID, theIns)
 			if !a.useNewPTA {
@@ -281,11 +281,11 @@ func (a *analysis) insChangeType(examIns *ssa.ChangeType, goID int, theIns ssa.I
 	switch mc := examIns.X.(type) {
 	case *ssa.MakeClosure: // yield closure value for *Function and free variable values supplied by Bindings
 		theFn := mc.Fn.(*ssa.Function)
-		if fromPkgsOfInterest(theFn) {
+		if a.fromPkgsOfInterest(theFn) {
 			fnName := mc.Fn.Name()
 			if !a.exploredFunction(theFn, goID, theIns) {
 				a.updateRecords(fnName, goID, "PUSH ")
-				a.RWIns[goID] = append(a.RWIns[goID], theIns)
+				a.RWIns[a.fromPath][goID] = append(a.RWIns[a.fromPath][goID], theIns)
 				a.updateLockMap(goID, theIns)
 				a.updateRLockMap(goID, theIns)
 				if !a.useNewPTA {
@@ -330,7 +330,7 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 		} else if examIns.Call.Value.Name() == "delete" { // built-in delete op
 			if theVal, ok := examIns.Call.Args[0].(*ssa.UnOp); ok {
 				if theVal.Op == token.MUL && !isLocalAddr(theVal.X) {
-					a.RWIns[goID] = append(a.RWIns[goID], theIns)
+					a.RWIns[a.fromPath][goID] = append(a.RWIns[a.fromPath][goID], theIns)
 					a.updateLockMap(goID, theIns)
 					a.updateRLockMap(goID, theIns)
 					if !a.useNewPTA {
@@ -367,7 +367,7 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 	} else if examIns.Call.StaticCallee() == nil {
 		//log.Debug("***********************special case*****************************************")
 		return
-	} else if fromPkgsOfInterest(examIns.Call.StaticCallee()) && examIns.Call.StaticCallee().Pkg.Pkg.Name() != "sync" { // calling a function
+	} else if a.fromPkgsOfInterest(examIns.Call.StaticCallee()) && examIns.Call.StaticCallee().Pkg.Pkg.Name() != "sync" { // calling a function
 		if examIns.Call.Value.Name() == "AfterFunc" && examIns.Call.StaticCallee().Pkg.Pkg.Name() == "time" { // calling time.AfterFunc()
 			a.paramFunc = examIns.Call.Args[1]
 		}
@@ -375,7 +375,7 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 			switch access := checkArgs.(type) {
 			case *ssa.FieldAddr:
 				if !isLocalAddr(access.X) && strings.HasPrefix(examIns.Call.Value.Name(), "Add") {
-					a.RWIns[goID] = append(a.RWIns[goID], theIns)
+					a.RWIns[a.fromPath][goID] = append(a.RWIns[a.fromPath][goID], theIns)
 					a.updateLockMap(goID, theIns)
 					a.updateRLockMap(goID, theIns)
 					if !a.useNewPTA {
@@ -393,7 +393,7 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 		fnName = checkTokenName(fnName, examIns)
 		if !a.exploredFunction(examIns.Call.StaticCallee(), goID, theIns) {
 			a.updateRecords(fnName, goID, "PUSH ")
-			a.RWIns[goID] = append(a.RWIns[goID], theIns)
+			a.RWIns[a.fromPath][goID] = append(a.RWIns[a.fromPath][goID], theIns)
 			a.visitAllInstructions(examIns.Call.StaticCallee(), goID)
 		}
 	} else if examIns.Call.StaticCallee().Pkg.Pkg.Name() == "sync" {
@@ -402,7 +402,7 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 			fnName := examIns.Call.Value.Name()
 			if !a.exploredFunction(examIns.Call.StaticCallee(), goID, theIns) {
 				a.updateRecords(fnName, goID, "PUSH ")
-				a.RWIns[goID] = append(a.RWIns[goID], theIns)
+				a.RWIns[a.fromPath][goID] = append(a.RWIns[a.fromPath][goID], theIns)
 				a.visitAllInstructions(examIns.Call.StaticCallee(), goID)
 			}
 		case "Lock":
@@ -455,13 +455,13 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 			a.mapFreeze = true
 		case "Wait":
 			stats.IncStat(stats.NWaitGroupWait)
-			a.RWIns[goID] = append(a.RWIns[goID], theIns)
+			a.RWIns[a.fromPath][goID] = append(a.RWIns[a.fromPath][goID], theIns)
 			if !a.useNewPTA {
 				a.pta0Cfg.AddQuery(examIns.Call.Args[0])
 			}
 		case "Done":
 			stats.IncStat(stats.NWaitGroupDone)
-			a.RWIns[goID] = append(a.RWIns[goID], theIns)
+			a.RWIns[a.fromPath][goID] = append(a.RWIns[a.fromPath][goID], theIns)
 			if !a.useNewPTA {
 				a.pta0Cfg.AddQuery(examIns.Call.Args[0])
 			}
@@ -494,9 +494,9 @@ func (a *analysis) insGo(examIns *ssa.Go, goID int, theIns ssa.Instruction) {
 	if len(a.workList) > 0 {
 		newGoID = a.workList[len(a.workList)-1].goID + 1
 	}
-	a.RWIns[goID] = append(a.RWIns[goID], theIns)
+	a.RWIns[a.fromPath][goID] = append(a.RWIns[a.fromPath][goID], theIns)
 	if goID == 0 && a.insDRA == 0 { // this is first *ssa.Go instruction in main goroutine
-		a.insDRA = len(a.RWIns[goID]) // race analysis will begin at this instruction
+		a.insDRA = len(a.RWIns[a.fromPath][goID]) // race analysis will begin at this instruction
 	}
 
 	var info = goroutineInfo{examIns, fnName, newGoID}
@@ -511,7 +511,7 @@ func (a *analysis) insGo(examIns *ssa.Go, goID int, theIns ssa.Instruction) {
 
 func (a *analysis) insMapUpdate(examIns *ssa.MapUpdate, goID int, theIns ssa.Instruction) {
 	stats.IncStat(stats.NStore)
-	a.RWIns[goID] = append(a.RWIns[goID], theIns)
+	a.RWIns[a.fromPath][goID] = append(a.RWIns[a.fromPath][goID], theIns)
 	a.updateLockMap(goID, theIns)
 	switch ptType := examIns.Map.(type) {
 	case *ssa.UnOp:
@@ -523,7 +523,7 @@ func (a *analysis) insMapUpdate(examIns *ssa.MapUpdate, goID int, theIns ssa.Ins
 }
 
 func (a *analysis) insSelect(examIns *ssa.Select, goID int, theIns ssa.Instruction) []string {
-	a.RWIns[goID] = append(a.RWIns[goID], theIns)
+	a.RWIns[a.fromPath][goID] = append(a.RWIns[a.fromPath][goID], theIns)
 	defaultCase := 0
 	if !examIns.Blocking { defaultCase++ } // non-blocking select
 	readyChans := make([]string, len(examIns.States) + defaultCase) // name of ready channels

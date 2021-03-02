@@ -16,7 +16,7 @@ import (
 )
 
 type analysis struct {
-	mu 				sync.Mutex
+	mu 				sync.RWMutex
 	useNewPTA    	bool //useNewPTA the new pta
 	useDefaultPTA	bool //use default go pta
 	result       	*pointer.Result //now can reuse the result
@@ -24,6 +24,7 @@ type analysis struct {
 	ptaConfig    	*pointer.Config
 	pta0Cfg			*pta0.Config
 
+	fromPath		string
 	prog            *ssa.Program
 	pkgs            []*ssa.Package
 	mains           []*ssa.Package
@@ -31,7 +32,8 @@ type analysis struct {
 	HBgraph         *graph.Graph
 	RWinsMap        map[goIns]graph.Node
 	trieMap         map[fnInfo]*trie 				// map each function to a trie node
-	RWIns           [][]ssa.Instruction
+	RWIns           map[string][][]ssa.Instruction
+	RWInsInd	    [][]ssa.Instruction
 	insDRA          int 							// index of instruction (in main goroutine) at which to begin data race analysis
 	storeIns        []string
 	workList        []goroutineInfo
@@ -71,10 +73,12 @@ type analysis struct {
 type AnalysisRunner struct {
 	mu    			sync.Mutex
 	Analysis 		*analysis
+	fromPath		string
 	prog 			*ssa.Program
 	pkgs 			[]*ssa.Package
 	ptaconfig 		*pointer.Config
 	pta0Cfg			*pta0.Config
+	ptaResult 		*pta0.Result
 	trieLimit		int      // set as user config option later, an integer that dictates how many times a function can be called under identical context
 	efficiency		bool // configuration setting to avoid recursion in tested program
 }
@@ -112,14 +116,13 @@ var (
 	testMode     = false // Used by race_test.go for collecting output.
 )
 
-var useNewPTA = true //bz: default value for this branch
+var useNewPTA = false
 var trieLimit = 2      // set as user config option later, an integer that dictates how many times a function can be called under identical context
 var efficiency = false // configuration setting to avoid recursion in tested program
 var channelComm = true // analyze channel communication
-var fromPath = ""      // interested packages are those located at this path
 var entryFn = "main"
 var allEntries = false
-var useDefaultPTA = false
+var useDefaultPTA = true
 
 func init() {
 	excludedPkgs = []string{
@@ -130,13 +133,13 @@ func init() {
 
 // main sets up arguments and calls staticAnalysis function
 func main() {//default: -useNewPTA
-	newPTA := flag.Bool("useNewPTA", true, "Use the new pointer analysis in go_tools.")
-	builtinPTA := flag.Bool("useDefaultPTA", false, "Use the built-in pointer analysis.")
+	newPTA := flag.Bool("useNewPTA", false, "Use the new pointer analysis in go_tools.")
+	builtinPTA := flag.Bool("useDefaultPTA", true, "Use the built-in pointer analysis.")
 	debug := flag.Bool("debug", true, "Prints log.Debug messages.")
 	lockOps := flag.Bool("lockOps", false, "Prints lock and unlock operations. ")
 	flag.BoolVar(&stats.CollectStats, "collectStats", false, "Collect analysis statistics.")
 	help := flag.Bool("help", false, "Show all command-line options.")
-	withoutComm := flag.Bool("withoutComm", true, "Show analysis results without communication consideration.")
+	withoutComm := flag.Bool("withoutComm", false, "Show analysis results without communication consideration.")
 	withComm := flag.Bool("withComm", false, "Show analysis results with communication consideration.")
 	analyzeAll := flag.Bool("analyzeAll", false, "Analyze all main() entry-points. ")
 	flag.Parse()
