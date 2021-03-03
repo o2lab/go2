@@ -347,6 +347,18 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		wg1.Wait()
 	}
 
+	if len(runner.Analysis.finalReport) > 0 {
+		raceCount := 0
+		for _, e := range runner.Analysis.finalReport {
+			log.Info(len(e.racePairs), " races found for ", e.entryInfo, "...")
+			for i, r := range e.racePairs {
+				runner.Analysis.printRace(i+1, r.insPair, r.addrPair, r.goIDs, r.insInd)
+				raceCount++
+			}
+		}
+		log.Info("Total of ", raceCount, " races found for all entry points. ")
+	}
+
 	return nil
 }
 

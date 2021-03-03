@@ -44,10 +44,12 @@ func (a *analysis) checkRacyPairs() []*raceInfo {
 								addrPair: 	addressPair,
 								goIDs: 		[]int{i, j},
 								insInd: 	[]int{ii, jj},
-								total: 		len(a.reportedAddr),
 							}
 							//a.mu.Lock()
-							a.printRace(len(a.reportedAddr), insSlice, addressPair, []int{i, j}, []int{ii, jj})
+							if !allEntries {
+								a.printRace(len(a.reportedAddr), insSlice, addressPair, []int{i, j}, []int{ii, jj})
+							}
+
 							//a.mu.Unlock()
 						}
 					}
@@ -269,21 +271,24 @@ func (a *analysis) printRace(counter int, insPair []ssa.Instruction, addrPair []
 		log.Print(errMsg)
 		var printStack []string // store functions in stack and pop terminated functions
 		var printPos []token.Pos
-		for p, everyIns := range a.RWInsInd[goIDs[i]] {
-			if p < insInd[i]-1 {
-				if isFunc, ok := everyIns.(*ssa.Call); ok {
-					printName := isFunc.Call.Value.Name()
-					printName = checkTokenName(printName, everyIns.(*ssa.Call))
-					printStack = append(printStack, printName)
-					printPos = append(printPos, everyIns.Pos())
-				} else if _, ok1 := everyIns.(*ssa.Return); ok1 && len(printStack) > 0 {
-					printStack = printStack[:len(printStack)-1]
-					printPos = printPos[:len(printPos)-1]
+		if !allEntries {
+			for p, everyIns := range a.RWInsInd[goIDs[i]] {
+				if p < insInd[i]-1 {
+					if isFunc, ok := everyIns.(*ssa.Call); ok {
+						printName := isFunc.Call.Value.Name()
+						printName = checkTokenName(printName, everyIns.(*ssa.Call))
+						printStack = append(printStack, printName)
+						printPos = append(printPos, everyIns.Pos())
+					} else if _, ok1 := everyIns.(*ssa.Return); ok1 && len(printStack) > 0 {
+						printStack = printStack[:len(printStack)-1]
+						printPos = printPos[:len(printPos)-1]
+					}
+				} else {
+					continue
 				}
-			} else {
-				continue
 			}
 		}
+
 		if len(printStack) > 0 {
 			log.Println("\tcalled by function[s]: ")
 			for p, toPrint := range printStack {

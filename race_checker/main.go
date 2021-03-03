@@ -76,7 +76,6 @@ type raceInfo struct {
 	addrPair 		[]ssa.Value
 	goIDs 			[]int
 	insInd 			[]int
-	total 			int
 }
 
 type raceReport struct {
