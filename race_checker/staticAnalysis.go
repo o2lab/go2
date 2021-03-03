@@ -324,7 +324,6 @@ func (runner *AnalysisRunner) Run(args []string) error {
 
 				if !allEntries { // no parallelization
 					runner.Analysis.racyStackTops = analysisData.racyStackTops
-					log.Info("Done for entry at " + main.Pkg.Path())
 				}
 				runner.Analysis.finalReport = append(runner.Analysis.finalReport, rr)
 				runner.mu.Unlock()
@@ -347,17 +346,22 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		wg1.Wait()
 	}
 
-	if len(runner.Analysis.finalReport) > 0 {
-		raceCount := 0
-		for _, e := range runner.Analysis.finalReport {
+	raceCount := 0
+	for _, e := range runner.Analysis.finalReport {
+		if len(e.racePairs) > 0 && e.racePairs[0] != nil {
 			log.Info(len(e.racePairs), " races found for ", e.entryInfo, "...")
 			for i, r := range e.racePairs {
-				runner.Analysis.printRace(i+1, r.insPair, r.addrPair, r.goIDs, r.insInd)
-				raceCount++
+				if r != nil {
+					runner.Analysis.printRace(i+1, r.insPair, r.addrPair, r.goIDs, r.insInd)
+					raceCount++
+				}
 			}
+		} else {
+			log.Info("No races found for ", e.entryInfo, "...")
 		}
-		log.Info("Total of ", raceCount, " races found for all entry points. ")
 	}
+	log.Info("Total of ", raceCount, " races found for all entry points. ")
+
 
 	return nil
 }
@@ -463,10 +467,6 @@ func (runner *AnalysisRunner) runWithEntryPoint(main *ssa.Package) *raceReport {
 	}
 
 	rr.racePairs = analysisData.checkRacyPairs()
-
-	if !allEntries {
-		log.Info("Done for entry at " + main.Pkg.Path())
-	}
 
 	runner.Analysis = analysisData
 	runner.mu.Unlock()
