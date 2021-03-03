@@ -139,10 +139,15 @@ func main() {//default: -useNewPTA
 	lockOps := flag.Bool("lockOps", false, "Prints lock and unlock operations. ")
 	flag.BoolVar(&stats.CollectStats, "collectStats", false, "Collect analysis statistics.")
 	help := flag.Bool("help", false, "Show all command-line options.")
-	withoutComm := flag.Bool("withoutComm", false, "Show analysis results without communication consideration.")
+	withoutComm := flag.Bool("withoutComm", true, "Show analysis results without communication consideration.")
 	withComm := flag.Bool("withComm", false, "Show analysis results with communication consideration.")
 	analyzeAll := flag.Bool("analyzeAll", false, "Analyze all main() entry-points. ")
+	runTest := flag.Bool("runTest", false, "For micro-benchmark debugging... ")
 	flag.Parse()
+	if *runTest {
+		efficiency = false
+		trieLimit = 2
+	}
 	if *help {
 		flag.PrintDefaults()
 		return

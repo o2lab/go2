@@ -5,7 +5,6 @@ import (
 	"github.com/logrusorgru/aurora"
 	log "github.com/sirupsen/logrus"
 	"github.com/twmb/algoimpl/go/graph"
-	pta0 "github.tamu.edu/April1989/go_tools/go/pointer_default"
 	"github.tamu.edu/April1989/go_tools/go/ssa"
 	"go/token"
 	"regexp"
@@ -113,15 +112,18 @@ func (a *analysis) sameAddress(addr1 ssa.Value, addr2 ssa.Value) bool {
 	}
 	// check points-to set to see if they can point to the same object
 	if useDefaultPTA {
-		a.pta0Cfg.AddQuery(addr1)
-		a.pta0Cfg.AddQuery(addr2)
-		result, _ := pta0.Analyze(a.pta0Cfg)
-		a.pta0Result = result
+		//a.pta0Cfg.AddQuery(addr1)
+		//a.pta0Cfg.AddQuery(addr2)
+		//result, _ := pta0.Analyze(a.pta0Cfg)
+		//a.pta0Result = result
 		ptsets := a.pta0Result.Queries
 		//a.mu.Lock()
-		res := ptsets[addr1].PointsTo().Intersects(ptsets[addr2].PointsTo())
+		//if ptsets[addr1].PointsTo().Intersects(ptsets[addr2].PointsTo()) {
+		//	fmt.Println(a.prog.Fset.Position(addr1.Pos()))
+		//	fmt.Println(a.prog.Fset.Position(addr2.Pos()))
+		//}
+		return ptsets[addr1].PointsTo().Intersects(ptsets[addr2].PointsTo())
 		//a.mu.Unlock()
-		return res
 	}
 	ptset1 := a.result.Queries[addr1]
 	ptset2 := a.result.Queries[addr2]
@@ -267,7 +269,6 @@ func (a *analysis) printRace(counter int, insPair []ssa.Instruction, addrPair []
 		if testMode {
 			colorOutput := regexp.MustCompile(`\x1b\[\d+m`)
 			a.racyStackTops = append(a.racyStackTops, colorOutput.ReplaceAllString(errMsg, ""))
-			fmt.Println(a.racyStackTops)
 		}
 		log.Print(errMsg)
 		var printStack []string // store functions in stack and pop terminated functions

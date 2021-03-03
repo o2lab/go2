@@ -335,7 +335,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 					entryInfo: main.Pkg.Path(),
 				}
 				rr.racePairs = analysisData.checkRacyPairs()
-				fmt.Println(analysisData.fromPath, rr.racePairs[0])
+				runner.Analysis.racyStackTops = analysisData.racyStackTops
 
 				if !allEntries {
 					log.Info("Done for entry at " + main.Pkg.Path())
@@ -344,7 +344,6 @@ func (runner *AnalysisRunner) Run(args []string) error {
 			}(m)
 		}
 		wg.Wait()
-		fmt.Println(finalReport[0].racePairs[0])
 	} else {
 		var wg1 sync.WaitGroup
 		var finalReport []*raceReport

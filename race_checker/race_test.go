@@ -242,7 +242,6 @@ func runChecker(t *testing.T, filenames []string) ([]*ast.File, []error) {
 	for _, msg := range runner.Analysis.racyStackTops {
 		raceErrors = append(raceErrors, fmt.Errorf(msg))
 	}
-
 	return files, raceErrors
 }
 
