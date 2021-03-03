@@ -68,6 +68,21 @@ type analysis struct {
 	ifSuccEnd       map[ssa.Instruction]*ssa.Return // map ending of successor block to final return statement
 	commIfSucc      []ssa.Instruction               // store first ins of succ block that contains channel communication
 	omitComm        []*ssa.BasicBlock               // omit these blocks as they are race-free due to channel communication
+	finalReport		[]*raceReport
+}
+
+type raceInfo struct {
+	insPair 		[]ssa.Instruction
+	addrPair 		[]ssa.Value
+	goIDs 			[]int
+	insInd 			[]int
+	total 			int
+}
+
+type raceReport struct {
+	entryInfo		string
+	racePairs		[]*raceInfo
+	noGoroutines	int
 }
 
 type AnalysisRunner struct {
@@ -112,13 +127,12 @@ type trie struct {
 
 var (
 	excludedPkgs []string
-	nonMainPkgs  []string
 	testMode     = false // Used by race_test.go for collecting output.
 )
 
 var useNewPTA = false
-var trieLimit = 2      // set as user config option later, an integer that dictates how many times a function can be called under identical context
-var efficiency = false // configuration setting to avoid recursion in tested program
+var trieLimit = 1      // set as user config option later, an integer that dictates how many times a function can be called under identical context
+var efficiency = true // configuration setting to avoid recursion in tested program
 var channelComm = true // analyze channel communication
 var entryFn = "main"
 var allEntries = false
@@ -139,7 +153,7 @@ func main() {//default: -useNewPTA
 	lockOps := flag.Bool("lockOps", false, "Prints lock and unlock operations. ")
 	flag.BoolVar(&stats.CollectStats, "collectStats", false, "Collect analysis statistics.")
 	help := flag.Bool("help", false, "Show all command-line options.")
-	withoutComm := flag.Bool("withoutComm", true, "Show analysis results without communication consideration.")
+	withoutComm := flag.Bool("withoutComm", false, "Show analysis results without communication consideration.")
 	withComm := flag.Bool("withComm", false, "Show analysis results with communication consideration.")
 	analyzeAll := flag.Bool("analyzeAll", false, "Analyze all main() entry-points. ")
 	runTest := flag.Bool("runTest", false, "For micro-benchmark debugging... ")
@@ -167,13 +181,9 @@ func main() {//default: -useNewPTA
 		log.SetLevel(log.TraceLevel)
 	}
 	if *withoutComm {
-		trieLimit = 1
-		efficiency = true
 		channelComm = false
 	}
 	if *withComm {
-		trieLimit = 1
-		efficiency = true
 		channelComm = true
 	}
 	if *analyzeAll {

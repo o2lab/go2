@@ -148,20 +148,6 @@ func pkgSelection(initial []*packages.Package) ([]*ssa.Package, *ssa.Program, []
 	return mains, prog, pkgs
 }
 
-type raceInfo struct {
-	insPair 		[]ssa.Instruction
-	addrPair 		[]ssa.Value
-	goIDs 			[]int
-	insInd 			[]int
-	total 			int
-}
-
-type raceReport struct {
-	entryInfo		string
-	racePairs		[]*raceInfo
-	noGoroutines	int
-}
-
 func (runner *AnalysisRunner) Run(args []string) error {
 	cfg := &packages.Config{
 		Mode:  packages.LoadAllSyntax, // the level of information returned for each package
@@ -188,7 +174,6 @@ func (runner *AnalysisRunner) Run(args []string) error {
 
 	if useDefaultPTA {
 		var wg sync.WaitGroup
-		var finalReport []*raceReport
 		runner.pta0Cfg = &pta0.Config{
 			Mains:          mains,
 			BuildCallGraph: false,
@@ -269,7 +254,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 				if !allEntries {
 					log.Info("Building Happens-Before graph... ")
 				}
-
+				runner.mu.Lock()
 				analysisData := &analysis{
 					useDefaultPTA:  runner.Analysis.useDefaultPTA,
 					pta0Result: 	runner.Analysis.pta0Result,
@@ -336,23 +321,26 @@ func (runner *AnalysisRunner) Run(args []string) error {
 					entryInfo: main.Pkg.Path(),
 				}
 				rr.racePairs = analysisData.checkRacyPairs()
-				runner.Analysis.racyStackTops = analysisData.racyStackTops
 
-				if !allEntries {
+				if !allEntries { // no parallelization
+					runner.Analysis.racyStackTops = analysisData.racyStackTops
 					log.Info("Done for entry at " + main.Pkg.Path())
 				}
-				finalReport = append(finalReport, rr)
+				runner.Analysis.finalReport = append(runner.Analysis.finalReport, rr)
+				runner.mu.Unlock()
 			}(m)
 		}
 		wg.Wait()
-	} else {
+	} else { // TODO: for new PTA
 		var wg1 sync.WaitGroup
 		var finalReport []*raceReport
 		for _, m := range mains {
 			wg1.Add(1)
 			go func(main *ssa.Package) {
+				runner.mu.Lock()
 				goReport := runner.runWithEntryPoint(main)
 				finalReport = append(finalReport, goReport)
+				runner.mu.Unlock()
 				wg1.Done()
 			}(m)
 		}
@@ -370,6 +358,7 @@ func (runner *AnalysisRunner) runWithEntryPoint(main *ssa.Package) *raceReport {
 	if useNewPTA {
 		result = runner.runEachMainBaseline(main)
 	}
+	runner.mu.Lock()
 	analysisData := &analysis{
 		useNewPTA:       useNewPTA,
 		result: 		 result,
@@ -468,6 +457,7 @@ func (runner *AnalysisRunner) runWithEntryPoint(main *ssa.Package) *raceReport {
 	}
 
 	runner.Analysis = analysisData
+	runner.mu.Unlock()
 	return rr
 }
 
