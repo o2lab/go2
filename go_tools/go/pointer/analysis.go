@@ -44,6 +44,12 @@ const (
 	otFunction             // function object
 )
 
+var ( //bz: my performance
+	maxTime time.Duration
+	minTime time.Duration
+	total   int64
+)
+
 // An object represents a contiguous block of memory to which some
 // (generalized) pointer may point.
 //
@@ -131,7 +137,7 @@ type analysis struct {
 	atFuncs     map[*ssa.Function]bool      // address-taken functions (for presolver)
 	mapValues   []nodeid                    // values of makemap objects (indirect in HVN)
 	work        nodeset                     // solver's worklist
-	//result      *Result                     // results of the analysis
+	//result      *Result                     // results of the analysis: default
 	track      track // pointerlike types whose aliasing we track
 	deltaSpace []int // working space for iterating over PTS deltas
 
@@ -257,6 +263,104 @@ func translateQueries(val ssa.Value, id nodeid, cgn *cgnode, result *Result, _re
 	}
 }
 
+//bz: user api, to analyze multiple mains
+func AnalyzeMultiMains(config *Config) (results map[*ssa.Package]*Result, err error) {
+	if config.Mains == nil {
+		return nil, fmt.Errorf("no main/test packages to analyze (check $GOROOT/$GOPATH)")
+	}
+	defer func() {
+		if p := recover(); p != nil {
+			err = fmt.Errorf("internal error in pointer analysis: %v (please report this bug)", p)
+			fmt.Fprintln(os.Stderr, "Internal panic in pointer analysis:")
+			debug.PrintStack()
+		}
+	}()
+
+	assert(len(config.Mains) > 1, "This API is for analyzing MULTIPLE mains. If analyzing one main, please use pointer.Analyze().")
+	maxTime = 0
+	minTime = 1000000000
+
+	var mode string //which pta is running
+	if config.Origin {
+		mode = strconv.Itoa(config.K) + "-ORIGIN-SENSITIVE"
+	} else if config.CallSiteSensitive {
+		mode = strconv.Itoa(config.K) + "-CFA"
+	} else {
+		mode = "CONTEXT-INSENSITIVE"
+	}
+	fmt.Println(" *** MODE: " + mode + " *** ")
+	fmt.Println(" *** Analyze Scope ***************** ")
+	if len(config.Scope) > 0 {
+		for _, pkg := range config.Scope {
+			fmt.Println(" - " + pkg)
+		}
+	}
+	fmt.Println(" *********************************** ")
+	fmt.Println(" *** Level: " + strconv.Itoa(config.Level) + " *** ")
+	//bz: change to default, remove flags
+	fmt.Println(" *** Use Queries/IndirectQueries *** ")
+	fmt.Println(" *** Use Default Queries API *** ")
+	if config.TrackMore {
+		fmt.Println(" *** Track All Types *** ")
+	} else {
+		fmt.Println(" *** Default Type Tracking (skip basic types) *** ")
+	}
+
+	fmt.Println(" *** Multiple Mains **************** ")
+	for i, main := range config.Mains {
+		//create a config
+		var _mains []*ssa.Package
+		_mains = append(_mains, main)
+		_config := &Config{
+			Mains:          _mains,
+			Reflection:     config.Reflection,
+			BuildCallGraph: config.BuildCallGraph,
+			Log:            config.Log,
+			//CallSiteSensitive: true, //kcfa
+			Origin: config.Origin, //origin
+			//shared config
+			K:             config.K,
+			LimitScope:    config.LimitScope, //bz: only consider app methods now -> no import will be considered
+			DEBUG:         config.DEBUG,      //bz: rm all printed out info in console
+			Scope:         config.Scope,      //bz: analyze scope + input path
+			Exclusion:     config.Exclusion,  //bz: copied from race_checker if any
+			TrackMore:     config.TrackMore,  //bz: track pointers with all types
+			Level:         config.Level,      //bz: see pointer.Config
+			DoPerformance: config.DoPerformance,
+		}
+
+		//we initially run the analysis
+		start := time.Now()
+		_result, err := AnalyzeWCtx(_config, false)
+		if err != nil {
+			return nil, err
+		}
+
+		translateResult(_result, main)
+		elapse := time.Now().Sub(start)
+		if maxTime < elapse {
+			maxTime = elapse
+		}
+		if minTime > elapse {
+			minTime = elapse
+		}
+		total = total + elapse.Milliseconds()
+
+		//performance
+		fmt.Println(strconv.Itoa(i)+": "+main.String(), " (use "+elapse.String()+")")
+	}
+	fmt.Println(" *********************************** ")
+
+	//bz: i want this...
+	fmt.Println("Total: ", (time.Duration(total)*time.Millisecond).String()+".")
+	fmt.Println("Max: ", maxTime.String()+".")
+	fmt.Println("Min: ", minTime.String()+".")
+	fmt.Println("Avg: ", float32(total)/float32(len(config.Mains))/float32(1000), "s.")
+
+	results = main2Analysis
+	return results, nil
+}
+
 //bz: change to default api
 //but result does not include call graph (a.result.CallGraph),
 //since the type does not match and race checker also does not use this
@@ -279,41 +383,12 @@ func Analyze(config *Config) (result *Result, err error) {
 	}
 
 	//we initially run the analysis
-	_result, err := AnalyzeWCtx(config)
+	_result, err := AnalyzeWCtx(config, true)
 	if err != nil {
 		return nil, err
 	}
-	//translate to default return value
-	result = &Result{
-		Queries:         make(map[ssa.Value][]PointerWCtx),
-		IndirectQueries: make(map[ssa.Value][]PointerWCtx),
-	}
 
-	//go through each cgnode
-	callgraph := _result.CallGraph
-	fns := callgraph.Fn2CGNode
-	for _, cgns := range fns {
-		for _, cgn := range cgns {
-			for val, id := range cgn.localval {
-				translateQueries(val, id, cgn, result, _result)
-			}
-
-			for obj, id := range cgn.localobj {
-				translateQueries(obj, id, cgn, result, _result)
-			}
-		}
-	}
-	for val, id := range _result.a.globalval {
-		translateQueries(val, id, nil, result, _result)
-	}
-	for obj, id := range _result.a.globalobj {
-		translateQueries(obj, id, nil, result, _result)
-	}
-
-	main2Analysis = make(map[*ssa.Package]*Result)
-	main2Analysis[main] = result
-	result.a = _result.a
-
+	result = translateResult(_result, main)
 	return result, nil
 }
 
@@ -324,7 +399,7 @@ func Analyze(config *Config) (result *Result, err error) {
 // Pointer analysis of a transitively closed well-typed program should
 // always succeed.  An error can occur only due to an internal bug.
 //
-func AnalyzeWCtx(config *Config) (result *ResultWCtx, err error) { //Result
+func AnalyzeWCtx(config *Config, printConfig bool) (result *ResultWCtx, err error) { //Result
 	if config.Mains == nil {
 		return nil, fmt.Errorf("no main/test packages to analyze (check $GOROOT/$GOPATH)")
 	}
@@ -365,65 +440,70 @@ func AnalyzeWCtx(config *Config) (result *ResultWCtx, err error) { //Result
 		a.log = os.Stderr // for debugging crashes; extremely verbose
 	}
 
-	var mode string //which pta is running
-	if a.config.Origin {
-		mode = strconv.Itoa(a.config.K) + "-ORIGIN-SENSITIVE"
-	} else if a.config.CallSiteSensitive {
-		mode = strconv.Itoa(a.config.K) + "-CFA"
-	} else {
-		mode = "CONTEXT-INSENSITIVE"
-	}
-
 	UpdateDEBUG(a.config.DEBUG) //in pointer/callgraph, print out info changes
 
-	//update analysis scope: +
+	//update analysis import
 	imports := a.config.Mains[0].Pkg.Imports()
 	if len(imports) > 0 {
 		for _, _import := range imports {
 			a.config.imports = append(a.config.imports, _import.Name())
 		}
 	}
-	fmt.Println(" *** MODE: " + mode + " *** ")
-	fmt.Println(" *** Analyze Scope ***************** ")
-	if len(a.config.Scope) > 0 {
-		for _, pkg := range a.config.Scope {
-			fmt.Println(" - " + pkg)
+
+	if printConfig {
+		var mode string //which pta is running
+		if a.config.Origin {
+			mode = strconv.Itoa(a.config.K) + "-ORIGIN-SENSITIVE"
+		} else if a.config.CallSiteSensitive {
+			mode = strconv.Itoa(a.config.K) + "-CFA"
+		} else {
+			mode = "CONTEXT-INSENSITIVE"
 		}
-	}
-	fmt.Println(" *********************************** ")
-	fmt.Println(" *** Import Libs ******************* ")
-	if len(a.config.imports) > 0 {
-		for _, pkg := range a.config.imports {
-			fmt.Print(pkg + ", ")
-		}
-		fmt.Println()
-	}
-	fmt.Println(" *********************************** ")
-	if len(a.config.Mains) > 1 {
-		fmt.Println(" *** Multiple Mains **************** ")
-		for i, main := range a.config.Mains {
-			fmt.Println(strconv.Itoa(i) + ": " + main.String())
+		fmt.Println(" *** MODE: " + mode + " *** ")
+		fmt.Println(" *** Analyze Scope ***************** ")
+		if len(a.config.Scope) > 0 {
+			for _, pkg := range a.config.Scope {
+				fmt.Println(" - " + pkg)
+			}
 		}
 		fmt.Println(" *********************************** ")
-	}
-	fmt.Println(" *** Level: " + strconv.Itoa(a.config.Level) + " *** ")
-	//bz: change to default, remove flags
-	fmt.Println(" *** Use Queries/IndirectQueries *** ")
-	fmt.Println(" *** Use Default Queries API *** ")
-	if a.config.TrackMore {
-		fmt.Println(" *** Track Types in Scope *** ")
-	} else {
-		fmt.Println(" *** Default Type Tracking *** ")
-	}
-	if optRenumber {
-		fmt.Println(" *** optRenumber ON *** ")
-	} else {
-		fmt.Println(" *** optRenumber OFF *** ")
-	}
-	if optHVN {
-		fmt.Println(" *** optHVN ON *** ")
-	} else {
-		fmt.Println(" *** optHVN OFF *** ")
+		fmt.Println(" *** Import Libs ******************* ")
+		if len(a.config.imports) > 0 {
+			for _, pkg := range a.config.imports {
+				fmt.Print(pkg + ", ")
+			}
+			fmt.Println()
+		}
+		fmt.Println(" *********************************** ")
+		if len(a.config.Mains) > 1 {
+			fmt.Println(" *** Multiple Mains **************** ")
+			for i, main := range a.config.Mains {
+				fmt.Println(strconv.Itoa(i) + ": " + main.String())
+			}
+			fmt.Println(" *********************************** ")
+		}
+		fmt.Println(" *** Level: " + strconv.Itoa(a.config.Level) + " *** ")
+		//bz: change to default, remove flags
+		fmt.Println(" *** Use Queries/IndirectQueries *** ")
+		fmt.Println(" *** Use Default Queries API *** ")
+		if a.config.TrackMore {
+			fmt.Println(" *** Track All Types *** ")
+		} else {
+			fmt.Println(" *** Default Type Tracking (skip basic types) *** ")
+		}
+
+		if config.DoPerformance { //bz: this is from my main, i want them to print out
+			if optRenumber {
+				fmt.Println(" *** optRenumber ON *** ")
+			} else {
+				fmt.Println(" *** optRenumber OFF *** ")
+			}
+			if optHVN {
+				fmt.Println(" *** optHVN ON *** ")
+			} else {
+				fmt.Println(" *** optHVN OFF *** ")
+			}
+		}
 	}
 
 	if a.log != nil {
@@ -573,6 +653,43 @@ func AnalyzeWCtx(config *Config) (result *ResultWCtx, err error) { //Result
 	}
 
 	return a.result, nil
+}
+
+//bz: translate to default return value, and update main2Analysis
+func translateResult(_result *ResultWCtx, main *ssa.Package) *Result {
+	result := &Result{
+		Queries:         make(map[ssa.Value][]PointerWCtx),
+		IndirectQueries: make(map[ssa.Value][]PointerWCtx),
+	}
+
+	//go through each cgnode
+	callgraph := _result.CallGraph
+	fns := callgraph.Fn2CGNode
+	for _, cgns := range fns {
+		for _, cgn := range cgns {
+			for val, id := range cgn.localval {
+				translateQueries(val, id, cgn, result, _result)
+			}
+
+			for obj, id := range cgn.localobj {
+				translateQueries(obj, id, cgn, result, _result)
+			}
+		}
+	}
+	for val, id := range _result.a.globalval {
+		translateQueries(val, id, nil, result, _result)
+	}
+	for obj, id := range _result.a.globalobj {
+		translateQueries(obj, id, nil, result, _result)
+	}
+
+	if main2Analysis == nil {
+		main2Analysis = make(map[*ssa.Package]*Result)
+	}
+	main2Analysis[main] = result
+	result.a = _result.a
+
+	return result
 }
 
 //bz: used in race_checker

@@ -9,6 +9,7 @@ package pointer
 
 import (
 	"fmt"
+	"github.tamu.edu/April1989/go_tools/flags"
 	"go/types"
 )
 
@@ -24,6 +25,13 @@ func (a *analysis) solve() {
 		a.num_constraints = 0
 		fmt.Println("#constraints (before solve()): ", len(a.constraints))
 		fmt.Println("#cgnodes (before solve()): ", len(a.cgnodes))
+
+		if flags.PrintCGNodes { //bz: debug
+			fmt.Println("\nDump cgnodes (before solve()): ")
+			for i, cgn := range a.cgnodes {
+				fmt.Println(i, ". ", cgn.String())
+			}
+		}
 	}
 
 	start("Solving")
@@ -104,6 +112,10 @@ func (a *analysis) processNewConstraints() {
 	// (May grow during call to solveConstraints.)
 	if a.config.DoPerformance && len(a.constraints) > 0 {
 		a.num_constraints = a.num_constraints + len(a.constraints)
+		//if len(a.constraints) > 0 { //bz: debug: changed
+		//	fmt.Println("#constraints (during solve()): ", a.num_constraints)
+		//	fmt.Println("#cgnodes (during solve()): ", len(a.cgnodes))
+		//}
 	}
 	constraints := a.constraints
 	a.constraints = nil
@@ -211,7 +223,7 @@ func (a *analysis) addWork(id nodeid) {
 	if a.log != nil {
 		if Online {
 			fmt.Fprintf(a.log, "\t\tadd to work (online): n%d\n", id)
-		}else{
+		} else {
 			fmt.Fprintf(a.log, "\t\tadd to work: n%d\n", id)
 		}
 	}
@@ -356,7 +368,7 @@ func (c *invokeConstraint) solve(a *analysis, delta *nodeset) {
 		sig := fn.Signature
 		fnObj := a.globalobj[fn] // dynamic calls use shared contour  ---> bz: fnObj is nodeid
 
-		if fnObj == 0 {//bz: because a.objectNode(fn) was not called during gen phase.
+		if fnObj == 0 { //bz: because a.objectNode(fn) was not called during gen phase.
 			if a.log != nil { //debug
 				fmt.Fprintf(a.log, "\n\n------------- GENERATING INVOKE FUNC HERE: "+fn.String()+" ------------------------------ \n")
 			}
@@ -367,7 +379,7 @@ func (c *invokeConstraint) solve(a *analysis, delta *nodeset) {
 						fmt.Println("!! GENERATING INVOKE FUNC ONLINE (share contour): " + fn.String())
 					}
 					fnObj = a.genInvokeOnline(nil, nil, fn)
-				} else { 	//bz: special handling of invoke targets, create here
+				} else { //bz: special handling of invoke targets, create here
 					if a.config.DEBUG {
 						fmt.Println("!! GENERATING INVOKE FUNC ONLINE (ctx-sensitive): " + fn.String())
 					}
@@ -380,7 +392,7 @@ func (c *invokeConstraint) solve(a *analysis, delta *nodeset) {
 					}
 					continue
 				}
-				fnObj = a.genInvokeOnline(nil, nil, fn)
+				fnObj = a.genInvokeOnline(nil, nil, fn) //bz: if reaches here, fn can only be lib from import
 			}
 			if a.log != nil { //debug
 				fmt.Fprintf(a.log, "------------------------------ ------------------------------ ---------------------------- \n")
@@ -398,7 +410,7 @@ func (c *invokeConstraint) solve(a *analysis, delta *nodeset) {
 			}
 		} else {
 			if a.log != nil { //debug
-				fmt.Fprintf(a.log, "!! ALREADY EXIST INVOKE FUNC: " + fn.String()+"\n")
+				fmt.Fprintf(a.log, "!! ALREADY EXIST INVOKE FUNC: "+fn.String()+"\n")
 			}
 		}
 		// bz: back to normal workflow -> context-insensitive

@@ -450,6 +450,7 @@ func (a *analysis) showCounts() {
 			counts[reflect.TypeOf(c)]++
 		}
 		fmt.Fprintf(a.log, "# constraints:\t%d\n", len(a.constraints))
+
 		var lines []string
 		for t, n := range counts {
 			line := fmt.Sprintf("%7d  (%2d%%)\t%s", n, 100*n/len(a.constraints), t)
@@ -469,4 +470,30 @@ func (a *analysis) showCounts() {
 		}
 		fmt.Fprintf(a.log, "# ptsets:\t%d\n", len(m))
 	}
+
+	//bz: add showcount to console
+	counts := make(map[reflect.Type]int)
+	for _, c := range a.constraints {
+		counts[reflect.TypeOf(c)]++
+	}
+	fmt.Println("# constraints:\t%d\n", len(a.constraints))
+
+	var lines []string
+	for t, n := range counts {
+		line := fmt.Sprintf("%7d  (%2d%%)\t%s", n, 100*n/len(a.constraints), t)
+		lines = append(lines, line)
+	}
+	sort.Sort(sort.Reverse(sort.StringSlice(lines)))
+	for _, line := range lines {
+		fmt.Println("\t%s\n", line)
+	}
+
+	fmt.Println("# nodes:\t%d\n", len(a.nodes))
+
+	// Show number of pointer equivalence classes.
+	m := make(map[*solverState]bool)
+	for _, n := range a.nodes {
+		m[n.solve] = true
+	}
+	fmt.Println("# ptsets:\t%d\n", len(m))
 }
