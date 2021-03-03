@@ -236,8 +236,6 @@ func (runner *AnalysisRunner) Run(args []string) error {
 				runner.Analysis.fromPath = m.Pkg.Path()
 			} else if efficiency && !allEntries { // an entry point was selected by user
 				runner.Analysis.fromPath = runner.fromPath
-			} else { // running tests
-				runner.Analysis.fromPath = m.Pkg.Path()
 			}
 			if !allEntries {
 				log.Info("Compiling stack trace for every Goroutine... ")
@@ -304,6 +302,9 @@ func (runner *AnalysisRunner) Run(args []string) error {
 					commIfSucc: 	runner.Analysis.commIfSucc,
 					omitComm:   	runner.Analysis.omitComm,
 					racyStackTops: 	runner.Analysis.racyStackTops,
+				}
+				if !efficiency { // running test
+					analysisData.fromPath = runner.Analysis.fromPath
 				}
 
 				analysisData.RWInsInd = analysisData.RWIns[analysisData.fromPath]
