@@ -339,8 +339,8 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		for _, m := range mains {
 			wg1.Add(1)
 			go func(main *ssa.Package) {
-				runner.mu.Lock()
 				goReport := runner.runWithEntryPoint(main)
+				runner.mu.Lock()
 				finalReport = append(finalReport, goReport)
 				runner.mu.Unlock()
 				wg1.Done()

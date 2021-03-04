@@ -1,0 +1,70 @@
+[36mINFO[0m[02:17:38] Loading input packages...                    
+[36mINFO[0m[02:17:40] Done  -- 1 packages detected.                
+[36mINFO[0m[02:17:40] Building SSA code for entire program...      
+[36mINFO[0m[02:17:40] Done  -- SSA code built. 1 packages and 4974 functions detected.  
+[36mINFO[0m[02:17:41] Compiling stack trace for every Goroutine...  
+[37mDEBU[0m[02:17:41] -----------------------------------Stack trace begins----------------------------------- 
+[37mDEBU[0m[02:17:41] PUSH main at lvl 0                           
+[37mDEBU[0m[02:17:41]  PUSH TestGrpc3090 at lvl 1                  
+[37mDEBU[0m[02:17:41]   spawning Goroutine ----->  TestGrpc3090$1  
+[37mDEBU[0m[02:17:41]  POP  TestGrpc3090 at lvl 1                  
+[37mDEBU[0m[02:17:41] POP  main at lvl 0                           
+[37mDEBU[0m[02:17:41] -----------------------------------Goroutine TestGrpc3090$1-----------------------------------[1] 
+[37mDEBU[0m[02:17:41] PUSH TestGrpc3090$1 at lvl 0                 
+[37mDEBU[0m[02:17:41]  PUSH Dial at lvl 1                          
+[37mDEBU[0m[02:17:41]   PUSH DialContext at lvl 2                  
+[37mDEBU[0m[02:17:41]    PUSH newCCResolverWrapper at lvl 3        
+[37mDEBU[0m[02:17:41]     PUSH Build at lvl 4                      
+[37mDEBU[0m[02:17:41]      PUSH UpdateState at lvl 5               
+[37mDEBU[0m[02:17:42]       PUSH UpdateState at lvl 6              
+[37mDEBU[0m[02:17:42]        PUSH poll at lvl 7                    
+[37mDEBU[0m[02:17:42]         spawning Goroutine ----->  poll$1    
+[37mDEBU[0m[02:17:42]        POP  poll at lvl 7                    
+[37mDEBU[0m[02:17:42]       POP  UpdateState at lvl 6              
+[37mDEBU[0m[02:17:42]      POP  UpdateState at lvl 5               
+[37mDEBU[0m[02:17:42]     POP  Build at lvl 4                      
+[37mDEBU[0m[02:17:42]    POP  newCCResolverWrapper at lvl 3        
+[37mDEBU[0m[02:17:42]   POP  DialContext at lvl 2                  
+[37mDEBU[0m[02:17:42]  POP  Dial at lvl 1                          
+[37mDEBU[0m[02:17:42] POP  TestGrpc3090$1 at lvl 0                 
+[37mDEBU[0m[02:17:42] -----------------------------------Goroutine poll$1-----------------------------------[2] 
+[37mDEBU[0m[02:17:42] PUSH poll$1 at lvl 0                         
+[37mDEBU[0m[02:17:42]  PUSH resolveNow at lvl 1                    
+[37mDEBU[0m[02:17:42]   PUSH ResolveNow at lvl 2                   
+[37mDEBU[0m[02:17:42]   POP  ResolveNow at lvl 2                   
+[37mDEBU[0m[02:17:42]  POP  resolveNow at lvl 1                    
+[37mDEBU[0m[02:17:42] POP  poll$1 at lvl 0                         
+[37mDEBU[0m[02:17:42] -----------------------------------Stack trace ends----------------------------------- 
+[36mINFO[0m[02:17:42] Done  -- 1 goroutines analyzed! 3 instructions of interest detected!  
+[36mINFO[0m[02:17:42] Building Happens-Before graph...             
+[36mINFO[0m[02:17:42] Done  -- Happens-Before graph built          
+[36mINFO[0m[02:17:42] Checking for data races...                   
+[36mINFO[0m[02:17:42] Data race #1                                 
+[36mINFO[0m[02:17:42] ==================================================================================================== 
+[36mINFO[0m[02:17:42]  Write of [35m&t3.resolver [#1][0m in function [92mnewCCResolverWrapper[0m at /home/yiqingzhao94/Downloads/research/go2/race_checker/tests/GoBench/Grpc/3090/main.go:63:6 
+[36mINFO[0m[02:17:42] 	called by function[s]:                      
+[36mINFO[0m[02:17:42] 	   Dial /home/yiqingzhao94/Downloads/research/go2/race_checker/tests/GoBench/Grpc/3090/main.go:97:7 
+[36mINFO[0m[02:17:42] 	    DialContext /home/yiqingzhao94/Downloads/research/go2/race_checker/tests/GoBench/Grpc/3090/main.go:89:13 
+[36mINFO[0m[02:17:42] 	     newCCResolverWrapper /home/yiqingzhao94/Downloads/research/go2/race_checker/tests/GoBench/Grpc/3090/main.go:86:22 
+[36mINFO[0m[02:17:42] 	      command-line-arguments.Builder /home/yiqingzhao94/Downloads/research/go2/race_checker/tests/GoBench/Grpc/3090/main.go:63:42 
+[36mINFO[0m[02:17:42] 	in goroutine  *** TestGrpc3090$1 [ 1 ] *** , with the following call stack:  
+[36mINFO[0m[02:17:42] 	   --> Goroutine:  main [ 0 ]               
+[36mINFO[0m[02:17:42] 	       TestGrpc3090                         
+[36mINFO[0m[02:17:42]  Read of [35m&ccr.resolver [#1][0m in function [92mresolveNow[0m at /home/yiqingzhao94/Downloads/research/go2/race_checker/tests/GoBench/Grpc/3090/main.go:43:18 
+[36mINFO[0m[02:17:42] 	called by function[s]:                      
+[36mINFO[0m[02:17:42] 	   resolveNow /home/yiqingzhao94/Downloads/research/go2/race_checker/tests/GoBench/Grpc/3090/main.go:52:17 
+[36mINFO[0m[02:17:42] 	in goroutine  *** poll$1 [ 2 ] *** , with the following call stack:  
+[36mINFO[0m[02:17:42] 	   --> Goroutine:  main [ 0 ]               
+[36mINFO[0m[02:17:42] 	       TestGrpc3090                         
+[36mINFO[0m[02:17:42] 	    --> Goroutine:  TestGrpc3090$1 [ 1 ]    
+[36mINFO[0m[02:17:42] 	        Dial                                
+[36mINFO[0m[02:17:42] 	         DialContext                        
+[36mINFO[0m[02:17:42] 	          newCCResolverWrapper              
+[36mINFO[0m[02:17:42] 	           Build                            
+[36mINFO[0m[02:17:42] 	            UpdateState                     
+[36mINFO[0m[02:17:42] 	             UpdateState                    
+[36mINFO[0m[02:17:42] 	              poll                          
+[36mINFO[0m[02:17:42] Locks acquired before Write access:  []      
+[36mINFO[0m[02:17:42] Locks acquired before Read  access:  [&ccr.mu [#2]] 
+[36mINFO[0m[02:17:42] ==================================================================================================== 
+[36mINFO[0m[02:17:42] Done for entry at command-line-arguments     
