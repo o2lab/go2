@@ -48,7 +48,7 @@ type analysis struct {
 	goRLockset      map[int][]ssa.Value             // map each goroutine to its initial set of read locks
 	mapFreeze       bool
 	paramFunc       ssa.Value
-	goStack         [][]string
+	goStack         map[string][][]string
 	goCaller        map[int]int
 	goNames         map[int]string
 	chanToken		map[string]string				// map token number to channel name
@@ -136,6 +136,7 @@ var channelComm = true // analyze channel communication
 var entryFn = "main"
 var allEntries = false
 var useDefaultPTA = true
+var fromPath = ""
 
 func init() {
 	excludedPkgs = []string{

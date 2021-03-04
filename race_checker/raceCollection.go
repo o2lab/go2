@@ -287,8 +287,23 @@ func (a *analysis) printRace(counter int, insPair []ssa.Instruction, addrPair []
 					continue
 				}
 			}
+		} else {
+			for p, everyIns := range a.RWIns[fromPath][goIDs[i]] {
+				if p < insInd[i]-1 {
+					if isFunc, ok := everyIns.(*ssa.Call); ok {
+						printName := isFunc.Call.Value.Name()
+						printName = checkTokenName(printName, everyIns.(*ssa.Call))
+						printStack = append(printStack, printName)
+						printPos = append(printPos, everyIns.Pos())
+					} else if _, ok1 := everyIns.(*ssa.Return); ok1 && len(printStack) > 0 {
+						printStack = printStack[:len(printStack)-1]
+						printPos = printPos[:len(printPos)-1]
+					}
+				} else {
+					continue
+				}
+			}
 		}
-
 		if len(printStack) > 0 {
 			log.Println("\tcalled by function[s]: ")
 			for p, toPrint := range printStack {
@@ -308,7 +323,7 @@ func (a *analysis) printRace(counter int, insPair []ssa.Instruction, addrPair []
 			j = temp
 		}
 		for q, eachGo := range pathGo {
-			eachStack := a.goStack[eachGo]
+			eachStack := a.goStack[a.fromPath][eachGo]
 			for k, eachFn := range eachStack {
 				if k == 0 {
 					log.Println("\t ", strings.Repeat(" ", q), "--> Goroutine: ", eachFn, "[", a.goCaller[eachGo], "]")

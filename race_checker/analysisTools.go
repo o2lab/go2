@@ -214,7 +214,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 		if fn.Name() == entryFn {
 			a.levels[goID] = 0 // initialize level count at main entry
 			a.updateRecords(fn.Name(), goID, "PUSH ")
-			a.goStack = append(a.goStack, []string{}) // initialize first interior slice for main goroutine
+			a.goStack[a.fromPath] = append(a.goStack[a.fromPath], []string{}) // initialize first interior slice for main goroutine
 			a.trieMap = make(map[fnInfo]*trie)
 		}
 	}

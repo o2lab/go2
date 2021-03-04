@@ -149,6 +149,8 @@ func pkgSelection(initial []*packages.Package) ([]*ssa.Package, *ssa.Program, []
 }
 
 func (runner *AnalysisRunner) Run(args []string) error {
+	trieLimit = runner.trieLimit
+	efficiency = runner.efficiency
 	cfg := &packages.Config{
 		Mode:  packages.LoadAllSyntax, // the level of information returned for each package
 		Dir:   "",                     // directory in which to run the build system's query tool
@@ -198,6 +200,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 			goLockset:       make(map[int][]ssa.Value),
 			goRLockset:      make(map[int][]ssa.Value),
 			mapFreeze:       false,
+			goStack:  		 make(map[string][][]string),
 			goCaller:        make(map[int]int),
 			goNames:         make(map[int]string),
 			chanToken:       make(map[string]string),
@@ -217,7 +220,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		}
 		// first forloop for collecting pta data from all entry points
 		for _, m := range mains {
-			if efficiency && allEntries { // iterate all entry points
+			if allEntries { // iterate all entry points
 				runner.Analysis.fromPath = m.Pkg.Path()
 			} else if efficiency && !allEntries { // an entry point was selected by user
 				runner.Analysis.fromPath = runner.fromPath
@@ -288,10 +291,10 @@ func (runner *AnalysisRunner) Run(args []string) error {
 					omitComm:   	runner.Analysis.omitComm,
 					racyStackTops: 	runner.Analysis.racyStackTops,
 				}
+
 				if !efficiency { // running test
 					analysisData.fromPath = runner.Analysis.fromPath
 				}
-
 				analysisData.RWInsInd = analysisData.RWIns[analysisData.fromPath]
 
 				// confirm channel readiness for unknown select cases:
@@ -346,21 +349,25 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		wg1.Wait()
 	}
 
-	raceCount := 0
-	for _, e := range runner.Analysis.finalReport {
-		if len(e.racePairs) > 0 && e.racePairs[0] != nil {
-			log.Info(len(e.racePairs), " races found for ", e.entryInfo, "...")
-			for i, r := range e.racePairs {
-				if r != nil {
-					runner.Analysis.printRace(i+1, r.insPair, r.addrPair, r.goIDs, r.insInd)
-					raceCount++
+	if allEntries {
+		raceCount := 0
+		for _, e := range runner.Analysis.finalReport {
+			if len(e.racePairs) > 0 && e.racePairs[0] != nil {
+				log.Info(len(e.racePairs), " races found for ", e.entryInfo, "...")
+				for i, r := range e.racePairs {
+					if r != nil {
+						fromPath = e.entryInfo
+						runner.Analysis.printRace(i+1, r.insPair, r.addrPair, r.goIDs, r.insInd)
+						raceCount++
+					}
 				}
+			} else {
+				log.Info("No races found for ", e.entryInfo, "...")
 			}
-		} else {
-			log.Info("No races found for ", e.entryInfo, "...")
 		}
+		log.Info("Total of ", raceCount, " races found for all entry points. ")
 	}
-	log.Info("Total of ", raceCount, " races found for all entry points. ")
+
 
 
 	return nil
