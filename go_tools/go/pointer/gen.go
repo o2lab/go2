@@ -1168,8 +1168,8 @@ func (a *analysis) genStaticCall(caller *cgnode, instr ssa.CallInstruction, site
 	var obj nodeid //bz: only used in some cases below
 	var id nodeid  //bz: only used if fn is in skips
 
-	//bz: check if in skip; only if we have not create it before
-	if _, ok := a.globalobj[fn]; !ok {
+	//bz: check if in skip; only if we have not create it before -> optHVN only
+	if _, ok := a.globalobj[fn]; optHVN && !ok {
 		//TODO: bz: this name matching is not perfect ...
 		name := fn.String()
 		name = name[0:strings.LastIndex(name, ".")] //remove func name
@@ -1223,7 +1223,7 @@ func (a *analysis) genStaticCall(caller *cgnode, instr ssa.CallInstruction, site
 	}
 
 	if obj != 0 {
-		if id != 0 { //bz: we need to make up this missing constraints
+		if optHVN && id != 0 { //bz: we need to make up this missing constraints
 			a.addressOf(fn.Type(), id, obj)
 			//but do we set value in a.globalobj?
 		}
@@ -2248,7 +2248,9 @@ func (a *analysis) generate() {
 			if a.log != nil {
 				fmt.Fprintf(a.log, "SKIP genMethodsOf() offline for type: "+T.String()+"\n")
 			}
-			skipTypes[_type] = _type
+			if optHVN {
+				skipTypes[_type] = _type
+			}
 			skip++
 			continue
 		}
@@ -2260,17 +2262,25 @@ func (a *analysis) generate() {
 			if a.log != nil {
 				fmt.Fprintf(a.log, "EXCLUDE genMethodsOf() offline for type: "+T.String()+"\n")
 			}
-			skipTypes[_type] = _type
+			if optHVN {
+				skipTypes[_type] = _type
+			}
 			skip++
 		}
 	}
-	fmt.Println("#Excluded types in genMethodsOf() offline (not function): ", skip)
+
+	if a.config.DEBUG {
+		fmt.Println("#Excluded types in genMethodsOf() offline (not function): ", skip)
+	}
+
 	if a.log != nil {
 		fmt.Fprintf(a.log, "\nDone genMethodsOf() offline. \n\n")
 
-		fmt.Fprintf(a.log, "\nDump out skipped types:  \n")
-		for _, _type := range skipTypes {
-			fmt.Fprintf(a.log, _type+"\n")
+		if optHVN {
+			fmt.Fprintf(a.log, "\nDump out skipped types:  \n")
+			for _, _type := range skipTypes {
+				fmt.Fprintf(a.log, _type+"\n")
+			}
 		}
 	}
 
