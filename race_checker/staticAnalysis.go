@@ -37,7 +37,7 @@ func (a *analysis) fromPkgsOfInterest(fn *ssa.Function) bool {
 			return false
 		}
 	}
-	if !strings.HasPrefix(fn.Pkg.Pkg.Path(), a.fromPath) { // path is dependent on tested program
+	if efficiency && !strings.HasPrefix(fn.Pkg.Pkg.Path(), a.fromPath) { // path is dependent on tested program
 		return false
 	}
 	return true
@@ -166,9 +166,6 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		return fmt.Errorf("No Go files detected. ")
 	}
 
-	if efficiency && !allEntries { // an entry point was selected by user
-		runner.fromPath = initial[0].PkgPath
-	}
 	log.Info("Done  -- ", len(initial), " packages detected. ")
 
 	mains, prog, pkgs := pkgSelection(initial)
@@ -251,10 +248,8 @@ func (runner *AnalysisRunner) Run(args []string) error {
 	// first forloop for collecting pta data from all entry points
 	for _, m := range mains {
 		runner.Analysis.main = m
-		if allEntries && !efficiency { // iterate all entry points in real program
+		if m.Pkg.Path() != "command-line-arguments" {
 			runner.Analysis.fromPath = m.Pkg.Path()
-		} else if efficiency && !allEntries { // an entry point was selected by user
-			runner.Analysis.fromPath = runner.fromPath
 		}
 		if !allEntries {
 			log.Info("Compiling stack trace for every Goroutine... ")
@@ -324,7 +319,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 				racyStackTops: 	runner.Analysis.racyStackTops,
 			}
 
-			if !efficiency && !allEntries { // running a single test
+			if analysisData.fromPath == "command-line-arguments" { // running a single test
 				analysisData.fromPath = runner.Analysis.fromPath
 			}
 			analysisData.RWInsInd = analysisData.RWIns[analysisData.fromPath]

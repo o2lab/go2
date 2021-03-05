@@ -131,13 +131,13 @@ var (
 	testMode     = false // Used by race_test.go for collecting output.
 )
 
-var useNewPTA = true
+var useNewPTA = false
 var trieLimit = 1      // set as user config option later, an integer that dictates how many times a function can be called under identical context
 var efficiency = true // configuration setting to avoid recursion in tested program
 var channelComm = true // analyze channel communication
 var entryFn = "main"
 var allEntries = false
-var useDefaultPTA = false
+var useDefaultPTA = true
 
 func init() {
 	excludedPkgs = []string{
@@ -216,6 +216,7 @@ func main() {//default: -useNewPTA
 	runner := &AnalysisRunner{
 		trieLimit: trieLimit,
 		efficiency: efficiency,
+		fromPath: "",
 	}
 	err0 := runner.Run(flag.Args())
 	if stats.CollectStats {

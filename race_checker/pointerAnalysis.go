@@ -5,8 +5,6 @@ import (
 	pta0 "github.tamu.edu/April1989/go_tools/go/pointer_default"
 	"github.tamu.edu/April1989/go_tools/go/ssa"
 	"go/types"
-	"strings"
-
 	//"go/types"
 	//"golang.org/x/tools/go/pointer"
 	//"golang.org/x/tools/go/ssa"
@@ -22,7 +20,7 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 	}
 	indir := false // toggle for indirect query (global variables)
 	if pointer.CanPoint(location.Type()) {
-		if useDaultPTA {
+		if useDefaultPTA {
 			a.pta0Cfg.AddQuery(location)
 		}
 	} else if underType, ok := location.Type().Underlying().(*types.Pointer); ok && pointer.CanPoint(underType.Elem()) {
@@ -31,18 +29,18 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 			a.pta0Cfg.AddIndirectQuery(location)
 		}
 	}
-	var result map[*ssa.Package]*pointer.Result
+	//var result map[*ssa.Package]*pointer.Result
 	var ptaResult *pta0.Result
-	var err error
+	//var err error
 	if useDefaultPTA {
-		ptaResult, err = pta0.Analyze(a.pta0Cfg)
+		ptaResult, _ = pta0.Analyze(a.pta0Cfg)
 		a.pta0Result = ptaResult
-	} else {
-		result, err = pointer.AnalyzeMultiMains(a.ptaConfig)
-		if err != nil && strings.HasPrefix(err.Error(), "internal error") {
-			return
-		}
-		a.result = result
+	//} else {
+	//	result, err = pointer.AnalyzeMultiMains(a.ptaConfig)
+	//	if err != nil && strings.HasPrefix(err.Error(), "internal error") {
+	//		return
+	//	}
+	//	a.result = result
 	}
 	var ptrSet []pointer.PointerWCtx
 	var pta0Set map[ssa.Value]pta0.Pointer
