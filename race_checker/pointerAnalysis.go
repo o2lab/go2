@@ -35,14 +35,14 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 			a.pta0Cfg.AddIndirectQuery(location)
 		}
 	}
-	var result *pointer.Result
+	var result map[*ssa.Package]*pointer.Result
 	var ptaResult *pta0.Result
 	var err error
 	if useDefaultPTA {
 		ptaResult, err = pta0.Analyze(a.pta0Cfg)
 		a.pta0Result = ptaResult
 	} else {
-		result, err = pointer.Analyze(a.ptaConfig)
+		result, err = pointer.AnalyzeMultiMains(a.ptaConfig)
 		if err != nil && strings.HasPrefix(err.Error(), "internal error") {
 			return
 		}
@@ -101,11 +101,11 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 		default:
 			break
 		}
-	} else {
-		ptrSet = a.result.Queries[location]          // set of pointers (with context) from result of pointer analysis
+	} else { // new PTA
+		ptrSet = a.result[a.main].Queries[location]          // set of pointers (with context) from result of pointer analysis
 
 		if indir {
-			ptrSetIndir := a.result.IndirectQueries[location]
+			ptrSetIndir := a.result[a.main].IndirectQueries[location]
 			_ = ptrSetIndir// TODO: check these labels
 		}
 

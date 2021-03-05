@@ -123,8 +123,9 @@ func (a *analysis) sameAddress(addr1 ssa.Value, addr2 ssa.Value) bool {
 		return ptsets[addr1].PointsTo().Intersects(ptsets[addr2].PointsTo())
 		//a.mu.Unlock()
 	}
-	ptset1 := a.result.Queries[addr1]
-	ptset2 := a.result.Queries[addr2]
+	// new PTA
+	ptset1 := a.result[a.main].Queries[addr1]
+	ptset2 := a.result[a.main].Queries[addr2]
 	for _, ptrCtx1 := range ptset1 {
 		for _, ptrCtx2 := range ptset2 {
 			if ptrCtx1.PointsTo().Intersects(ptrCtx2.PointsTo()) {

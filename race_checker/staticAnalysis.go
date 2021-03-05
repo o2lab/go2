@@ -175,180 +175,194 @@ func (runner *AnalysisRunner) Run(args []string) error {
 	runner.prog = prog
 	runner.pkgs = pkgs
 
+	var wg sync.WaitGroup
 	if useDefaultPTA {
-		var wg sync.WaitGroup
 		runner.pta0Cfg = &pta0.Config{
 			Mains:          mains,
 			BuildCallGraph: false,
 		}
-		runner.ptaResult, _ = pta0.Analyze(runner.pta0Cfg) // conduct pointer analysis (default version)
-		runner.Analysis = &analysis{
-			useNewPTA:       useNewPTA,
-			pta0Result:      runner.ptaResult,
-			useDefaultPTA: 	 useDefaultPTA,
-			ptaConfig:       runner.ptaconfig,
-			pta0Cfg:         runner.pta0Cfg,
-			fromPath:  		 "",
-			prog:            runner.prog,
-			pkgs:            runner.pkgs,
-			mains:           mains,
-			RWIns:  		 make(map[string][][]ssa.Instruction),
-			RWinsMap:        make(map[goIns]graph.Node),
-			insDRA:          0,
-			levels:          make(map[int]int),
-			lockMap:         make(map[ssa.Instruction][]ssa.Value),
-			RlockMap:        make(map[ssa.Instruction][]ssa.Value),
-			goLockset:       make(map[int][]ssa.Value),
-			goRLockset:      make(map[int][]ssa.Value),
-			mapFreeze:       false,
-			goStack:  		 make(map[string][][]string),
-			goCaller:        make(map[int]int),
-			goNames:         make(map[int]string),
-			chanToken:       make(map[string]string),
-			chanBuf:         make(map[string]int),
-			chanRcvs:        make(map[string][]*ssa.UnOp),
-			chanSnds:        make(map[string][]*ssa.Send),
-			selectBloc:      make(map[int]*ssa.Select),
-			selReady:        make(map[*ssa.Select][]string),
-			selUnknown:      make(map[*ssa.Select][]string),
-			selectCaseBegin: make(map[ssa.Instruction]string),
-			selectCaseEnd:   make(map[ssa.Instruction]string),
-			selectCaseBody:  make(map[ssa.Instruction]*ssa.Select),
-			selectDone:      make(map[ssa.Instruction]*ssa.Select),
-			ifSuccBegin:     make(map[ssa.Instruction]*ssa.If),
-			ifFnReturn:      make(map[*ssa.Function]*ssa.Return),
-			ifSuccEnd:       make(map[ssa.Instruction]*ssa.Return),
+		runner.ptaResult, _ = pta0.Analyze(runner.pta0Cfg)
+	} else { // new PTA
+		runner.ptaconfig = &pointer.Config{
+			Mains:          mains, //bz: all mains in a project
+			Reflection:     false,
+			BuildCallGraph: true,
+			Log:            nil,
+			//CallSiteSensitive: true, //kcfa
+			Origin: true, //origin
+			//shared config
+			K:          1,
+			LimitScope: true,         //bz: only consider app methods now -> no import will be considered
+			DEBUG:      false,        //bz: rm all printed out info in console
+			Scope:      scope,        //bz: analyze scope + input path
+			Exclusion:  excludedPkgs, //bz: copied from race_checker if any
+			TrackMore:  true,         //bz: track pointers with all types
+			Level:      0,            //bz: see pointer.Config
 		}
-		// first forloop for collecting pta data from all entry points
-		for _, m := range mains {
-			if allEntries && !efficiency { // iterate all entry points in real program
-				runner.Analysis.fromPath = m.Pkg.Path()
-			} else if efficiency && !allEntries { // an entry point was selected by user
-				runner.Analysis.fromPath = runner.fromPath
-			}
-			if !allEntries {
-				log.Info("Compiling stack trace for every Goroutine... ")
-				log.Debug(strings.Repeat("-", 35), "Stack trace begins", strings.Repeat("-", 35))
-			}
-			runner.Analysis.visitAllInstructions(m.Func(entryFn), 0)
-			if !allEntries {
-				log.Debug(strings.Repeat("-", 35), "Stack trace ends", strings.Repeat("-", 35))
-			}
-			totalIns := 0
-			for g := range runner.Analysis.RWIns {
-				totalIns += len(runner.Analysis.RWIns[g])
-			}
-
-			if !allEntries {
-				log.Info("Done  -- ", len(runner.Analysis.RWIns), " goroutines analyzed! ", totalIns, " instructions of interest detected! ")
-			}
+		start := time.Now()                                    //performance
+		runner.ptaresult, _ = pointer.AnalyzeMultiMains(runner.ptaconfig) // conduct pointer analysis for multiple mains
+		t := time.Now()
+		elapsed := t.Sub(start)
+		fmt.Println("\nDone  -- PTA/CG Build; Using " + elapsed.String() + ".\n ")
+		fmt.Println("#Receive Result: ", len(runner.ptaresult))
+		for mainEntry, result := range runner.ptaresult { //bz: you can get the result for each main here
+			fmt.Println("Receive result (#Queries: ", len(result.Queries), ", #IndirectQueries: ", len(result.IndirectQueries), ") for main: ", mainEntry.String())
 		}
-		finResult, err9 := pta0.Analyze(runner.Analysis.pta0Cfg) // all queries have been added, conduct pointer analysis
-		if err9 != nil {
-			log.Fatal(err9)
+	}
+	runner.Analysis = &analysis{
+		useNewPTA:       useNewPTA,
+		pta0Result:      runner.ptaResult,
+		result: 		 runner.ptaresult,
+		useDefaultPTA: 	 useDefaultPTA,
+		ptaConfig:       runner.ptaconfig,
+		pta0Cfg:         runner.pta0Cfg,
+		fromPath:  		 "",
+		prog:            runner.prog,
+		pkgs:            runner.pkgs,
+		mains:           mains,
+		RWIns:  		 make(map[string][][]ssa.Instruction),
+		RWinsMap:        make(map[goIns]graph.Node),
+		insDRA:          0,
+		levels:          make(map[int]int),
+		lockMap:         make(map[ssa.Instruction][]ssa.Value),
+		RlockMap:        make(map[ssa.Instruction][]ssa.Value),
+		goLockset:       make(map[int][]ssa.Value),
+		goRLockset:      make(map[int][]ssa.Value),
+		mapFreeze:       false,
+		goStack:  		 make(map[string][][]string),
+		goCaller:        make(map[int]int),
+		goNames:         make(map[int]string),
+		chanToken:       make(map[string]string),
+		chanBuf:         make(map[string]int),
+		chanRcvs:        make(map[string][]*ssa.UnOp),
+		chanSnds:        make(map[string][]*ssa.Send),
+		selectBloc:      make(map[int]*ssa.Select),
+		selReady:        make(map[*ssa.Select][]string),
+		selUnknown:      make(map[*ssa.Select][]string),
+		selectCaseBegin: make(map[ssa.Instruction]string),
+		selectCaseEnd:   make(map[ssa.Instruction]string),
+		selectCaseBody:  make(map[ssa.Instruction]*ssa.Select),
+		selectDone:      make(map[ssa.Instruction]*ssa.Select),
+		ifSuccBegin:     make(map[ssa.Instruction]*ssa.If),
+		ifFnReturn:      make(map[*ssa.Function]*ssa.Return),
+		ifSuccEnd:       make(map[ssa.Instruction]*ssa.Return),
+	}
+	// first forloop for collecting pta data from all entry points
+	for _, m := range mains {
+		if allEntries && !efficiency { // iterate all entry points in real program
+			runner.Analysis.fromPath = m.Pkg.Path()
+		} else if efficiency && !allEntries { // an entry point was selected by user
+			runner.Analysis.fromPath = runner.fromPath
 		}
-		runner.Analysis.pta0Result = finResult
+		if !allEntries {
+			log.Info("Compiling stack trace for every Goroutine... ")
+			log.Debug(strings.Repeat("-", 35), "Stack trace begins", strings.Repeat("-", 35))
+		}
+		runner.Analysis.visitAllInstructions(m.Func(entryFn), 0)
+		if !allEntries {
+			log.Debug(strings.Repeat("-", 35), "Stack trace ends", strings.Repeat("-", 35))
+		}
+		totalIns := 0
+		for g := range runner.Analysis.RWIns {
+			totalIns += len(runner.Analysis.RWIns[g])
+		}
 
-		// second forloop for race checking using pta info obtained from first forloop
-		for _, m := range mains {
-			wg.Add(1)
-			go func(main *ssa.Package) {
-				defer wg.Done()
+		if !allEntries {
+			log.Info("Done  -- ", len(runner.Analysis.RWIns), " goroutines analyzed! ", totalIns, " instructions of interest detected! ")
+		}
+	}
+	finResult, err9 := pta0.Analyze(runner.Analysis.pta0Cfg) // all queries have been added, conduct pointer analysis
+	if err9 != nil {
+		log.Fatal(err9)
+	}
+	runner.Analysis.pta0Result = finResult
 
-				if !allEntries {
-					log.Info("Building Happens-Before graph... ")
-				}
-				runner.mu.Lock()
-				analysisData := &analysis{
-					useDefaultPTA:  runner.Analysis.useDefaultPTA,
-					pta0Result: 	runner.Analysis.pta0Result,
-					pta0Cfg:   	  	runner.Analysis.pta0Cfg,
-					fromPath: 		main.Pkg.Path(),
-					prog: 			runner.Analysis.prog,
-					pkgs: 			runner.Analysis.pkgs,
-					RWinsMap: 		runner.Analysis.RWinsMap,
-					RWIns: 			runner.Analysis.RWIns,
-					insDRA: 		runner.Analysis.insDRA,
-					lockMap:    	runner.Analysis.lockMap,
-					RlockMap:		runner.Analysis.RlockMap,
-					goStack:    	runner.Analysis.goStack,
-					goCaller:   	runner.Analysis.goCaller,
-					goNames:    	runner.Analysis.goNames,
-					chanToken:  	runner.Analysis.chanToken,
-					chanBuf:    	runner.Analysis.chanBuf,
-					chanRcvs:   	runner.Analysis.chanRcvs,
-					chanSnds:   	runner.Analysis.chanSnds,
-					selectBloc: 	runner.Analysis.selectBloc,
-					selReady:   	runner.Analysis.selReady,
-					selUnknown: 	runner.Analysis.selUnknown,
-					selectCaseBegin:runner.Analysis.selectCaseBegin,
-					selectCaseEnd: 	runner.Analysis.selectCaseEnd,
-					selectCaseBody: runner.Analysis.selectCaseBody,
-					selectDone: 	runner.Analysis.selectDone,
-					ifSuccBegin: 	runner.Analysis.ifSuccBegin,
-					ifSuccEnd:  	runner.Analysis.ifSuccEnd,
-					ifFnReturn: 	runner.Analysis.ifFnReturn,
-					commIfSucc: 	runner.Analysis.commIfSucc,
-					omitComm:   	runner.Analysis.omitComm,
-					racyStackTops: 	runner.Analysis.racyStackTops,
-				}
+	// second forloop for race checking using pta info obtained from first forloop
+	for _, m := range mains {
+		wg.Add(1)
+		go func(main *ssa.Package) {
+			defer wg.Done()
 
-				if !efficiency && !allEntries { // running a single test
-					analysisData.fromPath = runner.Analysis.fromPath
-				}
-				analysisData.RWInsInd = analysisData.RWIns[analysisData.fromPath]
+			if !allEntries {
+				log.Info("Building Happens-Before graph... ")
+			}
+			runner.mu.Lock()
+			analysisData := &analysis{
+				useDefaultPTA:  runner.Analysis.useDefaultPTA,
+				pta0Result: 	runner.Analysis.pta0Result,
+				pta0Cfg:   	  	runner.Analysis.pta0Cfg,
+				result: 		runner.Analysis.result,
+				fromPath: 		main.Pkg.Path(),
+				prog: 			runner.Analysis.prog,
+				pkgs: 			runner.Analysis.pkgs,
+				RWinsMap: 		runner.Analysis.RWinsMap,
+				RWIns: 			runner.Analysis.RWIns,
+				insDRA: 		runner.Analysis.insDRA,
+				lockMap:    	runner.Analysis.lockMap,
+				RlockMap:		runner.Analysis.RlockMap,
+				goStack:    	runner.Analysis.goStack,
+				goCaller:   	runner.Analysis.goCaller,
+				goNames:    	runner.Analysis.goNames,
+				chanToken:  	runner.Analysis.chanToken,
+				chanBuf:    	runner.Analysis.chanBuf,
+				chanRcvs:   	runner.Analysis.chanRcvs,
+				chanSnds:   	runner.Analysis.chanSnds,
+				selectBloc: 	runner.Analysis.selectBloc,
+				selReady:   	runner.Analysis.selReady,
+				selUnknown: 	runner.Analysis.selUnknown,
+				selectCaseBegin:runner.Analysis.selectCaseBegin,
+				selectCaseEnd: 	runner.Analysis.selectCaseEnd,
+				selectCaseBody: runner.Analysis.selectCaseBody,
+				selectDone: 	runner.Analysis.selectDone,
+				ifSuccBegin: 	runner.Analysis.ifSuccBegin,
+				ifSuccEnd:  	runner.Analysis.ifSuccEnd,
+				ifFnReturn: 	runner.Analysis.ifFnReturn,
+				commIfSucc: 	runner.Analysis.commIfSucc,
+				omitComm:   	runner.Analysis.omitComm,
+				racyStackTops: 	runner.Analysis.racyStackTops,
+			}
 
-				// confirm channel readiness for unknown select cases:
-				if len(analysisData.selUnknown) > 0 {
-					for sel, chs := range analysisData.selUnknown {
-						for i, ch := range chs {
-							if _, ready := analysisData.chanSnds[ch]; !ready && ch != "" {
-								if _, ready0 := analysisData.chanRcvs[ch]; !ready0 {
-									if _, ready1 := analysisData.chanBuf[analysisData.chanToken[ch]]; !ready1 {
-										analysisData.selReady[sel][i] = ""
-									}
+			if !efficiency && !allEntries { // running a single test
+				analysisData.fromPath = runner.Analysis.fromPath
+			}
+			analysisData.RWInsInd = analysisData.RWIns[analysisData.fromPath]
+
+			// confirm channel readiness for unknown select cases:
+			if len(analysisData.selUnknown) > 0 {
+				for sel, chs := range analysisData.selUnknown {
+					for i, ch := range chs {
+						if _, ready := analysisData.chanSnds[ch]; !ready && ch != "" {
+							if _, ready0 := analysisData.chanRcvs[ch]; !ready0 {
+								if _, ready1 := analysisData.chanBuf[analysisData.chanToken[ch]]; !ready1 {
+									analysisData.selReady[sel][i] = ""
 								}
 							}
 						}
 					}
 				}
+			}
 
-				analysisData.HBgraph = graph.New(graph.Directed)
-				analysisData.buildHB()
+			analysisData.HBgraph = graph.New(graph.Directed)
+			analysisData.buildHB()
 
-				if !allEntries {
-					log.Info("Done  -- Happens-Before graph built ")
+			if !allEntries {
+				log.Info("Done  -- Happens-Before graph built ")
 
-					log.Info("Checking for data races... ")
-				}
-				rr := &raceReport{
-					entryInfo: main.Pkg.Path(),
-				}
-				rr.racePairs = analysisData.checkRacyPairs()
+				log.Info("Checking for data races... ")
+			}
+			rr := &raceReport{
+				entryInfo: main.Pkg.Path(),
+			}
+			rr.racePairs = analysisData.checkRacyPairs()
 
-				if !allEntries { // no parallelization
-					runner.Analysis.racyStackTops = analysisData.racyStackTops
-				}
-				runner.Analysis.finalReport = append(runner.Analysis.finalReport, rr)
-				runner.mu.Unlock()
-			}(m)
-		}
-		wg.Wait()
-	} else { // TODO: for new PTA
-		var wg1 sync.WaitGroup
-		var finalReport []*raceReport
-		for _, m := range mains {
-			wg1.Add(1)
-			go func(main *ssa.Package) {
-				goReport := runner.runWithEntryPoint(main)
-				runner.mu.Lock()
-				finalReport = append(finalReport, goReport)
-				runner.mu.Unlock()
-				wg1.Done()
-			}(m)
-		}
-		wg1.Wait()
+			if !allEntries { // no parallelization
+				runner.Analysis.racyStackTops = analysisData.racyStackTops
+			}
+			runner.Analysis.finalReport = append(runner.Analysis.finalReport, rr)
+			runner.mu.Unlock()
+		}(m)
 	}
+	wg.Wait()
 
 	if allEntries {
 		raceCount := 0
@@ -373,157 +387,3 @@ func (runner *AnalysisRunner) Run(args []string) error {
 
 	return nil
 }
-
-func (runner *AnalysisRunner) runWithEntryPoint(main *ssa.Package) *raceReport {
-	rr := &raceReport{
-		entryInfo: main.Pkg.Path(),
-	}
-	var result *pointer.Result
-	if useNewPTA {
-		result = runner.runEachMainBaseline(main)
-	}
-	runner.mu.Lock()
-	analysisData := &analysis{
-		useNewPTA:       useNewPTA,
-		result: 		 result,
-		pta0Result:      runner.ptaResult,
-		useDefaultPTA: 	 useDefaultPTA,
-		ptaConfig:       runner.ptaconfig,
-		pta0Cfg:         runner.pta0Cfg,
-		fromPath:  		 "",
-		prog:            runner.prog,
-		pkgs:            runner.pkgs,
-		mains:           []*ssa.Package{main},
-		RWinsMap:        make(map[goIns]graph.Node),
-		insDRA:          0,
-		levels:          make(map[int]int),
-		lockMap:         make(map[ssa.Instruction][]ssa.Value),
-		RlockMap:        make(map[ssa.Instruction][]ssa.Value),
-		goLockset:       make(map[int][]ssa.Value),
-		goRLockset:      make(map[int][]ssa.Value),
-		mapFreeze:       false,
-		goCaller:        make(map[int]int),
-		goNames:         make(map[int]string),
-		chanToken:       make(map[string]string),
-		chanBuf:         make(map[string]int),
-		chanRcvs:        make(map[string][]*ssa.UnOp),
-		chanSnds:        make(map[string][]*ssa.Send),
-		selectBloc:      make(map[int]*ssa.Select),
-		selReady:        make(map[*ssa.Select][]string),
-		selUnknown:      make(map[*ssa.Select][]string),
-		selectCaseBegin: make(map[ssa.Instruction]string),
-		selectCaseEnd:   make(map[ssa.Instruction]string),
-		selectCaseBody:  make(map[ssa.Instruction]*ssa.Select),
-		selectDone:      make(map[ssa.Instruction]*ssa.Select),
-		ifSuccBegin:     make(map[ssa.Instruction]*ssa.If),
-		ifFnReturn:      make(map[*ssa.Function]*ssa.Return),
-		ifSuccEnd:       make(map[ssa.Instruction]*ssa.Return),
-	}
-	if efficiency && allEntries { // iterate all entry points
-		analysisData.fromPath = main.Pkg.Path()
-	} else if efficiency && !allEntries { // an entry point was selected by user
-		analysisData.fromPath = runner.fromPath
-	}
-	// for new PTA: extract scope from pkgs
-	if analysisData.fromPath != "" {
-		scope = []string{analysisData.fromPath}
-	}
-	if !allEntries {
-		log.Info("Compiling stack trace for every Goroutine... ")
-		log.Debug(strings.Repeat("-", 35), "Stack trace begins", strings.Repeat("-", 35))
-	}
-	analysisData.visitAllInstructions(main.Func(entryFn), 0)
-	if !allEntries {
-		log.Debug(strings.Repeat("-", 35), "Stack trace ends", strings.Repeat("-", 35))
-	}
-	totalIns := 0
-	for g := range analysisData.RWIns {
-		totalIns += len(analysisData.RWIns[g])
-	}
-
-	if !allEntries {
-		log.Info("Done  -- ", len(analysisData.RWIns), " goroutines analyzed! ", totalIns, " instructions of interest detected! ")
-	}
-
-
-	// confirm channel readiness for unknown select cases:
-	if len(analysisData.selUnknown) > 0 {
-		for sel, chs := range analysisData.selUnknown {
-			for i, ch := range chs {
-				if _, ready := analysisData.chanSnds[ch]; !ready && ch != "" {
-					if _, ready0 := analysisData.chanRcvs[ch]; !ready0 {
-						if _, ready1 := analysisData.chanBuf[analysisData.chanToken[ch]]; !ready1 {
-							analysisData.selReady[sel][i] = ""
-						}
-					}
-				}
-			}
-		}
-	}
-
-	if !allEntries {
-		log.Info("Building Happens-Before graph... ")
-	}
-
-	analysisData.HBgraph = graph.New(graph.Directed)
-	//analysisData.buildHB()
-
-	if !allEntries {
-		log.Info("Done  -- Happens-Before graph built ")
-
-		log.Info("Checking for data races... ")
-	}
-
-	rr.racePairs = analysisData.checkRacyPairs()
-
-	runner.Analysis = analysisData
-	runner.mu.Unlock()
-	return rr
-}
-
-//bz: do each main one by one -> performance base line
-func (runner *AnalysisRunner) runEachMainBaseline(main *ssa.Package) *pointer.Result {
-	logfile, err := os.Create("go_pta_log") //bz: for me ...
-	if err != nil {
-		log.Fatal(err)
-	}
-	var mains []*ssa.Package
-	mains = append(mains, main)
-	// Configure pointer analysis to build call-graph
-	runner.ptaconfig = &pointer.Config{
-		Mains:          mains, //bz: NOW assume only one main
-		Reflection:     false,
-		BuildCallGraph: true,
-		Log:            logfile,
-		//CallSiteSensitive: true, //kcfa
-		Origin: true, //origin
-		//shared config
-		K:          1,
-		LimitScope: true,         //bz: only consider app methods now
-		DEBUG:      false,   //bz: do all printed out info in console --> turn off to avoid internal nil reference panic
-		Scope:      scope,        //bz: analyze scope, default is "command-line-arguments"
-		Exclusion: excludedPkgs, //excludedPkgs here
-		Level:      0,
-		//bz: Level = 1: if callee is from app or import
-		// Level = 2: parent of caller in app, caller in lib, callee also in lib || parent in lib, caller in app, callee in lib || parent in lib, caller in lib, callee in app
-		// Level = 3: this also analyze lib's import == lib's lib
-		// Level = 0: analyze all
-		TrackMore:      true, //bz: track pointers with types declared in Analyze Scope; cannot guarantee all basic types, e.g., []bytes, etc.
-	}
-
-	start := time.Now()
-	result, err2 := pointer.Analyze(runner.ptaconfig) // conduct pointer analysis (customized version)
-	t := time.Now()
-	elapsed := t.Sub(start)
-	log.Info("Done -- PTA/CG Built; Using " + elapsed.String() + ". Go check go_pta_log for detail. ")
-
-	if err2 != nil {
-		log.Fatal(err2)
-	}
-	if runner.ptaconfig.DEBUG {
-		result.DumpAll()
-	}
-
-	return result
-}
-

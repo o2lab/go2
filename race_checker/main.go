@@ -19,7 +19,7 @@ type analysis struct {
 	mu 				sync.RWMutex
 	useNewPTA    	bool //useNewPTA the new pta
 	useDefaultPTA	bool //use default go pta
-	result       	*pointer.Result //now can reuse the result
+	result       	map[*ssa.Package]*pointer.Result //now can reuse the result
 	pta0Result 		*pta0.Result
 	ptaConfig    	*pointer.Config
 	pta0Cfg			*pta0.Config
@@ -28,6 +28,7 @@ type analysis struct {
 	prog            *ssa.Program
 	pkgs            []*ssa.Package
 	mains           []*ssa.Package
+	main  			*ssa.Package
 	analysisStat    stat
 	HBgraph         *graph.Graph
 	RWinsMap        map[goIns]graph.Node
@@ -91,6 +92,7 @@ type AnalysisRunner struct {
 	prog 			*ssa.Program
 	pkgs 			[]*ssa.Package
 	ptaconfig 		*pointer.Config
+	ptaresult 		map[*ssa.Package]*pointer.Result
 	pta0Cfg			*pta0.Config
 	ptaResult 		*pta0.Result
 	trieLimit		int      // set as user config option later, an integer that dictates how many times a function can be called under identical context
@@ -129,14 +131,13 @@ var (
 	testMode     = false // Used by race_test.go for collecting output.
 )
 
-var useNewPTA = false
+var useNewPTA = true
 var trieLimit = 1      // set as user config option later, an integer that dictates how many times a function can be called under identical context
 var efficiency = true // configuration setting to avoid recursion in tested program
 var channelComm = true // analyze channel communication
 var entryFn = "main"
 var allEntries = false
-var useDefaultPTA = true
-var fromPath = ""
+var useDefaultPTA = false
 
 func init() {
 	excludedPkgs = []string{
@@ -148,7 +149,7 @@ func init() {
 // main sets up arguments and calls staticAnalysis function
 func main() {//default: -useNewPTA
 	newPTA := flag.Bool("useNewPTA", false, "Use the new pointer analysis in go_tools.")
-	builtinPTA := flag.Bool("useDefaultPTA", true, "Use the built-in pointer analysis.")
+	builtinPTA := flag.Bool("useDefaultPTA", false, "Use the built-in pointer analysis.")
 	debug := flag.Bool("debug", true, "Prints log.Debug messages.")
 	lockOps := flag.Bool("lockOps", false, "Prints lock and unlock operations. ")
 	flag.BoolVar(&stats.CollectStats, "collectStats", false, "Collect analysis statistics.")
