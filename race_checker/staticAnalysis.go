@@ -220,6 +220,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		prog:            runner.prog,
 		pkgs:            runner.pkgs,
 		mains:           mains,
+		main:			 mains[0],
 		RWIns:  		 make(map[string][][]ssa.Instruction),
 		RWinsMap:        make(map[goIns]graph.Node),
 		insDRA:          0,
@@ -249,6 +250,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 	}
 	// first forloop for collecting pta data from all entry points
 	for _, m := range mains {
+		runner.Analysis.main = m
 		if allEntries && !efficiency { // iterate all entry points in real program
 			runner.Analysis.fromPath = m.Pkg.Path()
 		} else if efficiency && !allEntries { // an entry point was selected by user
