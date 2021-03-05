@@ -288,7 +288,7 @@ func (a *analysis) printRace(counter int, insPair []ssa.Instruction, addrPair []
 				}
 			}
 		} else {
-			for p, everyIns := range a.RWIns[fromPath][goIDs[i]] {
+			for p, everyIns := range a.RWIns[a.fromPath][goIDs[i]] {
 				if p < insInd[i]-1 {
 					if isFunc, ok := everyIns.(*ssa.Call); ok {
 						printName := isFunc.Call.Value.Name()

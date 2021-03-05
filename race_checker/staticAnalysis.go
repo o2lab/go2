@@ -149,6 +149,7 @@ func pkgSelection(initial []*packages.Package) ([]*ssa.Package, *ssa.Program, []
 }
 
 func (runner *AnalysisRunner) Run(args []string) error {
+	startExec := time.Now() // measure total duration of running entire code base
 	trieLimit = runner.trieLimit
 	efficiency = runner.efficiency
 	cfg := &packages.Config{
@@ -220,7 +221,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		}
 		// first forloop for collecting pta data from all entry points
 		for _, m := range mains {
-			if allEntries { // iterate all entry points
+			if allEntries && !efficiency { // iterate all entry points in real program
 				runner.Analysis.fromPath = m.Pkg.Path()
 			} else if efficiency && !allEntries { // an entry point was selected by user
 				runner.Analysis.fromPath = runner.fromPath
@@ -241,13 +242,13 @@ func (runner *AnalysisRunner) Run(args []string) error {
 			if !allEntries {
 				log.Info("Done  -- ", len(runner.Analysis.RWIns), " goroutines analyzed! ", totalIns, " instructions of interest detected! ")
 			}
-
-			finResult, err9 := pta0.Analyze(runner.Analysis.pta0Cfg) // all queries have been added, conduct pointer analysis
-			if err9 != nil {
-				log.Fatal(err9)
-			}
-			runner.Analysis.pta0Result = finResult
 		}
+		finResult, err9 := pta0.Analyze(runner.Analysis.pta0Cfg) // all queries have been added, conduct pointer analysis
+		if err9 != nil {
+			log.Fatal(err9)
+		}
+		runner.Analysis.pta0Result = finResult
+
 		// second forloop for race checking using pta info obtained from first forloop
 		for _, m := range mains {
 			wg.Add(1)
@@ -292,7 +293,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 					racyStackTops: 	runner.Analysis.racyStackTops,
 				}
 
-				if !efficiency { // running test
+				if !efficiency && !allEntries { // running a single test
 					analysisData.fromPath = runner.Analysis.fromPath
 				}
 				analysisData.RWInsInd = analysisData.RWIns[analysisData.fromPath]
@@ -356,7 +357,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 				log.Info(len(e.racePairs), " races found for ", e.entryInfo, "...")
 				for i, r := range e.racePairs {
 					if r != nil {
-						fromPath = e.entryInfo
+						runner.Analysis.fromPath = e.entryInfo
 						runner.Analysis.printRace(i+1, r.insPair, r.addrPair, r.goIDs, r.insInd)
 						raceCount++
 					}
@@ -367,8 +368,8 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		}
 		log.Info("Total of ", raceCount, " races found for all entry points. ")
 	}
-
-
+	execDur := time.Since(startExec)
+	log.Info(execDur, " elapsed. ")
 
 	return nil
 }
