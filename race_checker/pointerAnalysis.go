@@ -22,16 +22,12 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 	}
 	indir := false // toggle for indirect query (global variables)
 	if pointer.CanPoint(location.Type()) {
-		if useNewPTA {
-			a.ptaConfig.AddQuery(location)
-		} else {
+		if useDaultPTA {
 			a.pta0Cfg.AddQuery(location)
 		}
 	} else if underType, ok := location.Type().Underlying().(*types.Pointer); ok && pointer.CanPoint(underType.Elem()) {
 		indir = true
-		if useNewPTA {
-			a.ptaConfig.AddIndirectQuery(location)
-		} else {
+		if useDefaultPTA {
 			a.pta0Cfg.AddIndirectQuery(location)
 		}
 	}
