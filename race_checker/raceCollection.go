@@ -179,10 +179,28 @@ func (a *analysis) lockSetsIntersect(insA ssa.Instruction, insB ssa.Instruction)
 	setA := a.lockMap[insA] // lockset of instruction-A
 	if a.isReadIns(insA) {
 		setA = append(setA, a.RlockMap[insA]...)
+		if unOp, ok := insA.(*ssa.UnOp); ok {
+			if _, global := unOp.X.(*ssa.Global); global {
+				return false
+			}
+		} else if storeOp, ok1 := insB.(*ssa.Store); ok1 {
+			if _, global := storeOp.Addr.(*ssa.Global); global {
+				return false
+			}
+		}
 	}
 	setB := a.lockMap[insB] // lockset of instruction-B
 	if a.isReadIns(insB) {
 		setB = append(setB, a.RlockMap[insB]...)
+		if unOp, ok := insB.(*ssa.UnOp); ok {
+			if _, global := unOp.X.(*ssa.Global); global {
+				return false
+			}
+		} else if storeOp, ok1 := insB.(*ssa.Store); ok1 {
+			if _, global := storeOp.Addr.(*ssa.Global); global {
+				return false
+			}
+		}
 	}
 	for _, addrA := range setA {
 		for _, addrB := range setB {

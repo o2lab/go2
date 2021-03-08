@@ -53,6 +53,13 @@ func (a *analysis) isReadIns(ins ssa.Instruction) bool {
 		return true
 	case *ssa.Lookup:
 		return true
+	case *ssa.FieldAddr:
+		if _, isAlloc := insType.X.(*ssa.Alloc); isAlloc {
+			return false
+		} else if _, isFreeVar := insType.X.(*ssa.FreeVar); isFreeVar {
+			return false
+		}
+		return true
 	case *ssa.Call:
 		if len(insType.Call.Args) > 0 && insType.Call.Value.Name() != "Done" && insType.Call.Value.Name() != "Wait" {
 			for _, anArg := range insType.Call.Args {

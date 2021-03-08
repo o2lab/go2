@@ -102,7 +102,7 @@ func (a *analysis) buildHB() {
 					if len(selectN) > 1 {
 						selectN = selectN[1:]
 					} // completed analysis of one select statement
-				} else if ifInstr, ok2 := a.ifSuccBegin[anIns]; ok2 && channelComm {
+				} else if ifInstr, ok2 := a.ifSuccBegin[anIns]; ok2 {
 					skipSucc := false
 					for beginIns, ifIns := range a.ifSuccBegin {
 						if ifIns == ifInstr && beginIns != anIns && sliceContainsInsAt(a.commIfSucc, beginIns) != -1 && channelComm { // other succ contains channel communication
