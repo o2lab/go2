@@ -321,19 +321,19 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 						}
 					} else if deferIns.Call.StaticCallee().Name() == "Unlock" {
 						lockLoc := deferIns.Call.Args[0]
-						if !a.useNewPTA {
+						if !useNewPTA {
 							a.pta0Cfg.AddQuery(lockLoc)
 						}
 						toUnlock = append(toUnlock, lockLoc)
 					} else if deferIns.Call.StaticCallee().Name() == "RUnlock" {
 						RlockLoc := deferIns.Call.Args[0]
-						if !a.useNewPTA {
+						if !useNewPTA {
 							a.pta0Cfg.AddQuery(RlockLoc)
 						}
 						toRUnlock = append(toRUnlock, RlockLoc)
 					} else if deferIns.Call.Value.Name() == "Done" {
 						a.RWIns[a.fromPath][goID] = append(a.RWIns[a.fromPath][goID], dIns)
-						if !a.useNewPTA {
+						if !useNewPTA {
 							a.pta0Cfg.AddQuery(deferIns.Call.Args[0])
 						}
 					}

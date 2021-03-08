@@ -35,12 +35,6 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 	if useDefaultPTA {
 		ptaResult, _ = pta0.Analyze(a.pta0Cfg)
 		a.pta0Result = ptaResult
-	//} else {
-	//	result, err = pointer.AnalyzeMultiMains(a.ptaConfig)
-	//	if err != nil && strings.HasPrefix(err.Error(), "internal error") {
-	//		return
-	//	}
-	//	a.result = result
 	}
 	var ptrSet []pointer.PointerWCtx
 	var pta0Set map[ssa.Value]pta0.Pointer

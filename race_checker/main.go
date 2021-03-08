@@ -17,8 +17,6 @@ import (
 
 type analysis struct {
 	mu 				sync.RWMutex
-	useNewPTA    	bool //useNewPTA the new pta
-	useDefaultPTA	bool //use default go pta
 	result       	map[*ssa.Package]*pointer.Result //now can reuse the result
 	pta0Result 		*pta0.Result
 	ptaConfig    	*pointer.Config
@@ -141,7 +139,7 @@ var useDefaultPTA = true
 
 func init() {
 	excludedPkgs = []string{
-		"fmt",
+		"fmt", //
 		"reflect",
 	}
 }

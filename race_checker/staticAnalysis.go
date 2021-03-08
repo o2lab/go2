@@ -21,9 +21,6 @@ import (
 	"time"
 )
 
-var scope []string //bz: now extract scope from pkgs
-
-
 // fromPkgsOfInterest determines if a function is from a package of interest
 func (a *analysis) fromPkgsOfInterest(fn *ssa.Function) bool {
 	if fn.Pkg == nil || fn.Pkg.Pkg == nil {
@@ -152,6 +149,8 @@ func (runner *AnalysisRunner) Run(args []string) error {
 	startExec := time.Now() // measure total duration of running entire code base
 	trieLimit = runner.trieLimit
 	efficiency = runner.efficiency
+
+	// Load packages...
 	cfg := &packages.Config{
 		Mode:  packages.LoadAllSyntax, // the level of information returned for each package
 		Dir:   "",                     // directory in which to run the build system's query tool
@@ -161,19 +160,18 @@ func (runner *AnalysisRunner) Run(args []string) error {
 
 	os.Stderr = nil // No need to output package errors for now. Delete this line to view package errors
 	initial, _ := packages.Load(cfg, args...)
-
 	if len(initial) == 0 {
 		return fmt.Errorf("No Go files detected. ")
 	}
-
 	log.Info("Done  -- ", len(initial), " packages detected. ")
 
 	mains, prog, pkgs := pkgSelection(initial)
 	runner.prog = prog
 	runner.pkgs = pkgs
 
+	// Configure pointer analysis...
 	var wg sync.WaitGroup
-	if useDefaultPTA {
+	if useDefaultPTA { // default PTA
 		runner.pta0Cfg = &pta0.Config{
 			Mains:          mains,
 			BuildCallGraph: false,
@@ -185,13 +183,12 @@ func (runner *AnalysisRunner) Run(args []string) error {
 			Reflection:     false,
 			BuildCallGraph: true,
 			Log:            nil,
-			//CallSiteSensitive: true, //kcfa
 			Origin: true, //origin
 			//shared config
 			K:          1,
 			LimitScope: true,         //bz: only consider app methods now -> no import will be considered
 			DEBUG:      false,        //bz: rm all printed out info in console
-			Scope:      scope,        //bz: analyze scope + input path
+			//Scope:      scope,        //bz: analyze scope + input path
 			Exclusion:  excludedPkgs, //bz: copied from race_checker if any
 			TrackMore:  true,         //bz: track pointers with all types
 			Level:      0,            //bz: see pointer.Config
@@ -206,11 +203,11 @@ func (runner *AnalysisRunner) Run(args []string) error {
 			fmt.Println("Receive result (#Queries: ", len(result.Queries), ", #IndirectQueries: ", len(result.IndirectQueries), ") for main: ", mainEntry.String())
 		}
 	}
+
+	// Configure static analysis...
 	runner.Analysis = &analysis{
-		useNewPTA:       useNewPTA,
 		pta0Result:      runner.ptaResult,
 		result: 		 runner.ptaresult,
-		useDefaultPTA: 	 useDefaultPTA,
 		ptaConfig:       runner.ptaconfig,
 		pta0Cfg:         runner.pta0Cfg,
 		fromPath:  		 "",
@@ -245,7 +242,8 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		ifFnReturn:      make(map[*ssa.Function]*ssa.Return),
 		ifSuccEnd:       make(map[ssa.Instruction]*ssa.Return),
 	}
-	// first forloop for collecting pta data from all entry points
+
+	// first forloop for collecting r/w access, thread creation and pta querying (for default PTA) from all entry points
 	for _, m := range mains {
 		runner.Analysis.main = m
 		if m.Pkg.Path() != "command-line-arguments" {
@@ -260,21 +258,23 @@ func (runner *AnalysisRunner) Run(args []string) error {
 			log.Debug(strings.Repeat("-", 35), "Stack trace ends", strings.Repeat("-", 35))
 		}
 		totalIns := 0
-		for g := range runner.Analysis.RWIns {
-			totalIns += len(runner.Analysis.RWIns[g])
+		for g := range runner.Analysis.RWIns[runner.Analysis.fromPath] {
+			totalIns += len(runner.Analysis.RWIns[runner.Analysis.fromPath][g])
 		}
-
 		if !allEntries {
-			log.Info("Done  -- ", len(runner.Analysis.RWIns), " goroutines analyzed! ", totalIns, " instructions of interest detected! ")
+			log.Info("Done  -- ", len(runner.Analysis.RWIns[runner.Analysis.fromPath]), " goroutines analyzed! ", totalIns, " instructions of interest detected! ")
 		}
 	}
-	finResult, err9 := pta0.Analyze(runner.Analysis.pta0Cfg) // all queries have been added, conduct pointer analysis
-	if err9 != nil {
-		log.Fatal(err9)
-	}
-	runner.Analysis.pta0Result = finResult
 
-	// second forloop for race checking using pta info obtained from first forloop
+	if useDefaultPTA {
+		finResult, err9 := pta0.Analyze(runner.Analysis.pta0Cfg) // all queries have been added, conduct pointer analysis
+		if err9 != nil {
+			log.Fatal(err9)
+		}
+		runner.Analysis.pta0Result = finResult
+	}
+
+	// second forloop for race checking using results from pta
 	for _, m := range mains {
 		wg.Add(1)
 		go func(main *ssa.Package) {
@@ -285,13 +285,13 @@ func (runner *AnalysisRunner) Run(args []string) error {
 			}
 			runner.mu.Lock()
 			analysisData := &analysis{
-				useDefaultPTA:  runner.Analysis.useDefaultPTA,
 				pta0Result: 	runner.Analysis.pta0Result,
 				pta0Cfg:   	  	runner.Analysis.pta0Cfg,
 				result: 		runner.Analysis.result,
 				fromPath: 		main.Pkg.Path(),
 				prog: 			runner.Analysis.prog,
 				pkgs: 			runner.Analysis.pkgs,
+				main:  			main,
 				RWinsMap: 		runner.Analysis.RWinsMap,
 				RWIns: 			runner.Analysis.RWIns,
 				insDRA: 		runner.Analysis.insDRA,
