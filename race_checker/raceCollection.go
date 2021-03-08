@@ -114,14 +114,8 @@ func (a *analysis) sameAddress(addr1 ssa.Value, addr2 ssa.Value) bool {
 	}
 	// check points-to set to see if they can point to the same object
 	if useDefaultPTA {
-		//a.pta0Cfg.AddQuery(addr1)
-		//a.pta0Cfg.AddQuery(addr2)
-		//result, _ := pta0.Analyze(a.pta0Cfg)
-		//a.pta0Result = result
 		ptsets := a.pta0Result.Queries
-		//a.mu.Lock()
 		return ptsets[addr1].PointsTo().Intersects(ptsets[addr2].PointsTo())
-		//a.mu.Unlock()
 	}
 	// new PTA
 	ptset1 := a.result[a.main].Queries[addr1]
