@@ -129,17 +129,17 @@ var (
 	testMode     = false // Used by race_test.go for collecting output.
 )
 
-var useNewPTA = false
+var useNewPTA = true
 var trieLimit = 1      // set as user config option later, an integer that dictates how many times a function can be called under identical context
 var efficiency = true // configuration setting to avoid recursion in tested program
 var channelComm = true // analyze channel communication
 var entryFn = "main"
 var allEntries = false
-var useDefaultPTA = true
+var useDefaultPTA = false
 
 func init() {
 	excludedPkgs = []string{
-		"fmt", //
+		"fmt",
 		"reflect",
 	}
 }
