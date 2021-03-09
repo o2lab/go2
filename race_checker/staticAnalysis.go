@@ -198,10 +198,10 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		t := time.Now()
 		elapsed := t.Sub(start)
 		fmt.Println("\nDone  -- PTA/CG Build; Using " + elapsed.String() + ".\n ")
-		fmt.Println("#Receive Result: ", len(runner.ptaresult))
-		for mainEntry, result := range runner.ptaresult { //bz: you can get the result for each main here
-			fmt.Println("Receive result (#Queries: ", len(result.Queries), ", #IndirectQueries: ", len(result.IndirectQueries), ") for main: ", mainEntry.String())
-		}
+		//fmt.Println("#Receive Result: ", len(runner.ptaresult))
+		//for mainEntry, result := range runner.ptaresult { //bz: you can get the result for each main here
+		//	fmt.Println("Receive result (#Queries: ", len(result.Queries), ", #IndirectQueries: ", len(result.IndirectQueries), ") for main: ", mainEntry.String())
+		//}
 	}
 
 	// Configure static analysis...
