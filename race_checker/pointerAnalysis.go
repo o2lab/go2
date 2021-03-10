@@ -29,17 +29,12 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 			a.pta0Cfg.AddIndirectQuery(location)
 		}
 	}
-	//var result map[*ssa.Package]*pointer.Result
-	var ptaResult *pta0.Result
-	//var err error
-	if useDefaultPTA {
-		ptaResult, _ = pta0.Analyze(a.pta0Cfg)
-		a.pta0Result = ptaResult
-	}
+
 	var ptrSet []pointer.PointerWCtx
 	var pta0Set map[ssa.Value]pta0.Pointer
 	var PT0Set []*pta0.Label
 	if useDefaultPTA {
+		a.pta0Result, _ = pta0.Analyze(a.pta0Cfg)
 		pta0Set = a.pta0Result.Queries
 		PT0Set = pta0Set[location].PointsTo().Labels()
 
@@ -91,7 +86,6 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 		}
 	} else { // new PTA
 		ptrSet = a.result[a.main].Queries[location]          // set of pointers (with context) from result of pointer analysis
-
 		if indir {
 			ptrSetIndir := a.result[a.main].IndirectQueries[location]
 			_ = ptrSetIndir// TODO: check these labels

@@ -392,7 +392,6 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 			case *ssa.ChangeType: // a value-preserving type change, write op
 				a.insChangeType(examIns, goID, theIns)
 			case *ssa.Defer:
-				a.RWIns[a.fromPath][goID] = append(a.RWIns[a.fromPath][goID], theIns)
 				toDefer = append([]ssa.Instruction{theIns}, toDefer...)
 			case *ssa.MakeInterface: // construct instance of interface type
 				a.insMakeInterface(examIns, goID, theIns)

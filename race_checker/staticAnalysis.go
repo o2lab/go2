@@ -104,7 +104,9 @@ func pkgSelection(initial []*packages.Package) ([]*ssa.Package, *ssa.Program, []
 			}
 			log.Info("Iterating through all entry point options...")
 		} else {
-			fmt.Print("Enter option number of choice: (or enter \"-\" for other desired entry point)\n")
+			fmt.Print("Enter option number of choice: \n")
+			fmt.Print("*** use space delimiter for multiple selections *** \n")
+			fmt.Print("*** use \"-\" for a range of selections *** \n")
 			fmt.Scan(&mainInd)
 			if mainInd == "-" {
 				fmt.Print("Enter function name to begin analysis from: ")
@@ -146,7 +148,6 @@ func pkgSelection(initial []*packages.Package) ([]*ssa.Package, *ssa.Program, []
 }
 
 func (runner *AnalysisRunner) Run(args []string) error {
-	startExec := time.Now() // measure total duration of running entire code base
 	trieLimit = runner.trieLimit
 	efficiency = runner.efficiency
 
@@ -169,6 +170,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 	runner.prog = prog
 	runner.pkgs = pkgs
 
+	startExec := time.Now() // measure total duration of running entire code base
 	// Configure pointer analysis...
 	var wg sync.WaitGroup
 	if useDefaultPTA { // default PTA
@@ -279,11 +281,10 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		wg.Add(1)
 		go func(main *ssa.Package) {
 			defer wg.Done()
-
 			if !allEntries {
 				log.Info("Building Happens-Before graph... ")
 			}
-			runner.mu.Lock()
+
 			analysisData := &analysis{
 				pta0Result: 	runner.Analysis.pta0Result,
 				pta0Cfg:   	  	runner.Analysis.pta0Cfg,
@@ -356,7 +357,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 				runner.Analysis.racyStackTops = analysisData.racyStackTops
 			}
 			runner.Analysis.finalReport = append(runner.Analysis.finalReport, rr)
-			runner.mu.Unlock()
+
 		}(m)
 	}
 	wg.Wait()
