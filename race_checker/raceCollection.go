@@ -15,13 +15,13 @@ import (
 func (a *analysis) checkRacyPairs() []*raceInfo {
 	var races []*raceInfo
 	var ri *raceInfo
-	for i := 0; i < len(a.RWInsInd); i++ {
-		for j := i + 1; j < len(a.RWInsInd); j++ { // must be in different goroutines, j always greater than i
-			for ii, goI := range a.RWInsInd[i] {
+	for i := 0; i < len(a.RWIns); i++ {
+		for j := i + 1; j < len(a.RWIns); j++ { // must be in different goroutines, j always greater than i
+			for ii, goI := range a.RWIns[i] {
 				if (i == 0 && ii < a.insDRA) || (channelComm && sliceContainsBloc(a.omitComm, goI.Block())) {
 					continue
 				}
-				for jj, goJ := range a.RWInsInd[j] {
+				for jj, goJ := range a.RWIns[j] {
 					if channelComm && sliceContainsBloc(a.omitComm, goJ.Block()) {
 						continue
 					}
@@ -45,12 +45,9 @@ func (a *analysis) checkRacyPairs() []*raceInfo {
 								goIDs: 		[]int{i, j},
 								insInd: 	[]int{ii, jj},
 							}
-							//a.mu.Lock()
 							if !allEntries {
 								a.printRace(len(a.reportedAddr), insSlice, addressPair, []int{i, j}, []int{ii, jj})
 							}
-
-							//a.mu.Unlock()
 						}
 					}
 				}
@@ -114,12 +111,12 @@ func (a *analysis) sameAddress(addr1 ssa.Value, addr2 ssa.Value) bool {
 	}
 	// check points-to set to see if they can point to the same object
 	if useDefaultPTA {
-		ptsets := a.pta0Result.Queries
+		ptsets := a.ptaRes0.Queries
 		return ptsets[addr1].PointsTo().Intersects(ptsets[addr2].PointsTo())
 	}
 	// new PTA
-	ptset1 := a.result[a.main].Queries[addr1]
-	ptset2 := a.result[a.main].Queries[addr2]
+	ptset1 := a.ptaRes[a.main].Queries[addr1]
+	ptset2 := a.ptaRes[a.main].Queries[addr2]
 	for _, ptrCtx1 := range ptset1 {
 		for _, ptrCtx2 := range ptset2 {
 			if ptrCtx1.PointsTo().Intersects(ptrCtx2.PointsTo()) {
@@ -267,7 +264,7 @@ func (a *analysis) printRace(counter int, insPair []ssa.Instruction, addrPair []
 		var printStack []string // store functions in stack and pop terminated functions
 		var printPos []token.Pos
 		if !allEntries {
-			for p, everyIns := range a.RWInsInd[goIDs[i]] {
+			for p, everyIns := range a.RWIns[goIDs[i]] {
 				if p < insInd[i]-1 {
 					if isFunc, ok := everyIns.(*ssa.Call); ok {
 						printName := isFunc.Call.Value.Name()
@@ -283,7 +280,7 @@ func (a *analysis) printRace(counter int, insPair []ssa.Instruction, addrPair []
 				}
 			}
 		} else {
-			for p, everyIns := range a.RWIns[a.fromPath][goIDs[i]] {
+			for p, everyIns := range a.RWIns[goIDs[i]] {
 				if p < insInd[i]-1 {
 					if isFunc, ok := everyIns.(*ssa.Call); ok {
 						printName := isFunc.Call.Value.Name()
@@ -318,10 +315,104 @@ func (a *analysis) printRace(counter int, insPair []ssa.Instruction, addrPair []
 			j = temp
 		}
 		for q, eachGo := range pathGo {
-			eachStack := a.goStack[a.fromPath][eachGo]
+			eachStack := a.goStack[eachGo]
 			for k, eachFn := range eachStack {
 				if k == 0 {
 					log.Println("\t ", strings.Repeat(" ", q), "--> Goroutine: ", eachFn, "[", a.goCaller[eachGo], "]")
+				} else {
+					log.Println("\t   ", strings.Repeat(" ", q), strings.Repeat(" ", k), eachFn)
+				}
+			}
+		}
+	}
+	log.Println("Locks acquired before Write access: ", writeLocks)
+	log.Println("Locks acquired before Read  access: ", readLocks)
+	log.Println(strings.Repeat("=", 100))
+}
+
+
+func (r *raceReport) printRace(counter int, insPair []ssa.Instruction, addrPair []ssa.Value, goIDs []int, insInd []int) {
+	log.Printf("Data race #%d", counter)
+	log.Println(strings.Repeat("=", 100))
+	var writeLocks []ssa.Value
+	var readLocks []ssa.Value
+	for i, anIns := range insPair {
+		var errMsg string
+		var access string
+		if isWriteIns(anIns) {
+			access = " Write of "
+			if _, ok := anIns.(*ssa.Call); ok {
+				errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].String()), " in function ", aurora.BrightGreen(anIns.Parent().Name()), " at ", r.prog.Fset.Position(addrPair[i].Pos()))
+			} else {
+				errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].String()), " in function ", aurora.BrightGreen(anIns.Parent().Name()), " at ", r.prog.Fset.Position(insPair[i].Pos()))
+			}
+			writeLocks = r.lockMap[anIns]
+		} else {
+			access = " Read of "
+			errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].String()), " in function ", aurora.BrightGreen(anIns.Parent().Name()), " at ", r.prog.Fset.Position(anIns.Pos()))
+			readLocks = append(r.lockMap[anIns], r.RlockMap[anIns]...)
+		}
+		log.Print(errMsg)
+		var printStack []string // store functions in stack and pop terminated functions
+		var printPos []token.Pos
+		if !allEntries {
+			for p, everyIns := range r.RWIns[goIDs[i]] {
+				if p < insInd[i]-1 {
+					if isFunc, ok := everyIns.(*ssa.Call); ok {
+						printName := isFunc.Call.Value.Name()
+						printName = checkTokenName(printName, everyIns.(*ssa.Call))
+						printStack = append(printStack, printName)
+						printPos = append(printPos, everyIns.Pos())
+					} else if _, ok1 := everyIns.(*ssa.Return); ok1 && len(printStack) > 0 {
+						printStack = printStack[:len(printStack)-1]
+						printPos = printPos[:len(printPos)-1]
+					}
+				} else {
+					continue
+				}
+			}
+		} else {
+			for p, everyIns := range r.RWIns[goIDs[i]] {
+				if p < insInd[i]-1 {
+					if isFunc, ok := everyIns.(*ssa.Call); ok {
+						printName := isFunc.Call.Value.Name()
+						printName = checkTokenName(printName, everyIns.(*ssa.Call))
+						printStack = append(printStack, printName)
+						printPos = append(printPos, everyIns.Pos())
+					} else if _, ok1 := everyIns.(*ssa.Return); ok1 && len(printStack) > 0 {
+						printStack = printStack[:len(printStack)-1]
+						printPos = printPos[:len(printPos)-1]
+					}
+				} else {
+					continue
+				}
+			}
+		}
+		if len(printStack) > 0 {
+			log.Println("\tcalled by function[s]: ")
+			for p, toPrint := range printStack {
+				if len(printPos) != 0 {
+					log.Println("\t ", strings.Repeat(" ", p), toPrint, r.prog.Fset.Position(printPos[p]))
+				}
+			}
+		}
+		if goIDs[i] > 0 { // show location where calling goroutine was spawned
+			log.Println("\tin goroutine  ***", r.goNames[goIDs[i]], "[", goIDs[i], "] *** , with the following call stack: ")
+		} else { // main goroutine
+			log.Println("\tin goroutine  ***", r.goNames[goIDs[i]], "[", goIDs[i], "] *** ")
+		}
+		var pathGo []int
+		j := goIDs[i]
+		for j > 0 {
+			pathGo = append([]int{j}, pathGo...)
+			temp := r.goCaller[j]
+			j = temp
+		}
+		for q, eachGo := range pathGo {
+			eachStack := r.goStack[eachGo]
+			for k, eachFn := range eachStack {
+				if k == 0 {
+					log.Println("\t ", strings.Repeat(" ", q), "--> Goroutine: ", eachFn, "[", r.goCaller[eachGo], "]")
 				} else {
 					log.Println("\t   ", strings.Repeat(" ", q), strings.Repeat(" ", k), eachFn)
 				}

@@ -21,26 +21,23 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 	indir := false // toggle for indirect query (global variables)
 	if pointer.CanPoint(location.Type()) {
 		if useDefaultPTA {
-			a.pta0Cfg.AddQuery(location)
+			a.mu.Lock()
+			a.ptaCfg0.AddQuery(location)
+			a.mu.Unlock()
 		}
 	} else if underType, ok := location.Type().Underlying().(*types.Pointer); ok && pointer.CanPoint(underType.Elem()) {
 		indir = true
 		if useDefaultPTA {
-			a.pta0Cfg.AddIndirectQuery(location)
+			a.ptaCfg0.AddIndirectQuery(location)
 		}
 	}
-	//var result map[*ssa.Package]*pointer.Result
-	var ptaResult *pta0.Result
-	//var err error
-	if useDefaultPTA {
-		ptaResult, _ = pta0.Analyze(a.pta0Cfg)
-		a.pta0Result = ptaResult
-	}
+
 	var ptrSet []pointer.PointerWCtx
 	var pta0Set map[ssa.Value]pta0.Pointer
 	var PT0Set []*pta0.Label
 	if useDefaultPTA {
-		pta0Set = a.pta0Result.Queries
+		a.ptaRes0, _ = pta0.Analyze(a.ptaCfg0)
+		pta0Set = a.ptaRes0.Queries
 		PT0Set = pta0Set[location].PointsTo().Labels()
 
 		var fnName string
@@ -69,7 +66,7 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 			fnName = theFunc.Name()
 			if !a.exploredFunction(theFunc, goID, theIns) {
 				a.updateRecords(fnName, goID, "PUSH ")
-				a.RWIns[a.fromPath][goID] = append(a.RWIns[a.fromPath][goID], theIns)
+				a.RWIns[goID] = append(a.RWIns[goID], theIns)
 				a.visitAllInstructions(theFunc, goID)
 			}
 		case *ssa.MakeInterface:
@@ -81,7 +78,7 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 			fnName = check.Name()
 			if !a.exploredFunction(check, goID, theIns) {
 				a.updateRecords(fnName, goID, "PUSH ")
-				a.RWIns[a.fromPath][goID] = append(a.RWIns[a.fromPath][goID], theIns)
+				a.RWIns[goID] = append(a.RWIns[goID], theIns)
 				a.visitAllInstructions(check, goID)
 			}
 		case *ssa.MakeChan:
@@ -90,10 +87,9 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 			break
 		}
 	} else { // new PTA
-		ptrSet = a.result[a.main].Queries[location]          // set of pointers (with context) from result of pointer analysis
-
+		ptrSet = a.ptaRes[a.main].Queries[location] // set of pointers (with context) from ptaRes of pointer analysis
 		if indir {
-			ptrSetIndir := a.result[a.main].IndirectQueries[location]
+			ptrSetIndir := a.ptaRes[a.main].IndirectQueries[location]
 			_ = ptrSetIndir// TODO: check these labels
 		}
 
@@ -138,7 +134,7 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 			fnName = theFunc.Name()
 			if !a.exploredFunction(theFunc, goID, theIns) {
 				a.updateRecords(fnName, goID, "PUSH ")
-				a.RWIns[a.fromPath][goID] = append(a.RWIns[a.fromPath][goID], theIns)
+				a.RWIns[goID] = append(a.RWIns[goID], theIns)
 				a.visitAllInstructions(theFunc, goID)
 			}
 		case *ssa.MakeInterface:
@@ -150,7 +146,7 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 			fnName = check.Name()
 			if !a.exploredFunction(check, goID, theIns) {
 				a.updateRecords(fnName, goID, "PUSH ")
-				a.RWIns[a.fromPath][goID] = append(a.RWIns[a.fromPath][goID], theIns)
+				a.RWIns[goID] = append(a.RWIns[goID], theIns)
 				a.visitAllInstructions(check, goID)
 			}
 		case *ssa.MakeChan:

@@ -16,11 +16,11 @@ import (
 )
 
 type analysis struct {
-	mu 				sync.RWMutex
-	result       	map[*ssa.Package]*pointer.Result //now can reuse the result
-	pta0Result 		*pta0.Result
-	ptaConfig    	*pointer.Config
-	pta0Cfg			*pta0.Config
+	mu      sync.RWMutex
+	ptaRes  map[*ssa.Package]*pointer.Result //now can reuse the ptaRes
+	ptaRes0 *pta0.Result
+	ptaCfg  *pointer.Config
+	ptaCfg0 *pta0.Config
 
 	fromPath		string
 	prog            *ssa.Program
@@ -31,13 +31,11 @@ type analysis struct {
 	HBgraph         *graph.Graph
 	RWinsMap        map[goIns]graph.Node
 	trieMap         map[fnInfo]*trie 				// map each function to a trie node
-	RWIns           map[string][][]ssa.Instruction
-	RWInsInd	    [][]ssa.Instruction
-	insDRA          int 							// index of instruction (in main goroutine) at which to begin data race analysis
+	RWIns           [][]ssa.Instruction				// instructions grouped by goroutine
+	insDRA          int								// index of instruction (in main goroutine) at which to begin data race analysis
 	storeIns        []string
 	workList        []goroutineInfo
 	reportedAddr    []ssa.Value 					// stores already reported addresses
-	racyStackTops   []string
 	levels          map[int]int
 	lockMap         map[ssa.Instruction][]ssa.Value // map each read/write access to a snapshot of actively maintained lockset
 	lockSet         []ssa.Value                     // active lockset, to be maintained along instruction traversal
@@ -47,7 +45,7 @@ type analysis struct {
 	goRLockset      map[int][]ssa.Value             // map each goroutine to its initial set of read locks
 	mapFreeze       bool
 	paramFunc       ssa.Value
-	goStack         map[string][][]string
+	goStack         [][]string
 	goCaller        map[int]int
 	goNames         map[int]string
 	chanToken		map[string]string				// map token number to channel name
@@ -67,7 +65,7 @@ type analysis struct {
 	ifSuccEnd       map[ssa.Instruction]*ssa.Return // map ending of successor block to final return statement
 	commIfSucc      []ssa.Instruction               // store first ins of succ block that contains channel communication
 	omitComm        []*ssa.BasicBlock               // omit these blocks as they are race-free due to channel communication
-	finalReport		[]*raceReport
+	racyStackTops	[]string
 }
 
 type raceInfo struct {
@@ -81,20 +79,27 @@ type raceReport struct {
 	entryInfo		string
 	racePairs		[]*raceInfo
 	noGoroutines	int
+	prog 			*ssa.Program
+	lockMap		 	map[ssa.Instruction][]ssa.Value
+	RlockMap		map[ssa.Instruction][]ssa.Value
+	RWIns			[][]ssa.Instruction
+	goNames	        map[int]string
+	goCaller			map[int]int
+	goStack         [][]string
 }
 
 type AnalysisRunner struct {
-	mu    			sync.Mutex
-	Analysis 		*analysis
-	fromPath		string
-	prog 			*ssa.Program
-	pkgs 			[]*ssa.Package
-	ptaconfig 		*pointer.Config
-	ptaresult 		map[*ssa.Package]*pointer.Result
-	pta0Cfg			*pta0.Config
-	ptaResult 		*pta0.Result
-	trieLimit		int      // set as user config option later, an integer that dictates how many times a function can be called under identical context
-	efficiency		bool // configuration setting to avoid recursion in tested program
+	mu         	sync.Mutex
+	prog       	*ssa.Program
+	pkgs       	[]*ssa.Package
+	ptaConfig  	*pointer.Config
+	ptaResult  	map[*ssa.Package]*pointer.Result
+	ptaConfig0 	*pta0.Config
+	ptaResult0 	*pta0.Result
+	trieLimit  	int      // set as user config option later, an integer that dictates how many times a function can be called under identical context
+	efficiency 	bool // configuration setting to avoid recursion in tested program
+	racyStackTops   []string
+	finalReport	[]*raceReport
 }
 
 type fnInfo struct { // all fields must be comparable for fnInfo to be used as key to trieMap
@@ -156,7 +161,11 @@ func main() {//default: -useNewPTA
 	withComm := flag.Bool("withComm", false, "Show analysis results with communication consideration.")
 	analyzeAll := flag.Bool("analyzeAll", false, "Analyze all main() entry-points. ")
 	runTest := flag.Bool("runTest", false, "For micro-benchmark debugging... ")
+	//setTrie := flag.Int("trieLimit", 1, "Set trie limit... ")
 	flag.Parse()
+	//if *setTrie > 1 {
+	//	trieLimit = *setTrie
+	//}
 	if *runTest {
 		efficiency = false
 		trieLimit = 2
@@ -214,7 +223,6 @@ func main() {//default: -useNewPTA
 	runner := &AnalysisRunner{
 		trieLimit: trieLimit,
 		efficiency: efficiency,
-		fromPath: "",
 	}
 	err0 := runner.Run(flag.Args())
 	if stats.CollectStats {
