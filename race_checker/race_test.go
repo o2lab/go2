@@ -239,7 +239,7 @@ func runChecker(t *testing.T, filenames []string) ([]*ast.File, []error) {
 		t.Fatal(err)
 	}
 	var raceErrors []error
-	for _, msg := range runner.Analysis.racyStackTops {
+	for _, msg := range runner.racyStackTops {
 		raceErrors = append(raceErrors, fmt.Errorf(msg))
 	}
 	return files, raceErrors

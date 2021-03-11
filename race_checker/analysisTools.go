@@ -18,7 +18,7 @@ func (a *analysis) buildHB() {
 	waitingN := make(map[*ssa.Call]graph.Node)
 	chanRecvs := make(map[string]graph.Node) // map channel name to graph node
 	chanSends := make(map[string]graph.Node) // map channel name to graph node
-	for nGo, insSlice := range a.RWInsInd {
+	for nGo, insSlice := range a.RWIns {
 		for i, anIns := range insSlice {
 			disjoin := false // detach select case statement from subsequent instruction
 			insKey := goIns{ins: anIns, goID: nGo}
@@ -214,15 +214,14 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 		if fn.Name() == entryFn {
 			a.levels[goID] = 0 // initialize level count at main entry
 			a.updateRecords(fn.Name(), goID, "PUSH ")
-			a.goStack[a.fromPath] = append(a.goStack[a.fromPath], []string{}) // initialize first interior slice for main goroutine
-			a.trieMap = make(map[fnInfo]*trie)
+			a.goStack = append(a.goStack, []string{}) // initialize first interior slice for main goroutine
 		}
 	}
 	if _, ok := a.levels[goID]; !ok && goID > 0 { // initialize level counter for new goroutine
 		a.levels[goID] = 1
 	}
-	if goID >= len(a.RWIns[a.fromPath]) { // initialize interior slice for new goroutine
-		a.RWIns[a.fromPath] = append(a.RWIns[a.fromPath], []ssa.Instruction{})
+	if goID >= len(a.RWIns) { // initialize interior slice for new goroutine
+		a.RWIns = append(a.RWIns, []ssa.Instruction{})
 	}
 	fnBlocks := fn.Blocks
 	bCap := 1
@@ -316,25 +315,31 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 						fnName = checkTokenNameDefer(fnName, deferIns)
 						if !a.exploredFunction(deferIns.Call.StaticCallee(), goID, theIns) {
 							a.updateRecords(fnName, goID, "PUSH ")
-							a.RWIns[a.fromPath][goID] = append(a.RWIns[a.fromPath][goID], dIns)
+							a.RWIns[goID] = append(a.RWIns[goID], dIns)
 							a.visitAllInstructions(deferIns.Call.StaticCallee(), goID)
 						}
 					} else if deferIns.Call.StaticCallee().Name() == "Unlock" {
 						lockLoc := deferIns.Call.Args[0]
 						if !useNewPTA {
-							a.pta0Cfg.AddQuery(lockLoc)
+							a.mu.Lock()
+							a.ptaCfg0.AddQuery(lockLoc)
+							a.mu.Unlock()
 						}
 						toUnlock = append(toUnlock, lockLoc)
 					} else if deferIns.Call.StaticCallee().Name() == "RUnlock" {
 						RlockLoc := deferIns.Call.Args[0]
 						if !useNewPTA {
-							a.pta0Cfg.AddQuery(RlockLoc)
+							a.mu.Lock()
+							a.ptaCfg0.AddQuery(RlockLoc)
+							a.mu.Unlock()
 						}
 						toRUnlock = append(toRUnlock, RlockLoc)
 					} else if deferIns.Call.Value.Name() == "Done" {
-						a.RWIns[a.fromPath][goID] = append(a.RWIns[a.fromPath][goID], dIns)
+						a.RWIns[goID] = append(a.RWIns[goID], dIns)
 						if !useNewPTA {
-							a.pta0Cfg.AddQuery(deferIns.Call.Args[0])
+							a.mu.Lock()
+							a.ptaCfg0.AddQuery(deferIns.Call.Args[0])
+							a.mu.Unlock()
 						}
 					}
 				}
@@ -402,7 +407,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 			case *ssa.Go: // for spawning of goroutines
 				a.insGo(examIns, goID, theIns)
 			case *ssa.Return:
-				a.RWIns[a.fromPath][goID] = append(a.RWIns[a.fromPath][goID], theIns)
+				a.RWIns[goID] = append(a.RWIns[goID], theIns)
 				if examIns.Block().Comment == "if.then" || examIns.Block().Comment == "if.else" || examIns.Block().Comment == "if.done" {
 					a.ifFnReturn[fn] = examIns // will be revised iteratively to eventually contain final return instruction
 				}
@@ -414,10 +419,10 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				selIns = examIns
 				a.selectBloc[bVisit[bInd]] = examIns
 			case *ssa.If:
-				a.RWIns[a.fromPath][goID] = append(a.RWIns[a.fromPath][goID], theIns)
+				a.RWIns[goID] = append(a.RWIns[goID], theIns)
 				ifIns = examIns
 			default:
-				a.RWIns[a.fromPath][goID] = append(a.RWIns[a.fromPath][goID], theIns) // TODO: consolidate
+				a.RWIns[goID] = append(a.RWIns[goID], theIns) // TODO: consolidate
 			}
 			if ii == len(aBlock.Instrs)-1 && a.mapFreeze { // TODO: this can happen too early
 				a.mapFreeze = false
@@ -425,14 +430,14 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 			if activeCase && readyChans[selCount] != "defaultCase" && readyChans[selCount] != "timeOut" {
 				if ii == 0 {
 					a.selectCaseBegin[theIns] = readyChans[selCount] // map first instruction in case to channel name
-					if a.RWIns[a.fromPath][goID][len(a.RWIns[a.fromPath][goID])-1] != theIns {
-						a.RWIns[a.fromPath][goID] = append(a.RWIns[a.fromPath][goID], theIns)
+					if a.RWIns[goID][len(a.RWIns[goID])-1] != theIns {
+						a.RWIns[goID] = append(a.RWIns[goID], theIns)
 					}
 					a.selectCaseBody[theIns] = selIns
 				} else if ii == len(aBlock.Instrs)-1 {
 					a.selectCaseEnd[theIns] = readyChans[selCount] // map last instruction in case to channel name
-					if a.RWIns[a.fromPath][goID][len(a.RWIns[a.fromPath][goID])-1] != theIns {
-						a.RWIns[a.fromPath][goID] = append(a.RWIns[a.fromPath][goID], theIns)
+					if a.RWIns[goID][len(a.RWIns[goID])-1] != theIns {
+						a.RWIns[goID] = append(a.RWIns[goID], theIns)
 					}
 					a.selectCaseBody[theIns] = selIns
 				} else {
@@ -443,8 +448,8 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				a.selectCaseBody[theIns] = selIns
 			}
 			if selDone && ii == 0 {
-				if sliceContainsInsAt(a.RWIns[a.fromPath][goID], theIns) == -1 {
-					a.RWIns[a.fromPath][goID] = append(a.RWIns[a.fromPath][goID], theIns)
+				if sliceContainsInsAt(a.RWIns[goID], theIns) == -1 {
+					a.RWIns[goID] = append(a.RWIns[goID], theIns)
 				}
 			}
 		}
@@ -512,10 +517,10 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 // newGoroutine goes through the goroutine, logs its info, and goes through the instructions within
 func (a *analysis) newGoroutine(info goroutineInfo) {
 	a.storeIns = append(a.storeIns, info.entryMethod)
-	if info.goID >= len(a.RWIns[a.fromPath]) { // initialize interior slice for new goroutine
-		a.RWIns[a.fromPath] = append(a.RWIns[a.fromPath], []ssa.Instruction{})
+	if info.goID >= len(a.RWIns) { // initialize interior slice for new goroutine
+		a.RWIns = append(a.RWIns, []ssa.Instruction{})
 	}
-	a.RWIns[a.fromPath][info.goID] = append(a.RWIns[a.fromPath][info.goID], info.goIns)
+	a.RWIns[info.goID] = append(a.RWIns[info.goID], info.goIns)
 	a.goNames[info.goID] = info.entryMethod
 	if !allEntries {
 		log.Debug(strings.Repeat("-", 35), "Goroutine ", info.entryMethod, strings.Repeat("-", 35), "[", info.goID, "]")
@@ -539,7 +544,7 @@ func (a *analysis) exploredFunction(fn *ssa.Function, goID int, theIns ssa.Instr
 	if efficiency && !a.fromPkgsOfInterest(fn) { // for temporary debugging purposes only
 		return true
 	}
-	if sliceContainsInsAt(a.RWIns[a.fromPath][goID], theIns) >= 0 {
+	if sliceContainsInsAt(a.RWIns[goID], theIns) >= 0 {
 		return true
 	}
 	if efficiency && sliceContainsStr(a.storeIns, fn.Name()) { // for temporary debugging purposes only
@@ -547,7 +552,7 @@ func (a *analysis) exploredFunction(fn *ssa.Function, goID int, theIns ssa.Instr
 	}
 	visitedIns := []ssa.Instruction{}
 	if len(a.RWIns) > 0 {
-		visitedIns = a.RWIns[a.fromPath][goID]
+		visitedIns = a.RWIns[goID]
 	}
 	csSlice, csStr := insToCallStack(visitedIns)
 	if sliceContainsStrCtr(csSlice, fn.Name()) > trieLimit {
