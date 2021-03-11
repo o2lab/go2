@@ -248,14 +248,14 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		wg.Add(1)
 		go func(main *ssa.Package) {
 			defer wg.Done()
-			if m.Pkg.Path() != "command-line-arguments" {
-				Analysis.fromPath = m.Pkg.Path()
+			if main.Pkg.Path() != "command-line-arguments" {
+				Analysis.fromPath = main.Pkg.Path()
 			}
 			if !allEntries {
 				log.Info("Compiling stack trace for every Goroutine... ")
 				log.Debug(strings.Repeat("-", 35), "Stack trace begins", strings.Repeat("-", 35))
 			}
-			Analysis.visitAllInstructions(m.Func(entryFn), 0)
+			Analysis.visitAllInstructions(main.Func(entryFn), 0)
 			if !allEntries {
 				log.Debug(strings.Repeat("-", 35), "Stack trace ends", strings.Repeat("-", 35))
 			}
