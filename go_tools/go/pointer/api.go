@@ -433,9 +433,9 @@ func (r *ResultWCtx) pointsTo(v ssa.Value) []PointerWCtx {
 }
 
 //bz: user API: return PointerWCtx for a ssa.Value used under context of *ssa.GO,
-//input: ssa.Value, *ssa.GO;
-//output: PointerWCtx; this can be empty with nothing if we cannot match any
-func (r *ResultWCtx) pointsToByGo(v ssa.Value, goInstr *ssa.Go) PointerWCtx {
+//input: ssa.Value, *ssa.GO
+//output: PointerWCtx; this can be empty if we cannot match any v with its goInstr
+func (r *ResultWCtx) PointsToByGo(v ssa.Value, goInstr *ssa.Go) PointerWCtx {
 	ptss := r.pointsToFreeVar(v)
 	if ptss != nil {
 		return ptss[0] //bz: should only have one value
@@ -455,8 +455,8 @@ func (r *ResultWCtx) pointsToByGo(v ssa.Value, goInstr *ssa.Go) PointerWCtx {
 	return PointerWCtx{a: nil}
 }
 
-//bz: user API: return PointerWCtx for a ssa.Value used under the main context
-func (r *ResultWCtx) pointsToByMain(v ssa.Value) PointerWCtx {
+//bz: user API: return PointerWCtx for a ssa.Value used under the MAIN context
+func (r *ResultWCtx) PointsToByMain(v ssa.Value) PointerWCtx {
 	ptss := r.pointsToFreeVar(v)
 	if ptss != nil {
 		return ptss[0] //bz: should only have one value
@@ -527,7 +527,7 @@ func (r *ResultWCtx) pointsToFurther(v ssa.Value) []PointerWCtx {
 	return nil
 }
 
-//bz: for mine data
+//bz: for my data, debug, performance
 func (r *ResultWCtx) CountMyReachUnreachFunctions(doDetail bool) (map[*ssa.Function]*ssa.Function, map[*ssa.Function]*ssa.Function,
 	map[int]int, map[int]int, map[*ssa.Function]*ssa.Function) {
 	//cgns
