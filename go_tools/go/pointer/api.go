@@ -76,12 +76,12 @@ type Config struct {
 	//bz: origin-sensitive -> go routine as origin-entry
 	Origin bool
 	//bz: shared config by context-sensitive
-	K              int      //how many level? the most recent callsite/origin?
-	LimitScope     bool     //only apply kcfa to app methods
-	DEBUG          bool     //print out debug info
-	Scope          []string //analyzed scope -> from user input: -path
-	Exclusion      []string //excluded packages from this analysis -> from race_checker if any
-	TrackMore      bool     //bz: track pointers with all types
+	K          int      //how many level? the most recent callsite/origin?
+	LimitScope bool     //only apply kcfa to app methods
+	DEBUG      bool     //print out debug info
+	Scope      []string //analyzed scope -> from user input: -path
+	Exclusion  []string //excluded packages from this analysis -> from race_checker if any
+	TrackMore  bool     //bz: track pointers with all types
 
 	imports       []string //bz: internal use: store all import pkgs in a main
 	Level         int      //bz: level == 0: traverse all app and lib, but with different ctx; level == 1: traverse 1 level lib call; level == 2: traverse 2 leve lib calls; no other option now
@@ -209,7 +209,7 @@ type ResultWCtx struct {
 	ExtendedQueries map[ssa.Value][]PointerWCtx
 	Warnings        []Warning // warnings of unsoundness
 
-	DEBUG          bool // bz: print out debug info ...
+	DEBUG bool // bz: print out debug info ...
 }
 
 //bz:
@@ -435,7 +435,7 @@ func (r *ResultWCtx) pointsTo(v ssa.Value) []PointerWCtx {
 //bz: user API: return PointerWCtx for a ssa.Value used under context of *ssa.GO,
 //input: ssa.Value, *ssa.GO
 //output: PointerWCtx; this can be empty if we cannot match any v with its goInstr
-func (r *ResultWCtx) PointsToByGo(v ssa.Value, goInstr *ssa.Go) PointerWCtx {
+func (r *ResultWCtx) pointsToByGo(v ssa.Value, goInstr *ssa.Go) PointerWCtx {
 	ptss := r.pointsToFreeVar(v)
 	if ptss != nil {
 		return ptss[0] //bz: should only have one value
@@ -456,7 +456,7 @@ func (r *ResultWCtx) PointsToByGo(v ssa.Value, goInstr *ssa.Go) PointerWCtx {
 }
 
 //bz: user API: return PointerWCtx for a ssa.Value used under the MAIN context
-func (r *ResultWCtx) PointsToByMain(v ssa.Value) PointerWCtx {
+func (r *ResultWCtx) pointsToByMain(v ssa.Value) PointerWCtx {
 	ptss := r.pointsToFreeVar(v)
 	if ptss != nil {
 		return ptss[0] //bz: should only have one value
@@ -744,6 +744,46 @@ func (r *Result) DumpAll() {
 //bz: do comparison with default
 func (r *Result) GetResult() *ResultWCtx {
 	return r.a.result
+}
+
+//bz: user API: return PointerWCtx for a ssa.Value used under context of *ssa.GO,
+//input: ssa.Value, *ssa.GO
+//output: PointerWCtx; this can be empty if we cannot match any v with its goInstr
+func (r *Result) PointsToByGo(v ssa.Value, goInstr *ssa.Go) PointerWCtx {
+	ptss := r.GetResult().pointsToFreeVar(v)
+	if ptss != nil {
+		return ptss[0] //bz: should only have one value
+	}
+	if goInstr == nil {
+		return r.GetResult().pointsToByMain(v)
+	}
+	ptss = r.GetResult().pointsToRegular(v) //return type: []PointerWCtx
+	for _, pts := range ptss {
+		if pts.MatchMyContext(goInstr) {
+			return pts
+		}
+	}
+	//fmt.Println(" ****  Pointer Analysis cannot match this ssa.Value: " + v.String() + " with this *ssa.GO: " + goInstr.String() + " **** ") //panic
+	return PointerWCtx{a: nil}
+}
+
+//bz: user API: return PointerWCtx for a ssa.Value used under the MAIN context
+func (r *Result) PointsToByMain(v ssa.Value) PointerWCtx {
+	ptss := r.GetResult().pointsToFreeVar(v)
+	if ptss != nil {
+		return ptss[0] //bz: should only have one value
+	}
+	ptss = r.GetResult().pointsToRegular(v) //return type: []PointerWCtx
+	for _, pts := range ptss {
+		if pts.cgn == nil || pts.cgn.callersite == nil || pts.cgn.callersite[0] == nil {
+			continue //from extended query or shared contour
+		}
+		if pts.cgn.callersite[0].targets == r.GetResult().main.callersite[0].targets {
+			return pts
+		}
+	}
+	//fmt.Println(" ****  Pointer Analysis cannot match this ssa.Value: " + v.String() + " with main thread **** ") //panic
+	return PointerWCtx{a: nil}
 }
 
 //bz: do comparison with default
