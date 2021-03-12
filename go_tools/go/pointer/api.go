@@ -205,7 +205,7 @@ type ResultWCtx struct {
 	Queries         map[ssa.Value][]PointerWCtx // pts(v) for each v in setValueNode().
 	IndirectQueries map[ssa.Value][]PointerWCtx // pts(*v) for each v in setValueNode().
 	GlobalQueries   map[ssa.Value][]PointerWCtx // pts(v) for each freevar in setValueNode().
-	ExtendedQueries map[ssa.Value][]PointerWCtx
+	ExtendedQueries map[ssa.Value][]PointerWCtx // all other v
 	Warnings        []Warning // warnings of unsoundness
 
 	DEBUG bool // bz: print out debug info ...
@@ -511,7 +511,9 @@ func (r *ResultWCtx) pointsToFreeVar(v ssa.Value) []PointerWCtx {
 			return pointers
 		}
 	}
-	//fmt.Println(" ****  Pointer Analysis did not record for this ssa.Value: " + v.String() + " **** (PointsToFreeVar)") //panic
+	if r.DEBUG {
+		fmt.Println(" ****  Pointer Analysis did not record for this ssa.Value: " + v.String() + " **** (PointsToFreeVar)") //panic
+	}
 	return nil
 }
 
@@ -749,20 +751,30 @@ func (r *Result) GetResult() *ResultWCtx {
 //input: ssa.Value, *ssa.GO
 //output: PointerWCtx; this can be empty if we cannot match any v with its goInstr
 func (r *Result) PointsToByGo(v ssa.Value, goInstr *ssa.Go) PointerWCtx {
-	ptss := r.a.result.pointsToFreeVar(v)
-	if ptss != nil {
-		return ptss[0] //bz: should only have one value
+	ptss := r.a.result.pointsToRegular(v) //return type: []PointerWCtx
+	_, ok1 := v.(*ssa.FreeVar)
+	_, ok2 := v.(*ssa.Global)
+	_, ok3 := v.(*ssa.UnOp)
+	if ok1 || ok2 || ok3 { //free var: only one pts available
+		return ptss[0]
 	}
+
 	if goInstr == nil {
 		return r.a.result.pointsToByMain(v)
 	}
-	ptss = r.GetResult().pointsToRegular(v) //return type: []PointerWCtx
+	//others
 	for _, pts := range ptss {
 		if pts.MatchMyContext(goInstr) {
 			return pts
 		}
 	}
-	//fmt.Println(" ****  Pointer Analysis cannot match this ssa.Value: " + v.String() + " with this *ssa.GO: " + goInstr.String() + " **** ") //panic
+	if r.a.result.DEBUG {
+		if goInstr == nil {
+			fmt.Println(" **** *Result: Pointer Analysis cannot match this ssa.Value: " + v.String() + " with this *ssa.GO: main **** ") //panic
+		}else{
+			fmt.Println(" **** *Result: Pointer Analysis cannot match this ssa.Value: " + v.String() + " with this *ssa.GO: " + goInstr.String() + " **** ") //panic
+		}
+	}
 	return PointerWCtx{a: nil}
 }
 

@@ -689,6 +689,10 @@ func translateResult(_result *ResultWCtx, main *ssa.Package) *Result {
 	main2Analysis[main] = result
 	result.a = _result.a
 
+	//also udpate _result for new api
+	_result.Queries = result.Queries
+	_result.IndirectQueries = result.IndirectQueries
+
 	return result
 }
 
