@@ -221,7 +221,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 				prog:     runner.prog,
 				pkgs:     runner.pkgs,
 				mains:    mains,
-				main:            m,
+				main:            main,
 				RWinsMap:        make(map[goIns]graph.Node),
 				trieMap:         make(map[fnInfo]*trie),
 				insDRA:          0,
