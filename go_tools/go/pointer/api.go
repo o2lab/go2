@@ -434,13 +434,13 @@ func (r *ResultWCtx) pointsTo(v ssa.Value) []PointerWCtx {
 //bz: user API: return PointerWCtx for a ssa.Value used under context of *ssa.GO,
 //input: ssa.Value, *ssa.GO
 //output: PointerWCtx; this can be empty if we cannot match any v with its goInstr
-func (r *ResultWCtx) PointsToByGo(v ssa.Value, goInstr *ssa.Go) PointerWCtx {
+func (r *ResultWCtx) pointsToByGo(v ssa.Value, goInstr *ssa.Go) PointerWCtx {
 	ptss := r.pointsToFreeVar(v)
 	if ptss != nil {
 		return ptss[0] //bz: should only have one value
 	}
 	if goInstr == nil {
-		return r.PointsToByMain(v)
+		return r.pointsToByMain(v)
 	}
 	ptss = r.pointsToRegular(v) //return type: []PointerWCtx
 	for _, pts := range ptss {
@@ -455,7 +455,7 @@ func (r *ResultWCtx) PointsToByGo(v ssa.Value, goInstr *ssa.Go) PointerWCtx {
 }
 
 //bz: user API: return PointerWCtx for a ssa.Value used under the MAIN context
-func (r *ResultWCtx) PointsToByMain(v ssa.Value) PointerWCtx {
+func (r *ResultWCtx) pointsToByMain(v ssa.Value) PointerWCtx {
 	ptss := r.pointsToFreeVar(v)
 	if ptss != nil {
 		return ptss[0] //bz: should only have one value
@@ -749,12 +749,12 @@ func (r *Result) GetResult() *ResultWCtx {
 //input: ssa.Value, *ssa.GO
 //output: PointerWCtx; this can be empty if we cannot match any v with its goInstr
 func (r *Result) PointsToByGo(v ssa.Value, goInstr *ssa.Go) PointerWCtx {
-	ptss := r.GetResult().pointsToFreeVar(v)
+	ptss := r.a.result.pointsToFreeVar(v)
 	if ptss != nil {
 		return ptss[0] //bz: should only have one value
 	}
 	if goInstr == nil {
-		return r.GetResult().pointsToByMain(v)
+		return r.a.result.pointsToByMain(v)
 	}
 	ptss = r.GetResult().pointsToRegular(v) //return type: []PointerWCtx
 	for _, pts := range ptss {
