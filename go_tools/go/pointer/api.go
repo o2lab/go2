@@ -13,7 +13,6 @@ import (
 	"github.tamu.edu/April1989/go_tools/go/types/typeutil"
 	"go/token"
 	"io"
-	"os"
 	"strconv"
 	"strings"
 )
@@ -435,7 +434,7 @@ func (r *ResultWCtx) pointsTo(v ssa.Value) []PointerWCtx {
 //bz: user API: return PointerWCtx for a ssa.Value used under context of *ssa.GO,
 //input: ssa.Value, *ssa.GO
 //output: PointerWCtx; this can be empty if we cannot match any v with its goInstr
-func (r *ResultWCtx) pointsToByGo(v ssa.Value, goInstr *ssa.Go) PointerWCtx {
+func (r *ResultWCtx) PointsToByGo(v ssa.Value, goInstr *ssa.Go) PointerWCtx {
 	ptss := r.pointsToFreeVar(v)
 	if ptss != nil {
 		return ptss[0] //bz: should only have one value
@@ -456,7 +455,7 @@ func (r *ResultWCtx) pointsToByGo(v ssa.Value, goInstr *ssa.Go) PointerWCtx {
 }
 
 //bz: user API: return PointerWCtx for a ssa.Value used under the MAIN context
-func (r *ResultWCtx) pointsToByMain(v ssa.Value) PointerWCtx {
+func (r *ResultWCtx) PointsToByMain(v ssa.Value) PointerWCtx {
 	ptss := r.pointsToFreeVar(v)
 	if ptss != nil {
 		return ptss[0] //bz: should only have one value
@@ -765,58 +764,6 @@ func (r *Result) PointsToByGo(v ssa.Value, goInstr *ssa.Go) PointerWCtx {
 	}
 	//fmt.Println(" ****  Pointer Analysis cannot match this ssa.Value: " + v.String() + " with this *ssa.GO: " + goInstr.String() + " **** ") //panic
 	return PointerWCtx{a: nil}
-}
-
-//bz: user API: return PointerWCtx for a ssa.Value used under the MAIN context
-func (r *Result) PointsToByMain(v ssa.Value) PointerWCtx {
-	ptss := r.GetResult().pointsToFreeVar(v)
-	if ptss != nil {
-		return ptss[0] //bz: should only have one value
-	}
-	ptss = r.GetResult().pointsToRegular(v) //return type: []PointerWCtx
-	for _, pts := range ptss {
-		if pts.cgn == nil || pts.cgn.callersite == nil || pts.cgn.callersite[0] == nil {
-			continue //from extended query or shared contour
-		}
-		if pts.cgn.callersite[0].targets == r.GetResult().main.callersite[0].targets {
-			return pts
-		}
-	}
-	//fmt.Println(" ****  Pointer Analysis cannot match this ssa.Value: " + v.String() + " with main thread **** ") //panic
-	return PointerWCtx{a: nil}
-}
-
-//bz: do comparison with default
-func (r *Result) DumpToCompare(cgfile *os.File, queryfile *os.File) {
-	_result := r.a.result
-
-	fmt.Println("\nWe are going to dump call graph for comparison. If not desired, turn off doCompare.")
-	callers := _result.CallGraph.Nodes
-	for _, caller := range callers {
-		fmt.Fprintln(cgfile, caller.String()) //bz: with context
-		outs := caller.Out                    // caller --> callee
-		for _, out := range outs {            //callees
-			fmt.Fprintln(cgfile, "  -> "+out.Callee.String()) //bz: with context
-		}
-	}
-
-	fmt.Println("\nWe are going to dump queries for comparison. If not desired, turn off doCompare.")
-	queries := r.Queries
-	inQueries := r.IndirectQueries
-	fmt.Fprintln(queryfile, "Queries Detail: ")
-	for v, ps := range queries {
-		for _, p := range ps { //p -> types.Pointer: includes its context
-			//SSA here is your *ssa.Value
-			fmt.Fprintln(queryfile, "(SSA:"+v.String()+"): {"+p.PointsTo().String()+"}")
-		}
-	}
-
-	fmt.Fprintln(queryfile, "Indirect Queries Detail: ")
-	for v, ps := range inQueries {
-		for _, p := range ps { //p -> types.Pointer: includes its context
-			fmt.Fprintln(queryfile, "(SSA:"+v.String()+"): {"+p.PointsTo().String()+"}")
-		}
-	}
 }
 
 // A Pointer is an equivalence class of pointer-like values.
