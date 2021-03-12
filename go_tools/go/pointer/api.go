@@ -441,7 +441,7 @@ func (r *ResultWCtx) PointsToByGo(v ssa.Value, goInstr *ssa.Go) PointerWCtx {
 		return ptss[0] //bz: should only have one value
 	}
 	if goInstr == nil {
-		return r.pointsToByMain(v)
+		return r.PointsToByMain(v)
 	}
 	ptss = r.pointsToRegular(v) //return type: []PointerWCtx
 	for _, pts := range ptss {
