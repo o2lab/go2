@@ -208,46 +208,46 @@ func (runner *AnalysisRunner) Run(args []string) error {
 	// Iterate each entry point...
 	var wg sync.WaitGroup
 	for _, m := range mains {
-		// Configure static analysis...
-		Analysis := &analysis{
-			ptaRes:   runner.ptaResult,
-			ptaRes0:  runner.ptaResult0,
-			ptaCfg:   runner.ptaConfig,
-			ptaCfg0:  runner.ptaConfig0,
-			fromPath: "",
-			prog:     runner.prog,
-			pkgs:     runner.pkgs,
-			mains:    mains,
-			main:            m,
-			RWinsMap:        make(map[goIns]graph.Node),
-			trieMap:         make(map[fnInfo]*trie),
-			insDRA:          0,
-			levels:          make(map[int]int),
-			lockMap:         make(map[ssa.Instruction][]ssa.Value),
-			RlockMap:        make(map[ssa.Instruction][]ssa.Value),
-			goLockset:       make(map[int][]ssa.Value),
-			goRLockset:      make(map[int][]ssa.Value),
-			mapFreeze:       false,
-			goCaller:        make(map[int]int),
-			goNames:         make(map[int]string),
-			chanToken:       make(map[string]string),
-			chanBuf:         make(map[string]int),
-			chanRcvs:        make(map[string][]*ssa.UnOp),
-			chanSnds:        make(map[string][]*ssa.Send),
-			selectBloc:      make(map[int]*ssa.Select),
-			selReady:        make(map[*ssa.Select][]string),
-			selUnknown:      make(map[*ssa.Select][]string),
-			selectCaseBegin: make(map[ssa.Instruction]string),
-			selectCaseEnd:   make(map[ssa.Instruction]string),
-			selectCaseBody:  make(map[ssa.Instruction]*ssa.Select),
-			selectDone:      make(map[ssa.Instruction]*ssa.Select),
-			ifSuccBegin:     make(map[ssa.Instruction]*ssa.If),
-			ifFnReturn:      make(map[*ssa.Function]*ssa.Return),
-			ifSuccEnd:       make(map[ssa.Instruction]*ssa.Return),
-		}
 		wg.Add(1)
 		go func(main *ssa.Package) {
 			defer wg.Done()
+			// Configure static analysis...
+			Analysis := &analysis{
+				ptaRes:   runner.ptaResult,
+				ptaRes0:  runner.ptaResult0,
+				ptaCfg:   runner.ptaConfig,
+				ptaCfg0:  runner.ptaConfig0,
+				fromPath: "",
+				prog:     runner.prog,
+				pkgs:     runner.pkgs,
+				mains:    mains,
+				main:            m,
+				RWinsMap:        make(map[goIns]graph.Node),
+				trieMap:         make(map[fnInfo]*trie),
+				insDRA:          0,
+				levels:          make(map[int]int),
+				lockMap:         make(map[ssa.Instruction][]ssa.Value),
+				RlockMap:        make(map[ssa.Instruction][]ssa.Value),
+				goLockset:       make(map[int][]ssa.Value),
+				goRLockset:      make(map[int][]ssa.Value),
+				mapFreeze:       false,
+				goCaller:        make(map[int]int),
+				goNames:         make(map[int]string),
+				chanToken:       make(map[string]string),
+				chanBuf:         make(map[string]int),
+				chanRcvs:        make(map[string][]*ssa.UnOp),
+				chanSnds:        make(map[string][]*ssa.Send),
+				selectBloc:      make(map[int]*ssa.Select),
+				selReady:        make(map[*ssa.Select][]string),
+				selUnknown:      make(map[*ssa.Select][]string),
+				selectCaseBegin: make(map[ssa.Instruction]string),
+				selectCaseEnd:   make(map[ssa.Instruction]string),
+				selectCaseBody:  make(map[ssa.Instruction]*ssa.Select),
+				selectDone:      make(map[ssa.Instruction]*ssa.Select),
+				ifSuccBegin:     make(map[ssa.Instruction]*ssa.If),
+				ifFnReturn:      make(map[*ssa.Function]*ssa.Return),
+				ifSuccEnd:       make(map[ssa.Instruction]*ssa.Return),
+			}
 			if main.Pkg.Path() != "command-line-arguments" {
 				Analysis.fromPath = main.Pkg.Path()
 			}
