@@ -15,7 +15,7 @@ func (a *analysis) buildHB() {
 	var selCaseEndN []graph.Node
 	var ifN []graph.Node
 	var ifSuccEndN []graph.Node
-	waitingN := make(map[*ssa.Call]graph.Node)
+	waitingN := make(map[goIns]graph.Node)
 	chanRecvs := make(map[string]graph.Node) // map channel name to graph node
 	chanSends := make(map[string]graph.Node) // map channel name to graph node
 	for nGo, insSlice := range a.RWIns {
@@ -133,10 +133,10 @@ func (a *analysis) buildHB() {
 				a.RWinsMap[insKey] = prevN
 			} else if callIns, ok := anIns.(*ssa.Call); ok { // taking care of WG operations. TODO: identify different WG instances
 				if callIns.Call.Value.Name() == "Wait" {
-					waitingN[callIns] = prevN // store Wait node for later edge creation TO this node
+					waitingN[insKey] = prevN // store Wait node for later edge creation TO this node
 				} else if callIns.Call.Value.Name() == "Done" {
-					for wIns, wNode := range waitingN {
-						if a.sameAddress(callIns.Call.Args[0], wIns.Call.Args[0]) {
+					for wKey, wNode := range waitingN {
+						if a.sameAddress(callIns.Call.Args[0], wKey.ins.(*ssa.Call).Call.Args[0], nGo, wKey.goID) {
 							err := a.HBgraph.MakeEdge(prevN, wNode) // create edge from Done node to Wait node
 							if err != nil {
 								log.Fatal(err)
@@ -146,8 +146,8 @@ func (a *analysis) buildHB() {
 				}
 			} else if dIns, ok1 := anIns.(*ssa.Defer); ok1 {
 				if dIns.Call.Value.Name() == "Done" {
-					for wIns, wNode := range waitingN {
-						if a.sameAddress(dIns.Call.Args[0], wIns.Call.Args[0]) {
+					for wKey, wNode := range waitingN {
+						if a.sameAddress(dIns.Call.Args[0], wKey.ins.(*ssa.Call).Call.Args[0], nGo, wKey.goID) {
 							err := a.HBgraph.MakeEdge(prevN, wNode) // create edge from Done node to Wait node
 							if err != nil {
 								log.Fatal(err)

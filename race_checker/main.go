@@ -70,7 +70,7 @@ type analysis struct {
 
 type raceInfo struct {
 	insPair 		[]ssa.Instruction
-	addrPair 		[]ssa.Value
+	addrPair 		[2]ssa.Value
 	goIDs 			[]int
 	insInd 			[]int
 }
@@ -84,7 +84,7 @@ type raceReport struct {
 	RlockMap		map[ssa.Instruction][]ssa.Value
 	RWIns			[][]ssa.Instruction
 	goNames	        map[int]string
-	goCaller			map[int]int
+	goCaller		map[int]int
 	goStack         [][]string
 }
 

@@ -5,6 +5,7 @@ import (
 	"github.com/logrusorgru/aurora"
 	log "github.com/sirupsen/logrus"
 	"github.com/twmb/algoimpl/go/graph"
+	"github.tamu.edu/April1989/go_tools/go/pointer"
 	"github.tamu.edu/April1989/go_tools/go/ssa"
 	"go/token"
 	"regexp"
@@ -28,15 +29,12 @@ func (a *analysis) checkRacyPairs() []*raceInfo {
 					if (isWriteIns(goI) && isWriteIns(goJ)) || (isWriteIns(goI) && a.isReadIns(goJ)) || (a.isReadIns(goI) && isWriteIns(goJ)) { // only read and write instructions
 						insSlice := []ssa.Instruction{goI, goJ}
 						addressPair := a.insAddress(insSlice) // one instruction from each goroutine
-						if len(addressPair) < 2 {
-							continue
-						}
-						if a.sameAddress(addressPair[0], addressPair[1]) &&
+						if a.sameAddress(addressPair[0], addressPair[1], i, j) &&
 							!sliceContains(a.reportedAddr, addressPair[0]) &&
 							!a.reachable(goI, i, goJ, j) &&
 							!a.reachable(goJ, j, goI, i) &&
 							!a.bothAtomic(insSlice[0], insSlice[1]) &&
-							!a.lockSetsIntersect(insSlice[0], insSlice[1]) &&
+							!a.lockSetsIntersect(goI, goJ, i, j) &&
 							!a.selectMutEx(insSlice[0], insSlice[1]) {
 							a.reportedAddr = append(a.reportedAddr, addressPair[0])
 							ri = &raceInfo{
@@ -59,34 +57,34 @@ func (a *analysis) checkRacyPairs() []*raceInfo {
 }
 
 // insAddress takes a slice of ssa instructions and returns a slice of their corresponding addresses
-func (a *analysis) insAddress(insSlice []ssa.Instruction) []ssa.Value { // obtain addresses of instructions
-	theAddrs := []ssa.Value{}
-	for _, anIns := range insSlice {
+func (a *analysis) insAddress(insSlice []ssa.Instruction) [2]ssa.Value { // obtain addresses of instructions
+	theAddrs := [2]ssa.Value{}
+	for i, anIns := range insSlice {
 		switch theIns := anIns.(type) {
 		case *ssa.Store: // write
-			theAddrs = append(theAddrs, theIns.Addr)
+			theAddrs[i] = theIns.Addr
 		case *ssa.Call:
 			if theIns.Call.Value.Name() == "delete" { // write
-				theAddrs = append(theAddrs, theIns.Call.Args[0].(*ssa.UnOp).X)
+				theAddrs[i] = theIns.Call.Args[0].(*ssa.UnOp).X
 			} else if strings.HasPrefix(theIns.Call.Value.Name(), "Add") && theIns.Call.StaticCallee().Pkg.Pkg.Name() == "atomic" { // write
-				theAddrs = append(theAddrs, theIns.Call.Args[0].(*ssa.FieldAddr).X)
+				theAddrs[i] = theIns.Call.Args[0].(*ssa.FieldAddr).X
 			} else if len(theIns.Call.Args) > 0 { // read
 				for _, anArg := range theIns.Call.Args {
 					if readAcc, ok := anArg.(*ssa.FieldAddr); ok {
-						theAddrs = append(theAddrs, readAcc.X)
+						theAddrs[i] = readAcc.X
 					}
 				}
 			}
 		case *ssa.UnOp: // read
-			theAddrs = append(theAddrs, theIns.X)
+			theAddrs[i] = theIns.X
 		case *ssa.Lookup: // read
-			theAddrs = append(theAddrs, theIns.X)
+			theAddrs[i] = theIns.X
 		case *ssa.FieldAddr: // read
-			theAddrs = append(theAddrs, theIns.X)
+			theAddrs[i] = theIns.X
 		case *ssa.MapUpdate: // write
 			switch accType := theIns.Map.(type) {
 			case *ssa.UnOp:
-				theAddrs = append(theAddrs, accType.X)
+				theAddrs[i] = accType.X
 			case *ssa.MakeMap:
 			}
 		}
@@ -95,7 +93,7 @@ func (a *analysis) insAddress(insSlice []ssa.Instruction) []ssa.Value { // obtai
 }
 
 // sameAddress determines if two addresses have the same global address(for package-level variables only)
-func (a *analysis) sameAddress(addr1 ssa.Value, addr2 ssa.Value) bool {
+func (a *analysis) sameAddress(addr1 ssa.Value, addr2 ssa.Value, go1 int, go2 int) bool {
 	if global1, ok1 := addr1.(*ssa.Global); ok1 {
 		if global2, ok2 := addr2.(*ssa.Global); ok2 {
 			if global1.Pos() == global2.Pos() {// compare position of identifiers
@@ -115,16 +113,32 @@ func (a *analysis) sameAddress(addr1 ssa.Value, addr2 ssa.Value) bool {
 		return ptsets[addr1].PointsTo().Intersects(ptsets[addr2].PointsTo())
 	}
 	// new PTA
-	ptset1 := a.ptaRes[a.main].Queries[addr1]
-	ptset2 := a.ptaRes[a.main].Queries[addr2]
-	for _, ptrCtx1 := range ptset1 {
-		for _, ptrCtx2 := range ptset2 {
-			if ptrCtx1.PointsTo().Intersects(ptrCtx2.PointsTo()) {
-				return true
+	if go1 == 0 && go2 == 0 {
+		ptset1 := a.ptaRes[a.main].Queries[addr1]
+		ptset2 := a.ptaRes[a.main].Queries[addr2]
+		for _, ptrCtx1 := range ptset1 {
+			for _, ptrCtx2 := range ptset2 {
+				if ptrCtx1.MayAlias(ptrCtx2) {
+					return true
+				}
 			}
 		}
+		return false
 	}
-	return false
+	var pt1 pointer.PointerWCtx
+	var pt2 pointer.PointerWCtx
+	if go1 == 0 {
+		pt1 = a.ptaRes[a.main].PointsToByGo(addr1, nil)
+	} else {
+		pt1 = a.ptaRes[a.main].PointsToByGo(addr1, a.RWIns[go1][0].(*ssa.Go))
+	}
+	if go2 == 0 {
+		pt2 = a.ptaRes[a.main].PointsToByGo(addr2, nil)
+	} else {
+		pt2 = a.ptaRes[a.main].PointsToByGo(addr2, a.RWIns[go2][0].(*ssa.Go))
+	}
+	return  pt1.MayAlias(pt2)
+
 }
 
 // reachable determines if 2 input instructions are connected in the Happens-Before Graph
@@ -172,7 +186,7 @@ func sliceContainsNode(slice []graph.Node, node graph.Node) bool {
 }
 
 // lockSetsIntersect determines if two input instructions are trying to access a variable that is protected by the same set of locks
-func (a *analysis) lockSetsIntersect(insA ssa.Instruction, insB ssa.Instruction) bool {
+func (a *analysis) lockSetsIntersect(insA ssa.Instruction, insB ssa.Instruction, goA int, goB int) bool {
 	setA := a.lockMap[insA] // lockset of instruction-A
 	if a.isReadIns(insA) {
 		setA = append(setA, a.RlockMap[insA]...)
@@ -183,7 +197,7 @@ func (a *analysis) lockSetsIntersect(insA ssa.Instruction, insB ssa.Instruction)
 	}
 	for _, addrA := range setA {
 		for _, addrB := range setB {
-			if a.sameAddress(addrA, addrB) {
+			if a.sameAddress(addrA, addrB, goA, goB) {
 				return true
 			} else {
 				posA := getSrcPos(addrA)
@@ -235,7 +249,7 @@ func getSrcPos(address ssa.Value) token.Pos {
 //func (a *analysis) reportRace
 
 // printRace will print the details of a data race such as the write/read of a variable and other helpful information
-func (a *analysis) printRace(counter int, insPair []ssa.Instruction, addrPair []ssa.Value, goIDs []int, insInd []int) {
+func (a *analysis) printRace(counter int, insPair []ssa.Instruction, addrPair [2]ssa.Value, goIDs []int, insInd []int) {
 	log.Printf("Data race #%d", counter)
 	log.Println(strings.Repeat("=", 100))
 	var writeLocks []ssa.Value
@@ -331,7 +345,7 @@ func (a *analysis) printRace(counter int, insPair []ssa.Instruction, addrPair []
 }
 
 
-func (r *raceReport) printRace(counter int, insPair []ssa.Instruction, addrPair []ssa.Value, goIDs []int, insInd []int) {
+func (r *raceReport) printRace(counter int, insPair []ssa.Instruction, addrPair [2]ssa.Value, goIDs []int, insInd []int) {
 	log.Printf("Data race #%d", counter)
 	log.Println(strings.Repeat("=", 100))
 	var writeLocks []ssa.Value

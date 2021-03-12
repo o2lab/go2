@@ -150,7 +150,7 @@ func (a *analysis) lockSetContainsAt(s []ssa.Value, e ssa.Value) int {
 		if aPos == bPos {
 			return i
 		}
-		if a.sameAddress(locA, locB) {
+		if a.sameAddress(locA, locB, 0, 0) {
 			return i
 		}
 	}
