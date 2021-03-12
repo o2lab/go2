@@ -764,15 +764,22 @@ func (r *Result) PointsToByGo(v ssa.Value, goInstr *ssa.Go) PointerWCtx {
 	}
 	//others
 	for _, pts := range ptss {
-		if pts.MatchMyContext(goInstr) {
-			return pts
+		if pts.cgn.fn == v.Parent() { //many same v from different functions, separate them
+			if v.Parent().IsFromApp {
+				if pts.MatchMyContext(goInstr) {
+					return pts
+				}
+			}else{
+				//discard the goInstr input, we use shared contour in real pta, hence only one pts is available
+				return pts
+			}
 		}
 	}
 	if r.a.result.DEBUG {
 		if goInstr == nil {
-			fmt.Println(" **** *Result: Pointer Analysis cannot match this ssa.Value: " + v.String() + " with this *ssa.GO: main **** ") //panic
+			fmt.Println(" **** *Result:", v.Parent(),"Pointer Analysis cannot match this ssa.Value: " + v.String() + " with this *ssa.GO: main **** ") //panic
 		}else{
-			fmt.Println(" **** *Result: Pointer Analysis cannot match this ssa.Value: " + v.String() + " with this *ssa.GO: " + goInstr.String() + " **** ") //panic
+			fmt.Println(" **** *Result:", v.Parent()," Pointer Analysis cannot match this ssa.Value: " + v.String() + " with this *ssa.GO: " + goInstr.String() + " **** ") //panic
 		}
 	}
 	return PointerWCtx{a: nil}
