@@ -100,19 +100,12 @@ func sliceContainsInsAt(s []ssa.Instruction, e ssa.Instruction) int {
 	return -1
 }
 
-// deleteFromLockSet removes k from s
-func (a *analysis) deleteFromLockSet(s []ssa.Value, k int) []ssa.Value {
-	var res []ssa.Value
-	res = append(s[:k], s[k+1:]...)
-	return res
-}
-
 // lockSetContainsAt returns the index of e in s
-func (a *analysis) lockSetContainsAt(s []ssa.Value, e ssa.Value) int {
+func (a *analysis) lockSetContainsAt(s map[int][]*lockInfo, e ssa.Value, goID int) int {
 	var aPos, bPos token.Pos
-	for i, k := range s {
+	for i, k := range s[goID] {
 		var locA, locB ssa.Value
-		switch aType := k.(type) {
+		switch aType := k.locAddr.(type) {
 		case *ssa.Global:
 			aPos = aType.Pos()
 		case *ssa.FieldAddr:
@@ -124,7 +117,6 @@ func (a *analysis) lockSetContainsAt(s []ssa.Value, e ssa.Value) int {
 					aPos = aType1.X.Pos()
 					locA = aType1.X
 				}
-
 			} else {
 				aPos = aType.X.Pos()
 				locA = aType.X
@@ -186,10 +178,10 @@ func (a *analysis) isReadySel(ch string) bool {
 	return false
 }
 
-func lockSetVal(s []ssa.Value) []token.Pos {
-	res := make([]token.Pos, len(s))
-	for i, val := range s {
-		res[i] = val.Pos()
+func lockSetVal(s map[int][]*lockInfo, goID int) []token.Pos {
+	res := make([]token.Pos, 0)
+	for _, ls := range s[goID] {
+		res = append(res, ls.locAddr.Pos())
 	}
 	return res
 }

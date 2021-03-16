@@ -38,12 +38,12 @@ type analysis struct {
 	reportedAddr    []ssa.Value 					// stores already reported addresses
 	levels          map[int]int
 	lockMap         map[ssa.Instruction][]ssa.Value // map each read/write access to a snapshot of actively maintained lockset
-	lockSet         []ssa.Value                     // active lockset, to be maintained along instruction traversal
+	lockSet         map[int][]*lockInfo               // active lockset, to be maintained along instruction traversal
 	RlockMap        map[ssa.Instruction][]ssa.Value // map each read/write access to a snapshot of actively maintained lockset
-	RlockSet        []ssa.Value                     // active lockset, to be maintained along instruction traversal
-	goLockset       map[int][]ssa.Value             // map each goroutine to its initial lockset
-	goRLockset      map[int][]ssa.Value             // map each goroutine to its initial set of read locks
-	mapFreeze       bool
+	RlockSet        map[int][]*lockInfo                     // active lockset, to be maintained along instruction traversal
+	//goLockset       map[int][]ssa.Value             // map each goroutine to its initial lockset
+	//goRLockset      map[int][]ssa.Value             // map each goroutine to its initial set of read locks
+	//mapFreeze       bool
 	paramFunc       ssa.Value
 	goStack         [][]string
 	goCaller        map[int]int
@@ -66,6 +66,11 @@ type analysis struct {
 	commIfSucc      []ssa.Instruction               // store first ins of succ block that contains channel communication
 	omitComm        []*ssa.BasicBlock               // omit these blocks as they are race-free due to channel communication
 	racyStackTops	[]string
+}
+
+type lockInfo struct {
+	locAddr 		ssa.Value
+	locFreeze 		bool
 }
 
 type raceInfo struct {

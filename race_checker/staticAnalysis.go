@@ -231,10 +231,9 @@ func (runner *AnalysisRunner) Run(args []string) error {
 				insDRA:          0,
 				levels:          make(map[int]int),
 				lockMap:         make(map[ssa.Instruction][]ssa.Value),
+				lockSet:         make(map[int][]*lockInfo),
 				RlockMap:        make(map[ssa.Instruction][]ssa.Value),
-				goLockset:       make(map[int][]ssa.Value),
-				goRLockset:      make(map[int][]ssa.Value),
-				mapFreeze:       false,
+				RlockSet:   	 make(map[int][]*lockInfo),
 				goCaller:        make(map[int]int),
 				goNames:         make(map[int]string),
 				chanToken:       make(map[string]string),
@@ -300,8 +299,10 @@ func (runner *AnalysisRunner) Run(args []string) error {
 				entryInfo: main.Pkg.Path(),
 			}
 			rr.racePairs = Analysis.checkRacyPairs()
+			runner.mu.Lock()
 			runner.racyStackTops = Analysis.racyStackTops
 			runner.finalReport = append(runner.finalReport, rr)
+			runner.mu.Unlock()
 		}(m)
 	}
 	wg.Wait()

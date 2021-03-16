@@ -424,8 +424,18 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 			default:
 				a.RWIns[goID] = append(a.RWIns[goID], theIns) // TODO: consolidate
 			}
-			if ii == len(aBlock.Instrs)-1 && a.mapFreeze { // TODO: this can happen too early
-				a.mapFreeze = false
+			if ii == len(aBlock.Instrs)-1 && len(toUnlock) > 0 { // TODO: this can happen too early
+				for _, l := range toUnlock {
+					if a.lockSetContainsAt(a.lockSet, l, goID) == -1 {
+						a.lockSet[a.goCaller[goID]][a.lockSetContainsAt(a.lockSet, l, a.goCaller[goID])].locFreeze = false
+					} else {
+						//a.lockSet[goID][a.lockSetContainsAt(a.lockSet, l, goID)].locFreeze = false
+					}
+				}
+			} else if ii == len(aBlock.Instrs)-1 && len(toRUnlock) > 0 { // TODO: modify for unlock in diff thread
+				for _, l := range toRUnlock {
+					a.RlockSet[goID][a.lockSetContainsAt(a.RlockSet, l, goID)].locFreeze = false
+				}
 			}
 			if activeCase && readyChans[selCount] != "defaultCase" && readyChans[selCount] != "timeOut" {
 				if ii == 0 {
@@ -472,33 +482,24 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 	}
 	if len(toUnlock) > 0 {
 		for _, loc := range toUnlock {
-			if goID == 0 {
-				if z := a.lockSetContainsAt(a.lockSet, loc); z >= 0 {
-					log.Trace("Unlocking ", loc.String(), "  (", a.lockSet[z].Pos(), ") removing index ", z, " from: ", lockSetVal(a.lockSet))
-					a.lockSet = a.deleteFromLockSet(a.lockSet, z)
-				}
+			if z := a.lockSetContainsAt(a.lockSet, loc, goID); z >= 0 {
+				log.Trace("Unlocking ", loc.String(), "  (", a.lockSet[goID][z].locAddr.Pos(), ") removing index ", z, " from: ", lockSetVal(a.lockSet, goID))
+				a.lockSet[goID] = append(a.lockSet[goID][:z], a.lockSet[goID][z+1:]...)
 			} else {
-				if z := a.lockSetContainsAt(a.goLockset[goID], loc); z >= 0 {
-					log.Trace("Unlocking ", loc.String(), "  (", a.goLockset[goID][z].Pos(), ") removing index ", z, " from: ", lockSetVal(a.goLockset[goID]))
-					a.goLockset[goID] = a.deleteFromLockSet(a.goLockset[goID], z)
+				z = a.lockSetContainsAt(a.lockSet, loc, a.goCaller[goID])
+				if z == -1 {
+					continue
 				}
+				a.lockSet[a.goCaller[goID]] = append(a.lockSet[a.goCaller[goID]][:z], a.lockSet[a.goCaller[goID]][z+1:]...)
 			}
 		}
 	}
 	if len(toRUnlock) > 0 {
 		for _, rloc := range toRUnlock {
-			if goID == 0 { // main goroutine
-				if z := a.lockSetContainsAt(a.RlockSet, rloc); z >= 0 {
-					log.Trace("RUnlocking ", rloc.String(), "  (", a.RlockSet[z].Pos(), ") removing index ", z, " from: ", lockSetVal(a.RlockSet))
-					a.RlockSet = a.deleteFromLockSet(a.RlockSet, z)
-				}
-			} else { // worker goroutine
-				if z := a.lockSetContainsAt(a.goRLockset[goID], rloc); z >= 0 {
-					log.Trace("RUnlocking ", rloc.String(), "  (", a.goRLockset[goID][z].Pos(), ") removing index ", z, " from: ", lockSetVal(a.goRLockset[goID]))
-					a.goRLockset[goID] = a.deleteFromLockSet(a.goRLockset[goID], z)
-
-				}
-			}
+			if z := a.lockSetContainsAt(a.RlockSet, rloc, goID); z >= 0 {
+				log.Trace("RUnlocking ", rloc.String(), "  (", a.RlockSet[goID][z].locAddr.Pos(), ") removing index ", z, " from: ", lockSetVal(a.RlockSet, goID))
+				a.RlockSet[goID] = append(a.RlockSet[goID][:z], a.RlockSet[goID][z+1:]...)
+			} //TODO : modify for unlock in diff thread
 		}
 	}
 	// done with all instructions in function body, now pop the function
@@ -524,6 +525,9 @@ func (a *analysis) newGoroutine(info goroutineInfo) {
 	a.goNames[info.goID] = info.entryMethod
 	if !allEntries {
 		log.Debug(strings.Repeat("-", 35), "Goroutine ", info.entryMethod, strings.Repeat("-", 35), "[", info.goID, "]")
+	}
+	if len(a.lockSet[a.goCaller[info.goID]]) > 0 {
+		a.lockSet[info.goID] = a.lockSet[a.goCaller[info.goID]]
 	}
 	if !allEntries {
 		log.Debug(strings.Repeat(" ", a.levels[info.goID]), "PUSH ", info.entryMethod, " at lvl ", a.levels[info.goID])
