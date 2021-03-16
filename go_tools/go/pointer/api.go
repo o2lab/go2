@@ -764,7 +764,7 @@ func (r *Result) PointsToByGo(v ssa.Value, goInstr *ssa.Go) PointerWCtx {
 	}
 	//others
 	for _, pts := range ptss {
-		if pts.cgn.fn == v.Parent() { //many same v from different functions, separate them
+		if pts.cgn.fn == v.Parent() { //many same v (ssa.Value) from different functions, separate them
 			if v.Parent().IsFromApp {
 				if pts.MatchMyContext(goInstr) {
 					return pts
@@ -780,6 +780,45 @@ func (r *Result) PointsToByGo(v ssa.Value, goInstr *ssa.Go) PointerWCtx {
 			fmt.Println(" **** *Result:", v.Parent(),"Pointer Analysis cannot match this ssa.Value: " + v.String() + " with this *ssa.GO: main **** ") //panic
 		}else{
 			fmt.Println(" **** *Result:", v.Parent()," Pointer Analysis cannot match this ssa.Value: " + v.String() + " with this *ssa.GO: " + goInstr.String() + " **** ") //panic
+		}
+	}
+	return PointerWCtx{a: nil}
+}
+
+//bz: user API: return PointerWCtx for a ssa.Value used under context of *ssa.GO,
+//input: ssa.Value, *ssa.GO, loopID = 1/2
+//output: PointerWCtx; this can be empty if we cannot match any v with its goInstr
+//Update: many same v from different functions ... further separate them
+func (r *Result) PointsToByGoWithLoopID(v ssa.Value, goInstr *ssa.Go, loopID int) PointerWCtx {
+	ptss := r.a.result.pointsToRegular(v) //return type: []PointerWCtx
+	_, ok1 := v.(*ssa.FreeVar)
+	_, ok2 := v.(*ssa.Global)
+	_, ok3 := v.(*ssa.UnOp)
+	if ok1 || ok2 || ok3 { //free var: only one pts available
+		return ptss[0]
+	}
+
+	if goInstr == nil {
+		return r.a.result.pointsToByMain(v)
+	}
+	//others
+	for _, pts := range ptss {
+		if pts.cgn.fn == v.Parent() { //many same v (ssa.Value) from different functions, separate them
+			if v.Parent().IsFromApp {
+				if pts.MatchMyContextWithLoopID(goInstr, loopID) {
+					return pts
+				}
+			}else{
+				//discard the goInstr input, we use shared contour in real pta, hence only one pts is available
+				return pts
+			}
+		}
+	}
+	if r.a.result.DEBUG {
+		if goInstr == nil {
+			fmt.Println(" **** *Result: Pointer Analysis cannot match this ssa.Value: " + v.String() + " with this *ssa.GO: main **** ") //panic
+		}else{
+			fmt.Println(" **** *Result: Pointer Analysis cannot match this ssa.Value: " + v.String() + " with this *ssa.GO: " + goInstr.String() + " **** ") //panic
 		}
 	}
 	return PointerWCtx{a: nil}
@@ -931,6 +970,42 @@ func (p PointerWCtx) MatchMyContext(go_instr *ssa.Go) bool {
 		actual_go_instr := actualCS[0].goInstr
 		if actual_go_instr == go_instr {
 			return true
+		}
+	}
+	return false
+}
+
+//bz: whether goID is match with the contexts in this pointer + loopID
+//TODO: this does not match parent context if callsite.length > 1 (k > 1)
+func (p PointerWCtx) MatchMyContextWithLoopID(go_instr *ssa.Go, loopID int) bool {
+	if p.cgn == nil || p.cgn.callersite == nil || p.cgn.callersite[0] == nil {
+		return false //shared contour
+	}
+	my_cs := p.cgn.callersite[0]
+	my_go_instr := my_cs.goInstr
+	if my_go_instr == go_instr {
+		if loopID == 0 {
+			return true //no loop
+		}else if my_cs.loopID == loopID {
+			return true //loop id matched
+		}else {
+			return false //loop id not matched
+		}
+	}
+	if p.cgn.actualCallerSite == nil {
+		return false
+	}
+	//double check actualCallerSite
+	for _, actualCS := range p.cgn.actualCallerSite {
+		actual_go_instr := actualCS[0].goInstr
+		if actual_go_instr == go_instr {
+			if loopID == 0 {
+				return true //no loop
+			}else if actualCS[0].loopID == loopID {
+				return true //loop id matched
+			}else {
+				return false //loop id not matched
+			}
 		}
 	}
 	return false
