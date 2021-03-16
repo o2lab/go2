@@ -405,6 +405,9 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				toUnlock = append(toUnlock, unlockOps...)
 				toRUnlock = append(toRUnlock, runlockOps...)
 			case *ssa.Go: // for spawning of goroutines
+				if aBlock.Comment == "for.body" || aBlock.Comment == "rangeindex.body" {
+					a.insGo(examIns, goID, theIns)
+				}
 				a.insGo(examIns, goID, theIns)
 			case *ssa.Return:
 				a.RWIns[goID] = append(a.RWIns[goID], theIns)
@@ -465,8 +468,8 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 		}
 		if aBlock.Comment == "for.body" || aBlock.Comment == "rangeindex.body" { // repeat unrolling of forloop
 			if repeatSwitch == false {
-				repeatSwitch = true // repeat analysis of current block
-				bInd--
+				//repeatSwitch = true // repeat analysis of current block
+				//bInd--
 			} else { // repetition conducted
 				repeatSwitch = false
 			}
