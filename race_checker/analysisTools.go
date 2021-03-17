@@ -405,10 +405,13 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				toUnlock = append(toUnlock, unlockOps...)
 				toRUnlock = append(toRUnlock, runlockOps...)
 			case *ssa.Go: // for spawning of goroutines
+				loopID := 0
 				if aBlock.Comment == "for.body" || aBlock.Comment == "rangeindex.body" {
-					a.insGo(examIns, goID, theIns)
+					loopID++
+					a.insGo(examIns, goID, theIns, loopID)
+					loopID++
 				}
-				a.insGo(examIns, goID, theIns)
+				a.insGo(examIns, goID, theIns, loopID)
 			case *ssa.Return:
 				a.RWIns[goID] = append(a.RWIns[goID], theIns)
 				if examIns.Block().Comment == "if.then" || examIns.Block().Comment == "if.else" || examIns.Block().Comment == "if.done" {
