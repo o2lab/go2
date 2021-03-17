@@ -429,10 +429,8 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 			}
 			if ii == len(aBlock.Instrs)-1 && len(toUnlock) > 0 { // TODO: this can happen too early
 				for _, l := range toUnlock {
-					if a.lockSetContainsAt(a.lockSet, l, goID) == -1 {
-						a.lockSet[a.goCaller[goID]][a.lockSetContainsAt(a.lockSet, l, a.goCaller[goID])].locFreeze = false
-					} else {
-						//a.lockSet[goID][a.lockSetContainsAt(a.lockSet, l, goID)].locFreeze = false
+					if a.lockSetContainsAt(a.lockSet, l, goID) != -1 {
+						a.lockSet[goID][a.lockSetContainsAt(a.lockSet, l, goID)].locFreeze = false
 					}
 				}
 			} else if ii == len(aBlock.Instrs)-1 && len(toRUnlock) > 0 { // TODO: modify for unlock in diff thread

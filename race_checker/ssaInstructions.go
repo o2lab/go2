@@ -422,11 +422,9 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 				a.ptaCfg0.AddQuery(lockLoc)
 				a.mu.Unlock()
 			}
-			//if a.lockSetContainsAt(a.lockSet, lockLoc, goID) == -1 { // if lock is not already in active lockset
-				lock := &lockInfo{locAddr: lockLoc, locFreeze: false}
-				a.lockSet[goID] = append(a.lockSet[goID], lock)
-				log.Trace("Locking   ", lockLoc.String(), "  (",  lockLoc.Pos(), ")  lockset now contains: ", lockSetVal(a.lockSet, goID))
-			//}
+			lock := &lockInfo{locAddr: lockLoc, locFreeze: false, parentFn: theIns.Parent(), locBlocInd: theIns.Block().Index}
+			a.lockSet[goID] = append(a.lockSet[goID], lock)
+			log.Trace("Locking   ", lockLoc.String(), "  (",  lockLoc.Pos(), ")  lockset now contains: ", lockSetVal(a.lockSet, goID))
 
 		case "Unlock":
 			lockLoc := examIns.Call.Args[0]
@@ -435,12 +433,12 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 				a.ptaCfg0.AddQuery(lockLoc)
 				a.mu.Unlock()
 			}
-			unlockOps = append(unlockOps, lockLoc)
-			if a.lockSetContainsAt(a.lockSet, lockLoc, goID) == -1 {
-				//fmt.Println(a.lockSet[a.goCaller[goID]])
-				a.lockSet[a.goCaller[goID]][a.lockSetContainsAt(a.lockSet, lockLoc, a.goCaller[goID])].locFreeze = true
+			lockOp := a.lockSetContainsAt(a.lockSet, lockLoc, goID) // index of locking operation
+			if a.lockSet[goID][lockOp].parentFn == theIns.Parent() && a.lockSet[goID][lockOp].locBlocInd == theIns.Block().Index { // common block
+				a.lockSet[goID] = append(a.lockSet[goID][:lockOp], a.lockSet[goID][lockOp+1:]...) // remove from lockset
 			} else {
-				a.lockSet[goID][a.lockSetContainsAt(a.lockSet, lockLoc, goID)].locFreeze = true
+				unlockOps = append(unlockOps, lockLoc)
+				a.lockSet[goID][lockOp].locFreeze = true
 			}
 		case "RLock":
 			RlockLoc := examIns.Call.Args[0]          // identifier for address of lock
