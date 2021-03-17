@@ -487,7 +487,7 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 }
 
 // insGo analyzes go calls
-func (a *analysis) insGo(examIns *ssa.Go, goID int, theIns ssa.Instruction) {
+func (a *analysis) insGo(examIns *ssa.Go, goID int, theIns ssa.Instruction, loopID int) {
 	var fnName string
 	switch anonFn := examIns.Call.Value.(type) {
 	case *ssa.MakeClosure: // go call for anonymous function
@@ -504,6 +504,9 @@ func (a *analysis) insGo(examIns *ssa.Go, goID int, theIns ssa.Instruction) {
 	}
 
 	newGoID := goID + 1 // increment goID for child goroutine
+	if loopID > 0 {
+		a.loopIDs[newGoID] = loopID
+	}
 	if len(a.workList) > 0 {
 		newGoID = a.workList[len(a.workList)-1].goID + 1
 	}

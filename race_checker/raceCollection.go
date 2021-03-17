@@ -144,14 +144,30 @@ func (a *analysis) sameAddress(addr1 ssa.Value, addr2 ssa.Value, go1 int, go2 in
 	var pt1 pointer.PointerWCtx
 	var pt2 pointer.PointerWCtx
 	if go1 == 0 {
-		pt1 = a.ptaRes[a.main].PointsToByGo(addr1, nil)
+		if loopID, ok := a.loopIDs[go1]; ok {
+			pt1 = a.ptaRes[a.main].PointsToByGoWithLoopID(addr1, nil, loopID)
+		} else {
+			pt1 = a.ptaRes[a.main].PointsToByGo(addr1, nil)
+		}
 	} else {
-		pt1 = a.ptaRes[a.main].PointsToByGo(addr1, a.RWIns[go1][0].(*ssa.Go))
+		if loopID, ok := a.loopIDs[go1]; ok {
+			pt1 = a.ptaRes[a.main].PointsToByGoWithLoopID(addr1, a.RWIns[go1][0].(*ssa.Go), loopID)
+		} else {
+			pt1 = a.ptaRes[a.main].PointsToByGo(addr1, a.RWIns[go1][0].(*ssa.Go))
+		}
 	}
 	if go2 == 0 {
-		pt2 = a.ptaRes[a.main].PointsToByGo(addr2, nil)
+		if loopID, ok := a.loopIDs[go2]; ok {
+			pt2 = a.ptaRes[a.main].PointsToByGoWithLoopID(addr2, nil, loopID)
+		} else {
+			pt2 = a.ptaRes[a.main].PointsToByGo(addr2, nil)
+		}
 	} else {
-		pt2 = a.ptaRes[a.main].PointsToByGo(addr2, a.RWIns[go2][0].(*ssa.Go))
+		if loopID, ok := a.loopIDs[go2]; ok {
+			pt2 = a.ptaRes[a.main].PointsToByGoWithLoopID(addr1, a.RWIns[go2][0].(*ssa.Go), loopID)
+		} else {
+			pt2 = a.ptaRes[a.main].PointsToByGo(addr2, a.RWIns[go2][0].(*ssa.Go))
+		}
 	}
 	return  pt1.MayAlias(pt2)
 

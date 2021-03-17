@@ -250,6 +250,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 				ifSuccBegin:     make(map[ssa.Instruction]*ssa.If),
 				ifFnReturn:      make(map[*ssa.Function]*ssa.Return),
 				ifSuccEnd:       make(map[ssa.Instruction]*ssa.Return),
+				loopIDs:  		 make(map[int]int),
 			}
 			if main.Pkg.Path() != "command-line-arguments" {
 				Analysis.fromPath = main.Pkg.Path()
