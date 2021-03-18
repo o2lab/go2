@@ -25,7 +25,6 @@ func main() {
 		fmt.Println("mystruct: ", my1.myf.f)
 		w.Done()
 	}()
-	w.Wait()
 
 	w.Add(1)
 	go func() {

@@ -50,7 +50,7 @@ func (a *analysis) checkRacyPairs() []*raceInfo {
 						}
 						insSlice := []ssa.Instruction{goI, goJ}
 						addressPair := a.insAddress(insSlice) // one instruction from each goroutine
-						//!!!! bz: for my debug, please comment off, do not delete
+						////!!!! bz: for my debug, please comment off, do not delete
 						//if a.ptaCfg.DEBUG {
 						//	var goIinstr string
 						//	var goJinstr string
@@ -64,7 +64,7 @@ func (a *analysis) checkRacyPairs() []*raceInfo {
 						//	}else{
 						//		goJinstr = a.RWIns[j][0].String()
 						//	}
-						//	fmt.Println(addressPair[0], " Go: ",goIinstr, i, a.loopIDs[i], ";  ", addressPair[1], " Go: ", goJinstr,j, a.loopIDs[j])
+						//	fmt.Println(addressPair[0], " Go: ", goIinstr, " loopid: ", a.loopIDs[i], ";  ", addressPair[1], " Go: ", goJinstr, " loopid: ", a.loopIDs[j])
 						//}
 						if a.sameAddress(addressPair[0], addressPair[1], i, j) &&
 							!sliceContains(a.reportedAddr, addressPair[0]) &&
