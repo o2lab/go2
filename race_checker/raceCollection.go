@@ -12,6 +12,24 @@ import (
 	"strings"
 )
 
+func isLocal(ins ssa.Instruction) bool {
+	switch rw := ins.(type) {
+	case *ssa.UnOp:
+		if faddr, ok := rw.X.(*ssa.FieldAddr); ok {
+			if _, local := faddr.X.(*ssa.Alloc); local {
+				return true
+			}
+		}
+	case *ssa.Store:
+		if faddr, ok := rw.Addr.(*ssa.FieldAddr); ok {
+			if _, local := faddr.X.(*ssa.Alloc); local {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // checkRacyPairs checks accesses among two concurrent goroutines
 func (a *analysis) checkRacyPairs() []*raceInfo {
 	var races []*raceInfo
@@ -27,6 +45,9 @@ func (a *analysis) checkRacyPairs() []*raceInfo {
 						continue
 					}
 					if (isWriteIns(goI) && isWriteIns(goJ)) || (isWriteIns(goI) && a.isReadIns(goJ)) || (a.isReadIns(goI) && isWriteIns(goJ)) { // only read and write instructions
+						if isLocal(goI) && isLocal(goJ) { // both are locally declared
+							continue
+						}
 						insSlice := []ssa.Instruction{goI, goJ}
 						addressPair := a.insAddress(insSlice) // one instruction from each goroutine
 						//!!!! bz: for my debug, please comment off, do not delete
