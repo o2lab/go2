@@ -64,7 +64,7 @@ func (a *analysis) checkRacyPairs() []*raceInfo {
 						//	}else{
 						//		goJinstr = a.RWIns[j][0].String()
 						//	}
-						//	fmt.Println(addressPair[0], " Go: ", goIinstr, ";  ", addressPair[1], " Go: ", goJinstr)
+						//	fmt.Println(addressPair[0], " Go: ",goIinstr, i, a.loopIDs[i], ";  ", addressPair[1], " Go: ", goJinstr,j, a.loopIDs[j])
 						//}
 						if a.sameAddress(addressPair[0], addressPair[1], i, j) &&
 							!sliceContains(a.reportedAddr, addressPair[0]) &&
@@ -171,8 +171,6 @@ func (a *analysis) sameAddress(addr1 ssa.Value, addr2 ssa.Value, go1 int, go2 in
 		//	loopID = 0
 		//	pt1 = a.ptaRes[a.main].PointsToByGoWithLoopID(addr1, nil, loopID)
 		pt1 = a.ptaRes[a.main].PointsToByGo(addr1, nil)
-		//cs := pt1.GetMyContext()[0]
-		//fmt.Println(&cs)
 		//}
 	} else {
 		//if loopID, ok := a.loopIDs[go1]; ok {
