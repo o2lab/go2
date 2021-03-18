@@ -22,7 +22,6 @@ type analysis struct {
 	ptaCfg  *pointer.Config
 	ptaCfg0 *pta0.Config
 
-	fromPath		string
 	prog            *ssa.Program
 	pkgs            []*ssa.Package
 	mains           []*ssa.Package

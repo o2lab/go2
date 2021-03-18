@@ -34,7 +34,7 @@ func (a *analysis) fromPkgsOfInterest(fn *ssa.Function) bool {
 			return false
 		}
 	}
-	if efficiency && !strings.HasPrefix(fn.Pkg.Pkg.Path(), a.fromPath) { // path is dependent on tested program
+	if efficiency && a.main.Pkg.Path() != "command-line-arguments" && !strings.HasPrefix(fn.Pkg.Pkg.Path(), a.main.Pkg.Path()) { // path is dependent on tested program
 		return false
 	}
 	return true
@@ -221,7 +221,6 @@ func (runner *AnalysisRunner) Run(args []string) error {
 				ptaRes0:  runner.ptaResult0,
 				ptaCfg:   runner.ptaConfig,
 				ptaCfg0:  runner.ptaConfig0,
-				fromPath: "",
 				prog:     runner.prog,
 				pkgs:     runner.pkgs,
 				mains:    mains,
@@ -251,9 +250,6 @@ func (runner *AnalysisRunner) Run(args []string) error {
 				ifFnReturn:      make(map[*ssa.Function]*ssa.Return),
 				ifSuccEnd:       make(map[ssa.Instruction]*ssa.Return),
 				loopIDs:  		 make(map[int]int),
-			}
-			if main.Pkg.Path() != "command-line-arguments" {
-				Analysis.fromPath = main.Pkg.Path()
 			}
 			if !allEntries {
 				log.Info("Compiling stack trace for every Goroutine... ")
