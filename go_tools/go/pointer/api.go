@@ -1016,9 +1016,23 @@ func (p PointerWCtx) GetMyContext() []*callsite {
 	return p.cgn.callersite
 }
 
-//bz: return the loopID of the context of cgn (1st *callsite)
-func (p PointerWCtx) GetMyLoopID() int {
-	return p.cgn.callersite[0].loopID
+//bz: user API, expose to user
+type GoLoopID struct {
+	GoInstr  *ssa.Go
+	LoopID   int
+}
+
+//bz: return the goInstruction and loopID of the context of cgn (1st *callsite)
+//    return value can be nil if context is shared contour or pts == empty
+func (p PointerWCtx) GetGoAndMyLoopID() *GoLoopID {
+	if p.cgn == nil || p.cgn.callersite == nil || p.cgn.callersite[0] == nil {
+		return nil
+	}
+	cs := p.cgn.callersite[0]
+	return &GoLoopID{
+		GoInstr: cs.goInstr,
+		LoopID:  cs.loopID,
+	}
 }
 
 //bz: add ctx
