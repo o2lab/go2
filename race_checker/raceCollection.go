@@ -52,19 +52,19 @@ func (a *analysis) checkRacyPairs() []*raceInfo {
 						addressPair := a.insAddress(insSlice) // one instruction from each goroutine
 						////!!!! bz: for my debug, please comment off, do not delete
 						//if a.ptaCfg.DEBUG {
-							var goIinstr string
-							var goJinstr string
-							if i == 0 {
-								goIinstr = "main"
-							}else{
-								goIinstr = a.RWIns[i][0].String()
-							}
-							if j == 0 {
-								goJinstr = "main"
-							}else{
-								goJinstr = a.RWIns[j][0].String()
-							}
-							fmt.Println(addressPair[0], " Go: ", goIinstr, " loopid: ", a.loopIDs[i], ";  ", addressPair[1], " Go: ", goJinstr, " loopid: ", a.loopIDs[j])
+						//	var goIinstr string
+						//	var goJinstr string
+						//	if i == 0 {
+						//		goIinstr = "main"
+						//	}else{
+						//		goIinstr = a.RWIns[i][0].String()
+						//	}
+						//	if j == 0 {
+						//		goJinstr = "main"
+						//	}else{
+						//		goJinstr = a.RWIns[j][0].String()
+						//	}
+						//	fmt.Println(addressPair[0], " Go: ", goIinstr, " loopid: ", a.loopIDs[i], ";  ", addressPair[1], " Go: ", goJinstr, " loopid: ", a.loopIDs[j])
 						//}
 						if a.sameAddress(addressPair[0], addressPair[1], i, j) &&
 							!sliceContains(a.reportedAddr, addressPair[0]) &&
@@ -165,40 +165,38 @@ func (a *analysis) sameAddress(addr1 ssa.Value, addr2 ssa.Value, go1 int, go2 in
 	var pt1 pointer.PointerWCtx
 	var pt2 pointer.PointerWCtx
 	if go1 == 0 {
-		if loopID, ok := a.loopIDs[go1]; ok {
-			pt1 = a.ptaRes[a.main].PointsToByGoWithLoopID(addr1, nil, loopID)
-		} else {
-			loopID = 0
-			pt1 = a.ptaRes[a.main].PointsToByGoWithLoopID(addr1, nil, loopID)
-		//pt1 = a.ptaRes[a.main].PointsToByGo(addr1, nil)
-		cs := pt1.GetMyContext()[0]
-		fmt.Println(&cs)
-		}
+		//if loopID, ok := a.loopIDs[go1]; ok {
+		//	pt1 = a.ptaRes[a.main].PointsToByGoWithLoopID(addr1, nil, loopID)
+		//} else {
+		//	loopID = 0
+		//	pt1 = a.ptaRes[a.main].PointsToByGoWithLoopID(addr1, nil, loopID)
+		pt1 = a.ptaRes[a.main].PointsToByGo(addr1, nil)
+		//}
 	} else {
-		if loopID, ok := a.loopIDs[go1]; ok {
-			pt1 = a.ptaRes[a.main].PointsToByGoWithLoopID(addr1, a.RWIns[go1][0].(*ssa.Go), loopID)
-		} else {
-			loopID = 0
-			pt1 = a.ptaRes[a.main].PointsToByGoWithLoopID(addr1, a.RWIns[go1][0].(*ssa.Go), loopID)
-		//pt1 = a.ptaRes[a.main].PointsToByGo(addr1, a.RWIns[go1][0].(*ssa.Go))
-		}
+		//if loopID, ok := a.loopIDs[go1]; ok {
+		//	pt1 = a.ptaRes[a.main].PointsToByGoWithLoopID(addr1, a.RWIns[go1][0].(*ssa.Go), loopID)
+		//} else {
+		//	loopID = 0
+		//	pt1 = a.ptaRes[a.main].PointsToByGoWithLoopID(addr1, a.RWIns[go1][0].(*ssa.Go), loopID)
+		pt1 = a.ptaRes[a.main].PointsToByGo(addr1, a.RWIns[go1][0].(*ssa.Go))
+		//}
 	}
 	if go2 == 0 {
-		if loopID, ok := a.loopIDs[go2]; ok {
-			pt2 = a.ptaRes[a.main].PointsToByGoWithLoopID(addr2, nil, loopID)
-		} else {
-			loopID = 0
-			pt2 = a.ptaRes[a.main].PointsToByGoWithLoopID(addr2, nil, loopID)
-		//pt2 = a.ptaRes[a.main].PointsToByGo(addr2, nil)
-		}
+		//if loopID, ok := a.loopIDs[go2]; ok {
+		//	pt2 = a.ptaRes[a.main].PointsToByGoWithLoopID(addr2, nil, loopID)
+		//} else {
+		//	loopID = 0
+		//	pt2 = a.ptaRes[a.main].PointsToByGoWithLoopID(addr2, nil, loopID)
+		pt2 = a.ptaRes[a.main].PointsToByGo(addr2, nil)
+		//}
 	} else {
-		if loopID, ok := a.loopIDs[go2]; ok {
-			pt2 = a.ptaRes[a.main].PointsToByGoWithLoopID(addr1, a.RWIns[go2][0].(*ssa.Go), loopID)
-		} else {
-			loopID = 0
-			pt2 = a.ptaRes[a.main].PointsToByGoWithLoopID(addr2, a.RWIns[go2][0].(*ssa.Go), loopID)
-		//pt2 = a.ptaRes[a.main].PointsToByGo(addr2, a.RWIns[go2][0].(*ssa.Go))
-		}
+		//if loopID, ok := a.loopIDs[go2]; ok {
+		//	pt2 = a.ptaRes[a.main].PointsToByGoWithLoopID(addr1, a.RWIns[go2][0].(*ssa.Go), loopID)
+		//} else {
+		//	loopID = 0
+		//	pt2 = a.ptaRes[a.main].PointsToByGoWithLoopID(addr2, a.RWIns[go2][0].(*ssa.Go), loopID)
+		pt2 = a.ptaRes[a.main].PointsToByGo(addr2, a.RWIns[go2][0].(*ssa.Go))
+		//}
 	}
 	return  pt1.MayAlias(pt2)
 
