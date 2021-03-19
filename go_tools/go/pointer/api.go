@@ -1016,6 +1016,11 @@ func (p PointerWCtx) GetMyContext() []*callsite {
 	return p.cgn.callersite
 }
 
+//bz: return the loopID of the context of cgn (1st *callsite)
+func (p PointerWCtx) GetMyLoopID() int {
+	return p.cgn.callersite[0].loopID
+}
+
 //bz: add ctx
 func (p PointerWCtx) String() string {
 	if p.cgn == nil {
