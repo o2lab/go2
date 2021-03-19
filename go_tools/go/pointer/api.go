@@ -1024,7 +1024,7 @@ type GoLoopID struct {
 
 //bz: return the goInstruction and loopID of the context of cgn (1st *callsite)
 //    return value can be nil if context is shared contour or pts == empty
-func (p PointerWCtx) GetGoAndMyLoopID() *GoLoopID {
+func (p PointerWCtx) GetMyGoAndLoopID() *GoLoopID {
 	if p.cgn == nil || p.cgn.callersite == nil || p.cgn.callersite[0] == nil {
 		return nil
 	}
