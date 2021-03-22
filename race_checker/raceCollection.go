@@ -198,8 +198,29 @@ func (a *analysis) sameAddress(addr1 ssa.Value, addr2 ssa.Value, go1 int, go2 in
 		pt2 = a.ptaRes[a.main].PointsToByGo(addr2, a.RWIns[go2][0].(*ssa.Go))
 		//}
 	}
-	return  pt1.MayAlias(pt2)
+	if pt1.MayAlias(pt2) {
+		if pt1.GetMyGoAndLoopID() != nil && pt2.GetMyGoAndLoopID() != nil &&
+			pt1.GetMyGoAndLoopID().GoInstr == pt2.GetMyGoAndLoopID().GoInstr && // declared in same goroutine
+			a.RWIns[go1][0] == a.RWIns[go2][0] &&
+			a.goCaller[go1] == a.goCaller[go2] &&
+			a.loopIDs[go1] > 0 && // accesses located in loop
+			a.loopIDs[go2] > 0 &&
+			pt1.GetMyGoAndLoopID().LoopID == pt2.GetMyGoAndLoopID().LoopID &&
+			pt1.GetMyGoAndLoopID().GoInstr != a.RWIns[go1][0] {
+				//fmt.Println(pt1.GetMyGoAndLoopID().GoInstr == a.RWIns[go1][0])
+				//fmt.Println(pt1.GetMyGoAndLoopID().LoopID)
+				return false
+		}
+		if pt1.GetMyGoAndLoopID() != nil {
+			//fmt.Println(pt1.GetMyGoAndLoopID().LoopID)
+			//fmt.Println(pt2.GetMyGoAndLoopID().LoopID)
+		}
 
+		//fmt.Println(a.RWIns[go1][0])
+		//fmt.Println(a.RWIns[0][0])
+		return true
+	}
+	return false
 }
 
 // reachable determines if 2 input instructions are connected in the Happens-Before Graph

@@ -213,6 +213,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 		}
 		if fn.Name() == entryFn {
 			a.levels[goID] = 0 // initialize level count at main entry
+			a.loopIDs[goID] = 0
 			a.updateRecords(fn.Name(), goID, "PUSH ")
 			a.goStack = append(a.goStack, []string{}) // initialize first interior slice for main goroutine
 		}

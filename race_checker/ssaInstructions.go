@@ -509,6 +509,8 @@ func (a *analysis) insGo(examIns *ssa.Go, goID int, theIns ssa.Instruction, loop
 	}
 	if loopID > 0 {
 		a.loopIDs[newGoID] = loopID
+	} else {
+		a.loopIDs[newGoID] = 0
 	}
 	a.RWIns[goID] = append(a.RWIns[goID], theIns)
 	if goID == 0 && a.insDRA == 0 { // this is first *ssa.Go instruction in main goroutine
