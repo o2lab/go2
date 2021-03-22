@@ -166,43 +166,43 @@ func (a *analysis) sameAddress(addr1 ssa.Value, addr2 ssa.Value, go1 int, go2 in
 	var pt2 pointer.PointerWCtx
 	if go1 == 0 {
 		if loopID, ok := a.loopIDs[go1]; ok {
-			fmt.Println(addr1, loopID)
 			pt1 = a.ptaRes[a.main].PointsToByGoWithLoopID(addr1, nil, loopID)
+			fmt.Println(addr1, loopID, pt1.GetMyGoAndLoopID().LoopID)
 		} else {
 			loopID = 0
-			fmt.Println(addr1, loopID)
 			pt1 = a.ptaRes[a.main].PointsToByGoWithLoopID(addr1, nil, loopID)
+			fmt.Println(addr1, loopID, pt1.GetMyGoAndLoopID().LoopID)
 		//pt1 = a.ptaRes[a.main].PointsToByGo(addr1, nil)
 		}
 	} else {
 		if loopID, ok := a.loopIDs[go1]; ok {
-			fmt.Println(addr1, loopID)
 			pt1 = a.ptaRes[a.main].PointsToByGoWithLoopID(addr1, a.RWIns[go1][0].(*ssa.Go), loopID)
+			fmt.Println(addr1, loopID, pt1.GetMyGoAndLoopID().LoopID)
 		} else {
 			loopID = 0
-			fmt.Println(addr1, loopID)
 			pt1 = a.ptaRes[a.main].PointsToByGoWithLoopID(addr1, a.RWIns[go1][0].(*ssa.Go), loopID)
+			fmt.Println(addr1, loopID, pt1.GetMyGoAndLoopID().LoopID)
 		//pt1 = a.ptaRes[a.main].PointsToByGo(addr1, a.RWIns[go1][0].(*ssa.Go))
 		}
 	}
 	if go2 == 0 {
 		if loopID, ok := a.loopIDs[go2]; ok {
-			fmt.Println(addr2, loopID)
 			pt2 = a.ptaRes[a.main].PointsToByGoWithLoopID(addr2, nil, loopID)
+			fmt.Println(addr2, loopID, pt2.GetMyGoAndLoopID().LoopID)
 		} else {
 			loopID = 0
-			fmt.Println(addr2, loopID)
 			pt2 = a.ptaRes[a.main].PointsToByGoWithLoopID(addr2, nil, loopID)
+			fmt.Println(addr2, loopID, pt2.GetMyGoAndLoopID().LoopID)
 		//pt2 = a.ptaRes[a.main].PointsToByGo(addr2, nil)
 		}
 	} else {
 		if loopID, ok := a.loopIDs[go2]; ok {
-			fmt.Println(addr2, loopID)
 			pt2 = a.ptaRes[a.main].PointsToByGoWithLoopID(addr1, a.RWIns[go2][0].(*ssa.Go), loopID)
+			fmt.Println(addr2, loopID, pt2.GetMyGoAndLoopID().LoopID)
 		} else {
 			loopID = 0
-			fmt.Println(addr2, loopID)
 			pt2 = a.ptaRes[a.main].PointsToByGoWithLoopID(addr2, a.RWIns[go2][0].(*ssa.Go), loopID)
+			fmt.Println(addr2, loopID, pt2.GetMyGoAndLoopID().LoopID)
 		//pt2 = a.ptaRes[a.main].PointsToByGo(addr2, a.RWIns[go2][0].(*ssa.Go))
 		}
 	}
