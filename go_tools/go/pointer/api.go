@@ -756,6 +756,9 @@ func (r *Result) PointsToByGo(v ssa.Value, goInstr *ssa.Go) PointerWCtx {
 	_, ok2 := v.(*ssa.Global)
 	_, ok3 := v.(*ssa.UnOp)
 	if ok1 || ok2 || ok3 { //free var: only one pts available
+		if len(ptss) == 0 {
+			return PointerWCtx{a: nil}
+		}
 		return ptss[0]
 	}
 

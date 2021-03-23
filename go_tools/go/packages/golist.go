@@ -292,6 +292,11 @@ func handleDriverUnderDir(restPatterns []string, patterns []string, response *re
 			if err != nil {
 				panic(fmt.Sprintf("!!! Windows: path walker failed with err: %s\n", err))
 			}
+
+			if len(subdirs) > 0 {
+				//goListDriverRecursive(subdirs, size, response, cfg, ctx, restPatterns)
+				goListDriverRecursiveSeq(subdirs, len(subdirs) , response, cfg, ctx, restPatterns)
+			}
 		} else { //default: Unix (MacOS + Ubuntu)
 			cmd := exec.Command("find", ".", "-type", "d")
 			cmd.Dir = cfg.Dir   //set cmd dir
@@ -305,11 +310,11 @@ func handleDriverUnderDir(restPatterns []string, patterns []string, response *re
 			outStr, _ := string(stdout.Bytes()), string(stderr.Bytes())
 			//fmt.Printf("run ls cmd. out:\n%s\nerr:\n%s\n", outStr, errStr) //bz: for me to debug
 			subdirs = strings.Split(outStr, "\n") //bz: record the future dir we need to traverse
-		}
 
-		if len(subdirs) - 2 > 0 {
-			//goListDriverRecursive(subdirs, size, response, cfg, ctx, restPatterns)
-			goListDriverRecursiveSeq(subdirs, len(subdirs) - 2, response, cfg, ctx, restPatterns)
+			if len(subdirs) - 2 > 0 {
+				//goListDriverRecursive(subdirs, size, response, cfg, ctx, restPatterns)
+				goListDriverRecursiveSeq(subdirs, len(subdirs) - 2, response, cfg, ctx, restPatterns)
+			}
 		}
 	}
 }
