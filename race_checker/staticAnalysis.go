@@ -207,7 +207,9 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		//	ptaRes.DumpAll()
 		//}
 	}
-
+	if len(mains) > 1 {
+		allEntries = true
+	}
 	// Iterate each entry point...
 	var wg sync.WaitGroup
 	for _, m := range mains {
