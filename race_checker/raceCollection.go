@@ -207,7 +207,7 @@ func (a *analysis) sameAddress(addr1 ssa.Value, addr2 ssa.Value, go1 int, go2 in
 		//pt2 = a.ptaRes[a.main].PointsToByGo(addr2, a.RWIns[go2][0].(*ssa.Go))
 		}
 	}
-	fmt.Println(pt2.String(), pt2.PointsTo().String(), "\n")
+	//fmt.Println(pt2.String(), pt2.PointsTo().String(), "\n")
 	return pt1.MayAlias(pt2)
 	//if pt1.MayAlias(pt2) {
 	//	if pt1.GetMyGoAndLoopID() != nil && pt2.GetMyGoAndLoopID() != nil &&
