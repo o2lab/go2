@@ -150,7 +150,6 @@ func pkgSelection(initial []*packages.Package) ([]*ssa.Package, *ssa.Program, []
 func (runner *AnalysisRunner) Run(args []string) error {
 	trieLimit = runner.trieLimit
 	efficiency = runner.efficiency
-
 	// Load packages...
 	cfg := &packages.Config{
 		Mode:  packages.LoadAllSyntax, // the level of information returned for each package
@@ -254,6 +253,10 @@ func (runner *AnalysisRunner) Run(args []string) error {
 			if !allEntries {
 				log.Info("Compiling stack trace for every Goroutine... ")
 				log.Debug(strings.Repeat("-", 35), "Stack trace begins", strings.Repeat("-", 35))
+			}
+			if strings.Contains(main.Pkg.String(), "GoBench") {
+				trieLimit = 2
+				efficiency = false
 			}
 			Analysis.visitAllInstructions(main.Func(entryFn), 0)
 			if !allEntries {

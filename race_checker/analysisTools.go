@@ -439,7 +439,9 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				}
 			} else if ii == len(aBlock.Instrs)-1 && len(toRUnlock) > 0 { // TODO: modify for unlock in diff thread
 				for _, l := range toRUnlock {
-					a.RlockSet[goID][a.lockSetContainsAt(a.RlockSet, l, goID)].locFreeze = false
+					if a.lockSetContainsAt(a.RlockSet, l, goID) != -1 {
+						a.RlockSet[goID][a.lockSetContainsAt(a.RlockSet, l, goID)].locFreeze = false
+					}
 				}
 			}
 			if activeCase && readyChans[selCount] != "defaultCase" && readyChans[selCount] != "timeOut" {

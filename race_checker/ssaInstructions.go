@@ -434,11 +434,13 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 				a.mu.Unlock()
 			}
 			lockOp := a.lockSetContainsAt(a.lockSet, lockLoc, goID) // index of locking operation
-			if a.lockSet[goID][lockOp].parentFn == theIns.Parent() && a.lockSet[goID][lockOp].locBlocInd == theIns.Block().Index { // common block
-				a.lockSet[goID] = append(a.lockSet[goID][:lockOp], a.lockSet[goID][lockOp+1:]...) // remove from lockset
-			} else {
-				unlockOps = append(unlockOps, lockLoc)
-				a.lockSet[goID][lockOp].locFreeze = true
+			if lockOp != -1 {
+				if a.lockSet[goID][lockOp].parentFn == theIns.Parent() && a.lockSet[goID][lockOp].locBlocInd == theIns.Block().Index { // common block
+					a.lockSet[goID] = append(a.lockSet[goID][:lockOp], a.lockSet[goID][lockOp+1:]...) // remove from lockset
+				} else {
+					unlockOps = append(unlockOps, lockLoc)
+					a.lockSet[goID][lockOp].locFreeze = true
+				}
 			}
 		case "RLock":
 			RlockLoc := examIns.Call.Args[0]          // identifier for address of lock
@@ -461,7 +463,9 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 			}
 			runlockOps = append(runlockOps, RlockLoc)
 			if a.lockSetContainsAt(a.RlockSet, RlockLoc, goID) == -1 {
-				a.RlockSet[a.goCaller[goID]][a.lockSetContainsAt(a.RlockSet, RlockLoc, a.goCaller[goID])].locFreeze = true
+				if a.lockSetContainsAt(a.RlockSet, RlockLoc, a.goCaller[goID]) != -1 {
+					a.RlockSet[a.goCaller[goID]][a.lockSetContainsAt(a.RlockSet, RlockLoc, a.goCaller[goID])].locFreeze = true
+				}
 			} else {
 				a.RlockSet[goID][a.lockSetContainsAt(a.RlockSet, RlockLoc, goID)].locFreeze = true
 			}
