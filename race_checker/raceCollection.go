@@ -52,26 +52,26 @@ func (a *analysis) checkRacyPairs() []*raceInfo {
 						addressPair := a.insAddress(insSlice) // one instruction from each goroutine
 						////!!!! bz: for my debug, please comment off, do not delete
 						//if a.ptaCfg.DEBUG {
-						//	var goIinstr string
-						//	var goJinstr string
-						//	if i == 0 {
-						//		goIinstr = "main"
-						//	}else{
-						//		goIinstr = a.RWIns[i][0].String()
-						//	}
-						//	if j == 0 {
-						//		goJinstr = "main"
-						//	}else{
-						//		goJinstr = a.RWIns[j][0].String()
-						//	}
-						//	fmt.Println(addressPair[0], " Go: ", goIinstr, " loopid: ", a.loopIDs[i], ";  ", addressPair[1], " Go: ", goJinstr, " loopid: ", a.loopIDs[j])
+							var goIinstr string
+							var goJinstr string
+							if i == 0 {
+								goIinstr = "main"
+							}else{
+								goIinstr = a.RWIns[i][0].String()
+							}
+							if j == 0 {
+								goJinstr = "main"
+							}else{
+								goJinstr = a.RWIns[j][0].String()
+							}
+							fmt.Println(addressPair[0], " Go: ", goIinstr, " loopid: ", a.loopIDs[i], ";  ", addressPair[1], " Go: ", goJinstr, " loopid: ", a.loopIDs[j])
 						//}
 						if a.sameAddress(addressPair[0], addressPair[1], i, j) &&
 							!sliceContains(a.reportedAddr, addressPair[0]) &&
 							!a.reachable(goI, i, goJ, j) &&
 							!a.reachable(goJ, j, goI, i) &&
 							!a.bothAtomic(insSlice[0], insSlice[1]) &&
-							!a.lockSetsIntersect(goI, goJ, i, j) &&
+							!a.lockSetsIntersect(goI, goJ, i, j) && //return true
 							!a.selectMutEx(insSlice[0], insSlice[1]) {
 							a.reportedAddr = append(a.reportedAddr, addressPair[0])
 							ri = &raceInfo{
@@ -166,46 +166,50 @@ func (a *analysis) sameAddress(addr1 ssa.Value, addr2 ssa.Value, go1 int, go2 in
 	var pt2 pointer.PointerWCtx
 	if go1 == 0 {
 		if loopID, ok := a.loopIDs[go1]; ok {
-			pt1 = a.ptaRes[a.main].PointsToByGoWithLoopID(addr1, nil, loopID)
-			fmt.Println(addr1, loopID, pt1.GetMyGoAndLoopID().LoopID)
+			pt1 = a.ptaRes[a.main].PointsToByGoWithLoopID(addr1, nil, loopID) // ----> !!! SEE HERE: bz: why donot you store the map of goid <-> ssa.Go separately, so that you can assign a nil value to goid == 0 to skip the following long ifelse branches
+			                                                                  // when there is such long branches, it is easy to have wrong code some where inside the long branch but hard to find...
+			                                                                  //or another better coding pattern is to create another function, which works to solve this goId and cast to ssa.go stuff. this also reduce the probability of code errors
+			//fmt.Println(addr1, loopID, pt1.GetMyGoAndLoopID().LoopID)
 		} else {
 			loopID = 0
 			pt1 = a.ptaRes[a.main].PointsToByGoWithLoopID(addr1, nil, loopID)
-			fmt.Println(addr1, loopID, pt1.GetMyGoAndLoopID().LoopID)
+			//fmt.Println(addr1, loopID, pt1.GetMyGoAndLoopID().LoopID)
 		//pt1 = a.ptaRes[a.main].PointsToByGo(addr1, nil)
 		}
 	} else {
 		if loopID, ok := a.loopIDs[go1]; ok {
 			pt1 = a.ptaRes[a.main].PointsToByGoWithLoopID(addr1, a.RWIns[go1][0].(*ssa.Go), loopID)
-			fmt.Println(addr1, loopID, pt1.GetMyGoAndLoopID().LoopID)
+			//fmt.Println(addr1, loopID, pt1.GetMyGoAndLoopID().LoopID)
 		} else {
 			loopID = 0
 			pt1 = a.ptaRes[a.main].PointsToByGoWithLoopID(addr1, a.RWIns[go1][0].(*ssa.Go), loopID)
-			fmt.Println(addr1, loopID, pt1.GetMyGoAndLoopID().LoopID)
+			//fmt.Println(addr1, loopID, pt1.GetMyGoAndLoopID().LoopID)
 		//pt1 = a.ptaRes[a.main].PointsToByGo(addr1, a.RWIns[go1][0].(*ssa.Go))
 		}
 	}
+	fmt.Println(pt1.String(), pt1.PointsTo().String())
 	if go2 == 0 {
 		if loopID, ok := a.loopIDs[go2]; ok {
 			pt2 = a.ptaRes[a.main].PointsToByGoWithLoopID(addr2, nil, loopID)
-			fmt.Println(addr2, loopID, pt2.GetMyGoAndLoopID().LoopID)
+			//fmt.Println(addr2, loopID, pt2.GetMyGoAndLoopID().LoopID)
 		} else {
 			loopID = 0
 			pt2 = a.ptaRes[a.main].PointsToByGoWithLoopID(addr2, nil, loopID)
-			fmt.Println(addr2, loopID, pt2.GetMyGoAndLoopID().LoopID)
+			//fmt.Println(addr2, loopID, pt2.GetMyGoAndLoopID().LoopID)
 		//pt2 = a.ptaRes[a.main].PointsToByGo(addr2, nil)
 		}
 	} else {
 		if loopID, ok := a.loopIDs[go2]; ok {
-			pt2 = a.ptaRes[a.main].PointsToByGoWithLoopID(addr1, a.RWIns[go2][0].(*ssa.Go), loopID)
-			fmt.Println(addr2, loopID, pt2.GetMyGoAndLoopID().LoopID)
+			pt2 = a.ptaRes[a.main].PointsToByGoWithLoopID(addr2, a.RWIns[go2][0].(*ssa.Go), loopID)
+			//fmt.Println(addr2, loopID, pt2.GetMyGoAndLoopID().LoopID)
 		} else {
 			loopID = 0
 			pt2 = a.ptaRes[a.main].PointsToByGoWithLoopID(addr2, a.RWIns[go2][0].(*ssa.Go), loopID)
-			fmt.Println(addr2, loopID, pt2.GetMyGoAndLoopID().LoopID)
+			//fmt.Println(addr2, loopID, pt2.GetMyGoAndLoopID().LoopID)
 		//pt2 = a.ptaRes[a.main].PointsToByGo(addr2, a.RWIns[go2][0].(*ssa.Go))
 		}
 	}
+	fmt.Println(pt2.String(), pt2.PointsTo().String(), "\n")
 	return pt1.MayAlias(pt2)
 	//if pt1.MayAlias(pt2) {
 	//	if pt1.GetMyGoAndLoopID() != nil && pt2.GetMyGoAndLoopID() != nil &&
