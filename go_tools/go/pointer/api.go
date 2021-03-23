@@ -206,7 +206,7 @@ type ResultWCtx struct {
 	IndirectQueries map[ssa.Value][]PointerWCtx // pts(*v) for each v in setValueNode().
 	GlobalQueries   map[ssa.Value][]PointerWCtx // pts(v) for each freevar in setValueNode().
 	ExtendedQueries map[ssa.Value][]PointerWCtx // all other v
-	Warnings        []Warning // warnings of unsoundness
+	Warnings        []Warning                   // warnings of unsoundness
 
 	DEBUG bool // bz: print out debug info ...
 }
@@ -762,6 +762,7 @@ func (r *Result) PointsToByGo(v ssa.Value, goInstr *ssa.Go) PointerWCtx {
 	if goInstr == nil {
 		return r.a.result.pointsToByMain(v)
 	}
+
 	//others
 	for _, pts := range ptss {
 		if pts.cgn.fn == v.Parent() { //many same v (ssa.Value) from different functions, separate them
@@ -769,7 +770,7 @@ func (r *Result) PointsToByGo(v ssa.Value, goInstr *ssa.Go) PointerWCtx {
 				if pts.MatchMyContext(goInstr) {
 					return pts
 				}
-			}else{
+			} else {
 				//discard the goInstr input, we use shared contour in real pta, hence only one pts is available
 				return pts
 			}
@@ -777,9 +778,9 @@ func (r *Result) PointsToByGo(v ssa.Value, goInstr *ssa.Go) PointerWCtx {
 	}
 	if r.a.result.DEBUG {
 		if goInstr == nil {
-			fmt.Println(" **** *Result:", v.Parent(),"Pointer Analysis cannot match this ssa.Value: " + v.String() + " with this *ssa.GO: main **** ") //panic
-		}else{
-			fmt.Println(" **** *Result:", v.Parent()," Pointer Analysis cannot match this ssa.Value: " + v.String() + " with this *ssa.GO: " + goInstr.String() + " **** ") //panic
+			fmt.Println(" **** *Result:", v.Parent(), "Pointer Analysis cannot match this ssa.Value: "+v.String()+" with this *ssa.GO: main **** ") //panic
+		} else {
+			fmt.Println(" **** *Result:", v.Parent(), " Pointer Analysis cannot match this ssa.Value: "+v.String()+" with this *ssa.GO: "+goInstr.String()+" **** ") //panic
 		}
 	}
 	return PointerWCtx{a: nil}
@@ -801,6 +802,11 @@ func (r *Result) PointsToByGoWithLoopID(v ssa.Value, goInstr *ssa.Go, loopID int
 	if goInstr == nil {
 		return r.a.result.pointsToByMain(v)
 	}
+
+	if strings.Contains(v.String(), "fp.numFilterCalled") {
+		fmt.Print()
+	}
+
 	//others
 	for _, pts := range ptss {
 		if pts.cgn.fn == v.Parent() { //many same v (ssa.Value) from different functions, separate them
@@ -808,7 +814,7 @@ func (r *Result) PointsToByGoWithLoopID(v ssa.Value, goInstr *ssa.Go, loopID int
 				if pts.MatchMyContextWithLoopID(goInstr, loopID) {
 					return pts
 				}
-			}else{
+			} else {
 				//discard the goInstr input, we use shared contour in real pta, hence only one pts is available
 				return pts
 			}
@@ -817,7 +823,7 @@ func (r *Result) PointsToByGoWithLoopID(v ssa.Value, goInstr *ssa.Go, loopID int
 	if r.a.result.DEBUG {
 		if goInstr == nil {
 			fmt.Println(" **** *Result: Pointer Analysis cannot match this ssa.Value: " + v.String() + " with this *ssa.GO: main **** ") //panic
-		}else{
+		} else {
 			fmt.Println(" **** *Result: Pointer Analysis cannot match this ssa.Value: " + v.String() + " with this *ssa.GO: " + goInstr.String() + " **** ") //panic
 		}
 	}
@@ -986,9 +992,9 @@ func (p PointerWCtx) MatchMyContextWithLoopID(go_instr *ssa.Go, loopID int) bool
 	if my_go_instr == go_instr {
 		if loopID == 0 {
 			return true //no loop
-		}else if my_cs.loopID == loopID {
+		} else if my_cs.loopID == loopID {
 			return true //loop id matched
-		}else {
+		} else {
 			return false //loop id not matched
 		}
 	}
@@ -1001,14 +1007,12 @@ func (p PointerWCtx) MatchMyContextWithLoopID(go_instr *ssa.Go, loopID int) bool
 		if actual_go_instr == go_instr {
 			if loopID == 0 {
 				return true //no loop
-			}else if actualCS[0].loopID == loopID {
+			} else if actualCS[0].loopID == loopID {
 				return true //loop id matched
-			}else {
-				return false //loop id not matched
 			}
 		}
 	}
-	return false
+	return false //loop id not matched
 }
 
 //bz: return the context of cgn which calls setValueNode() to record this pointer;
@@ -1018,15 +1022,18 @@ func (p PointerWCtx) GetMyContext() []*callsite {
 
 //bz: user API, expose to user
 type GoLoopID struct {
-	GoInstr  *ssa.Go
-	LoopID   int
+	GoInstr *ssa.Go
+	LoopID  int
 }
 
 //bz: return the goInstruction and loopID of the context of cgn (1st *callsite)
 //    return value can be nil if context is shared contour or pts == empty
 func (p PointerWCtx) GetMyGoAndLoopID() *GoLoopID {
 	if p.cgn == nil || p.cgn.callersite == nil || p.cgn.callersite[0] == nil {
-		return nil
+		return &GoLoopID{
+			GoInstr: nil,
+			LoopID:  -1,
+		}
 	}
 	cs := p.cgn.callersite[0]
 	return &GoLoopID{

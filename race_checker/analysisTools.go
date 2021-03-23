@@ -232,7 +232,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 		return
 	}
 	bVisit := make([]int, 1, bCap) // create ordering at which blocks are visited
-	k := 0
+	k := 0                         // ----> !!! SEE HERE: bz: from line 235 to 262, the functionality inside the code block can be separated outside by creating a function to do this (and return bVisit since you need later )
 	b := fnBlocks[0]
 	bVisit[k] = 0
 	for k < len(bVisit) {
@@ -276,7 +276,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 	for bInd := 0; bInd < len(bVisit); bInd++ {
 		activeCase, selDone = false, false
 		aBlock := fnBlocks[bVisit[bInd]]
-		if aBlock.Comment == "recover" {
+		if aBlock.Comment == "recover" {// ----> !!! SEE HERE: bz: the same as above, from line 279 to 293 (or even 304) can be separated out
 			continue
 		}
 		if aBlock.Comment == "select.done" {
@@ -304,7 +304,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 		}
 		for ii, theIns := range aBlock.Instrs { // examine each instruction
 			if theIns.String() == "rundefers" { // execute deferred calls at this index
-				for _, dIns := range toDefer {
+				for _, dIns := range toDefer {  // ----> !!! SEE HERE: bz: the same as above, from line 307 to 347 can be separated out
 					deferIns := dIns.(*ssa.Defer)
 					if _, ok := deferIns.Call.Value.(*ssa.Builtin); ok {
 						continue
@@ -485,7 +485,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 			}
 		}
 	}
-	if len(toUnlock) > 0 {
+	if len(toUnlock) > 0 {// ----> !!! SEE HERE: bz: the same as above, from line 488 to 501 can be separated out
 		for _, loc := range toUnlock {
 			if z := a.lockSetContainsAt(a.lockSet, loc, goID); z >= 0 {
 				log.Trace("Unlocking ", loc.String(), "  (", a.lockSet[goID][z].locAddr.Pos(), ") removing index ", z, " from: ", lockSetVal(a.lockSet, goID))
@@ -499,7 +499,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 			}
 		}
 	}
-	if len(toRUnlock) > 0 {
+	if len(toRUnlock) > 0 {// ----> !!! SEE HERE: bz: the same as above, from line 502 to 509 can be separated out
 		for _, rloc := range toRUnlock {
 			if z := a.lockSetContainsAt(a.RlockSet, rloc, goID); z >= 0 {
 				log.Trace("RUnlocking ", rloc.String(), "  (", a.RlockSet[goID][z].locAddr.Pos(), ") removing index ", z, " from: ", lockSetVal(a.RlockSet, goID))
