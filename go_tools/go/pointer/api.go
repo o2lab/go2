@@ -803,9 +803,9 @@ func (r *Result) PointsToByGoWithLoopID(v ssa.Value, goInstr *ssa.Go, loopID int
 		return r.a.result.pointsToByMain(v)
 	}
 
-	if strings.Contains(v.String(), "fp.numFilterCalled") {
-		fmt.Print()
-	}
+	//if strings.Contains(v.String(), "fp.numFilterCalled") {
+	//	fmt.Print()
+	//}
 
 	//others
 	for _, pts := range ptss {

@@ -69,7 +69,7 @@ func (a *analysis) checkRacyPairs() []*raceInfo {
 							!a.reachable(goI, i, goJ, j) &&
 							!a.reachable(goJ, j, goI, i) &&
 							!a.bothAtomic(insSlice[0], insSlice[1]) &&
-							!a.lockSetsIntersect(goI, goJ, i, j) && //return true
+							!a.lockSetsIntersect(goI, goJ, i, j) &&
 							!a.selectMutEx(insSlice[0], insSlice[1]) {
 							a.reportedAddr = append(a.reportedAddr, addressPair[0])
 							ri = &raceInfo{
@@ -148,18 +148,6 @@ func (a *analysis) sameAddress(addr1 ssa.Value, addr2 ssa.Value, go1 int, go2 in
 		return ptsets[addr1].PointsTo().Intersects(ptsets[addr2].PointsTo())
 	}
 	// new PTA
-	if go1 == 0 && go2 == 0 {
-		ptset1 := a.ptaRes[a.main].Queries[addr1]
-		ptset2 := a.ptaRes[a.main].Queries[addr2]
-		for _, ptrCtx1 := range ptset1 {
-			for _, ptrCtx2 := range ptset2 {
-				if ptrCtx1.MayAlias(ptrCtx2) {
-					return true
-				}
-			}
-		}
-		return false
-	}
 	var pt1 pointer.PointerWCtx
 	var pt2 pointer.PointerWCtx
 	if go1 == 0 {
