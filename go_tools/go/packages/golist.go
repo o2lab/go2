@@ -308,7 +308,7 @@ func handleDriverUnderDir(restPatterns []string, patterns []string, response *re
 func goListDriverRecursiveSeq(subdirs []string, size int, response *responseDeduper, cfg *Config,
 	ctx context.Context, restPatterns []string) {
 	subdirs = removeDuplicateValues(subdirs)
-	for i := 1; i < len(subdirs)-1; i++ {    //bz: 1st element is ".", the last element is "", skip them
+	for i := 1; i < len(subdirs); i++ {    //bz: 1st element is ".", the last element is "", skip them //yq: last element not to be skipped
 		subdir := subdirs[i]
 		_cfg := &Config{
 			Mode:    LoadAllSyntax,

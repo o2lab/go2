@@ -32,7 +32,6 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 		}
 	}
 
-	//var ptrSet []pointer.PointerWCtx
 	var pta0Set map[ssa.Value]pta0.Pointer
 	var PT0Set []*pta0.Label
 	if useDefaultPTA {
@@ -87,46 +86,11 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 			break
 		}
 	} else { // new PTA
-
-		//ptrSet = a.ptaRes[a.main].Queries[location] // set of pointers (with context) from ptaRes of pointer analysis
-		//if indir {
-		//	ptrSetIndir := a.ptaRes[a.main].IndirectQueries[location]
-		//	_ = ptrSetIndir// TODO: check these labels
-		//}
-		//
-		//var fnName string
-		//rightLoc := 0       // initialize index for the right points-to location
-		//rightCtx := 0 // initialize index for the pointer with right context
-		//if len(ptrSet) > 1 { // multiple targets returned by pointer analysis
-		//	//log.Trace("***Pointer Analysis revealed ", len(PTSet), " targets for location - ", a.prog.Fset.Position(location.Pos()))
-		//	var fns []string
-		//	for ind, eachPtr := range ptrSet { // check each pointer (with context)
-		//		//log.Debug(eachPtr.GetMyContext())
-		//		ptsLabels := eachPtr.PointsTo().Labels() // set of labels for locations that the pointer (with context) points to
-		//		for _, eachLabel := range ptsLabels {
-		//			if eachLabel.Value().Parent() != nil {
-		//				fns = append(fns, eachLabel.Value().Parent().Name())
-		//				//log.Trace("*****target No.", ind+1, " - ", eachPtr.Value().Name(), " from function ", eachPtr.Value().Parent().Name())
-		//				if sliceContainsStr(a.storeIns, eachLabel.Value().Parent().Name()) { // calling function is in current goroutine
-		//					rightLoc = ind
-		//					break
-		//				}
-		//			} else {
-		//				continue
-		//			}
-		//		}
-		//	}
-		//	//log.Trace("***Executing target No.", rightLoc+1)
-		//} else if len(ptrSet) == 0 {
-		//	//log.Debug("Points-to set is empty: " + location.String() + " @ " + theIns.String())
-		//	return
-		//}
-		//labels := ptrSet[rightLoc].PointsTo().Labels()
 		var ptr pointer.PointerWCtx
 		if goID == 0 {
-			ptr = a.ptaRes[a.main].PointsToByGo(location, nil)
+			ptr = a.ptaRes[a.main].PointsToByGoWithLoopID(location, nil, a.loopIDs[0])
 		} else {
-			ptr = a.ptaRes[a.main].PointsToByGo(location, a.RWIns[goID][0].(*ssa.Go))
+			ptr = a.ptaRes[a.main].PointsToByGoWithLoopID(location, a.RWIns[goID][0].(*ssa.Go), a.loopIDs[goID])
 		}
 		labels := ptr.PointsTo().Labels()
 		if labels == nil {

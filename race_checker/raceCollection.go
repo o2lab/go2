@@ -165,64 +165,16 @@ func (a *analysis) sameAddress(addr1 ssa.Value, addr2 ssa.Value, go1 int, go2 in
 	var pt1 pointer.PointerWCtx
 	var pt2 pointer.PointerWCtx
 	if go1 == 0 {
-		if loopID, ok := a.loopIDs[go1]; ok {
-			pt1 = a.ptaRes[a.main].PointsToByGoWithLoopID(addr1, nil, loopID)
-			fmt.Println(addr1, loopID, pt1.GetMyGoAndLoopID().LoopID)
-		} else {
-			loopID = 0
-			pt1 = a.ptaRes[a.main].PointsToByGoWithLoopID(addr1, nil, loopID)
-			fmt.Println(addr1, loopID, pt1.GetMyGoAndLoopID().LoopID)
-		//pt1 = a.ptaRes[a.main].PointsToByGo(addr1, nil)
-		}
+		pt1 = a.ptaRes[a.main].PointsToByGoWithLoopID(addr1, nil, a.loopIDs[go1])
 	} else {
-		if loopID, ok := a.loopIDs[go1]; ok {
-			pt1 = a.ptaRes[a.main].PointsToByGoWithLoopID(addr1, a.RWIns[go1][0].(*ssa.Go), loopID)
-			fmt.Println(addr1, loopID, pt1.GetMyGoAndLoopID().LoopID)
-		} else {
-			loopID = 0
-			pt1 = a.ptaRes[a.main].PointsToByGoWithLoopID(addr1, a.RWIns[go1][0].(*ssa.Go), loopID)
-			fmt.Println(addr1, loopID, pt1.GetMyGoAndLoopID().LoopID)
-		//pt1 = a.ptaRes[a.main].PointsToByGo(addr1, a.RWIns[go1][0].(*ssa.Go))
-		}
+		pt1 = a.ptaRes[a.main].PointsToByGoWithLoopID(addr1, a.RWIns[go1][0].(*ssa.Go), a.loopIDs[go1])
 	}
 	if go2 == 0 {
-		if loopID, ok := a.loopIDs[go2]; ok {
-			pt2 = a.ptaRes[a.main].PointsToByGoWithLoopID(addr2, nil, loopID)
-			fmt.Println(addr2, loopID, pt2.GetMyGoAndLoopID().LoopID)
-		} else {
-			loopID = 0
-			pt2 = a.ptaRes[a.main].PointsToByGoWithLoopID(addr2, nil, loopID)
-			fmt.Println(addr2, loopID, pt2.GetMyGoAndLoopID().LoopID)
-		//pt2 = a.ptaRes[a.main].PointsToByGo(addr2, nil)
-		}
+		pt2 = a.ptaRes[a.main].PointsToByGoWithLoopID(addr2, nil, a.loopIDs[go2])
 	} else {
-		if loopID, ok := a.loopIDs[go2]; ok {
-			pt2 = a.ptaRes[a.main].PointsToByGoWithLoopID(addr1, a.RWIns[go2][0].(*ssa.Go), loopID)
-			fmt.Println(addr2, loopID, pt2.GetMyGoAndLoopID().LoopID)
-		} else {
-			loopID = 0
-			pt2 = a.ptaRes[a.main].PointsToByGoWithLoopID(addr2, a.RWIns[go2][0].(*ssa.Go), loopID)
-			fmt.Println(addr2, loopID, pt2.GetMyGoAndLoopID().LoopID)
-		//pt2 = a.ptaRes[a.main].PointsToByGo(addr2, a.RWIns[go2][0].(*ssa.Go))
-		}
+		pt2 = a.ptaRes[a.main].PointsToByGoWithLoopID(addr2, a.RWIns[go2][0].(*ssa.Go), a.loopIDs[go2])
 	}
 	return pt1.MayAlias(pt2)
-	//if pt1.MayAlias(pt2) {
-	//	if pt1.GetMyGoAndLoopID() != nil && pt2.GetMyGoAndLoopID() != nil &&
-	//		pt1.GetMyGoAndLoopID().GoInstr == pt2.GetMyGoAndLoopID().GoInstr && // declared in same goroutine
-	//		a.RWIns[go1][0] == a.RWIns[go2][0] &&
-	//		a.goCaller[go1] == a.goCaller[go2] &&
-	//		a.loopIDs[go1] > 0 && // accesses located in loop
-	//		a.loopIDs[go2] > 0 &&
-	//		pt1.GetMyGoAndLoopID().LoopID == pt2.GetMyGoAndLoopID().LoopID &&
-	//		pt1.GetMyGoAndLoopID().GoInstr != a.RWIns[go1][0] {
-	//			return false
-	//	}
-	//	fmt.Println(pt1.GetMyGoAndLoopID())
-	//	fmt.Println(pt2.GetMyGoAndLoopID())
-	//	return true
-	//}
-	//return false
 }
 
 // reachable determines if 2 input instructions are connected in the Happens-Before Graph
@@ -440,36 +392,32 @@ func (r *raceReport) printRace(counter int, insPair []ssa.Instruction, addrPair 
 		if isWriteIns(anIns) {
 			access = " Write of "
 			if _, ok := anIns.(*ssa.Call); ok {
-				errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].String()), " in function ", aurora.BrightGreen(anIns.Parent().Name()), " at ", r.prog.Fset.Position(addrPair[i].Pos()))
+				if allEntries {
+					errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].String()), " in function ", aurora.BrightGreen(anIns.Parent().Name()))
+				} else {
+					errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].String()), " in function ", aurora.BrightGreen(anIns.Parent().Name()), " at ", r.prog.Fset.Position(addrPair[i].Pos()))
+				}
 			} else {
-				errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].String()), " in function ", aurora.BrightGreen(anIns.Parent().Name()), " at ", r.prog.Fset.Position(insPair[i].Pos()))
+				if allEntries {
+					errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].String()), " in function ", aurora.BrightGreen(anIns.Parent().Name()))
+				} else {
+					errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].String()), " in function ", aurora.BrightGreen(anIns.Parent().Name()), " at ", r.prog.Fset.Position(insPair[i].Pos()))
+				}
 			}
 			writeLocks = r.lockMap[anIns]
 		} else {
 			access = " Read of "
-			errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].String()), " in function ", aurora.BrightGreen(anIns.Parent().Name()), " at ", r.prog.Fset.Position(anIns.Pos()))
+			if allEntries {
+				errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].String()), " in function ", aurora.BrightGreen(anIns.Parent().Name()))
+			} else {
+				errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].String()), " in function ", aurora.BrightGreen(anIns.Parent().Name()), " at ", r.prog.Fset.Position(anIns.Pos()))
+			}
 			readLocks = append(r.lockMap[anIns], r.RlockMap[anIns]...)
 		}
 		log.Print(errMsg)
 		var printStack []string // store functions in stack and pop terminated functions
 		var printPos []token.Pos
 		if !allEntries {
-			for p, everyIns := range r.RWIns[goIDs[i]] {
-				if p < insInd[i]-1 {
-					if isFunc, ok := everyIns.(*ssa.Call); ok {
-						printName := isFunc.Call.Value.Name()
-						printName = checkTokenName(printName, everyIns.(*ssa.Call))
-						printStack = append(printStack, printName)
-						printPos = append(printPos, everyIns.Pos())
-					} else if _, ok1 := everyIns.(*ssa.Return); ok1 && len(printStack) > 0 {
-						printStack = printStack[:len(printStack)-1]
-						printPos = printPos[:len(printPos)-1]
-					}
-				} else {
-					continue
-				}
-			}
-		} else {
 			for p, everyIns := range r.RWIns[goIDs[i]] {
 				if p < insInd[i]-1 {
 					if isFunc, ok := everyIns.(*ssa.Call); ok {
@@ -506,13 +454,15 @@ func (r *raceReport) printRace(counter int, insPair []ssa.Instruction, addrPair 
 			temp := r.goCaller[j]
 			j = temp
 		}
-		for q, eachGo := range pathGo {
-			eachStack := r.goStack[eachGo]
-			for k, eachFn := range eachStack {
-				if k == 0 {
-					log.Println("\t ", strings.Repeat(" ", q), "--> Goroutine: ", eachFn, "[", r.goCaller[eachGo], "]")
-				} else {
-					log.Println("\t   ", strings.Repeat(" ", q), strings.Repeat(" ", k), eachFn)
+		if !allEntries {
+			for q, eachGo := range pathGo {
+				eachStack := r.goStack[eachGo]
+				for k, eachFn := range eachStack {
+					if k == 0 {
+						log.Println("\t ", strings.Repeat(" ", q), "--> Goroutine: ", eachFn, "[", r.goCaller[eachGo], "]")
+					} else {
+						log.Println("\t   ", strings.Repeat(" ", q), strings.Repeat(" ", k), eachFn)
+					}
 				}
 			}
 		}
