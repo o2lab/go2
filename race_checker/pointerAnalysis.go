@@ -40,7 +40,7 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 		PT0Set = pta0Set[location].PointsTo().Labels()
 
 		var fnName string
-		rightLoc := 0       // initialize index for the right points-to location
+		rightLoc := 0        // initialize index for the right points-to location
 		if len(PT0Set) > 1 { // multiple targets returned by pointer analysis
 			//log.Trace("***Pointer Analysis revealed ", len(PTSet), " targets for location - ", a.prog.Fset.Position(location.Pos()))
 			var fns []string
@@ -127,5 +127,6 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 		default:
 			break
 		}
+
 	}
 }
