@@ -34,7 +34,7 @@ func (a *analysis) fromPkgsOfInterest(fn *ssa.Function) bool {
 			return false
 		}
 	}
-	if efficiency && a.main.Pkg.Path() != "command-line-arguments" && !strings.HasPrefix(fn.Pkg.Pkg.Path(), a.main.Pkg.Path()) { // path is dependent on tested program
+	if efficiency && a.main.Pkg.Path() != "command-line-arguments" && !strings.HasPrefix(fn.Pkg.Pkg.Path(), strings.Split(a.main.Pkg.Path(), "/")[0]) { // path is dependent on tested program
 		return false
 	}
 	return true
