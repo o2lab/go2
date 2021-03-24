@@ -2264,7 +2264,7 @@ func (p *Package) Build() { p.buildOnce.Do(p.build) }
 
 //bz: create a basic block to hold the invoke callback fn instruction -> one and only one basic block
 // will not be triggered by default
-func (p *Package) CreateSyntheticCallForCallBack(fakeFn *Function, targetFn Value)  {
+func (p *Package) CreateSyntheticCallForCallBack(fakeFn *Function, targetFn Value, spawn bool)  {
 	if len(fakeFn.Blocks) == 0 { //first time
 		bb := fakeFn.newBasicBlock("synthetic.invoke")
 		fakeFn.currentBlock = bb
@@ -2272,10 +2272,16 @@ func (p *Package) CreateSyntheticCallForCallBack(fakeFn *Function, targetFn Valu
 		fakeFn.currentBlock = fakeFn.Blocks[0]
 	}
 
-	var v Call //bz: fake a call
-	v.Call.Value = targetFn
-	v.setType(types.NewTuple())
-	fakeFn.emit(&v)
+	if spawn { //bz: we fake a go call
+		v := Go{pos: fakeFn.Pos()}
+		v.Call.Value = targetFn
+		fakeFn.emit(&v)
+	}else{
+		var v Call //bz: fake a call
+		v.Call.Value = targetFn
+		v.setType(types.NewTuple())
+		fakeFn.emit(&v)
+	}
 	fakeFn.finishBody()
 }
 

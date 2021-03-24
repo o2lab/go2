@@ -16,7 +16,6 @@ import (
 	"path"
 	"path/filepath"
 	"reflect"
-	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -276,45 +275,22 @@ func handleDriverUnderDir(restPatterns []string, patterns []string, response *re
 
 	if !skip {
 		//TODO: bz: tmp condition filter to do the list all main entry points
-		//Update: to conside windows os console cmd;
-		//bz: list this subdir recursively until none
-		var subdirs []string //bz: the subdirectories
-		if runtime.GOOS == "windows" {//this does not work ... @https://helpdesk.kaseya.com/hc/en-gb/articles/229044948-Recursive-directory-listing-in-Windows
-			//udpated use pathwalker
-			fmt.Println("Runtime from Windows: use path walker.")
-			//cmd = exec.Command("dir", "/b", "/s", "/a:-D")
-			err := filepath.Walk(cfg.Dir, func(path string, info os.FileInfo, err error) error {
-				if info.IsDir() {
-					subdirs = append(subdirs, path)
-				}
-				return nil
-			})
-			if err != nil {
-				panic(fmt.Sprintf("!!! Windows: path walker failed with err: %s\n", err))
-			}
-
-			if len(subdirs) > 0 {
-				//goListDriverRecursive(subdirs, size, response, cfg, ctx, restPatterns)
-				goListDriverRecursiveSeq(subdirs, len(subdirs) , response, cfg, ctx, restPatterns)
-			}
-		} else { //default: Unix (MacOS + Ubuntu)
-			cmd := exec.Command("find", ".", "-type", "d")
-			cmd.Dir = cfg.Dir   //set cmd dir
-			var stdout, stderr bytes.Buffer
-			cmd.Stdout = &stdout
-			cmd.Stderr = &stderr
-			cmderr := cmd.Run()
-			if cmderr != nil { //bz: change to panic
-				panic(fmt.Sprintf("!!! cmd.Run() failed with %s\n", cmderr))
-			}
-			outStr, _ := string(stdout.Bytes()), string(stderr.Bytes())
-			//fmt.Printf("run ls cmd. out:\n%s\nerr:\n%s\n", outStr, errStr) //bz: for me to debug
-			subdirs = strings.Split(outStr, "\n") //bz: record the future dir we need to traverse
-
-			if len(subdirs) - 2 > 0 {
-				//goListDriverRecursive(subdirs, size, response, cfg, ctx, restPatterns)
-				goListDriverRecursiveSeq(subdirs, len(subdirs) - 2, response, cfg, ctx, restPatterns)
-			}
+		cmd := exec.Command("find", ".", "-type", "d") //bz: list this subdir recursively until none
+		cmd.Dir = cfg.Dir                              //set cmd dir
+		var stdout, stderr bytes.Buffer
+		cmd.Stdout = &stdout
+		cmd.Stderr = &stderr
+		cmderr := cmd.Run()
+		if cmderr != nil { //bz: change to panic
+			panic(fmt.Sprintf("!!! cmd.Run() failed with %s\n", cmderr))
+		}
+		outStr, _ := string(stdout.Bytes()), string(stderr.Bytes())
+		//fmt.Printf("run ls cmd. out:\n%s\nerr:\n%s\n", outStr, errStr) //bz: for me to debug
+		subdirs := strings.Split(outStr, "\n") //bz: record the future dir we need to traverse
+		size := len(subdirs) - 2
+		if size > 0 {
+			//goListDriverRecursive(subdirs, size, response, cfg, ctx, restPatterns)
+			goListDriverRecursiveSeq(subdirs, size, response, cfg, ctx, restPatterns)
 		}
 	}
 }
@@ -323,7 +299,7 @@ func handleDriverUnderDir(restPatterns []string, patterns []string, response *re
 func goListDriverRecursiveSeq(subdirs []string, size int, response *responseDeduper, cfg *Config,
 	ctx context.Context, restPatterns []string) {
 	subdirs = removeDuplicateValues(subdirs)
-	for i := 1; i < len(subdirs); i++ {    //bz: 1st element is ".", the last element is "", skip them //yq: last element not to be skipped
+	for i := 1; i < len(subdirs)-1; i++ {    //bz: 1st element is ".", the last element is "", skip them
 		subdir := subdirs[i]
 		_cfg := &Config{
 			Mode:    LoadAllSyntax,

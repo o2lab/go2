@@ -748,6 +748,7 @@ func (r *Result) GetResult() *ResultWCtx {
 	return r.a.result
 }
 
+
 //bz: for callback use only
 func (r *Result) GetMySyntheticFn(fn *ssa.Function) *ssa.Function {
 	return r.a.GetMySyntheticFn(fn)

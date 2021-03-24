@@ -1203,6 +1203,9 @@ func (a *analysis) genCallBack(caller *cgnode, instr ssa.CallInstruction, fn *ss
 		key = fn.String() + "@" + caller.contourkFull()
 	}
 
+	//check if fake function has spawned its own go routine
+	spawn := HasGoSpawn(fn)
+
 	//check if fake function already exists
 	fakeFn, okFn := a.globalcb[key]
 	var fakeCgns []*cgnode //to handle loop
@@ -1277,7 +1280,7 @@ func (a *analysis) genCallBack(caller *cgnode, instr ssa.CallInstruction, fn *ss
 	a.genFakeConstraints(fakeFn, v, call, fakeCgns)
 
 	//create a basic block to hold the invoke callback fn instruction
-	fakeFn.Pkg.CreateSyntheticCallForCallBack(fakeFn, targetFn)
+	fakeFn.Pkg.CreateSyntheticCallForCallBack(fakeFn, targetFn, spawn)
 
 	//TODO: why virtual calls (also be added in AnalyzeWCtx()) has duplicate edges?
 	for _, id := range ids {
@@ -1302,21 +1305,6 @@ func (a *analysis) genFakeConstraints(targetFn ssa.Value, v ssa.Value, call *ssa
 		fakeCgn.sites = append(fakeCgn.sites, site)
 	}
 	a.copy(targets, a.valueNode(v), 1) //bz: same as above, no context -> cb must exist a obj already before this point
-
-	////match input param for callback (targetFn)
-	//if fn, ok := targetFn.(*ssa.Function); ok {// if real target func has parameters
-	//	if len(fn.Params) > 1 { //includes receiver if any
-	//		for _, arg := range call.Args { //which params is callback fn's input params?
-	//			if arg != v {
-	//				for _, param := range fn.Params {
-	//					if param.Type() == arg.Type() { //matched
-	//						fmt.Println()
-	//					}
-	//				}
-	//			}
-	//		}
-	//	}
-	//}
 }
 
 //bz: if exist nodeid for *cgnode of fn with callersite as callsite, return nodeids of *cgnode
@@ -1342,7 +1330,7 @@ func (a *analysis) genStaticCall(caller *cgnode, instr ssa.CallInstruction, site
 		if a.config.DEBUG {
 			fmt.Println("Level excluded: " + fn.String())
 		}
-		if a.config.DoCallback || IsCallBack(fn) { //bz: if fn is in callback.yml
+		if a.config.DoCallback {
 			a.genCallBack(caller, instr, fn, site, call)
 		}
 		return

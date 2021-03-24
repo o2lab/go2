@@ -37,11 +37,9 @@ var DefaultElapsed int64
 //do preparation job
 func InitialMain() []*ssa.Package {
 	flags.ParseFlags()
-	if flags.DoYml || flags.DoCallback {
+	if flags.DoCallback {
 		flags.DoLevel = 1 //only consider app func
-		if flags.DoYml {
-			pointer.DecodeYaml("/Users/bozhen/Documents/GO2/go_tools/main/callback.yml")
-		}
+		pointer.DecodeYaml("/Users/bozhen/Documents/GO2/go_tools/main/callback.yml")
 	}
 
 	args := flag.Args()
@@ -165,7 +163,7 @@ func DoSeq(mains []*ssa.Package) {
 		Exclusion:     excludedPkgs,                      //bz: copied from race_checker if any
 		TrackMore:     true,                              //bz: track pointers with all types
 		Level:         level,                             //bz: see pointer.Config
-		DoCallback:    (flags.DoYml || flags.DoCallback), //bz: sythesize callback
+		DoCallback:    flags.DoCallback, //bz: sythesize callback
 		DoPerformance: flags.DoPerforamnce,               //bz: i want to see this performance
 	}
 
@@ -202,7 +200,7 @@ func doSameRootMy(mains []*ssa.Package) *pointer.Result {
 		Exclusion:     excludedPkgs,                      //bz: copied from race_checker if any
 		TrackMore:     true,                              //bz: track pointers with all types
 		Level:         0,                                 //bz: see pointer.Config
-		DoCallback:    (flags.DoYml || flags.DoCallback), //bz: sythesize callback
+		DoCallback:    flags.DoCallback, //bz: sythesize callback
 		DoPerformance: flags.DoPerforamnce,               //bz: if we output performance related info
 	}
 
@@ -389,7 +387,7 @@ func DoEachMainMy(i int, main *ssa.Package) *pointer.ResultWCtx {
 		Exclusion:     excludedPkgs,                      //bz: copied from race_checker if any
 		TrackMore:     true,                              //bz: track pointers with types declared in Analyze Scope
 		Level:         flags.DoLevel,                     //bz: see pointer.Config
-		DoCallback:    (flags.DoYml || flags.DoCallback), //bz: sythesize callback
+		DoCallback:    flags.DoCallback, //bz: sythesize callback
 		DoPerformance: flags.DoPerforamnce,               //bz: if we output performance related info
 	}
 

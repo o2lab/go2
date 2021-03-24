@@ -88,8 +88,8 @@ func DecodeYaml(path string)  {
 	}
 }
 
-//bz: match with fn signature from callback.yml
-func IsCallBack(fn *ssa.Function) bool {
+//bz: match with fn signature from callback.yml --> they have go routines spawned
+func HasGoSpawn(fn *ssa.Function) bool {
 	for _, sig := range signatures {
 		if sig == fn.String() {
 			return true

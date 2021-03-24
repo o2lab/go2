@@ -9,8 +9,8 @@ package pointer
 
 import (
 	"fmt"
-	"github.tamu.edu/April1989/go_tools/go/ssa"
 	"github.tamu.edu/April1989/go_tools/go/myutil/flags"
+	"github.tamu.edu/April1989/go_tools/go/ssa"
 	"go/types"
 )
 
@@ -391,12 +391,10 @@ func (c *invokeConstraint) solve(a *analysis, delta *nodeset) {
 					if a.config.DEBUG {
 						fmt.Println("Level excluded: " + fn.String())
 					}
-					if fn.IsMySynthetic {
+					if a.config.DoCallback && fn.IsMySynthetic { //bz: this is the callback
 						instr := c.site.instr.(ssa.CallInstruction)
 						call := instr.Common()
-						if a.config.DoCallback || IsCallBack(fn) { //bz: if fn is in callback.yml
-							a.genCallBack(c.caller, instr, fn, c.site, call)
-						}
+						a.genCallBack(c.caller, instr, fn, c.site, call)
 					}
 					continue
 				}

@@ -22,7 +22,7 @@ var PrintCGNodes = false //bz: print #cgnodes (before solve())
 var DoPerforamnce = true
 var DoDetail = false   //bz: print out all data from countReachUnreachXXX
 var DoCommonPart = false //bz: do compute common path
-var DoYml = false //bz: test and use callback.yml
+//var DoYml = false //bz: test and use callback.yml
 
 //different run scenario
 var DoSameRoot = false //bz: do all main in a pkg together from the same root -> all mains linked by the root node
@@ -43,7 +43,7 @@ func ParseFlags() {
 	_printCGNodes := flag.Bool("printCGNodes", false, "Print #cgnodes (before solve()).")
 	_doSameRoot := flag.Bool("doSameRoot", false, "Do all main together from the same root in one pkg, linked by the root node.")
 	_doParallel := flag.Bool("doParallel", false, "Do all mains in a pkg in parallel, but input is multiple mains.")
-	_doYml := flag.Bool("doYml", false, "Do callback.yml file.")
+	//_doYml := flag.Bool("doYml", false, "Do callback.yml file.")
 	//test useage in race checker
 	_doSeq := flag.Bool("doSeq", false, "Do all mains in a pkg sequential, but input is multiple mains.")
 
@@ -77,9 +77,9 @@ func ParseFlags() {
 	if *_doParallel {
 		DoParallel = true
 	}
-	if *_doYml {
-		DoYml = true
-	}
+	//if *_doYml {
+	//	DoYml = true
+	//}
 
 	//test useage in race checker
 	if *_doSeq {
