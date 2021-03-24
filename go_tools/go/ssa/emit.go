@@ -12,6 +12,7 @@ import (
 	"go/token"
 	"go/types"
 )
+//bz: BELOW ARE ALL THE FUNCTIONS CREATING *ssa.Instruction
 
 // emitNew emits to f a new (heap Alloc) instruction allocating an
 // object of type typ.  pos is the optional source location.

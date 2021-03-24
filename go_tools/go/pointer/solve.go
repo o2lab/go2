@@ -9,7 +9,8 @@ package pointer
 
 import (
 	"fmt"
-	"github.tamu.edu/April1989/go_tools/flags"
+	"github.tamu.edu/April1989/go_tools/go/ssa"
+	"github.tamu.edu/April1989/go_tools/go/myutil/flags"
 	"go/types"
 )
 
@@ -221,7 +222,7 @@ func (a *analysis) addLabel(ptr, label nodeid) bool {
 func (a *analysis) addWork(id nodeid) {
 	a.work.Insert(int(id))
 	if a.log != nil {
-		if Online {
+		if a.online {
 			fmt.Fprintf(a.log, "\t\tadd to work (online): n%d\n", id)
 		} else {
 			fmt.Fprintf(a.log, "\t\tadd to work: n%d\n", id)
@@ -390,8 +391,16 @@ func (c *invokeConstraint) solve(a *analysis, delta *nodeset) {
 					if a.config.DEBUG {
 						fmt.Println("Level excluded: " + fn.String())
 					}
+					if fn.IsMySynthetic {
+						instr := c.site.instr.(ssa.CallInstruction)
+						call := instr.Common()
+						if a.config.DoCallback || IsCallBack(fn) { //bz: if fn is in callback.yml
+							a.genCallBack(c.caller, instr, fn, c.site, call)
+						}
+					}
 					continue
 				}
+
 				fnObj = a.genInvokeOnline(nil, nil, fn) //bz: if reaches here, fn can only be lib from import
 			}
 			if a.log != nil { //debug

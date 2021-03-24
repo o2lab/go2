@@ -81,7 +81,7 @@ func doPackages(initial []*packages.Package, mode ssa.BuilderMode, deps bool) (*
 			if deps || isInitial[p] {
 				files = p.Syntax
 			}
-			ssamap[p] = prog.CreatePackage(p.Types, files, p.TypesInfo, true)
+			ssamap[p] = prog.CreatePackage(p.Types, files, p.TypesInfo, true) //bz: here starts to create ssa
 		}
 	})
 

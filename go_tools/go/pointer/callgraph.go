@@ -15,7 +15,7 @@ import (
 )
 
 var mainID nodeid //bz: record the target of root call to main method ID, NO REAL use, convenient for debug
-var DEBUG bool //bz: do we debug ...
+var DEBUG bool    //bz: do we debug ...
 
 //bz: update mainID, since opt.go will renumbering everything and change this
 func UpdateMainID(newid nodeid) {
@@ -41,13 +41,23 @@ type cgnode struct {
 	// -> I did not find a good way to fix this, so I attached the new go routine ctx here as actual_callersite
 	//    so that the pointer can use this to match the query ctx. This field is updated when finalizing call graph
 
-	localval   map[ssa.Value]nodeid  //bz: going to store things here and take away to get rid of queries
-	localobj   map[ssa.Value]nodeid  //bz: same as above
+	localval map[ssa.Value]nodeid //bz: going to store things here and take away to get rid of queries
+	localobj map[ssa.Value]nodeid //bz: same as above
+}
+
+//bz: test use only
+func (n *cgnode) Getlocalval() map[ssa.Value]nodeid {
+	return n.localval
+}
+
+//bz: do i have a shared contour as my context?
+func (n *cgnode) IsSharedContour() bool {
+	return n.callersite == nil || len(n.callersite) == 0 || n.callersite[0] == nil
 }
 
 //bz: going to replace and store (borrow them a pointer) a.localval and a.localobj here when calling genFunc() (gen.go)
 //only copy if func is in analysis scope
-func (n *cgnode) initLocalMaps()  {
+func (n *cgnode) initLocalMaps() {
 	n.localval = make(map[ssa.Value]nodeid)
 	n.localobj = make(map[ssa.Value]nodeid)
 }
@@ -73,16 +83,15 @@ func (n *cgnode) renumberHVN(mapping []nodeid) {
 	}
 	for obj, oldID := range n.localobj {
 		nid := mapping[oldID]
-		if nid == 0 || nid == oldID  { //bz: not updated or not re-mapped
+		if nid == 0 || nid == oldID { //bz: not updated or not re-mapped
 			continue
 		}
 		n.localobj[obj] = nid
 	}
 }
 
-
 // contour returns a description of this node's contour.
-//bz: only used for log
+//bz: default but with adjustment. only used for log
 func (n *cgnode) contour(isKcfa bool) string {
 	if isKcfa { //bz: print out info for kcfa
 		return n.contourkFull()
@@ -202,6 +211,25 @@ func (c *callsite) loopEqual(o *callsite) bool {
 	}
 }
 
+//bz: used in commonpart.go -> equal if instr equal
+func (c *callsite) relaxEqual(o *callsite) bool {
+	if o == nil && c == nil {
+		return true
+	}
+	if o == nil || c == nil {
+		return false
+	}
+	cInstr := c.instr
+	oInstr := o.instr
+	if cInstr == nil && oInstr == nil {
+		return true
+	} else if cInstr == nil || oInstr == nil {
+		return false //one is k callsite, one is from closure
+	} else { // most cases, comparing between callsite and callsite
+		return cInstr.String() == oInstr.String()
+	}
+}
+
 func (c *callsite) String() string {
 	if c.instr != nil {
 		//return c.instr.Common().Description() //bz: original code
@@ -235,7 +263,7 @@ type Ctx2nodeid struct {
 }
 
 //bz: renumbering func for opt
-func (r *Ctx2nodeid) renumber(renumbering []nodeid)  {
+func (r *Ctx2nodeid) renumber(renumbering []nodeid) {
 	for cs, oldIDs := range r.ctx2nodeid {
 		newIDs := make([]nodeid, len(oldIDs))
 		for idx, oldID := range oldIDs {
@@ -246,7 +274,7 @@ func (r *Ctx2nodeid) renumber(renumbering []nodeid)  {
 }
 
 //bz: renumbering func for hvn
-func (r *Ctx2nodeid) renumberHVN(mapping []nodeid)  {
+func (r *Ctx2nodeid) renumberHVN(mapping []nodeid) {
 	for cs, array := range r.ctx2nodeid {
 		objs := make([]nodeid, len(array))
 		for idx, ele := range array {
@@ -261,20 +289,22 @@ func (r *Ctx2nodeid) renumberHVN(mapping []nodeid)  {
 }
 
 //////////////////////////////// call graph to users ////////////////////////////////
-var numEdges = 0   //bz: perforamnce, number of edges
-
-func GetNumEdges() int {
-	return numEdges
-}
 
 //bz: for user
 type GraphWCtx struct {
 	Root      *Node                       // the distinguished root node
 	Nodes     map[*cgnode]*Node           // all nodes by cgnode
 	Fn2CGNode map[*ssa.Function][]*cgnode // a map
+
+	numEdges  int                         //bz: perforamnce, number of edges
+}
+
+func (g *GraphWCtx) GetNumEdges() int {
+	return g.numEdges
 }
 
 // bz: New returns a new Graph with the specified root node.
+// TODO: bz: do we need lock here if run in parallel?
 func NewWCtx(root *cgnode) *GraphWCtx {
 	g := &GraphWCtx{Nodes: make(map[*cgnode]*Node), Fn2CGNode: make(map[*ssa.Function][]*cgnode)}
 	g.Root = g.CreateNodeWCtx(root)
@@ -371,11 +401,11 @@ func (e Edge) Pos() token.Pos {
 
 // AddEdge adds the edge (caller, site, callee) to the call graph.
 // Elimination of duplicate edges is the caller's responsibility.
-func AddEdge(caller *Node, site ssa.CallInstruction, callee *Node) {
+func (g *GraphWCtx) AddEdge(caller *Node, site ssa.CallInstruction, callee *Node) {
 	e := &Edge{caller, site, callee}
 	callee.In = append(callee.In, e)
 	caller.Out = append(caller.Out, e)
-	numEdges++
+	g.numEdges++
 }
 
 // DeleteNode removes node n and its edges from the graph g.
@@ -386,10 +416,11 @@ func (g *GraphWCtx) DeleteNode(n *Node) {
 	delete(g.Nodes, n.GetCGNode())
 }
 
+//bz: make the following methods be obj-oriented to make it thread safe
 // deleteIns deletes all incoming edges to n.
 func (n *Node) deleteIns() {
 	for _, e := range n.In {
-		removeOutEdge(e)
+		n.removeOutEdge(e)
 	}
 	n.In = nil
 }
@@ -397,13 +428,13 @@ func (n *Node) deleteIns() {
 // deleteOuts deletes all outgoing edges from n.
 func (n *Node) deleteOuts() {
 	for _, e := range n.Out {
-		removeInEdge(e)
+		n.removeInEdge(e)
 	}
 	n.Out = nil
 }
 
 // removeOutEdge removes edge.Caller's outgoing edge 'edge'.
-func removeOutEdge(edge *Edge) {
+func (node *Node) removeOutEdge(edge *Edge) {
 	caller := edge.Caller
 	n := len(caller.Out)
 	for i, e := range caller.Out {
@@ -419,7 +450,7 @@ func removeOutEdge(edge *Edge) {
 }
 
 // removeInEdge removes edge.Callee's incoming edge 'edge'.
-func removeInEdge(edge *Edge) {
+func (node *Node) removeInEdge(edge *Edge) {
 	caller := edge.Callee
 	n := len(caller.In)
 	for i, e := range caller.In {
@@ -432,4 +463,18 @@ func removeInEdge(edge *Edge) {
 		}
 	}
 	panic("edge not found: " + edge.String())
+}
+
+//bz: used in commonpart.go
+func (g *GraphWCtx) GetNodesForFn(fn *ssa.Function) []*Node {
+	cgns := g.Fn2CGNode[fn]
+	var result []*Node
+	for _, cgn := range cgns {
+		n := g.GetNodeWCtx(cgn)
+		if n == nil {
+			continue
+		}
+		result = append(result, n)
+	}
+	return result
 }

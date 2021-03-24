@@ -186,8 +186,7 @@ func (a *analysis) sizeof(t types.Type) uint32 {
 
 // shouldTrack reports whether object type T contains (recursively)
 // any fields whose addresses should be tracked.
-// bz: NOW track all types DECLARED in the analyzed program, as long as itself is not a primitive/basic type
-// TODO: seems like not enough, maybe also control from the caller to check whether cgn if in app
+// bz: NOW track all types using trackAll
 func (a *analysis) shouldTrack(T types.Type) bool {
 	if a.track == trackAll {
 		return true // fast path
@@ -279,7 +278,7 @@ type nodeset struct {
 	intsets.Sparse
 }
 
-//bz:
+//bz: i added
 func (ns *nodeset) IsEmpty() bool {
 	return ns.Len() == 0
 }

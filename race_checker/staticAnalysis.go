@@ -193,7 +193,8 @@ func (runner *AnalysisRunner) Run(args []string) error {
 			Scope:      scope,        //bz: analyze scope
 			Exclusion: excludedPkgs, //bz: copied from race_checker if any
 			TrackMore: true,         //bz: track pointers with all types
-			Level:     0,            //bz: see pointer.Config
+			Level:     1,            //bz: see pointer.Config
+			DoCallback: true,        //bz: simplified callback
 		}
 		start := time.Now()                                               //performance
 		runner.ptaResult, _ = pointer.AnalyzeMultiMains(runner.ptaConfig) // conduct pointer analysis for multiple mains

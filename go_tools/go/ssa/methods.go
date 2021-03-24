@@ -150,7 +150,7 @@ func (prog *Program) needMethodsOf(T types.Type) {
 //
 // EXCLUSIVE_LOCKS_REQUIRED(prog.methodsMu)
 //
-func (prog *Program) needMethods(T types.Type, skip bool) {
+func (prog *Program) needMethods(T types.Type, skip bool) { //bz: 'skip' is never true
 	// Each package maintains its own set of types it has visited.
 	if prevSkip, ok := prog.runtimeTypes.At(T).(bool); ok {
 		// needMethods(T) was previously called

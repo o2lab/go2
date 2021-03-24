@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	log "github.com/sirupsen/logrus"
 	"github.com/twmb/algoimpl/go/graph"
 	"github.tamu.edu/April1989/go_tools/go/ssa"
@@ -218,6 +219,14 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 			a.goStack = append(a.goStack, []string{}) // initialize first interior slice for main goroutine
 		}
 	}
+	//for call back code: check if fn has a synthetic replacement
+	replace := a.ptaRes[a.main].GetMySyntheticFn(fn)
+	if replace != nil {
+		fmt.Println(" --> replaced by synthetic: ", fn)
+		fn = replace //we are going to visit synthetic fn
+	}
+	fmt.Println(" ... ", fn)
+
 	if _, ok := a.levels[goID]; !ok && goID > 0 { // initialize level counter for new goroutine
 		a.levels[goID] = 1
 	}

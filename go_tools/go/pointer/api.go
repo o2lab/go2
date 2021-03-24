@@ -13,6 +13,7 @@ import (
 	"github.tamu.edu/April1989/go_tools/go/types/typeutil"
 	"go/token"
 	"io"
+	"os"
 	"strconv"
 	"strings"
 )
@@ -75,12 +76,13 @@ type Config struct {
 	//bz: origin-sensitive -> go routine as origin-entry
 	Origin bool
 	//bz: shared config by context-sensitive
-	K          int      //how many level? the most recent callsite/origin?
-	LimitScope bool     //only apply kcfa to app methods
-	DEBUG      bool     //print out debug info
-	Scope      []string //analyzed scope -> from user input: -path
-	Exclusion  []string //excluded packages from this analysis -> from race_checker if any
-	TrackMore  bool     //bz: track pointers with all types
+	K              int      //how many level? the most recent callsite/origin?
+	LimitScope     bool     //only apply kcfa to app methods
+	DEBUG          bool     //print out debug info
+	Scope          []string //analyzed scope -> from user input: -path
+	Exclusion      []string //excluded packages from this analysis -> from race_checker if any
+	TrackMore      bool     //bz: track pointers with all types
+	DoCallback     bool     //bz: we synthesize for callback fn in app
 
 	imports       []string //bz: internal use: store all import pkgs in a main
 	Level         int      //bz: level == 0: traverse all app and lib, but with different ctx; level == 1: traverse 1 level lib call; level == 2: traverse 2 leve lib calls; no other option now
@@ -205,10 +207,10 @@ type ResultWCtx struct {
 	Queries         map[ssa.Value][]PointerWCtx // pts(v) for each v in setValueNode().
 	IndirectQueries map[ssa.Value][]PointerWCtx // pts(*v) for each v in setValueNode().
 	GlobalQueries   map[ssa.Value][]PointerWCtx // pts(v) for each freevar in setValueNode().
-	ExtendedQueries map[ssa.Value][]PointerWCtx // all other v
-	Warnings        []Warning                   // warnings of unsoundness
+	ExtendedQueries map[ssa.Value][]PointerWCtx
+	Warnings        []Warning // warnings of unsoundness
 
-	DEBUG bool // bz: print out debug info ...
+	DEBUG          bool // bz: print out debug info ...
 }
 
 //bz:
@@ -416,7 +418,7 @@ func (r *ResultWCtx) getMain() *Node {
 //input: ssa.Value;
 //output: PointerWCtx
 //panic: if no record for such input
-func (r *ResultWCtx) pointsTo(v ssa.Value) []PointerWCtx {
+func (r *ResultWCtx) PointsTo(v ssa.Value) []PointerWCtx {
 	pointers := r.pointsToFreeVar(v)
 	if pointers != nil {
 		return pointers
@@ -432,8 +434,8 @@ func (r *ResultWCtx) pointsTo(v ssa.Value) []PointerWCtx {
 }
 
 //bz: user API: return PointerWCtx for a ssa.Value used under context of *ssa.GO,
-//input: ssa.Value, *ssa.GO
-//output: PointerWCtx; this can be empty if we cannot match any v with its goInstr
+//input: ssa.Value, *ssa.GO;
+//output: PointerWCtx; this can be empty with nothing if we cannot match any
 func (r *ResultWCtx) pointsToByGo(v ssa.Value, goInstr *ssa.Go) PointerWCtx {
 	ptss := r.pointsToFreeVar(v)
 	if ptss != nil {
@@ -454,7 +456,7 @@ func (r *ResultWCtx) pointsToByGo(v ssa.Value, goInstr *ssa.Go) PointerWCtx {
 	return PointerWCtx{a: nil}
 }
 
-//bz: user API: return PointerWCtx for a ssa.Value used under the MAIN context
+//bz: user API: return PointerWCtx for a ssa.Value used under the main context
 func (r *ResultWCtx) pointsToByMain(v ssa.Value) PointerWCtx {
 	ptss := r.pointsToFreeVar(v)
 	if ptss != nil {
@@ -494,6 +496,7 @@ func (r *ResultWCtx) pointsToRegular(v ssa.Value) []PointerWCtx {
 }
 
 //bz: return []PointerWCtx for a free var,
+//UPDATE: NOT USED
 func (r *ResultWCtx) pointsToFreeVar(v ssa.Value) []PointerWCtx {
 	if globalv, ok := v.(*ssa.Global); ok {
 		pointers := r.GlobalQueries[globalv]
@@ -511,9 +514,7 @@ func (r *ResultWCtx) pointsToFreeVar(v ssa.Value) []PointerWCtx {
 			return pointers
 		}
 	}
-	if r.DEBUG {
-		fmt.Println(" ****  Pointer Analysis did not record for this ssa.Value: " + v.String() + " **** (PointsToFreeVar)") //panic
-	}
+	//fmt.Println(" ****  Pointer Analysis did not record for this ssa.Value: " + v.String() + " **** (PointsToFreeVar)") //panic
 	return nil
 }
 
@@ -528,7 +529,7 @@ func (r *ResultWCtx) pointsToFurther(v ssa.Value) []PointerWCtx {
 	return nil
 }
 
-//bz: for my data, debug, performance
+//bz: for mine data
 func (r *ResultWCtx) CountMyReachUnreachFunctions(doDetail bool) (map[*ssa.Function]*ssa.Function, map[*ssa.Function]*ssa.Function,
 	map[int]int, map[int]int, map[*ssa.Function]*ssa.Function) {
 	//cgns
@@ -747,6 +748,11 @@ func (r *Result) GetResult() *ResultWCtx {
 	return r.a.result
 }
 
+//bz: for callback use only
+func (r *Result) GetMySyntheticFn(fn *ssa.Function) *ssa.Function {
+	return r.a.GetMySyntheticFn(fn)
+}
+
 //bz: user API: return PointerWCtx for a ssa.Value used under context of *ssa.GO,
 //input: ssa.Value, *ssa.GO
 //output: PointerWCtx; this can be empty if we cannot match any v with its goInstr
@@ -834,6 +840,39 @@ func (r *Result) PointsToByGoWithLoopID(v ssa.Value, goInstr *ssa.Go, loopID int
 		}
 	}
 	return PointerWCtx{a: nil}
+}
+
+//bz: do comparison with default
+func (r *Result) DumpToCompare(cgfile *os.File, queryfile *os.File) {
+	_result := r.a.result
+
+	fmt.Println("\nWe are going to dump call graph for comparison. If not desired, turn off doCompare.")
+	callers := _result.CallGraph.Nodes
+	for _, caller := range callers {
+		fmt.Fprintln(cgfile, caller.String()) //bz: with context
+		outs := caller.Out                    // caller --> callee
+		for _, out := range outs {            //callees
+			fmt.Fprintln(cgfile, "  -> "+out.Callee.String()) //bz: with context
+		}
+	}
+
+	fmt.Println("\nWe are going to dump queries for comparison. If not desired, turn off doCompare.")
+	queries := r.Queries
+	inQueries := r.IndirectQueries
+	fmt.Fprintln(queryfile, "Queries Detail: ")
+	for v, ps := range queries {
+		for _, p := range ps { //p -> types.Pointer: includes its context
+			//SSA here is your *ssa.Value
+			fmt.Fprintln(queryfile, "(SSA:"+v.String()+"): {"+p.PointsTo().String()+"}")
+		}
+	}
+
+	fmt.Fprintln(queryfile, "Indirect Queries Detail: ")
+	for v, ps := range inQueries {
+		for _, p := range ps { //p -> types.Pointer: includes its context
+			fmt.Fprintln(queryfile, "(SSA:"+v.String()+"): {"+p.PointsTo().String()+"}")
+		}
+	}
 }
 
 // A Pointer is an equivalence class of pointer-like values.
@@ -1020,6 +1059,7 @@ func (p PointerWCtx) MatchMyContextWithLoopID(go_instr *ssa.Go, loopID int) bool
 	}
 	return false //loop id not matched
 }
+
 
 //bz: return the context of cgn which calls setValueNode() to record this pointer;
 func (p PointerWCtx) GetMyContext() []*callsite {

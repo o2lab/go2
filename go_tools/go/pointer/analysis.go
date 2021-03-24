@@ -26,8 +26,8 @@ import (
 
 const (
 	// optimization options; enable all when committing
-	// TODO: bz: optHVN mess up my constraints, tmp turn it off ....
-	optRenumber = true  // enable renumbering optimization (makes logs hard to read)
+	// TODO: bz: optHVN mess up my constraints and also make it sloooooow, tmp turn it off ....
+	optRenumber = false  // enable renumbering optimization (makes logs hard to read)
 	optHVN      = false // enable pointer equivalence via Hash-Value Numbering
 
 	// debugging options; disable all when committing
@@ -48,6 +48,9 @@ var ( //bz: my performance
 	maxTime time.Duration
 	minTime time.Duration
 	total   int64
+
+	main2Result map[*ssa.Package]*Result //bz: return value of AnalyzeMultiMains(), skip redo everytime calls Analyze()
+	main2ResultWCtx map[*ssa.Package]*ResultWCtx //bz: return value of AnalyzeMultiMains(), skip redo everytime calls Analyze()
 )
 
 // An object represents a contiguous block of memory to which some
@@ -160,8 +163,46 @@ type analysis struct {
 	closureWOGo map[nodeid]nodeid             //bz: solution@field actualCallerSite []*callsite of cgnode type
 
 	num_constraints int             //bz:  performance
+	numObjs         int             //bz: number of objects allocated
 	numOrigins      int             //bz: number of origins
 	preGens         []*ssa.Function //bz: number of pregenerated functions/cgs/constraints for reflection, os, runtime
+
+	globalcb     map[string]*ssa.Function       //bz: a map of synthetic fakeFn and its fn nodeid -> cannot use map of newFunction directly ...
+	callbacks    map[*ssa.Function]*Ctx2nodeid  //bz: fakeFn invoked by different context/call sites
+	gencb        []*cgnode                      //bz: queue of functions to generate constraints from genCallBack, we solve these at the end
+
+	//bz: make the following from var to here, to keep thread safe
+	isWithinScope bool //bz: whether the current genInstr() is working on a method within our scope
+	online        bool //bz: whether a constraint is from genInvokeOnline()
+	recordPreGen  bool //bz: when to record preGens
+
+	/** bz:
+	    we do have panics when turn on hvn optimization. panics are due to that hvn wrongly computes sccs.
+	    wrong sccs is because some pointers are not marked as indirect (but marked in default).
+	    This not-marked behavior is because we do not create function pointers for those functions that
+	    we skip their cgnode/func/constraints creation in offline generate(). So we keep a record here.
+
+	HOWEVER, we still have panics ... e.g., google.golang.org/grpc/benchmark/worker
+	OR maybe we need to do this for all functions?
+	HOWEVER, why is this a must?
+
+	MOREOVER, this makes the analysis even slower, since hvn uses a lot of time (it has nothing to do with my renumbering code)
+	do we really need this?
+	MAYBE this favors large programs? but the performance on tidb cannot stop ...
+
+	Update: we only record this skipTypes when optHVN is on
+	*/
+	skipTypes map[string]string //bz: a record of skiped methods in generate() off-line
+}
+
+//bz: for callback use only
+func (a *analysis) GetMySyntheticFn(base *ssa.Function) *ssa.Function {
+	for n, fn := range a.globalcb {
+		if n == base.String() {
+			return fn
+		}
+	}
+	return nil
 }
 
 // enclosingObj returns the first node of the addressable memory
@@ -202,7 +243,7 @@ func (a *analysis) warnf(pos token.Pos, format string, args ...interface{}) {
 func (a *analysis) computeTrackBits() {
 	if len(a.config.extendedQueries) != 0 {
 		// TODO(dh): only track the types necessary for the query.
-		a.track = trackAll //bz: we want this trackAll, but we do not set this
+		a.track = trackAll //bz: we want this trackAll, but we do not set this  --> update: set it
 		return
 	}
 	var queryTypes []types.Type
@@ -235,6 +276,11 @@ func (a *analysis) computeTrackBits() {
 
 var main2Analysis map[*ssa.Package]*Result //bz: skip redo everytime calls Analyze()
 
+//bz: expose to my test.go only
+func GetMain2ResultWCtx() map[*ssa.Package]*ResultWCtx {
+	return main2ResultWCtx
+}
+
 //bz: fill in the result
 func translateQueries(val ssa.Value, id nodeid, cgn *cgnode, result *Result, _result *ResultWCtx) {
 	t := val.Type()
@@ -263,7 +309,58 @@ func translateQueries(val ssa.Value, id nodeid, cgn *cgnode, result *Result, _re
 	}
 }
 
-//bz: user api, to analyze multiple mains
+//bz: print out config in console
+func printConfig(config *Config) {
+	var mode string //which pta is running
+	if config.Origin {
+		mode = strconv.Itoa(config.K) + "-ORIGIN-SENSITIVE"
+	} else if config.CallSiteSensitive {
+		mode = strconv.Itoa(config.K) + "-CFA"
+	} else {
+		mode = "CONTEXT-INSENSITIVE"
+	}
+	fmt.Println(" *** MODE: " + mode + " *** ")
+	fmt.Println(" *** Level: " + strconv.Itoa(config.Level) + " *** ")
+	//bz: change to default, remove flags
+	fmt.Println(" *** Use Queries/IndirectQueries *** ")
+	fmt.Println(" *** Use Default Queries API *** ")
+	if config.TrackMore {
+		fmt.Println(" *** Track All Types *** ")
+	} else {
+		fmt.Println(" *** Default Type Tracking (skip basic types) *** ")
+	}
+
+	if config.DoPerformance { //bz: this is from my main, i want them to print out
+		if optRenumber {
+			fmt.Println(" *** optRenumber ON *** ")
+		} else {
+			fmt.Println(" *** optRenumber OFF *** ")
+		}
+		if optHVN {
+			fmt.Println(" *** optHVN ON *** ")
+		} else {
+			fmt.Println(" *** optHVN OFF *** ")
+		}
+	}
+
+	fmt.Println(" *** Analyze Scope ***************** ")
+	if len(config.Scope) > 0 {
+		for _, pkg := range config.Scope {
+			fmt.Println(" - " + pkg)
+		}
+	}
+	fmt.Println(" *********************************** ")
+	fmt.Println(" *** Import Libs ******************* ")
+	if len(config.imports) > 0 {
+		for _, pkg := range config.imports {
+			fmt.Print(pkg + ", ")
+		}
+		fmt.Println()
+	}
+	fmt.Println(" *********************************** ")
+}
+
+//bz: user api, to analyze multiple mains sequentially
 func AnalyzeMultiMains(config *Config) (results map[*ssa.Package]*Result, err error) {
 	if config.Mains == nil {
 		return nil, fmt.Errorf("no main/test packages to analyze (check $GOROOT/$GOPATH)")
@@ -276,35 +373,14 @@ func AnalyzeMultiMains(config *Config) (results map[*ssa.Package]*Result, err er
 		}
 	}()
 
-	assert(len(config.Mains) > 1, "This API is for analyzing MULTIPLE mains. If analyzing one main, please use pointer.Analyze().")
+	if len(config.Mains) == 1 {
+		panic("This API is for analyzing MULTIPLE mains. If analyzing one main, please use pointer.Analyze().")
+	}
+
 	maxTime = 0
 	minTime = 1000000000
 
-	var mode string //which pta is running
-	if config.Origin {
-		mode = strconv.Itoa(config.K) + "-ORIGIN-SENSITIVE"
-	} else if config.CallSiteSensitive {
-		mode = strconv.Itoa(config.K) + "-CFA"
-	} else {
-		mode = "CONTEXT-INSENSITIVE"
-	}
-	fmt.Println(" *** MODE: " + mode + " *** ")
-	fmt.Println(" *** Analyze Scope ***************** ")
-	if len(config.Scope) > 0 {
-		for _, pkg := range config.Scope {
-			fmt.Println(" - " + pkg)
-		}
-	}
-	fmt.Println(" *********************************** ")
-	fmt.Println(" *** Level: " + strconv.Itoa(config.Level) + " *** ")
-	//bz: change to default, remove flags
-	fmt.Println(" *** Use Queries/IndirectQueries *** ")
-	fmt.Println(" *** Use Default Queries API *** ")
-	if config.TrackMore {
-		fmt.Println(" *** Track All Types *** ")
-	} else {
-		fmt.Println(" *** Default Type Tracking (skip basic types) *** ")
-	}
+	printConfig(config)
 
 	fmt.Println(" *** Multiple Mains **************** ")
 	for i, main := range config.Mains {
@@ -325,6 +401,7 @@ func AnalyzeMultiMains(config *Config) (results map[*ssa.Package]*Result, err er
 			Scope:         config.Scope,      //bz: analyze scope + input path
 			Exclusion:     config.Exclusion,  //bz: copied from race_checker if any
 			TrackMore:     config.TrackMore,  //bz: track pointers with all types
+			DoCallback:    config.DoCallback,  //bz: do callback
 			Level:         config.Level,      //bz: see pointer.Config
 			DoPerformance: config.DoPerformance,
 		}
@@ -357,7 +434,7 @@ func AnalyzeMultiMains(config *Config) (results map[*ssa.Package]*Result, err er
 	fmt.Println("Min: ", minTime.String()+".")
 	fmt.Println("Avg: ", float32(total)/float32(len(config.Mains))/float32(1000), "s.")
 
-	results = main2Analysis
+	results = main2Result
 	return results, nil
 }
 
@@ -377,7 +454,7 @@ func Analyze(config *Config) (result *Result, err error) {
 	}()
 
 	main := config.Mains[0] //bz: currently only handle one main
-	if result, ok := main2Analysis[main]; ok {
+	if result, ok := main2Result[main]; ok {
 		//we already done the analysis, now find and wrap the result
 		return result, nil
 	}
@@ -392,14 +469,13 @@ func Analyze(config *Config) (result *Result, err error) {
 	return result, nil
 }
 
-// bz: lazy way
-// AnalyzeWCtx runs the pointer analysis with the scope and options
+// bz: AnalyzeWCtx runs the pointer analysis with the scope and options
 // specified by config, and returns the (synthetic) root of the callgraph.
 //
 // Pointer analysis of a transitively closed well-typed program should
 // always succeed.  An error can occur only due to an internal bug.
 //
-func AnalyzeWCtx(config *Config, printConfig bool) (result *ResultWCtx, err error) { //Result
+func AnalyzeWCtx(config *Config, doPrintConfig bool) (result *ResultWCtx, err error) { //Result
 	if config.Mains == nil {
 		return nil, fmt.Errorf("no main/test packages to analyze (check $GOROOT/$GOPATH)")
 	}
@@ -430,14 +506,22 @@ func AnalyzeWCtx(config *Config, printConfig bool) (result *ResultWCtx, err erro
 			DEBUG:           config.DEBUG,
 		},
 		deltaSpace: make([]int, 0, 100),
-		//bz: i did not clear the following two after offline TODO: do I ?
+		//bz: i did not clear the following two after offline
 		fn2cgnodeIdx: make(map[*ssa.Function][]int),
 		closures:     make(map[*ssa.Function]*Ctx2nodeid),
 		closureWOGo:  make(map[nodeid]nodeid),
+		skipTypes:    make(map[string]string),
+
+		callbacks:    make(map[*ssa.Function]*Ctx2nodeid),
+		globalcb:     make(map[string]*ssa.Function),
 	}
 
 	if false {
 		a.log = os.Stderr // for debugging crashes; extremely verbose
+	}
+
+	if len(a.config.Mains) > 1 {
+		panic("This API is for analyzing ONE main. If analyzing multiple mains, please use pointer.AnalyzeMultiMains().")
 	}
 
 	UpdateDEBUG(a.config.DEBUG) //in pointer/callgraph, print out info changes
@@ -450,60 +534,8 @@ func AnalyzeWCtx(config *Config, printConfig bool) (result *ResultWCtx, err erro
 		}
 	}
 
-	if printConfig {
-		var mode string //which pta is running
-		if a.config.Origin {
-			mode = strconv.Itoa(a.config.K) + "-ORIGIN-SENSITIVE"
-		} else if a.config.CallSiteSensitive {
-			mode = strconv.Itoa(a.config.K) + "-CFA"
-		} else {
-			mode = "CONTEXT-INSENSITIVE"
-		}
-		fmt.Println(" *** MODE: " + mode + " *** ")
-		fmt.Println(" *** Analyze Scope ***************** ")
-		if len(a.config.Scope) > 0 {
-			for _, pkg := range a.config.Scope {
-				fmt.Println(" - " + pkg)
-			}
-		}
-		fmt.Println(" *********************************** ")
-		fmt.Println(" *** Import Libs ******************* ")
-		if len(a.config.imports) > 0 {
-			for _, pkg := range a.config.imports {
-				fmt.Print(pkg + ", ")
-			}
-			fmt.Println()
-		}
-		fmt.Println(" *********************************** ")
-		if len(a.config.Mains) > 1 {
-			fmt.Println(" *** Multiple Mains **************** ")
-			for i, main := range a.config.Mains {
-				fmt.Println(strconv.Itoa(i) + ": " + main.String())
-			}
-			fmt.Println(" *********************************** ")
-		}
-		fmt.Println(" *** Level: " + strconv.Itoa(a.config.Level) + " *** ")
-		//bz: change to default, remove flags
-		fmt.Println(" *** Use Queries/IndirectQueries *** ")
-		fmt.Println(" *** Use Default Queries API *** ")
-		if a.config.TrackMore {
-			fmt.Println(" *** Track All Types *** ")
-		} else {
-			fmt.Println(" *** Default Type Tracking (skip basic types) *** ")
-		}
-
-		if config.DoPerformance { //bz: this is from my main, i want them to print out
-			if optRenumber {
-				fmt.Println(" *** optRenumber ON *** ")
-			} else {
-				fmt.Println(" *** optRenumber OFF *** ")
-			}
-			if optHVN {
-				fmt.Println(" *** optHVN ON *** ")
-			} else {
-				fmt.Println(" *** optHVN OFF *** ")
-			}
-		}
+	if doPrintConfig {
+		printConfig(a.config)
 	}
 
 	if a.log != nil {
@@ -543,7 +575,9 @@ func AnalyzeWCtx(config *Config, printConfig bool) (result *ResultWCtx, err erro
 	if runtime := a.prog.ImportedPackage("runtime"); runtime != nil {
 		a.runtimeSetFinalizer = runtime.Func("SetFinalizer")
 	}
-	a.computeTrackBits() //bz: use when there is input queries before running this analysis; we do not need this for now?
+
+	//a.computeTrackBits() //bz: use when there is input queries before running this analysis; -> update: we do not need this. just update a.track here
+	a.track = trackAll
 
 	a.generate()   //bz: a preprocess for reflection/runtime/import libs
 	a.showCounts() //bz: print out size ...
@@ -576,8 +610,8 @@ func AnalyzeWCtx(config *Config, printConfig bool) (result *ResultWCtx, err erro
 			a.rtypes.SetHasher(a.hasher)
 		}
 
-		start := time.Now()
-		a.hvn() //default: do this hvn
+		start := time.Now() //bz: i add performance
+		a.hvn()             //default: do this hvn
 		elapsed := time.Now().Sub(start)
 		fmt.Println("HVN using ", elapsed) //bz: i want to know how slow it is ...
 	}
@@ -605,10 +639,6 @@ func AnalyzeWCtx(config *Config, printConfig bool) (result *ResultWCtx, err erro
 		}
 	}
 
-	if a.log != nil { // log format
-		fmt.Fprintf(a.log, "\n\n\nCall Graph -----> \n")
-	}
-
 	// Add dynamic edges to call graph.
 	var space [100]int
 	for _, caller := range a.cgnodes {
@@ -620,7 +650,7 @@ func AnalyzeWCtx(config *Config, printConfig bool) (result *ResultWCtx, err erro
 	}
 
 	//bz: update all callee actual ctx for a.closureWOGo
-	a.updateActaulCallSites()
+	a.updateActualCallSites()
 
 	//bz: just assign for the main method; not a good solution, will resolve later
 	for _, cgn := range a.cgnodes {
@@ -630,32 +660,53 @@ func AnalyzeWCtx(config *Config, printConfig bool) (result *ResultWCtx, err erro
 		}
 	}
 
+	if a.log != nil { // dump call graph
+		fmt.Fprintf(a.log, "\n\n\nCall Graph -----> \n")
+		printed := make(map[int]int)
+		cg := a.result.CallGraph
+		list := make([]*Node, 1)
+		list[0] = cg.Root
+		for len(list) > 0 {
+			node := list[0]
+			list = list[1:]
+			for _, out := range node.Out {
+				fmt.Fprintf(a.log, "\t%s (from %s) \n\t\t-> %s\n", out.Site, node.cgn.String(), out.Callee.String())
+				if printed[out.Callee.ID] == 0 { // not printed before
+					list = append(list, out.Callee)
+					printed[out.Callee.ID] = out.Callee.ID
+				}
+			}
+		}
+	}
+
 	a.result.CallGraph.computeFn2CGNode() //bz: update Fn2CGNode for user API
 	a.result.a = a                        //bz: update
 
 	if a.config.DoPerformance { //bz: performance test; dump info
 		fmt.Println("--------------------- Performance ------------------------")
 		fmt.Println("#Pre-generated cgnodes: ", len(a.preGens))
-		fmt.Println("#pts: ", len(a.nodes))
+		fmt.Println("#pts: ", len(a.nodes)) //this includes all kinds of pointers, e.g., cgnode, func, pointer
 		fmt.Println("#constraints (totol num): ", a.num_constraints)
 		fmt.Println("#cgnodes (totol num): ", len(a.cgnodes))
 		//fmt.Println("#func (totol num): ", len(a.fn2cgnodeIdx))
-		numTyp := 0
-		for _, track := range a.trackTypes {
-			if track {
-				numTyp++
-			}
-		}
-		fmt.Println("#tracked types (totol num): ", numTyp)
+		//numTyp := 0
+		//for _, track := range a.trackTypes {
+		//	if track {
+		//		numTyp++
+		//	}
+		//}
+		//fmt.Println("#tracked types (totol num): ", numTyp)
+		fmt.Println("#tracked types (totol num): trackAll") //bz: updated a.track = trackAll, skip this number
 		fmt.Println("#origins (totol num): ", a.numOrigins+1) //bz: main is not included here
+		fmt.Println("#objs (totol num): ", a.numObjs)
 		fmt.Println("\nCall Graph: (cgnode based: function + context) \n#Nodes: ", len(a.result.CallGraph.Nodes))
-		fmt.Println("#Edges: ", GetNumEdges())
+		fmt.Println("#Edges: ", a.result.CallGraph.GetNumEdges())
 	}
 
 	return a.result, nil
 }
 
-//bz: translate to default return value, and update main2Analysis
+//bz: translate to default return value, and update main2Result
 func translateResult(_result *ResultWCtx, main *ssa.Package) *Result {
 	result := &Result{
 		Queries:         make(map[ssa.Value][]PointerWCtx),
@@ -683,11 +734,18 @@ func translateResult(_result *ResultWCtx, main *ssa.Package) *Result {
 		translateQueries(obj, id, nil, result, _result)
 	}
 
-	if main2Analysis == nil {
-		main2Analysis = make(map[*ssa.Package]*Result)
+	//upate
+	if main2Result == nil {
+		main2Result = make(map[*ssa.Package]*Result)
 	}
-	main2Analysis[main] = result
+	main2Result[main] = result
 	result.a = _result.a
+
+	//udpate: test only
+	if main2ResultWCtx == nil {
+		main2ResultWCtx = make(map[*ssa.Package]*ResultWCtx)
+	}
+	main2ResultWCtx[main] = _result
 
 	//also udpate _result for new api
 	_result.Queries = result.Queries
@@ -708,7 +766,10 @@ func ContainStringRelax(s []string, e string) bool {
 
 //bz: solution@field actualCallerSite []*callsite of cgnode type
 //update the callee of nodes in a.closureWOGo
-func (a *analysis) updateActaulCallSites() {
+func (a *analysis) updateActualCallSites() {
+	if a.log != nil {
+		fmt.Fprintf(a.log, "\n\n")
+	}
 	cg := a.result.CallGraph
 	var total nodeset
 	waiting := a.closureWOGo
@@ -721,10 +782,10 @@ func (a *analysis) updateActaulCallSites() {
 			target := outEdge.Callee.cgn
 			if !total.Has(target.idx) {
 				if a.log != nil {
-					fmt.Fprintf(a.log, "* Update actualCallerSite for ----> \n   %s -> [%s] \n", target, cgn.contourkActualFull())
+					fmt.Fprintf(a.log, "* Update actualCallerSite for ----> \n%s -> [%s] \n", target, cgn.contourkActualFull())
 				}
 				if a.config.DEBUG {
-					fmt.Printf("* Update actualCallerSite for ----> \n   %s -> [%s] \n", target, cgn.contourkActualFull())
+					fmt.Printf("* Update actualCallerSite for ----> \n%s -> [%s] \n", target, cgn.contourkActualFull())
 				}
 				for _, actual := range cgn.actualCallerSite {
 					target.actualCallerSite = append(target.actualCallerSite, actual) //update
@@ -749,10 +810,10 @@ func (a *analysis) callEdge(caller *cgnode, site *callsite, calleeid nodeid) {
 	if a.closureWOGo[calleeid] != 0 {
 		if !a.equalContextFor(caller.callersite, callee.callersite) {
 			if a.log != nil {
-				fmt.Fprintf(a.log, "Update actualCallerSite for ----> \n   %s -> [%s] \n", callee, caller.contourkFull())
+				fmt.Fprintf(a.log, "Update actualCallerSite for ----> \n%s -> [%s] \n", callee, caller.contourkFull())
 			}
 			if a.config.DEBUG {
-				fmt.Printf("Update actualCallerSite for ----> \n   %s -> [%s] \n", callee, caller.contourkFull())
+				fmt.Printf("Update actualCallerSite for ----> \n%s -> [%s] \n", callee, caller.contourkFull())
 			}
 			callee.actualCallerSite = append(callee.actualCallerSite, caller.callersite) //update
 		}
@@ -763,16 +824,16 @@ func (a *analysis) callEdge(caller *cgnode, site *callsite, calleeid nodeid) {
 		// (to wrappers) to arise due to the elimination of
 		// context information, but I haven't observed any.
 		// Understand this better.
-		AddEdge(cg.CreateNodeWCtx(caller), site.instr, cg.CreateNodeWCtx(callee)) //bz: changed
+		cg.AddEdge(cg.CreateNodeWCtx(caller), site.instr, cg.CreateNodeWCtx(callee)) //bz: changed
 	}
 
 	if a.log != nil {
-		fmt.Fprintf(a.log, "\tcall edge %s -> %s\n", site, callee)
+		fmt.Fprintf(a.log, "\t%s -> %s\n", site, callee)
 	}
 
 	// Warn about calls to non-intrinsic external functions.
 	// TODO(adonovan): de-dup these messages.
-	if fn := callee.fn; fn.Blocks == nil && a.findIntrinsic(fn) == nil {
+	if fn := callee.fn; fn.Blocks == nil && a.findIntrinsic(fn) == nil && !fn.IsMySynthetic { //bz: we create synthetic funcs (cause this warning), skip this warn.
 		a.warnf(site.pos(), "unsound call to unknown intrinsic: %s", fn)
 		a.warnf(fn.Pos(), " (declared here)")
 	}

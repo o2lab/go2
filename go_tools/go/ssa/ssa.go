@@ -321,8 +321,10 @@ type Function struct {
 	targets      *targets                // linked stack of branch targets
 	lblocks      map[*ast.Object]*lblock // labelled blocks
 
+	//bz: the following will not be used in default
 	IsFromApp bool // bz: whether this fn is invoked by main method from the analyzed app
 	               // !! this is the only change in this file, all others are my comments
+	IsMySynthetic bool // bz: this is synthetic by me for callback fn
 }
 
 // BasicBlock represents an SSA basic block.

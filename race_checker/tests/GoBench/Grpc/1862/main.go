@@ -14,7 +14,7 @@ func TestGrpc1862(t *testing.T) {
 		defer wg.Done()
 		abort := false
 		time.AfterFunc(time.Nanosecond, func() { abort /* RACE Write */ = true }) // spawns child goroutine in time package triggering racy write on abort
-		if abort /* RACE Read */ {
+		if abort /* RACE Read */ { //@pointsto t0@main.TestGrpc1862$1=abort@main.TestGrpc1862$1$1
 		} // racy read on abort
 	}()
 	wg.Wait()

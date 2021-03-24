@@ -12,7 +12,7 @@ type callbackRecorder struct {
 	callbacks int
 }
 
-func (c *callbackRecorder) callback() {
+func (c *callbackRecorder) callback() {// @pointsto t0@(*main.callbackRecorder).callback=t1@main.TestIstio8144$1
 	c.callbacks /* RACE Write */ ++
 }
 

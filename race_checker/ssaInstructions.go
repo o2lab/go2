@@ -162,11 +162,11 @@ func (a *analysis) insSend(examIns *ssa.Send, goID int, theIns ssa.Instruction) 
 // insStore  ???
 func (a *analysis) insStore(examIns *ssa.Store, goID int, theIns ssa.Instruction) {
 	if !isLocalAddr(examIns.Addr) {
-		if len(a.storeIns) > 1 {
-			if a.storeIns[len(a.storeIns)-2] == "AfterFunc" { // ignore this write instruction as AfterFunc is analyzed elsewhere
-				return
-			}
-		}
+		//if len(a.storeIns) > 1 {
+		//	if a.storeIns[len(a.storeIns)-2] == "AfterFunc" { // ignore this write instruction as AfterFunc is analyzed elsewhere
+		//		return
+		//	}
+		//}
 		a.RWIns[goID] = append(a.RWIns[goID], theIns)
 		a.updateLockMap(goID, theIns)
 		if !useNewPTA {
