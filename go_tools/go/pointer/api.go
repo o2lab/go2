@@ -755,10 +755,10 @@ func (r *Result) PointsToByGo(v ssa.Value, goInstr *ssa.Go) PointerWCtx {
 	_, ok1 := v.(*ssa.FreeVar)
 	_, ok2 := v.(*ssa.Global)
 	_, ok3 := v.(*ssa.UnOp)
+	if len(ptss) == 0 {
+		return PointerWCtx{a: nil}
+	}
 	if ok1 || ok2 || ok3 { //free var: only one pts available
-		if len(ptss) == 0 {
-			return PointerWCtx{a: nil}
-		}
 		return ptss[0]
 	}
 
@@ -798,10 +798,10 @@ func (r *Result) PointsToByGoWithLoopID(v ssa.Value, goInstr *ssa.Go, loopID int
 	_, ok1 := v.(*ssa.FreeVar)
 	_, ok2 := v.(*ssa.Global)
 	_, ok3 := v.(*ssa.UnOp)
+	if len(ptss) == 0 {
+		return PointerWCtx{a: nil}
+	}
 	if ok1 || ok2 || ok3 { //free var: only one pts available
-		if len(ptss) == 0 {
-			return PointerWCtx{a: nil}
-		}
 		return ptss[0]
 	}
 
