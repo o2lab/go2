@@ -10,12 +10,12 @@ import (
 
 func (a *analysis) buildHB() {
 	var prevN graph.Node
-	var goCaller []graph.Node
 	var selectN []graph.Node
 	var readyCh []string
 	var selCaseEndN []graph.Node
 	var ifN []graph.Node
 	var ifSuccEndN []graph.Node
+	goCaller := make(map[*ssa.Go]graph.Node)
 	waitingN := make(map[goIns]graph.Node)
 	chanRecvs := make(map[string]graph.Node) // map channel name to graph node
 	chanSends := make(map[string]graph.Node) // map channel name to graph node
@@ -26,17 +26,16 @@ func (a *analysis) buildHB() {
 			if nGo == 0 && i == 0 { // main goroutine, first instruction
 				prevN = a.HBgraph.MakeNode() // initiate for future nodes
 				*prevN.Value = insKey
-				if _, ok := anIns.(*ssa.Go); ok {
-					goCaller = append(goCaller, prevN) // sequentially store go calls in the same goroutine
+				if goInstr, ok := anIns.(*ssa.Go); ok {
+					goCaller[goInstr] = prevN // sequentially store go calls in the same goroutine
 				}
 			} else {
 				currN := a.HBgraph.MakeNode()
 				*currN.Value = insKey
-				if nGo != 0 && i == 0 && goCaller != nil { // worker goroutine, first instruction
-					prevN = goCaller[0] // first node in subroutine
-					goCaller = goCaller[1:]
-				} else if _, ok := anIns.(*ssa.Go); ok {
-					goCaller = append(goCaller, currN) // sequentially store go calls in the same goroutine
+				if nGo != 0 && i == 0 { // worker goroutine, first instruction
+					prevN = goCaller[anIns.(*ssa.Go)] // first node in subroutine
+				} else if goInstr, ok := anIns.(*ssa.Go); ok {
+					goCaller[goInstr] = currN // store go calls in the same goroutine
 				} else if selIns, ok1 := anIns.(*ssa.Select); ok1 {
 					selectN = append(selectN, currN) // select node
 					readyCh = a.selReady[selIns]
