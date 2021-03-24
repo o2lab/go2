@@ -259,10 +259,6 @@ func (runner *AnalysisRunner) Run(args []string) error {
 				log.Info("Compiling stack trace for every Goroutine... ")
 				log.Debug(strings.Repeat("-", 35), "Stack trace begins", strings.Repeat("-", 35))
 			}
-			if strings.Contains(main.Pkg.String(), "GoBench") {
-				trieLimit = 2
-				efficiency = false
-			}
 			Analysis.visitAllInstructions(main.Func(entryFn), 0)
 			if !allEntries {
 				log.Debug(strings.Repeat("-", 35), "Stack trace ends", strings.Repeat("-", 35))
