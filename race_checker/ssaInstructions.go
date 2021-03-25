@@ -527,7 +527,11 @@ func (a *analysis) insGo(examIns *ssa.Go, goID int, theIns ssa.Instruction, loop
 	a.goStack[newGoID] = append(a.goStack[newGoID], a.storeIns...)
 	a.workList = append(a.workList, info) // store encountered goroutines
 	if !allEntries {
-		log.Debug(strings.Repeat(" ", a.levels[goID]), "spawning Goroutine ----->  ", fnName)
+		if loopID > 0 {
+			log.Debug(strings.Repeat(" ", a.levels[goID]), "spawning Goroutine (in loop) ----->  ", fnName)
+		} else {
+			log.Debug(strings.Repeat(" ", a.levels[goID]), "spawning Goroutine ----->  ", fnName)
+		}
 	}
 }
 

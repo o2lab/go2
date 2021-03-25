@@ -389,19 +389,19 @@ func (r *raceReport) printRace(counter int, insPair []ssa.Instruction, addrPair 
 		var access string
 		if isWriteIns(anIns) {
 			access = " Write of "
-			if _, ok := anIns.(*ssa.Call); ok {
-				if allEntries {
-					errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].String()), " in function ", aurora.BrightGreen(anIns.Parent().Name()))
-				} else {
-					errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].String()), " in function ", aurora.BrightGreen(anIns.Parent().Name()), " at ", r.prog.Fset.Position(addrPair[i].Pos()))
-				}
-			} else {
+			//if _, ok := anIns.(*ssa.Call); ok {
+			//	if allEntries {
+			//		errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].String()), " in function ", aurora.BrightGreen(anIns.Parent().Name()))
+			//	} else {
+			//		errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].String()), " in function ", aurora.BrightGreen(anIns.Parent().Name()), " at ", r.prog.Fset.Position(insPair[i].Pos()))
+			//	}
+			//} else {
 				if allEntries {
 					errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].String()), " in function ", aurora.BrightGreen(anIns.Parent().Name()))
 				} else {
 					errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].String()), " in function ", aurora.BrightGreen(anIns.Parent().Name()), " at ", r.prog.Fset.Position(insPair[i].Pos()))
 				}
-			}
+			//}
 			writeLocks = r.lockMap[anIns]
 		} else {
 			access = " Read of "

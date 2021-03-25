@@ -64,6 +64,7 @@ type analysis struct {
 	commIfSucc      []ssa.Instruction               // store first ins of succ block that contains channel communication
 	omitComm        []*ssa.BasicBlock               // omit these blocks as they are race-free due to channel communication
 	racyStackTops	[]string
+	inLoop			bool							// entered a loop
 	loopIDs			map[int]int						// map goID to loopID
 }
 

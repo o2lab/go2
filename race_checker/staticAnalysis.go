@@ -250,6 +250,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 				ifSuccBegin:     make(map[ssa.Instruction]*ssa.If),
 				ifFnReturn:      make(map[*ssa.Function]*ssa.Return),
 				ifSuccEnd:       make(map[ssa.Instruction]*ssa.Return),
+				inLoop:  		 false,
 				loopIDs:  		 make(map[int]int),
 			}
 			if !allEntries {

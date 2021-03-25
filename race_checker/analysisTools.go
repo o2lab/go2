@@ -264,7 +264,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 	var toDefer []ssa.Instruction // stack storing deferred calls
 	var toUnlock []ssa.Value
 	var toRUnlock []ssa.Value
-	repeatSwitch := false // triggered when encountering basic blocks for body of a forloop
+	//repeatSwitch := false // triggered when encountering basic blocks for body of a forloop
 	var readyChans []string
 	var selIns *ssa.Select // current select statement
 	var selCount int       // total cases in a select statement
@@ -300,6 +300,9 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 			if len(aBlock.Succs) == 0 {
 				ifEnds = append(ifEnds, aBlock.Instrs[len(aBlock.Instrs)-1])
 			}
+		}
+		if aBlock.Comment == "for.body" || aBlock.Comment == "rangeindex.body" {
+			a.inLoop = true
 		}
 		for ii, theIns := range aBlock.Instrs { // examine each instruction
 			if theIns.String() == "rundefers" { // execute deferred calls at this index
@@ -406,12 +409,12 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				toRUnlock = append(toRUnlock, runlockOps...)
 			case *ssa.Go: // for spawning of goroutines
 				loopID := 0
-				if aBlock.Comment == "for.body" || aBlock.Comment == "rangeindex.body" {
+				if a.inLoop {
 					loopID++
-					a.insGo(examIns, goID, theIns, loopID)
+					a.insGo(examIns, goID, theIns, loopID) // loopID == 1 if goroutine in loop
 					loopID++
 				}
-				a.insGo(examIns, goID, theIns, loopID)
+				a.insGo(examIns, goID, theIns, loopID) // loopID == 2 if goroutine in loop, loopID == 0 otherwise
 			case *ssa.Return:
 				a.RWIns[goID] = append(a.RWIns[goID], theIns)
 				if examIns.Block().Comment == "if.then" || examIns.Block().Comment == "if.else" || examIns.Block().Comment == "if.done" {
@@ -469,13 +472,14 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				}
 			}
 		}
-		if aBlock.Comment == "for.body" || aBlock.Comment == "rangeindex.body" { // repeat unrolling of forloop
-			if repeatSwitch == false {
+		if (aBlock.Comment == "for.body" || aBlock.Comment == "rangeindex.body") && a.inLoop {
+			//if repeatSwitch == false { // repeat unrolling of forloop
 				//repeatSwitch = true // repeat analysis of current block
 				//bInd--
-			} else { // repetition conducted
-				repeatSwitch = false
-			}
+			//} else { // repetition conducted
+			//	repeatSwitch = false
+			//}
+			a.inLoop = false
 		}
 		if activeCase && readyChans[selCount] != "defaultCase" && readyChans[selCount] != "timeOut" {
 			selCount++
@@ -530,7 +534,11 @@ func (a *analysis) newGoroutine(info goroutineInfo) {
 	a.RWIns[info.goID] = append(a.RWIns[info.goID], info.goIns)
 	a.goNames[info.goID] = info.entryMethod
 	if !allEntries {
-		log.Debug(strings.Repeat("-", 35), "Goroutine ", info.entryMethod, strings.Repeat("-", 35), "[", info.goID, "]")
+		if a.loopIDs[info.goID] > 0 {
+			log.Debug(strings.Repeat("-", 35), "Goroutine ", info.entryMethod, " (in loop)", strings.Repeat("-", 35), "[", info.goID, "]")
+		} else {
+			log.Debug(strings.Repeat("-", 35), "Goroutine ", info.entryMethod, strings.Repeat("-", 35), "[", info.goID, "]")
+		}
 	}
 	if len(a.lockSet[a.goCaller[info.goID]]) > 0 {
 		a.lockSet[info.goID] = a.lockSet[a.goCaller[info.goID]]
