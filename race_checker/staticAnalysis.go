@@ -4,6 +4,7 @@ import (
 	"fmt"
 	log "github.com/sirupsen/logrus"
 	"github.com/twmb/algoimpl/go/graph"
+	"github.tamu.edu/April1989/go_tools/go/myutil"
 	"github.tamu.edu/April1989/go_tools/go/packages"
 	"github.tamu.edu/April1989/go_tools/go/pointer"
 	pta0 "github.tamu.edu/April1989/go_tools/go/pointer_default"
@@ -196,6 +197,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 			Level:     1,            //bz: see pointer.Config
 			DoCallback: true,        //bz: simplified callback
 		}
+		myutil.InitialChecker(runner.ptaConfig) //bz: setup callback stuff
 		start := time.Now()                                               //performance
 		runner.ptaResult, _ = pointer.AnalyzeMultiMains(runner.ptaConfig) // conduct pointer analysis for multiple mains
 		t := time.Now()

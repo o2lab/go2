@@ -1198,9 +1198,11 @@ func (a *analysis) genCallBack(caller *cgnode, instr ssa.CallInstruction, fn *ss
 		panic("No callback fn in *ssa.MakeClosure @" + call.String() + ". Please adjust your callback.yml.")
 	}
 
-	key := fn.String() + "@" + caller.contourkFull() //the key of a.globalcb -> different callsite has different ir in fakeFn
+	key := fn.Name() + "@" + caller.contourkFull() //the key of a.globalcb -> different callsite has different ir in fakeFn
+	if fn.Signature.Recv() != nil {                //for virtual function, we need to change the key to include receiver type
+		key = fn.String() + "@" + caller.contourkFull()
+	}
 
-	fmt.Println("fake fn : ", key)
 	//check if fake function has spawned its own go routine
 	spawn := HasGoSpawn(fn)
 
@@ -1445,7 +1447,7 @@ func (a *analysis) genStaticCallForGoCall(caller *cgnode, instr ssa.CallInstruct
 	objs, ok, c2id := a.existClosure(fn, caller.callersite[0])
 	if ok { //exist closure, add its new context, but no constraints
 	} else if c2id != nil {
-		fmt.Println()
+		fmt.Println("TODO .... @genStaticCallForGoCall")
 	} else { //bz: case 1 and 3: we need a new contour and a new context for origin
 		if a.config.Origin && a.isInLoop(fn, instr) {
 			objs = make([]nodeid, 2)

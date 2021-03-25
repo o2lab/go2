@@ -2272,7 +2272,7 @@ func (p *Package) CreateSyntheticCallForCallBack(fakeFn *Function, targetFn Valu
 		fakeFn.currentBlock = fakeFn.Blocks[0]
 	}
 
-	if spawn { //bz: we fake a go call
+	if spawn { //bz: we fake a go call,
 		v := Go{pos: fakeFn.Pos()}
 		v.Call.Value = targetFn
 		fakeFn.emit(&v)

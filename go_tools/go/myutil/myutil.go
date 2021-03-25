@@ -39,7 +39,7 @@ func InitialMain() []*ssa.Package {
 	flags.ParseFlags()
 	if flags.DoCallback {
 		flags.DoLevel = 1 //only consider app func
-		pointer.DecodeYaml("/Users/bozhen/Documents/GO2/go_tools/main/callback.yml")
+		pointer.DecodeYaml("/Users/bozhen/Documents/GO2/go_tools/go/pointer/callback.yml")
 	}
 
 	args := flag.Args()
@@ -53,7 +53,19 @@ func InitialMain() []*ssa.Package {
 
 //bz: for my tests only
 func InitialTest() { //default scope of tests
+	flags.ParseFlags()
+	if flags.DoCallback {
+		flags.DoLevel = 1 //only consider app func
+		pointer.DecodeYaml("/Users/bozhen/Documents/GO2/go_tools/go/pointer/callback.yml")
+	}
 	scope = append(scope, "main")
+}
+
+//bz: for my tests only
+func InitialChecker(config *pointer.Config) {
+	if config.DoCallback {
+		pointer.DecodeYaml("/Users/bozhen/Documents/GO2/go_tools/go/pointer/callback.yml")
+	}
 }
 
 //do preparation job: commom
