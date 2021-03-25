@@ -9,12 +9,12 @@ import (
 
 func (a *analysis) buildHB() {
 	var prevN graph.Node
-	var goCaller []graph.Node
 	var selectN []graph.Node
 	var readyCh []string
 	var selCaseEndN []graph.Node
 	var ifN []graph.Node
 	var ifSuccEndN []graph.Node
+	goCaller := make(map[*ssa.Go]graph.Node)
 	waitingN := make(map[goIns]graph.Node)
 	chanRecvs := make(map[string]graph.Node) // map channel name to graph node
 	chanSends := make(map[string]graph.Node) // map channel name to graph node
@@ -25,17 +25,16 @@ func (a *analysis) buildHB() {
 			if nGo == 0 && i == 0 { // main goroutine, first instruction
 				prevN = a.HBgraph.MakeNode() // initiate for future nodes
 				*prevN.Value = insKey
-				if _, ok := anIns.(*ssa.Go); ok {
-					goCaller = append(goCaller, prevN) // sequentially store go calls in the same goroutine
+				if goInstr, ok := anIns.(*ssa.Go); ok {
+					goCaller[goInstr] = prevN // sequentially store go calls in the same goroutine
 				}
 			} else {
 				currN := a.HBgraph.MakeNode()
 				*currN.Value = insKey
-				if nGo != 0 && i == 0 && goCaller != nil { // worker goroutine, first instruction
-					prevN = goCaller[0] // first node in subroutine
-					goCaller = goCaller[1:]
-				} else if _, ok := anIns.(*ssa.Go); ok {
-					goCaller = append(goCaller, currN) // sequentially store go calls in the same goroutine
+				if nGo != 0 && i == 0 { // worker goroutine, first instruction
+					prevN = goCaller[anIns.(*ssa.Go)] // first node in subroutine
+				} else if goInstr, ok := anIns.(*ssa.Go); ok {
+					goCaller[goInstr] = currN // store go calls in the same goroutine
 				} else if selIns, ok1 := anIns.(*ssa.Select); ok1 {
 					selectN = append(selectN, currN) // select node
 					readyCh = a.selReady[selIns]
@@ -224,42 +223,43 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 	if goID >= len(a.RWIns) { // initialize interior slice for new goroutine
 		a.RWIns = append(a.RWIns, []ssa.Instruction{})
 	}
-	fnBlocks := fn.Blocks
-	bCap := 1
-	if len(fnBlocks) > 1 {
-		bCap = len(fnBlocks)
-	} else if len(fnBlocks) == 0 {
-		return
-	}
-	bVisit := make([]int, 1, bCap) // create ordering at which blocks are visited
-	k := 0                         // ----> !!! SEE HERE: bz: from line 235 to 262, the functionality inside the code block can be separated outside by creating a function to do this (and return bVisit since you need later )
-	b := fnBlocks[0]
-	bVisit[k] = 0
-	for k < len(bVisit) {
-		b = fnBlocks[bVisit[k]]
-		if len(b.Succs) == 0 {
-			k++
-			continue
-		}
-		j := k
-		for s, bNext := range b.Succs {
-			j += s
-			i := sliceContainsIntAt(bVisit, bNext.Index)
-			if i < k {
-				if j == len(bVisit)-1 {
-					bVisit = append(bVisit, bNext.Index)
-				} else if j < len(bVisit)-1 {
-					bVisit = append(bVisit[:j+2], bVisit[j+1:]...)
-					bVisit[j+1] = bNext.Index
-				}
-				if i != -1 { // visited block
-					bVisit = append(bVisit[:i], bVisit[i+1:]...)
-					j--
-				}
-			}
-		}
-		k++
-	}
+	//fnBlocks := fn.Blocks
+	//bCap := 1
+	//if len(fnBlocks) > 1 {
+	//	bCap = len(fnBlocks)
+	//} else if len(fnBlocks) == 0 {
+	//	return
+	//}
+	//bVisit := make([]int, 1, bCap) // create ordering at which blocks are visited
+	//k := 0                         // ----> !!! SEE HERE: bz: from line 235 to 262, the functionality inside the code block can be separated outside by creating a function to do this (and return bVisit since you need later )
+	//b := fnBlocks[0]
+	//bVisit[k] = 0
+	//for k < len(bVisit) {
+	//	b = fnBlocks[bVisit[k]]
+	//	if len(b.Succs) == 0 {
+	//		k++
+	//		continue
+	//	}
+	//	j := k
+	//	for s, bNext := range b.Succs {
+	//		j += s
+	//		i := sliceContainsIntAt(bVisit, bNext.Index)
+	//		if i < k {
+	//			if j == len(bVisit)-1 {
+	//				bVisit = append(bVisit, bNext.Index)
+	//			} else if j < len(bVisit)-1 {
+	//				bVisit = append(bVisit[:j+2], bVisit[j+1:]...)
+	//				bVisit[j+1] = bNext.Index
+	//			}
+	//			if i != -1 { // visited block
+	//				bVisit = append(bVisit[:i], bVisit[i+1:]...)
+	//				j--
+	//			}
+	//		}
+	//	}
+	//	k++
+	//}
+	bVisit := fn.DomPreorder()
 
 	var toDefer []ssa.Instruction // stack storing deferred calls
 	var toUnlock []ssa.Value
@@ -273,9 +273,8 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 	var selDone bool
 	var ifIns *ssa.If
 	var ifEnds []ssa.Instruction
-	for bInd := 0; bInd < len(bVisit); bInd++ {
+	for bInd, aBlock := range bVisit {
 		activeCase, selDone = false, false
-		aBlock := fnBlocks[bVisit[bInd]]
 		if aBlock.Comment == "recover" {// ----> !!! SEE HERE: bz: the same as above, from line 279 to 293 (or even 304) can be separated out
 			continue
 		}
@@ -424,7 +423,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				readyChans = a.insSelect(examIns, goID, theIns)
 				selCount = 0
 				selIns = examIns
-				a.selectBloc[bVisit[bInd]] = examIns
+				a.selectBloc[aBlock.Index] = examIns
 			case *ssa.If:
 				a.RWIns[goID] = append(a.RWIns[goID], theIns)
 				ifIns = examIns
