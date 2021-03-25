@@ -18,7 +18,7 @@ import (
 	"time"
 )
 
-//utility functions and var for my use
+//bz: utility functions and var declared for my use
 
 var scope []string           //bz: now extract from pkgs
 var excludedPkgs = []string{ //bz: excluded a lot of default constraints
@@ -61,7 +61,7 @@ func InitialTest() { //default scope of tests
 	scope = append(scope, "main")
 }
 
-//bz: for my tests only
+//bz: for race checker of callback branch use only
 func InitialChecker(config *pointer.Config) {
 	if config.DoCallback {
 		pointer.DecodeYaml("/Users/bozhen/Documents/GO2/go_tools/go/pointer/callback.yml")
@@ -114,7 +114,9 @@ func initial(args []string, cfg *packages.Config) []*ssa.Package {
 	//extract scope from pkgs
 	if len(pkgs) > 1 { //run under proj dir
 		scope = append(scope, pkgs[0].Pkg.Path()) //bz: the 1st pkg has the scope info == the root pkg
-	} //else: default input .go file
+	}else {  //else: default input .go file with default scope
+		scope = append(scope, "google.golang.org/grpc")
+	}
 
 	//initial set
 	MyMaxTime = 0

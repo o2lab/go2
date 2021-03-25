@@ -762,10 +762,10 @@ func (r *Result) PointsToByGo(v ssa.Value, goInstr *ssa.Go) PointerWCtx {
 	_, ok1 := v.(*ssa.FreeVar)
 	_, ok2 := v.(*ssa.Global)
 	_, ok3 := v.(*ssa.UnOp)
+	if len(ptss) == 0 {
+		return PointerWCtx{a: nil}
+	}
 	if ok1 || ok2 || ok3 { //free var: only one pts available
-		if len(ptss) == 0 {
-			return PointerWCtx{a: nil}
-		}
 		return ptss[0]
 	}
 
@@ -805,10 +805,10 @@ func (r *Result) PointsToByGoWithLoopID(v ssa.Value, goInstr *ssa.Go, loopID int
 	_, ok1 := v.(*ssa.FreeVar)
 	_, ok2 := v.(*ssa.Global)
 	_, ok3 := v.(*ssa.UnOp)
+	if len(ptss) == 0 {
+		return PointerWCtx{a: nil}
+	}
 	if ok1 || ok2 || ok3 { //free var: only one pts available
-		if len(ptss) == 0 {
-			return PointerWCtx{a: nil}
-		}
 		return ptss[0]
 	}
 
@@ -1019,6 +1019,9 @@ func (p PointerWCtx) MatchMyContext(go_instr *ssa.Go) bool {
 	}
 	//double check actualCallerSite
 	for _, actualCS := range p.cgn.actualCallerSite {
+		if actualCS == nil || actualCS[0] == nil {
+			continue
+		}
 		actual_go_instr := actualCS[0].goInstr
 		if actual_go_instr == go_instr {
 			return true
@@ -1049,6 +1052,9 @@ func (p PointerWCtx) MatchMyContextWithLoopID(go_instr *ssa.Go, loopID int) bool
 	}
 	//double check actualCallerSite
 	for _, actualCS := range p.cgn.actualCallerSite {
+		if actualCS == nil || actualCS[0] == nil {
+			continue
+		}
 		actual_go_instr := actualCS[0].goInstr
 		if actual_go_instr == go_instr {
 			if loopID == 0 {

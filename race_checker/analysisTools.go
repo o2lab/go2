@@ -222,10 +222,10 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 	//for call back code: check if fn has a synthetic replacement
 	replace := a.ptaRes[a.main].GetMySyntheticFn(fn)
 	if replace != nil {
-		fmt.Println(" --> replaced by synthetic: ", fn)
+		//fmt.Println(" --> replaced by synthetic: ", fn)
 		fn = replace //we are going to visit synthetic fn
 	}
-	fmt.Println(" ... ", fn)
+	//fmt.Println(" ... ", fn)
 
 	if _, ok := a.levels[goID]; !ok && goID > 0 { // initialize level counter for new goroutine
 		a.levels[goID] = 1

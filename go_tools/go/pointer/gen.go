@@ -975,7 +975,7 @@ func (a *analysis) considerKCFA(fn string) bool {
 // !!!!!! manually excluded pkg google.golang.org/grpc/grpclog ...
 func (a *analysis) withinScope(method string) bool {
 	if a.config.LimitScope {
-		if strings.Contains(method, "command-line-arguments") || strings.HasPrefix(method, "main."){ //default scope and in test cases
+		if strings.Contains(method, "command-line-arguments") || strings.HasPrefix(method, "main.") { //default scope and in test cases
 			return true
 		} else {
 			if len(a.config.Exclusion) > 0 { //user assigned exclusion -> bz: want to exclude all reflection ...
@@ -1144,7 +1144,7 @@ func (a *analysis) hasFuncParam(call *ssa.CallCommon) (ssa.Value, ssa.Value, boo
 
 		//we might not seen the fn for the following cases, check if fn is in scope -> no then return
 		case *ssa.Function: //e.g., _tests/main/cg_namefn.go, may be directly pass a func as param
-		    if a.withinScope(v.String()) {
+			if a.withinScope(v.String()) {
 				return v, v, true
 			}
 
@@ -1167,7 +1167,12 @@ func (a *analysis) hasFuncParam(call *ssa.CallCommon) (ssa.Value, ssa.Value, boo
 			}
 
 		case *ssa.Call: //e.g., _tests/main/cg_long.go
-			if fn, ok := v.Call.Value.(*ssa.Function); ok && a.withinScope(fn.String()) {
+			if fn, ok := v.Call.Value.(*ssa.Function); ok && fn.Signature.Results().Len() == 0 && a.withinScope(fn.String()) {
+				//bz: special cases in google.golang.org/grpc/benchmark/server, the code is:
+				//    tr, ok := trace.FromContext(stream.Context())
+				//stream.Context() as a function is used as a parameter of FromContext,
+				//but actually FromContext requires the return value of stream.Context() as parameter
+				//but the generated ir is not clear here ...
 				return v, fn, true
 			}
 		}
@@ -1295,6 +1300,8 @@ func (a *analysis) genCallBack(caller *cgnode, instr ssa.CallInstruction, fn *ss
 		}
 		a.genStaticCallCommon(caller, obj, site, call, result)
 	}
+
+	fmt.Println("---> caught: ", key, "\t ", targetFn)
 }
 
 //bz: generate fake target/constraints for fake function --> manually add it
@@ -1373,7 +1380,6 @@ func (a *analysis) genStaticCall(caller *cgnode, instr ssa.CallInstruction, site
 		if _type, ok := a.skipTypes[name]; ok {
 			//let's make a id here
 			id = a.addNodes(fn.Type(), _type)
-
 			if a.log != nil {
 				fmt.Fprintf(a.log, "Capture skipped type & function: %s\n", fn.String())
 			}
@@ -1406,13 +1412,20 @@ func (a *analysis) genStaticCall(caller *cgnode, instr ssa.CallInstruction, site
 
 			if caller.fn.IsMySynthetic {
 				//bz: synthetic fn and its callback fn need to match here using a.closure not a.fn2cgnodeIdx
-				objs, ok, _ := a.existClosure(fn, caller.callersite[0]) //TODO: this may be in a loop ...
-				if ok {                                                 //must be ok
-					obj = objs[0] //should return only one obj
+				objs, ok, _ := a.existClosure(fn, caller.callersite[0])
+				if ok { //exist closure
+					for _, obj := range objs { //bz: maybe objs is from loop
+						a.genStaticCallCommon(caller, obj, site, call, result)
+						return
+					}
 				} else {
 					obj = a.globalval[fn] + 1 //may be directly assign a function instead of make closure
 					if obj == 1 {
-						panic("Nil callback makeclosure func in a.existClosure: " + fn.String())
+						//bz: maybe a origin-sensitive function, not a shared contour
+						_, _, obj, _ = a.existContextFor(fn, caller)
+						if obj == 0 {
+							panic("Nil callback makeclosure func in a.existClosure: " + fn.String())
+						}
 					}
 				}
 			} else {
@@ -1742,6 +1755,12 @@ func (a *analysis) valueNodeClosure(cgn *cgnode, closure *ssa.MakeClosure, v ssa
 			comment = v.String()
 		}
 		var objs []nodeid
+
+		//if callersite == nil {
+		//	fmt.Println("--> makeclosure: ", fn, "\tnil")
+		//} else {
+		//	fmt.Println("--> makeclosure: ", fn, "\t", callersite)
+		//}
 
 		if c2id != nil { //closure might from loop but not solved at the same time/same cgnode
 			ids = make([]nodeid, 1)
@@ -2524,6 +2543,12 @@ func (a *analysis) generate() {
 		a.genq = a.genq[1:]
 		a.genFunc(cgn)
 	}
+
+	if a.log != nil {
+		fmt.Fprintf(a.log, "\nStart to analyze cgns from genCallBack(). \n\n")
+	}
+
+	fmt.Println("\nStart to analyze cgns from genCallBack().")
 
 	//bz: from genCallBack, we solve these at the end
 	for len(a.gencb) > 0 {
