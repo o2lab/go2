@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	log "github.com/sirupsen/logrus"
 	"github.com/twmb/algoimpl/go/graph"
 	"github.tamu.edu/April1989/go_tools/go/ssa"

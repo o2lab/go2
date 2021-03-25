@@ -12,7 +12,7 @@ import (
 	"github.tamu.edu/April1989/go_tools/go/ssa/ssautil"
 	"go/token"
 	"go/types"
-	"sync"
+	//"sync"
 
 	//"golang.org/x/tools/go/pointer"
 	//"golang.org/x/tools/go/ssa"
@@ -214,11 +214,11 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		allEntries = true
 	}
 	// Iterate each entry point...
-	var wg sync.WaitGroup
-	for _, m := range mains {
-		wg.Add(1)
-		go func(main *ssa.Package) {
-			defer wg.Done()
+	//var wg sync.WaitGroup
+	for _, main := range mains {
+		//wg.Add(1)
+		//go func(main *ssa.Package) {
+			//defer wg.Done()
 			// Configure static analysis...
 			Analysis := &analysis{
 				ptaRes:   runner.ptaResult,
@@ -304,9 +304,9 @@ func (runner *AnalysisRunner) Run(args []string) error {
 			runner.racyStackTops = Analysis.racyStackTops
 			runner.finalReport = append(runner.finalReport, rr)
 			runner.mu.Unlock()
-		}(m)
+		//}(m)
 	}
-	wg.Wait()
+	//wg.Wait()
 
 	if allEntries {
 		raceCount := 0
