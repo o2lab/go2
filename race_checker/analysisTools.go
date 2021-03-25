@@ -410,10 +410,6 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				toDefer = append([]ssa.Instruction{theIns}, toDefer...)
 			case *ssa.MakeInterface: // construct instance of interface type
 				a.insMakeInterface(examIns, goID, theIns)
-			case *ssa.Call:
-				unlockOps, runlockOps := a.insCall(examIns, goID, theIns)
-				toUnlock = append(toUnlock, unlockOps...)
-				toRUnlock = append(toRUnlock, runlockOps...)
 			case *ssa.Go: // for spawning of goroutines
 				loopID := 0
 				if aBlock.Comment == "for.body" || aBlock.Comment == "rangeindex.body" {
@@ -422,6 +418,10 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 					loopID++
 				}
 				a.insGo(examIns, goID, theIns, loopID)
+			case *ssa.Call:
+				unlockOps, runlockOps := a.insCall(examIns, goID, theIns)
+				toUnlock = append(toUnlock, unlockOps...)
+				toRUnlock = append(toRUnlock, runlockOps...)
 			case *ssa.Return:
 				a.RWIns[goID] = append(a.RWIns[goID], theIns)
 				if examIns.Block().Comment == "if.then" || examIns.Block().Comment == "if.else" || examIns.Block().Comment == "if.done" {

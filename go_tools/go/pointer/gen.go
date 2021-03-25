@@ -1198,11 +1198,9 @@ func (a *analysis) genCallBack(caller *cgnode, instr ssa.CallInstruction, fn *ss
 		panic("No callback fn in *ssa.MakeClosure @" + call.String() + ". Please adjust your callback.yml.")
 	}
 
-	key := fn.Name() + "@" + caller.contourkFull() //the key of a.globalcb -> different callsite has different ir in fakeFn
-	if fn.Signature.Recv() != nil {                //for virtual function, we need to change the key to include receiver type
-		key = fn.String() + "@" + caller.contourkFull()
-	}
+	key := fn.String() + "@" + caller.contourkFull() //the key of a.globalcb -> different callsite has different ir in fakeFn
 
+	fmt.Println("fake fn : ", key)
 	//check if fake function has spawned its own go routine
 	spawn := HasGoSpawn(fn)
 
