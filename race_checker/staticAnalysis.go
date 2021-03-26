@@ -251,6 +251,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 				ifFnReturn:      make(map[*ssa.Function]*ssa.Return),
 				ifSuccEnd:       make(map[ssa.Instruction]*ssa.Return),
 				inLoop:  		 false,
+				goInLoop:  		 make(map[int]bool),
 				loopIDs:  		 make(map[int]int),
 			}
 			if !allEntries {
@@ -267,6 +268,11 @@ func (runner *AnalysisRunner) Run(args []string) error {
 			}
 			if !allEntries {
 				log.Info("Done  -- ", len(Analysis.RWIns), " goroutines analyzed! ", totalIns, " instructions of interest detected! ")
+			}
+			if getGo {
+				for i := 0; i < len(Analysis.RWIns); i++ {
+					log.Info("Goroutine ", i, "  --  ", Analysis.goNames[i], "(spawned by loop: ", Analysis.goInLoop[i], ")")
+				}
 			}
 			if useDefaultPTA {
 				Analysis.ptaRes0, _ = pta0.Analyze(Analysis.ptaCfg0) // all queries have been added, conduct pointer analysis

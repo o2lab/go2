@@ -539,6 +539,7 @@ func (a *analysis) newGoroutine(info goroutineInfo) {
 	a.goNames[info.goID] = info.entryMethod
 	if !allEntries {
 		if a.loopIDs[info.goID] > 0 {
+			a.goInLoop[info.goID] = true
 			log.Debug(strings.Repeat("-", 35), "Goroutine ", info.entryMethod, " (in loop)", strings.Repeat("-", 35), "[", info.goID, "]")
 		} else {
 			log.Debug(strings.Repeat("-", 35), "Goroutine ", info.entryMethod, strings.Repeat("-", 35), "[", info.goID, "]")

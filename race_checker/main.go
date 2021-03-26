@@ -65,6 +65,7 @@ type analysis struct {
 	omitComm        []*ssa.BasicBlock               // omit these blocks as they are race-free due to channel communication
 	racyStackTops	[]string
 	inLoop			bool							// entered a loop
+	goInLoop	  	map[int]bool
 	loopIDs			map[int]int						// map goID to loopID
 }
 
@@ -148,6 +149,7 @@ var channelComm = true // analyze channel communication
 var entryFn = "main"
 var allEntries = false
 var useDefaultPTA = false
+var getGo = false
 
 func init() {
 	excludedPkgs = []string{
@@ -168,11 +170,15 @@ func main() {//default: -useNewPTA
 	withComm := flag.Bool("withComm", false, "Show analysis results with communication consideration.")
 	analyzeAll := flag.Bool("analyzeAll", false, "Analyze all main() entry-points. ")
 	runTest := flag.Bool("runTest", false, "For micro-benchmark debugging... ")
+	showGo := flag.Bool("showGo", false, "Show goroutine info in analyzed program. ")
 	//setTrie := flag.Int("trieLimit", 1, "Set trie limit... ")
 	flag.Parse()
 	//if *setTrie > 1 {
 	//	trieLimit = *setTrie
 	//}
+	if *showGo {
+		getGo = true
+	}
 	if *runTest {
 		efficiency = false
 		trieLimit = 2
