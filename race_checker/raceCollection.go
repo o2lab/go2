@@ -50,20 +50,23 @@ func (a *analysis) checkRacyPairs() []*raceInfo {
 						}
 						insSlice := []ssa.Instruction{goI, goJ}
 						addressPair := a.insAddress(insSlice) // one instruction from each goroutine
+						if addressPair[0] == nil || addressPair[1] == nil {
+							continue
+						}
 						////!!!! bz: for my debug, please comment off, do not delete
-						//	var goIinstr string
-						//	var goJinstr string
-						//	if i == 0 {
-						//		goIinstr = "main"
-						//	}else{
-						//		goIinstr = a.RWIns[i][0].String()
-						//	}
-						//	if j == 0 {
-						//		goJinstr = "main"
-						//	}else{
-						//		goJinstr = a.RWIns[j][0].String()
-						//	}
-						//	fmt.Println(addressPair[0], " Go: ", goIinstr, " loopid: ", a.loopIDs[i], ";  ", addressPair[1], " Go: ", goJinstr, " loopid: ", a.loopIDs[j])
+							var goIinstr string
+							var goJinstr string
+							if i == 0 {
+								goIinstr = "main"
+							}else{
+								goIinstr = a.RWIns[i][0].String()
+							}
+							if j == 0 {
+								goJinstr = "main"
+							}else{
+								goJinstr = a.RWIns[j][0].String()
+							}
+							fmt.Println(addressPair[0], " Go: ", goIinstr, " loopid: ", a.loopIDs[i], ";  ", addressPair[1], " Go: ", goJinstr, " loopid: ", a.loopIDs[j])
 						if a.sameAddress(addressPair[0], addressPair[1], i, j) &&
 							!sliceContains(a.reportedAddr, addressPair[0]) &&
 							!a.reachable(goI, i, goJ, j) &&
@@ -171,6 +174,13 @@ func (a *analysis) sameAddress(addr1 ssa.Value, addr2 ssa.Value, go1 int, go2 in
 		pt2 = a.ptaRes[a.main].PointsToByGoWithLoopID(addr2, nil, a.loopIDs[go2])
 	} else {
 		pt2 = a.ptaRes[a.main].PointsToByGoWithLoopID(addr2, a.RWIns[go2][0].(*ssa.Go), a.loopIDs[go2])
+	}
+
+	if strings.Contains(addr1.String(), "new int (i2)") {
+		fmt.Println(pt1.PointsTo().String(), " ", pt2.PointsTo().String())
+	}
+	if strings.Contains(addr2.String(), "new int (i2)") {
+		fmt.Println(pt1.PointsTo().String(), " ", pt2.PointsTo().String())
 	}
 	return pt1.MayAlias(pt2)
 }
