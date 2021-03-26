@@ -150,8 +150,8 @@ var useDefaultPTA = false
 
 func init() {
 	excludedPkgs = []string{
-		"fmt",
-		"reflect",
+		//"fmt",
+		//"reflect",
 	}
 }
 

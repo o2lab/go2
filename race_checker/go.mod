@@ -2,9 +2,10 @@ module github.com/o2lab/race-checker
 
 go 1.13
 
-replace github.tamu.edu/April1989/go_tools v0.0.0 => ../go_tools
+//replace github.tamu.edu/April1989/go_tools v0.0.0 => ../go_tools
 
 require (
+    github.tamu.edu/April1989/go_tools v0.0.1
 	github.com/boltdb/bolt v1.3.1
 	github.com/coreos/etcd v3.3.25+incompatible // indirect
 	github.com/cznic/mathutil v0.0.0-20181122101859-297441e03548 // indirect
@@ -43,4 +44,5 @@ require (
 	k8s.io/api v0.20.2
 	k8s.io/apimachinery v0.20.2
 	k8s.io/client-go v11.0.0+incompatible
+	k8s.io/helm v2.17.0+incompatible // indirect
 )

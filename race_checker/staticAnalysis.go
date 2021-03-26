@@ -220,6 +220,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		//go func(main *ssa.Package) {
 			//defer wg.Done()
 			// Configure static analysis...
+		fmt.Println("Detect ... ", main)
 			Analysis := &analysis{
 				ptaRes:   runner.ptaResult,
 				ptaRes0:  runner.ptaResult0,
