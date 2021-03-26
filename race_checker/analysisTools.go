@@ -542,7 +542,12 @@ func (a *analysis) newGoroutine(info goroutineInfo) {
 	a.RWIns[info.goID] = append(a.RWIns[info.goID], info.goIns)
 	a.goNames[info.goID] = info.entryMethod
 	if !allEntries {
-		log.Debug(strings.Repeat("-", 35), "Goroutine ", info.entryMethod, strings.Repeat("-", 35), "[", info.goID, "]")
+		if a.loopIDs[info.goID] > 0 {
+			a.goInLoop[info.goID] = true
+			log.Debug(strings.Repeat("-", 35), "Goroutine ", info.entryMethod, " (in loop)", strings.Repeat("-", 35), "[", info.goID, "]")
+		} else {
+			log.Debug(strings.Repeat("-", 35), "Goroutine ", info.entryMethod, strings.Repeat("-", 35), "[", info.goID, "]")
+		}
 	}
 	if len(a.lockSet[a.goCaller[info.goID]]) > 0 {
 		a.lockSet[info.goID] = a.lockSet[a.goCaller[info.goID]]
