@@ -154,7 +154,6 @@ var getGo = false
 func init() {
 	excludedPkgs = []string{
 		"fmt",
-		"reflect",
 	}
 }
 
