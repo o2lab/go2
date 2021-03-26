@@ -532,6 +532,9 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 
 // newGoroutine goes through the goroutine, logs its info, and goes through the instructions within
 func (a *analysis) newGoroutine(info goroutineInfo) {
+	if info.entryMethod == a.goNames[a.goCaller[info.goID]] {
+		return // recursive spawning of same goroutine
+	}
 	a.storeIns = append(a.storeIns, info.entryMethod)
 	if info.goID >= len(a.RWIns) { // initialize interior slice for new goroutine
 		a.RWIns = append(a.RWIns, []ssa.Instruction{})
