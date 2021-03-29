@@ -74,10 +74,6 @@ func (a *analysis) checkRacyPairs() []*raceInfo {
 							!a.bothAtomic(insSlice[0], insSlice[1]) &&
 							!a.lockSetsIntersect(goI, goJ, i, j) &&
 							!a.selectMutEx(insSlice[0], insSlice[1]) {
-							if addressPair[0] == addressPair[1] {
-								fmt.Println("this pair")
-
-							}
 							a.reportedAddr = append(a.reportedAddr, addressPair[0])
 							ri = &raceInfo{
 								insPair: 	insSlice,
