@@ -325,24 +325,45 @@ func goListDriverRecursiveSeq(subdirs []string, size int, response *responseDedu
 	subdirs = removeDuplicateValues(subdirs)
 	for i := 1; i < len(subdirs); i++ {    //bz: 1st element is ".", the last element is "", skip them //yq: last element not to be skipped
 		subdir := subdirs[i]
-		_cfg := &Config{
-			Mode:    LoadAllSyntax,
-			Context: cfg.Context,
-			Logf:    cfg.Logf,
-			Dir:     cfg.Dir + subdir[1:], // bz: we update this. remove the "." in subdir
-			Env:     cfg.Env,
-			Tests:   false,
+		if runtime.GOOS != "windows"{
+			_cfg := &Config{
+				Mode:    LoadAllSyntax,
+				Context: cfg.Context,
+				Logf:    cfg.Logf,
+				Dir:     cfg.Dir + subdir[1:], // bz: we update this. remove the "." in subdir
+				Env:     cfg.Env,
+				Tests:   false,
+			}
+			_state := &golistState{
+				cfg:        _cfg,
+				ctx:        ctx,
+				vendorDirs: map[string]bool{},
+			}
+			_dr, _err := _state.createDriverResponse(restPatterns...)
+			if _err != nil {
+				fmt.Println("ERROR from _state.createDriverResponse: %s", _err)
+			}
+			response.addAll(_dr)
+		}else{
+			_cfg := &Config{
+				Mode:    LoadAllSyntax,
+				Context: cfg.Context,
+				Logf:    cfg.Logf,
+				Dir:     subdir, 
+				Env:     cfg.Env,
+				Tests:   false,
+			}
+			_state := &golistState{
+				cfg:        _cfg,
+				ctx:        ctx,
+				vendorDirs: map[string]bool{},
+			}
+			_dr, _err := _state.createDriverResponse(restPatterns...)
+			if _err != nil {
+				fmt.Println("ERROR from _state.createDriverResponse: %s", _err)
+			}
+			response.addAll(_dr)
 		}
-		_state := &golistState{
-			cfg:        _cfg,
-			ctx:        ctx,
-			vendorDirs: map[string]bool{},
-		}
-		_dr, _err := _state.createDriverResponse(restPatterns...)
-		if _err != nil {
-			fmt.Println("ERROR from _state.createDriverResponse: %s", _err)
-		}
-		response.addAll(_dr)
 	}
 }
 
