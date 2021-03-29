@@ -273,7 +273,36 @@ func (runner *AnalysisRunner) Run(args []string) error {
 			}
 			if getGo {
 				for i := 0; i < len(Analysis.RWIns); i++ {
-					log.Info("Goroutine ", i, "  --  ", Analysis.goNames[i], "(spawned by loop: ", Analysis.goInLoop[i], ")")
+					name := "main"
+					if i > 0 {
+						name = Analysis.goNames[i]
+					}
+					log.Debug("Goroutine ", i, "  --  ", name)
+					if Analysis.goInLoop[i] {
+						log.Debug(strings.Repeat(" ", 10), strings.Repeat("*", 10), "spawned by a loop")
+					}
+					if i > 0 {
+						log.Debug("call stack: ")
+					}
+					var pathGo []int
+					goID := i
+					for goID > 0 {
+						pathGo = append([]int{goID}, pathGo...)
+						temp := Analysis.goCaller[goID]
+						goID = temp
+					}
+					if !allEntries {
+						for q, eachGo := range pathGo {
+							eachStack := Analysis.goStack[eachGo]
+							for k, eachFn := range eachStack {
+								if k == 0 {
+									log.Debug("\t ", strings.Repeat(" ", q), "--> Goroutine: ", eachFn, "[", Analysis.goCaller[eachGo], "]")
+								} else {
+									log.Debug("\t   ", strings.Repeat(" ", q), strings.Repeat(" ", k), eachFn)
+								}
+							}
+						}
+					}
 				}
 			}
 			if useDefaultPTA {
