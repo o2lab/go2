@@ -144,9 +144,10 @@ type trie struct {
 }
 
 var (
-	DEBUG = false  //bz: my debug
 	excludedPkgs []string
 	testMode     = false // Used by race_test.go for collecting output.
+	//bz: my code
+	DEBUG = false  //bz: my debug
 	doneInitialChecker = false //bz: whether i've initialized checker for test mode
 )
 

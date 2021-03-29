@@ -143,7 +143,14 @@ func (a *analysis) sameAddress(addr1 ssa.Value, addr2 ssa.Value, go1 int, go2 in
 	} else if freevar1, ok := addr1.(*ssa.FreeVar); ok {
 		if freevar2, ok2 := addr2.(*ssa.FreeVar); ok2 {
 			if freevar1.Pos() == freevar2.Pos() { // compare position of identifiers
-				if !sliceContainsFreeVar(a.bindingFV[a.RWIns[go1][0].(*ssa.Go)], freevar1) {
+				//bz: check the one with non-0 goID
+				var nonZeroGoID int
+				if go1 == 0 {
+					nonZeroGoID = go2
+				} else {
+					nonZeroGoID = go1
+				}
+				if !sliceContainsFreeVar(a.bindingFV[a.RWIns[nonZeroGoID][0].(*ssa.Go)], freevar1) {
 					return true
 				} else {
 					return false
@@ -196,8 +203,11 @@ func (a *analysis) sameAddress(addr1 ssa.Value, addr2 ssa.Value, go1 int, go2 in
 func (a *analysis) reachable(fromIns ssa.Instruction, fromGo int, toIns ssa.Instruction, toGo int) bool {
 	fromBlock := fromIns.Block().Index
 	if strings.HasPrefix(fromIns.Block().Comment, "rangeindex") && toIns.Parent() != nil && toIns.Parent().Parent() != nil { // checking both instructions belong to same forloop
-		if fromIns.Block().Comment == toIns.Parent().Parent().Blocks[fromBlock].Comment {
-			return false
+		//TODO: bz: this logic is too ad-hoc, need a new one -> tmp solution
+		if len(toIns.Parent().Parent().Blocks) > fromBlock {
+			if fromIns.Block().Comment == toIns.Parent().Parent().Blocks[fromBlock].Comment {
+				return false
+			}
 		}
 	}
 	fromInsKey := goIns{ins: fromIns, goID: fromGo}

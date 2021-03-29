@@ -5,7 +5,7 @@ go 1.13
 //replace github.tamu.edu/April1989/go_tools v0.0.0 => ../go_tools
 
 require (
-    github.tamu.edu/April1989/go_tools v0.0.1
+    github.tamu.edu/April1989/go_tools v0.0.2
 	github.com/boltdb/bolt v1.3.1
 	github.com/coreos/etcd v3.3.25+incompatible // indirect
 	github.com/cznic/mathutil v0.0.0-20181122101859-297441e03548 // indirect

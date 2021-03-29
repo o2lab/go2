@@ -36,6 +36,9 @@ func (a *analysis) fromPkgsOfInterest(fn *ssa.Function) bool {
 		}
 	}
 	if efficiency && a.main.Pkg.Path() != "command-line-arguments" && !strings.HasPrefix(fn.Pkg.Pkg.Path(), strings.Split(a.main.Pkg.Path(), "/")[0]) { // path is dependent on tested program
+		if a.ptaRes.GetMySyntheticFn(fn) != nil {
+			return true //bz: want to see the synthetic fn and its target
+		}
 		return false
 	}
 	return true
@@ -181,6 +184,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 	} else { // new PTA
 		scope := make([]string, 1)
 		scope[0] = pkgs[0].Pkg.Path() //bz: the 1st pkg has the scope info == the root pkg or default .go input
+		//scope[0] = "google.golang.org/grpc" //bz: debug use
 		runner.ptaConfig = &pointer.Config{
 			Mains:          mains, //bz: all mains in a project
 			Reflection:     false,
@@ -197,11 +201,14 @@ func (runner *AnalysisRunner) Run(args []string) error {
 			Level:     1,            //bz: see pointer.Config
 			DoCallback: true,        //bz: simplified callback
 		}
-		if testMode {
+		//bz: setup callback stuff
+		if testMode { //bz: -> skip repetitive redundant initialization
 			if !doneInitialChecker {
-				myutil.InitialChecker(runner.ptaConfig) //bz: setup callback stuff
+				myutil.InitialChecker(runner.ptaConfig)
 				doneInitialChecker = true
 			}
+		}else {
+			myutil.InitialChecker(runner.ptaConfig)
 		}
 		start := time.Now()                                               //performance
 		runner.ptaResult, _ = pointer.AnalyzeMultiMains(runner.ptaConfig) // conduct pointer analysis for multiple mains
