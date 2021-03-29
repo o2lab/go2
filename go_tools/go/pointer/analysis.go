@@ -543,7 +543,8 @@ func AnalyzeWCtx(config *Config, printConfig bool) (result *ResultWCtx, err erro
 	if runtime := a.prog.ImportedPackage("runtime"); runtime != nil {
 		a.runtimeSetFinalizer = runtime.Func("SetFinalizer")
 	}
-	a.computeTrackBits() //bz: use when there is input queries before running this analysis; we do not need this for now?
+	//a.computeTrackBits() //bz: use when there is input queries before running this analysis; we do not need this for now?
+	a.track = trackAll
 
 	a.generate()   //bz: a preprocess for reflection/runtime/import libs
 	a.showCounts() //bz: print out size ...
@@ -668,18 +669,30 @@ func translateResult(_result *ResultWCtx, main *ssa.Package) *Result {
 	for _, cgns := range fns {
 		for _, cgn := range cgns {
 			for val, id := range cgn.localval {
+				if id == 0 {
+					continue
+				}
 				translateQueries(val, id, cgn, result, _result)
 			}
 
 			for obj, id := range cgn.localobj {
+				if id == 0 {
+					continue
+				}
 				translateQueries(obj, id, cgn, result, _result)
 			}
 		}
 	}
 	for val, id := range _result.a.globalval {
+		if id == 0 {
+			continue
+		}
 		translateQueries(val, id, nil, result, _result)
 	}
 	for obj, id := range _result.a.globalobj {
+		if id == 0 {
+			continue
+		}
 		translateQueries(obj, id, nil, result, _result)
 	}
 
