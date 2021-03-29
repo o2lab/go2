@@ -74,6 +74,10 @@ func (a *analysis) checkRacyPairs() []*raceInfo {
 							!a.bothAtomic(insSlice[0], insSlice[1]) &&
 							!a.lockSetsIntersect(goI, goJ, i, j) &&
 							!a.selectMutEx(insSlice[0], insSlice[1]) {
+							if addressPair[0] == addressPair[1] {
+								fmt.Println("this pair")
+
+							}
 							a.reportedAddr = append(a.reportedAddr, addressPair[0])
 							ri = &raceInfo{
 								insPair: 	insSlice,
@@ -140,8 +144,12 @@ func (a *analysis) sameAddress(addr1 ssa.Value, addr2 ssa.Value, go1 int, go2 in
 		}
 	} else if freevar1, ok := addr1.(*ssa.FreeVar); ok {
 		if freevar2, ok2 := addr2.(*ssa.FreeVar); ok2 {
-			if freevar1.Pos() == freevar2.Pos() {// compare position of identifiers
-				return true
+			if freevar1.Pos() == freevar2.Pos() { // compare position of identifiers
+				if !sliceContainsFreeVar(a.bindingFV[a.RWIns[go1][0].(*ssa.Go)], freevar1) {
+					return true
+				} else {
+					return false
+				}
 			}
 		}
 	}

@@ -310,6 +310,9 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				ifEnds = append(ifEnds, aBlock.Instrs[len(aBlock.Instrs)-1])
 			}
 		}
+		if aBlock.Comment == "for.body" || aBlock.Comment == "rangeindex.body"  {
+			a.inLoop = true // TODO: consider nested loops
+		}
 		for ii, theIns := range aBlock.Instrs { // examine each instruction
 			if theIns.String() == "rundefers" { // execute deferred calls at this index
 				for _, dIns := range toDefer {  // ----> !!! SEE HERE: bz: the same as above, from line 307 to 347 can be separated out
@@ -409,7 +412,23 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				toDefer = append([]ssa.Instruction{theIns}, toDefer...)
 			case *ssa.MakeInterface: // construct instance of interface type
 				a.insMakeInterface(examIns, goID, theIns)
+			case *ssa.Call:
+				unlockOps, runlockOps := a.insCall(examIns, goID, theIns)
+				toUnlock = append(toUnlock, unlockOps...)
+				toRUnlock = append(toRUnlock, runlockOps...)
+			case *ssa.Alloc:
+				if a.inLoop {
+					a.allocLoop[examIns.Parent()] = append(a.allocLoop[examIns.Parent()], examIns.Comment)
+				}
 			case *ssa.Go: // for spawning of goroutines
+				if closure, ok := examIns.Call.Value.(*ssa.MakeClosure); ok && len(closure.Bindings) > 0 && a.inLoop { // if spawned in a loop
+					for i, binding := range closure.Bindings {
+						parentFn := examIns.Parent()
+						if fvar, ok1 := binding.(*ssa.Alloc); ok1 && sliceContainsStr(a.allocLoop[parentFn], fvar.Comment) {
+							a.bindingFV[examIns] = append(a.bindingFV[examIns], closure.Fn.(*ssa.Function).FreeVars[i]) // store freeVars declared within loop
+						}
+					}
+				}
 				loopID := 0
 				if aBlock.Comment == "for.body" || aBlock.Comment == "rangeindex.body" {
 					loopID++
