@@ -57,16 +57,18 @@ type analysis struct {
 	selectCaseBegin map[ssa.Instruction]string      // map first instruction in clause to channel name
 	selectCaseEnd   map[ssa.Instruction]string      // map last instruction in clause to channel name
 	selectCaseBody	map[ssa.Instruction]*ssa.Select		// map instructions to select instruction
-	selectDone      map[ssa.Instruction]*ssa.Select // map first instruction after select is done to select statement
-	ifSuccBegin     map[ssa.Instruction]*ssa.If     // map beginning of succ block to if statement
-	ifFnReturn      map[*ssa.Function]*ssa.Return   // map "if-containing" function to its final return
-	ifSuccEnd       map[ssa.Instruction]*ssa.Return // map ending of successor block to final return statement
-	commIfSucc      []ssa.Instruction               // store first ins of succ block that contains channel communication
-	omitComm        []*ssa.BasicBlock               // omit these blocks as they are race-free due to channel communication
-	racyStackTops	[]string
-	inLoop			bool							// entered a loop
-	goInLoop	  	map[int]bool
-	loopIDs			map[int]int						// map goID to loopID
+	selectDone    map[ssa.Instruction]*ssa.Select // map first instruction after select is done to select statement
+	ifSuccBegin   map[ssa.Instruction]*ssa.If     // map beginning of succ block to if statement
+	ifFnReturn    map[*ssa.Function]*ssa.Return   // map "if-containing" function to its final return
+	ifSuccEnd     map[ssa.Instruction]*ssa.Return // map ending of successor block to final return statement
+	commIfSucc    []ssa.Instruction               // store first ins of succ block that contains channel communication
+	omitComm      []*ssa.BasicBlock               // omit these blocks as they are race-free due to channel communication
+	racyStackTops []string
+	inLoop        bool							// entered a loop
+	goInLoop      map[int]bool
+	loopIDs       map[int]int						// map goID to loopID
+	allocLoop 	  map[*ssa.Function][]string
+	bindingFV     map[*ssa.Go][]*ssa.FreeVar
 }
 
 type lockInfo struct {

@@ -250,9 +250,11 @@ func (runner *AnalysisRunner) Run(args []string) error {
 				ifSuccBegin:     make(map[ssa.Instruction]*ssa.If),
 				ifFnReturn:      make(map[*ssa.Function]*ssa.Return),
 				ifSuccEnd:       make(map[ssa.Instruction]*ssa.Return),
-				inLoop:  		 false,
-				goInLoop:  		 make(map[int]bool),
-				loopIDs:  		 make(map[int]int),
+				inLoop:          false,
+				goInLoop:        make(map[int]bool),
+				loopIDs:         make(map[int]int),
+				allocLoop:   	 make(map[*ssa.Function][]string),
+				bindingFV:       make(map[*ssa.Go][]*ssa.FreeVar),
 			}
 			if !allEntries {
 				log.Info("Compiling stack trace for every Goroutine... ")

@@ -79,6 +79,15 @@ func sliceContainsStr(s []string, e string) bool {
 	return false
 }
 
+func sliceContainsFreeVar(s []*ssa.FreeVar, e *ssa.FreeVar) bool {
+	for _, a := range s {
+		if a == e {
+			return true
+		}
+	}
+	return false
+}
+
 // sliceContainsStrCtr will determine how many times e is in s
 func sliceContainsStrCtr(s []string, e string) int {
 	counter := 0
