@@ -412,10 +412,6 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				toDefer = append([]ssa.Instruction{theIns}, toDefer...)
 			case *ssa.MakeInterface: // construct instance of interface type
 				a.insMakeInterface(examIns, goID, theIns)
-			case *ssa.Call:
-				unlockOps, runlockOps := a.insCall(examIns, goID, theIns)
-				toUnlock = append(toUnlock, unlockOps...)
-				toRUnlock = append(toRUnlock, runlockOps...)
 			case *ssa.Alloc:
 				if a.inLoop {
 					a.allocLoop[examIns.Parent()] = append(a.allocLoop[examIns.Parent()], examIns.Comment)

@@ -1,7 +1,0 @@
-# callback functions that has new goroutine spawned
-callbackcfgs:
-  - package: time
-    method:
-      - name: AfterFunc
-        receiver: nil
-        # tell me the make closure function name, pkg and receiver (if any)

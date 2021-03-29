@@ -1,9 +1,0 @@
-package badstmt
-
-import (
-	"github.tamu.edu/April1989/go_tools/internal/lsp/foo"
-)
-
-func _() {
-	defer func() { foo. } //@rank(" }", Foo)
-}
