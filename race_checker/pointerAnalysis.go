@@ -69,11 +69,11 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 				a.visitAllInstructions(theFunc, goID)
 			}
 		case *ssa.MakeInterface:
-			methodName := theIns.(*ssa.Call).Call.Method.Name()
-			if a.prog.MethodSets.MethodSet(pta0Set[location].PointsTo().DynamicTypes().Keys()[0]).Lookup(a.mains[0].Pkg, methodName) == nil { // ignore abstract methods
+			methodName := theIns.(*ssa.Call).Call.Method.Name() //a.mains[0].Pkg -> a.main.Pkg
+			if a.prog.MethodSets.MethodSet(pta0Set[location].PointsTo().DynamicTypes().Keys()[0]).Lookup(a.main.Pkg, methodName) == nil { // ignore abstract methods
 				break
 			}
-			check := a.prog.LookupMethod(pta0Set[location].PointsTo().DynamicTypes().Keys()[0], a.mains[0].Pkg, methodName)
+			check := a.prog.LookupMethod(pta0Set[location].PointsTo().DynamicTypes().Keys()[0], a.main.Pkg, methodName)
 			fnName = check.Name()
 			if !a.exploredFunction(check, goID, theIns) {
 				a.updateRecords(fnName, goID, "PUSH ")
@@ -88,9 +88,9 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 	} else { // new PTA
 		var ptr pointer.PointerWCtx
 		if goID == 0 {
-			ptr = a.ptaRes[a.main].PointsToByGoWithLoopID(location, nil, a.loopIDs[0])
+			ptr = a.ptaRes.PointsToByGoWithLoopID(location, nil, a.loopIDs[0])
 		} else {
-			ptr = a.ptaRes[a.main].PointsToByGoWithLoopID(location, a.RWIns[goID][0].(*ssa.Go), a.loopIDs[goID])
+			ptr = a.ptaRes.PointsToByGoWithLoopID(location, a.RWIns[goID][0].(*ssa.Go), a.loopIDs[goID])
 		}
 		labels := ptr.PointsTo().Labels()
 		if labels == nil {
@@ -112,10 +112,10 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 			}
 		case *ssa.MakeInterface:
 			methodName := theIns.(*ssa.Call).Call.Method.Name()
-			if a.prog.MethodSets.MethodSet(ptr.PointsTo().DynamicTypes().Keys()[0]).Lookup(a.mains[0].Pkg, methodName) == nil { // ignore abstract methods
+			if a.prog.MethodSets.MethodSet(ptr.PointsTo().DynamicTypes().Keys()[0]).Lookup(a.main.Pkg, methodName) == nil { // ignore abstract methods
 				break
 			}
-			check := a.prog.LookupMethod(ptr.PointsTo().DynamicTypes().Keys()[0], a.mains[0].Pkg, methodName)
+			check := a.prog.LookupMethod(ptr.PointsTo().DynamicTypes().Keys()[0], a.main.Pkg, methodName)
 			fnName = check.Name()
 			if !a.exploredFunction(check, goID, theIns) {
 				a.updateRecords(fnName, goID, "PUSH ")

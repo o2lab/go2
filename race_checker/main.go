@@ -19,14 +19,15 @@ import (
 
 type analysis struct {
 	mu      sync.RWMutex
-	ptaRes  map[*ssa.Package]*pointer.Result //now can reuse the ptaRes
-	ptaRes0 *pta0.Result
+	//bz: mine
 	ptaCfg  *pointer.Config
+	ptaRes  *pointer.Result //now can reuse the ptaRes
+	//bz: default
 	ptaCfg0 *pta0.Config
-
+	ptaRes0 *pta0.Result
+	//race-checker uses
 	prog            *ssa.Program
 	pkgs            []*ssa.Package
-	mains           []*ssa.Package
 	main  			*ssa.Package
 	analysisStat    stat
 	HBgraph         *graph.Graph
@@ -102,10 +103,13 @@ type AnalysisRunner struct {
 	mu         	sync.Mutex
 	prog       	*ssa.Program
 	pkgs       	[]*ssa.Package
+	//bz: mine
 	ptaConfig  	*pointer.Config
 	ptaResult  	map[*ssa.Package]*pointer.Result
+	//bz: default
 	ptaConfig0 	*pta0.Config
 	ptaResult0 	*pta0.Result
+	//race-checker uses
 	trieLimit  	int      // set as user config option later, an integer that dictates how many times a function can be called under identical context
 	efficiency 	bool // configuration setting to avoid recursion in tested program
 	racyStackTops   []string
@@ -140,6 +144,7 @@ type trie struct {
 }
 
 var (
+	DEBUG = false  //bz: my debug
 	excludedPkgs []string
 	testMode     = false // Used by race_test.go for collecting output.
 )

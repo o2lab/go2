@@ -222,13 +222,15 @@ func (runner *AnalysisRunner) Run(args []string) error {
 			// Configure static analysis...
 		fmt.Println("Detect ... ", main)
 			Analysis := &analysis{
-				ptaRes:   runner.ptaResult,
-				ptaRes0:  runner.ptaResult0,
+				//bz: mine
+				ptaRes:   runner.ptaResult[main],
 				ptaCfg:   runner.ptaConfig,
+				//bz: default
+				ptaRes0:  runner.ptaResult0,
 				ptaCfg0:  runner.ptaConfig0,
+				//race-checker uses
 				prog:     runner.prog,
 				pkgs:     runner.pkgs,
-				mains:    mains,
 				main:            main,
 				RWinsMap:        make(map[goIns]graph.Node),
 				trieMap:         make(map[fnInfo]*trie),

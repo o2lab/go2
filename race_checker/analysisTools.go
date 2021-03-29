@@ -218,7 +218,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 		}
 	}
 	//for call back code: check if fn has a synthetic replacement
-	replace := a.ptaRes[a.main].GetMySyntheticFn(fn)
+	replace := a.ptaRes.GetMySyntheticFn(fn)
 	if replace != nil {
 		//fmt.Println(" --> replaced by synthetic: ", fn)
 		fn = replace //we are going to visit synthetic fn
