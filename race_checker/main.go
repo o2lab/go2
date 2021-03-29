@@ -147,6 +147,7 @@ var (
 	DEBUG = false  //bz: my debug
 	excludedPkgs []string
 	testMode     = false // Used by race_test.go for collecting output.
+	doneInitialChecker = false //bz: whether i've initialized checker for test mode
 )
 
 var useNewPTA = true
@@ -160,7 +161,7 @@ var getGo = false
 
 func init() {
 	excludedPkgs = []string{
-		//"fmt",
+		"fmt",
 		//"reflect",
 	}
 }

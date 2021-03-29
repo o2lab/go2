@@ -13,3 +13,6 @@ race_checker/go_pta_log
 race_checker/pta_summary.md
 runc/
 tidb/
+
+console*
+race_checker/tests/chronos

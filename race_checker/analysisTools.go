@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	log "github.com/sirupsen/logrus"
 	"github.com/twmb/algoimpl/go/graph"
 	"github.tamu.edu/April1989/go_tools/go/ssa"
@@ -220,7 +221,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 	//for call back code: check if fn has a synthetic replacement
 	replace := a.ptaRes.GetMySyntheticFn(fn)
 	if replace != nil {
-		//fmt.Println(" --> replaced by synthetic: ", fn)
+		fmt.Println(" --> replaced by synthetic: ", fn)
 		fn = replace //we are going to visit synthetic fn
 	}
 	//fmt.Println(" ... ", fn)

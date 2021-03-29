@@ -197,7 +197,12 @@ func (runner *AnalysisRunner) Run(args []string) error {
 			Level:     1,            //bz: see pointer.Config
 			DoCallback: true,        //bz: simplified callback
 		}
-		myutil.InitialChecker(runner.ptaConfig) //bz: setup callback stuff
+		if testMode {
+			if !doneInitialChecker {
+				myutil.InitialChecker(runner.ptaConfig) //bz: setup callback stuff
+				doneInitialChecker = true
+			}
+		}
 		start := time.Now()                                               //performance
 		runner.ptaResult, _ = pointer.AnalyzeMultiMains(runner.ptaConfig) // conduct pointer analysis for multiple mains
 		t := time.Now()
