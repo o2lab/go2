@@ -148,15 +148,6 @@ func (a *analysis) sameAddress(addr1 ssa.Value, addr2 ssa.Value, go1 int, go2 in
 				}
 			}
 		}
-	} else if _, ok2 := addr1.(*ssa.Parameter); ok2 {
-		a.pointerAnalysis(addr1, go1, nil)
-		addr1 = a.pbr
-	} else if _, ok3 := addr2.(*ssa.Parameter); ok3 {
-		a.pointerAnalysis(addr2, go2, nil)
-		addr2 = a.pbr
-	}
-	if addr1 != addr2 {
-		return false
 	}
 	// check points-to set to see if they can point to the same object
 	if useDefaultPTA {
