@@ -16,7 +16,7 @@ func NewMutableExistingTableDescriptor(tbl TableDescriptor) *MutableTableDescrip
 }
 
 func validateCheckInTxn(tableDesc *MutableTableDescriptor, checkName *string) {
-	tableDesc.FindCheckByName(*checkName) // racy read on checkName
+	tableDesc.FindCheckByName(*checkName /* RACE Read */) // racy read on checkName
 }
 
 type ConstraintToValidate struct {
@@ -56,7 +56,7 @@ func (*SchemaChanger) validateChecks(checks []ConstraintToValidate) {
 		desc := NewImmutableTableDescriptor(*tableDesc).MakeFirstMutationPublic()
 		for _, c /* RACE Write */ := range checks { // racy write on c (Name field)
 			go func() {
-				validateCheckInTxn( /* RACE Read */ desc, &c.Name )  // will trigger racy read
+				validateCheckInTxn(desc, &c.Name )  // will trigger racy read
 			}()
 		}
 	}()
