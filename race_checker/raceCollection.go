@@ -148,6 +148,15 @@ func (a *analysis) sameAddress(addr1 ssa.Value, addr2 ssa.Value, go1 int, go2 in
 				}
 			}
 		}
+	} else if _, ok2 := addr1.(*ssa.Parameter); ok2 {
+		a.pointerAnalysis(addr1, go1, nil)
+		addr1 = a.pbr
+	} else if _, ok3 := addr2.(*ssa.Parameter); ok3 {
+		a.pointerAnalysis(addr2, go2, nil)
+		addr2 = a.pbr
+	}
+	if addr1 != addr2 {
+		return false
 	}
 	// check points-to set to see if they can point to the same object
 	if useDefaultPTA {
@@ -184,12 +193,12 @@ func (a *analysis) sameAddress(addr1 ssa.Value, addr2 ssa.Value, go1 int, go2 in
 
 // reachable determines if 2 input instructions are connected in the Happens-Before Graph
 func (a *analysis) reachable(fromIns ssa.Instruction, fromGo int, toIns ssa.Instruction, toGo int) bool {
-	fromBlock := fromIns.Block().Index
-	if strings.HasPrefix(fromIns.Block().Comment, "rangeindex") && toIns.Parent() != nil && toIns.Parent().Parent() != nil { // checking both instructions belong to same forloop
-		if fromIns.Block().Comment == toIns.Parent().Parent().Blocks[fromBlock].Comment {
-			return false
-		}
-	}
+	//fromBlock := fromIns.Block().Index
+	//if strings.HasPrefix(fromIns.Block().Comment, "rangeindex") && toIns.Parent() != nil && toIns.Parent().Parent() != nil { // checking both instructions belong to same forloop
+	//	if fromIns.Block().Comment == toIns.Parent().Parent().Blocks[fromBlock].Comment {
+	//		return false
+	//	}
+	//}
 	//addrPair := a.insAddress([]ssa.Instruction{fromIns, toIns})
 	//addr1, addr2 := addrPair[0], addrPair[1]
 	//if addr1.String() == "new ConstraintToValidate (c)" && addr2.String() == "parameter checkName : *string" && fromGo == 1 && toGo == 2 {
