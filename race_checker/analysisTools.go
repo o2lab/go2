@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	log "github.com/sirupsen/logrus"
 	"github.com/twmb/algoimpl/go/graph"
 	"github.tamu.edu/April1989/go_tools/go/ssa"
@@ -33,7 +34,10 @@ func (a *analysis) buildHB() {
 				*currN.Value = insKey
 				if nGo != 0 && i == 0 { // worker goroutine, first instruction
 					prevN = goCaller[anIns.(*ssa.Go)] // first node in subroutine
-				} else if goInstr, ok := anIns.(*ssa.Go); ok {
+				} else if goInstr, ok := anIns.(*ssa.Go); ok { // spawning of subroutine
+					//if _, ok1 := goCaller[goInstr]; ok1 { // repeated spawning in loop
+					//	continue
+					//}
 					goCaller[goInstr] = currN // store go calls in the same goroutine
 				} else if selIns, ok1 := anIns.(*ssa.Select); ok1 {
 					selectN = append(selectN, currN) // select node
@@ -201,6 +205,9 @@ func (a *analysis) buildHB() {
 
 // visitAllInstructions visits each line and calls the corresponding helper function to drive the tool
 func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
+	if fn.Name() == "validateChecks$1" {
+		fmt.Println("d")
+	}
 	a.analysisStat.nGoroutine = goID + 1 // keep count of goroutine quantity
 	if fn == nil {
 		return
@@ -214,7 +221,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 			a.levels[goID] = 0 // initialize level count at main entry
 			a.loopIDs[goID] = 0
 			a.updateRecords(fn.Name(), goID, "PUSH ")
-			a.goStack = append(a.goStack, []string{}) // initialize first interior slice for main goroutine
+			a.goStack = append(a.goStack, []ssa.Instruction{}) // initialize first interior slice for main goroutine
 		}
 	}
 	if _, ok := a.levels[goID]; !ok && goID > 0 { // initialize level counter for new goroutine

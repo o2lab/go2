@@ -124,6 +124,8 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 			}
 		case *ssa.MakeChan:
 			a.chanName = theFunc.Name()
+		case *ssa.Alloc:
+			a.pbr = theFunc
 		default:
 			break
 		}

@@ -522,9 +522,9 @@ func (a *analysis) insGo(examIns *ssa.Go, goID int, theIns ssa.Instruction, loop
 	}
 
 	var info = goroutineInfo{examIns, fnName, newGoID}
-	a.goStack = append(a.goStack, []string{}) // initialize interior slice
+	a.goStack = append(a.goStack, []ssa.Instruction{}) // initialize interior slice
 	a.goCaller[newGoID] = goID                // map caller goroutine
-	a.goStack[newGoID] = append(a.goStack[newGoID], a.storeIns...)
+	a.goStack[newGoID] = append(a.goStack[newGoID], theIns)
 	a.workList = append(a.workList, info) // store encountered goroutines
 	if !allEntries {
 		if loopID > 0 {

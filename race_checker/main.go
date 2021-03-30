@@ -43,7 +43,7 @@ type analysis struct {
 	RlockMap        map[ssa.Instruction][]ssa.Value // map each read/write access to a snapshot of actively maintained lockset
 	RlockSet        map[int][]*lockInfo                     // active lockset, to be maintained along instruction traversal
 	paramFunc       ssa.Value
-	goStack         [][]string
+	goStack         [][]ssa.Instruction
 	goCaller        map[int]int
 	goNames         map[int]string
 	chanToken		map[string]string				// map token number to channel name
@@ -69,6 +69,7 @@ type analysis struct {
 	loopIDs       map[int]int						// map goID to loopID
 	allocLoop 	  map[*ssa.Function][]string
 	bindingFV     map[*ssa.Go][]*ssa.FreeVar
+	pbr 		  *ssa.Alloc
 }
 
 type lockInfo struct {

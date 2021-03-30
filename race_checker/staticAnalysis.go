@@ -298,7 +298,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 								if k == 0 {
 									log.Debug("\t ", strings.Repeat(" ", q), "--> Goroutine: ", eachFn, "[", Analysis.goCaller[eachGo], "]")
 								} else {
-									log.Debug("\t   ", strings.Repeat(" ", q), strings.Repeat(" ", k), eachFn)
+									log.Debug("\t   ", strings.Repeat(" ", q), strings.Repeat(" ", k), eachFn, Analysis.prog.Fset.Position(eachFn.Pos()))
 								}
 							}
 						}
