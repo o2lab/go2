@@ -50,6 +50,9 @@ func (a *analysis) checkRacyPairs() []*raceInfo {
 						}
 						insSlice := []ssa.Instruction{goI, goJ}
 						addressPair := a.insAddress(insSlice) // one instruction from each goroutine
+						if addressPair[0] == nil || addressPair[1] == nil {
+							continue
+						}
 						////!!!! bz: for my debug, please comment off, do not delete
 						//	var goIinstr string
 						//	var goJinstr string
@@ -187,6 +190,25 @@ func (a *analysis) reachable(fromIns ssa.Instruction, fromGo int, toIns ssa.Inst
 			return false
 		}
 	}
+	//addrPair := a.insAddress([]ssa.Instruction{fromIns, toIns})
+	//addr1, addr2 := addrPair[0], addrPair[1]
+	//if addr1.String() == "new ConstraintToValidate (c)" && addr2.String() == "parameter checkName : *string" && fromGo == 1 && toGo == 2 {
+	//	var pt1 pointer.PointerWCtx
+	//	var pt2 pointer.PointerWCtx
+	//	if fromGo == 0 {
+	//		pt1 = a.ptaRes[a.main].PointsToByGoWithLoopID(addr1, nil, a.loopIDs[fromGo])
+	//	} else {
+	//		pt1 = a.ptaRes[a.main].PointsToByGoWithLoopID(addr1, a.RWIns[fromGo][0].(*ssa.Go), a.loopIDs[fromGo])
+	//	}
+	//	if toGo == 0 {
+	//		pt2 = a.ptaRes[a.main].PointsToByGoWithLoopID(addr2, nil, a.loopIDs[toGo])
+	//	} else {
+	//		pt2 = a.ptaRes[a.main].PointsToByGoWithLoopID(addr2, a.RWIns[toGo][0].(*ssa.Go), a.loopIDs[toGo])
+	//	}
+	//	fmt.Println(pt1.GetMyGoAndLoopID().GoInstr, pt1.GetMyGoAndLoopID().LoopID) // loopID should be >0 ?
+	//	fmt.Println(pt2.GetMyGoAndLoopID().GoInstr, pt2.GetMyGoAndLoopID().LoopID)
+	//}
+
 	fromInsKey := goIns{ins: fromIns, goID: fromGo}
 	toInsKey := goIns{ins: toIns, goID: toGo}
 	fromNode := a.RWinsMap[fromInsKey] // starting node
@@ -284,8 +306,6 @@ func getSrcPos(address ssa.Value) token.Pos {
 	return position
 }
 
-//func (a *analysis) reportRace
-
 // printRace will print the details of a data race such as the write/read of a variable and other helpful information
 func (a *analysis) printRace(counter int, insPair []ssa.Instruction, addrPair [2]ssa.Value, goIDs []int, insInd []int) {
 	log.Printf("Data race #%d", counter)
@@ -348,34 +368,15 @@ func (a *analysis) printRace(counter int, insPair []ssa.Instruction, addrPair [2
 				}
 			}
 		}
+		log.Println("\tunder goroutine  ***", a.goNames[goIDs[i]], "[", goIDs[i], "] *** ")
+
 		if len(printStack) > 0 {
 			log.Println("\tcalled by function[s]: ")
 			for p, toPrint := range printStack {
 				log.Println("\t ", strings.Repeat(" ", p), toPrint, a.prog.Fset.Position(printPos[p]))
 			}
 		}
-		if goIDs[i] > 0 { // show location where calling goroutine was spawned
-			log.Println("\tin goroutine  ***", a.goNames[goIDs[i]], "[", goIDs[i], "] *** , with the following call stack: ")
-		} else { // main goroutine
-			log.Println("\tin goroutine  ***", a.goNames[goIDs[i]], "[", goIDs[i], "] *** ")
-		}
-		var pathGo []int
-		j := goIDs[i]
-		for j > 0 {
-			pathGo = append([]int{j}, pathGo...)
-			temp := a.goCaller[j]
-			j = temp
-		}
-		for q, eachGo := range pathGo {
-			eachStack := a.goStack[eachGo]
-			for k, eachFn := range eachStack {
-				if k == 0 {
-					log.Println("\t ", strings.Repeat(" ", q), "--> Goroutine: ", eachFn, "[", a.goCaller[eachGo], "]")
-				} else {
-					log.Println("\t   ", strings.Repeat(" ", q), strings.Repeat(" ", k), eachFn)
-				}
-			}
-		}
+
 	}
 	log.Println("Locks acquired before Write access: ", writeLocks)
 	log.Println("Locks acquired before Read  access: ", readLocks)
