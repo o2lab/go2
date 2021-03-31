@@ -580,13 +580,13 @@ func (a *analysis) exploredFunction(fn *ssa.Function, goID int, theIns ssa.Instr
 	if len(a.RWIns) > 0 {
 		visitedIns = a.RWIns[goID]
 	}
-	csSlice, _ := insToCallStack(visitedIns)
+	csSlice, csStr := insToCallStack(visitedIns)
 	if sliceContainsFnCtr(csSlice, fn) > trieLimit {
 		return true
 	}
 	fnKey := fnInfo{
-		fnName:     fn.Name(),
-		//contextStr: csStr,
+		fnName:     fn,
+		contextStr: csStr,
 	}
 	if existingTrieNode, ok := a.trieMap[fnKey]; ok {
 		existingTrieNode.budget++ // increment the number of times for calling the function under the current context by one
