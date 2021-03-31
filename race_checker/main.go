@@ -114,7 +114,7 @@ type AnalysisRunner struct {
 }
 
 type fnInfo struct { // all fields must be comparable for fnInfo to be used as key to trieMap
-	fnName     string
+	fnName     *ssa.Function
 	contextStr string
 }
 

@@ -585,7 +585,7 @@ func (a *analysis) exploredFunction(fn *ssa.Function, goID int, theIns ssa.Instr
 		return true
 	}
 	fnKey := fnInfo{
-		fnName:     fn.Name(),
+		fnName:     fn,
 		contextStr: csStr,
 	}
 	if existingTrieNode, ok := a.trieMap[fnKey]; ok {
