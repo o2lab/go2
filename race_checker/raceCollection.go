@@ -81,9 +81,7 @@ func (a *analysis) checkRacyPairs() []*raceInfo {
 								goIDs: 		[]int{i, j},
 								insInd: 	[]int{ii, jj},
 							}
-							if !allEntries {
-								a.printRace(len(a.reportedAddr), insSlice, addressPair, []int{i, j}, []int{ii, jj})
-							}
+							a.printRace(len(a.reportedAddr), insSlice, addressPair, []int{i, j}, []int{ii, jj})
 						}
 					}
 				}
@@ -368,7 +366,11 @@ func (a *analysis) printRace(counter int, insPair []ssa.Instruction, addrPair [2
 				}
 			}
 		}
-		log.Println("\tunder goroutine  ***", a.goNames(a.goCalls[goIDs[i]]), "[", goIDs[i], "] *** ")
+		if goIDs[i] == 0 { // main goroutine
+			log.Println("\tunder goroutine  ***  main  [", goIDs[i], "] *** ")
+		} else {
+			log.Println("\tunder goroutine  ***", a.goNames(a.goCalls[goIDs[i]]), "[", goIDs[i], "] *** ")
+		}
 
 		if len(printStack) > 0 {
 			log.Println("\tcalled by function[s]: ")
