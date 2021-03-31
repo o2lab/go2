@@ -9,7 +9,6 @@ import (
 // insToCallStack will return the callStack of the input instructions that called a function but did not return
 func insToCallStack(allIns []ssa.Instruction) ([]*ssa.Function, string) {
 	var callStack []*ssa.Function
-	//var csStr string
 	for _, anIns := range allIns {
 		if fnCall, ok := anIns.(*ssa.Call); ok {
 			callStack = append(callStack, fnCall.Call.StaticCallee())
@@ -17,8 +16,13 @@ func insToCallStack(allIns []ssa.Instruction) ([]*ssa.Function, string) {
 			callStack = callStack[:len(callStack)-1]
 		}
 	}
-	//csStr = strings.Join(callStack, "...") // combine into one string because slices are not comparable
-	return callStack, ""
+	csStr := ""
+	for _, fn := range callStack { // combine into one string because slices are not comparable
+		if fn != nil {
+			csStr += fn.Name()
+		}
+	}
+	return callStack, csStr
 }
 
 // sliceContains if the e value is present in the slice, s, of ssa values that true, and false otherwise
