@@ -606,7 +606,9 @@ func (a *analysis) insSelect(examIns *ssa.Select, goID int, theIns ssa.Instructi
 
 		case *ssa.Call: // timeOut
 			readyChans[i] = "timeOut"
-			defaultCase-- // non-blocking due to time-out not default
+			if !examIns.Blocking {
+				defaultCase-- // non-blocking due to time-out not default
+			}
 		case *ssa.MakeChan: // channel NOT ready
 		default: // may need to consider other cases as well
 			log.Trace("need to consider this case for channel readiness")

@@ -34,9 +34,9 @@ func (a *analysis) fromPkgsOfInterest(fn *ssa.Function) bool {
 			return false
 		}
 	}
-	if efficiency && a.main.Pkg.Path() != "command-line-arguments" && !strings.HasPrefix(fn.Pkg.Pkg.Path(), strings.Split(a.main.Pkg.Path(), "/")[0]) { // path is dependent on tested program
-		return false
-	}
+	//if efficiency && a.main.Pkg.Path() != "command-line-arguments" && !strings.HasPrefix(fn.Pkg.Pkg.Path(), strings.Split(a.main.Pkg.Path(), "/")[0]) { // path is dependent on tested program
+	//	return false
+	//}
 	return true
 }
 
@@ -277,9 +277,10 @@ func (runner *AnalysisRunner) Run(args []string) error {
 					if i > 0 {
 						name = Analysis.goNames(Analysis.goCalls[i])
 					}
-					log.Debug("Goroutine ", i, "  --  ", name)
 					if Analysis.goInLoop[i] {
-						log.Debug(strings.Repeat(" *", 10), " spawned by a loop", strings.Repeat(" *", 10))
+						log.Debug("Goroutine ", i, "  --  ", name, strings.Repeat(" *", 10), " spawned by a loop", strings.Repeat(" *", 10))
+					} else {
+						log.Debug("Goroutine ", i, "  --  ", name)
 					}
 					if i > 0 {
 						log.Debug("call stack: ")
@@ -343,22 +344,17 @@ func (runner *AnalysisRunner) Run(args []string) error {
 	}
 	wg.Wait()
 
-	if allEntries {
-		raceCount := 0
-		for k, e := range runner.finalReport {
-			if len(e.racePairs) > 0 && e.racePairs[0] != nil {
-				log.Info(len(e.racePairs), " races found for entry point No.", k, ": ", e.entryInfo, "...")
-				for _, r := range e.racePairs {
-					if r != nil {
-						raceCount++
-					}
-				}
-			} else {
-				log.Info("No races found for ", e.entryInfo, "...")
-			}
+	raceCount := 0
+	for k, e := range runner.finalReport {
+		if len(e.racePairs) > 0 && e.racePairs[0] != nil {
+			log.Info(len(e.racePairs), " races found for entry point No.", k, ": ", e.entryInfo, "...")
+			raceCount += len(e.racePairs)
+		} else {
+			log.Info("No races found for ", e.entryInfo, "...")
 		}
-		log.Info("Total of ", raceCount, " races found for all entry points. ")
 	}
+	log.Info("Total of ", raceCount, " races found for all entry points. ")
+
 	execDur := time.Since(startExec)
 	log.Info(execDur, " elapsed. ")
 

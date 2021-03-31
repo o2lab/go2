@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	log "github.com/sirupsen/logrus"
 	"github.com/twmb/algoimpl/go/graph"
 	"github.tamu.edu/April1989/go_tools/go/ssa"
@@ -205,9 +204,6 @@ func (a *analysis) buildHB() {
 
 // visitAllInstructions visits each line and calls the corresponding helper function to drive the tool
 func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
-	if fn.Name() == "validateChecks$1" {
-		fmt.Println("d")
-	}
 	a.analysisStat.nGoroutine = goID + 1 // keep count of goroutine quantity
 	if fn == nil {
 		return
@@ -231,42 +227,11 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 		a.RWIns = append(a.RWIns, []ssa.Instruction{})
 	}
 	fnBlocks := fn.Blocks
-	bCap := 1
-	if len(fnBlocks) > 1 {
-		bCap = len(fnBlocks)
-	} else if len(fnBlocks) == 0 {
-		return
+	bVisit0 := make([]int, len(fn.DomPreorder()))
+	for i, bb := range fn.DomPreorder() {
+		bVisit0[i] = bb.Index
 	}
-	bVisit := make([]int, 1, bCap) // create ordering at which blocks are visited
-	k := 0                         // ----> !!! SEE HERE: bz: from line 235 to 262, the functionality inside the code block can be separated outside by creating a function to do this (and return bVisit since you need later )
-	b := fnBlocks[0]
-	bVisit[k] = 0
-	for k < len(bVisit) {
-		b = fnBlocks[bVisit[k]]
-		if len(b.Succs) == 0 {
-			k++
-			continue
-		}
-		j := k
-		for s, bNext := range b.Succs {
-			j += s
-			i := sliceContainsIntAt(bVisit, bNext.Index)
-			if i < k {
-				if j == len(bVisit)-1 {
-					bVisit = append(bVisit, bNext.Index)
-				} else if j < len(bVisit)-1 {
-					bVisit = append(bVisit[:j+2], bVisit[j+1:]...)
-					bVisit[j+1] = bNext.Index
-				}
-				if i != -1 { // visited block
-					bVisit = append(bVisit[:i], bVisit[i+1:]...)
-					j--
-				}
-			}
-		}
-		k++
-	}
-	//bVisit := fn.DomPreorder()
+	bVisit := bVisit0
 
 	var toDefer []ssa.Instruction // stack storing deferred calls
 	var toUnlock []ssa.Value

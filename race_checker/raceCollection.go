@@ -81,7 +81,9 @@ func (a *analysis) checkRacyPairs() []*raceInfo {
 								goIDs: 		[]int{i, j},
 								insInd: 	[]int{ii, jj},
 							}
-							a.printRace(len(a.reportedAddr), insSlice, addressPair, []int{i, j}, []int{ii, jj})
+							if !allEntries {
+								a.printRace(len(a.reportedAddr), insSlice, addressPair, []int{i, j}, []int{ii, jj})
+							}
 						}
 					}
 				}
@@ -139,7 +141,7 @@ func (a *analysis) sameAddress(addr1 ssa.Value, addr2 ssa.Value, go1 int, go2 in
 	} else if freevar1, ok := addr1.(*ssa.FreeVar); ok {
 		if freevar2, ok2 := addr2.(*ssa.FreeVar); ok2 {
 			if freevar1.Pos() == freevar2.Pos() { // compare position of identifiers
-				if !sliceContainsFreeVar(a.bindingFV[a.RWIns[go1][0].(*ssa.Go)], freevar1) {
+				if go1 != 0 && !sliceContainsFreeVar(a.bindingFV[a.RWIns[go1][0].(*ssa.Go)], freevar1) {
 					return true
 				} else {
 					return false
