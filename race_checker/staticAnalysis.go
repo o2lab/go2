@@ -235,7 +235,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 				RlockMap:        make(map[ssa.Instruction][]ssa.Value),
 				RlockSet:   	 make(map[int][]*lockInfo),
 				goCaller:        make(map[int]int),
-				goNames:         make(map[int]string),
+				goCalls:         make(map[int]*ssa.Go),
 				chanToken:       make(map[string]string),
 				chanBuf:         make(map[string]int),
 				chanRcvs:        make(map[string][]*ssa.UnOp),
@@ -275,11 +275,11 @@ func (runner *AnalysisRunner) Run(args []string) error {
 				for i := 0; i < len(Analysis.RWIns); i++ {
 					name := "main"
 					if i > 0 {
-						name = Analysis.goNames[i]
+						name = Analysis.goNames(Analysis.goCalls[i])
 					}
 					log.Debug("Goroutine ", i, "  --  ", name)
 					if Analysis.goInLoop[i] {
-						log.Debug(strings.Repeat(" ", 10), strings.Repeat("*", 10), "spawned by a loop")
+						log.Debug(strings.Repeat(" *", 10), " spawned by a loop", strings.Repeat(" *", 10))
 					}
 					if i > 0 {
 						log.Debug("call stack: ")
@@ -296,9 +296,9 @@ func (runner *AnalysisRunner) Run(args []string) error {
 							eachStack := Analysis.goStack[eachGo]
 							for k, eachFn := range eachStack {
 								if k == 0 {
-									log.Debug("\t ", strings.Repeat(" ", q), "--> Goroutine: ", eachFn, "[", Analysis.goCaller[eachGo], "]")
+									log.Debug("\t ", strings.Repeat(" ", q), "--> Goroutine: ", eachFn.Name(), "[", Analysis.goCaller[eachGo], "] ", Analysis.prog.Fset.Position(eachFn.Pos()))
 								} else {
-									log.Debug("\t   ", strings.Repeat(" ", q), strings.Repeat(" ", k), eachFn, Analysis.prog.Fset.Position(eachFn.Pos()))
+									log.Debug("\t   ", strings.Repeat(" ", q), strings.Repeat(" ", k), eachFn.Name(), " ", Analysis.prog.Fset.Position(eachFn.Pos()))
 								}
 							}
 						}
@@ -348,9 +348,8 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		for k, e := range runner.finalReport {
 			if len(e.racePairs) > 0 && e.racePairs[0] != nil {
 				log.Info(len(e.racePairs), " races found for entry point No.", k, ": ", e.entryInfo, "...")
-				for i, r := range e.racePairs {
+				for _, r := range e.racePairs {
 					if r != nil {
-						e.printRace(i+1, r.insPair, r.addrPair, r.goIDs, r.insInd)
 						raceCount++
 					}
 				}

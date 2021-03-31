@@ -32,6 +32,15 @@ func sliceContains(s []ssa.Value, e ssa.Value) bool {
 	return false
 }
 
+func sliceContainsFn(s []*ssa.Function, e *ssa.Function) bool {
+	for _, a := range s {
+		if a.Pos() == e.Pos() {
+			return true
+		}
+	}
+	return false
+}
+
 func sliceContainsRcv(s []*ssa.UnOp, e *ssa.UnOp) bool {
 	for _, a := range s {
 		if a == e {

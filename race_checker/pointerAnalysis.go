@@ -48,7 +48,7 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 				if eachTarget.Value().Parent() != nil {
 					fns = append(fns, eachTarget.Value().Parent().Name())
 					//log.Trace("*****target No.", ind+1, " - ", eachTarget.Value().Name(), " from function ", eachTarget.Value().Parent().Name())
-					if sliceContainsStr(a.storeIns, eachTarget.Value().Parent().Name()) { // calling function is in current goroutine
+					if sliceContainsFn(a.storeFns, eachTarget.Value().Parent()) { // calling function is in current goroutine
 						rightLoc = ind
 						break
 					}
@@ -64,7 +64,7 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 		case *ssa.Function:
 			fnName = theFunc.Name()
 			if !a.exploredFunction(theFunc, goID, theIns) {
-				a.updateRecords(fnName, goID, "PUSH ")
+				a.updateRecords(fnName, goID, "PUSH ", theFunc)
 				a.RWIns[goID] = append(a.RWIns[goID], theIns)
 				a.visitAllInstructions(theFunc, goID)
 			}
@@ -76,7 +76,7 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 			check := a.prog.LookupMethod(pta0Set[location].PointsTo().DynamicTypes().Keys()[0], a.mains[0].Pkg, methodName)
 			fnName = check.Name()
 			if !a.exploredFunction(check, goID, theIns) {
-				a.updateRecords(fnName, goID, "PUSH ")
+				a.updateRecords(fnName, goID, "PUSH ", check)
 				a.RWIns[goID] = append(a.RWIns[goID], theIns)
 				a.visitAllInstructions(check, goID)
 			}
@@ -106,7 +106,7 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 		case *ssa.Function:
 			fnName = theFunc.Name()
 			if !a.exploredFunction(theFunc, goID, theIns) {
-				a.updateRecords(fnName, goID, "PUSH ")
+				a.updateRecords(fnName, goID, "PUSH ", theFunc)
 				a.RWIns[goID] = append(a.RWIns[goID], theIns)
 				a.visitAllInstructions(theFunc, goID)
 			}
@@ -118,7 +118,7 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 			check := a.prog.LookupMethod(ptr.PointsTo().DynamicTypes().Keys()[0], a.mains[0].Pkg, methodName)
 			fnName = check.Name()
 			if !a.exploredFunction(check, goID, theIns) {
-				a.updateRecords(fnName, goID, "PUSH ")
+				a.updateRecords(fnName, goID, "PUSH ", check)
 				a.RWIns[goID] = append(a.RWIns[goID], theIns)
 				a.visitAllInstructions(check, goID)
 			}

@@ -214,14 +214,14 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 	}
 	if !isSynthetic(fn) { // if function is NOT synthetic
 		if !a.fromPkgsOfInterest(fn) {
-			a.updateRecords(fn.Name(), goID, "POP  ")
+			a.updateRecords(fn.Name(), goID, "POP  ", fn)
 			return
 		}
 		if fn.Name() == entryFn {
 			a.levels[goID] = 0 // initialize level count at main entry
 			a.loopIDs[goID] = 0
-			a.updateRecords(fn.Name(), goID, "PUSH ")
-			a.goStack = append(a.goStack, []ssa.Instruction{}) // initialize first interior slice for main goroutine
+			a.updateRecords(fn.Name(), goID, "PUSH ", fn)
+			a.goStack = append(a.goStack, []*ssa.Function{}) // initialize first interior slice for main goroutine
 		}
 	}
 	if _, ok := a.levels[goID]; !ok && goID > 0 { // initialize level counter for new goroutine
@@ -325,7 +325,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 						fnName := deferIns.Call.Value.Name()
 						fnName = checkTokenNameDefer(fnName, deferIns)
 						if !a.exploredFunction(deferIns.Call.StaticCallee(), goID, theIns) {
-							a.updateRecords(fnName, goID, "PUSH ")
+							a.updateRecords(fnName, goID, "PUSH ", deferIns.Call.StaticCallee())
 							a.RWIns[goID] = append(a.RWIns[goID], dIns)
 							a.visitAllInstructions(deferIns.Call.StaticCallee(), goID)
 						}
@@ -534,10 +534,10 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 	}
 	// done with all instructions in function body, now pop the function
 	fnName := fn.Name()
-	if fnName == a.storeIns[len(a.storeIns)-1] {
-		a.updateRecords(fnName, goID, "POP  ")
+	if fnName == a.storeFns[len(a.storeFns)-1].Name() {
+		a.updateRecords(fnName, goID, "POP  ", fn)
 	}
-	if len(a.storeIns) == 0 && len(a.workList) != 0 { // finished reporting current goroutine and workList isn't empty
+	if len(a.storeFns) == 0 && len(a.workList) != 0 { // finished reporting current goroutine and workList isn't empty
 		nextGoInfo := a.workList[0] // get the goroutine info at head of workList
 		a.workList = a.workList[1:] // pop goroutine info from head of workList
 		a.newGoroutine(nextGoInfo)
@@ -545,30 +545,49 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 	}
 }
 
+func (a *analysis) goNames(goIns *ssa.Go) string {
+	var goName string
+	switch anonFn := goIns.Call.Value.(type) {
+	case *ssa.MakeClosure: // go call for anonymous function
+		goName = anonFn.Fn.Name()
+	case *ssa.Function:
+		goName = anonFn.Name()
+	case *ssa.TypeAssert:
+		switch paramType := a.paramFunc.(type) {
+		case *ssa.Function:
+			goName = paramType.Name()
+		case *ssa.MakeClosure:
+			goName = paramType.Fn.Name()
+		}
+	}
+	return goName
+}
+
 // newGoroutine goes through the goroutine, logs its info, and goes through the instructions within
 func (a *analysis) newGoroutine(info goroutineInfo) {
-	if info.entryMethod == a.goNames[a.goCaller[info.goID]] {
+	if info.goIns == a.goCalls[a.goCaller[info.goID]] {
 		return // recursive spawning of same goroutine
 	}
-	a.storeIns = append(a.storeIns, info.entryMethod)
+
+	a.storeFns = append(a.storeFns, info.entryMethod)
 	if info.goID >= len(a.RWIns) { // initialize interior slice for new goroutine
 		a.RWIns = append(a.RWIns, []ssa.Instruction{})
 	}
 	a.RWIns[info.goID] = append(a.RWIns[info.goID], info.goIns)
-	a.goNames[info.goID] = info.entryMethod
+	a.goCalls[info.goID] = info.goIns
 	if !allEntries {
 		if a.loopIDs[info.goID] > 0 {
 			a.goInLoop[info.goID] = true
-			log.Debug(strings.Repeat("-", 35), "Goroutine ", info.entryMethod, " (in loop)", strings.Repeat("-", 35), "[", info.goID, "]")
+			log.Debug(strings.Repeat("-", 35), "Goroutine ", info.entryMethod.Name(), " (in loop)", strings.Repeat("-", 35), "[", info.goID, "]")
 		} else {
-			log.Debug(strings.Repeat("-", 35), "Goroutine ", info.entryMethod, strings.Repeat("-", 35), "[", info.goID, "]")
+			log.Debug(strings.Repeat("-", 35), "Goroutine ", info.entryMethod.Name(), strings.Repeat("-", 35), "[", info.goID, "]")
 		}
 	}
 	if len(a.lockSet[a.goCaller[info.goID]]) > 0 {
 		a.lockSet[info.goID] = a.lockSet[a.goCaller[info.goID]]
 	}
 	if !allEntries {
-		log.Debug(strings.Repeat(" ", a.levels[info.goID]), "PUSH ", info.entryMethod, " at lvl ", a.levels[info.goID])
+		log.Debug(strings.Repeat(" ", a.levels[info.goID]), "PUSH ", info.entryMethod.Name(), " at lvl ", a.levels[info.goID])
 	}
 	a.levels[info.goID]++
 	switch info.goIns.Call.Value.(type) {
@@ -589,7 +608,7 @@ func (a *analysis) exploredFunction(fn *ssa.Function, goID int, theIns ssa.Instr
 	if sliceContainsInsAt(a.RWIns[goID], theIns) >= 0 {
 		return true
 	}
-	if efficiency && sliceContainsStr(a.storeIns, fn.Name()) { // for temporary debugging purposes only
+	if efficiency && sliceContainsFn(a.storeFns, fn) { // for temporary debugging purposes only
 		return true
 	}
 	visitedIns := []ssa.Instruction{}
