@@ -42,9 +42,11 @@ func sliceContainsFn(s []*ssa.Function, e *ssa.Function) bool {
 
 func sliceContainsFnCtr(s []*ssa.Function, e *ssa.Function) int {
 	ctr := 0
-	for _, a := range s {
-		if a.Pos() == e.Pos() {
-			ctr++
+	if e != nil {
+		for _, a := range s {
+			if a != nil && a.Pos() == e.Pos() {
+				ctr++
+			}
 		}
 	}
 	return ctr
