@@ -4,22 +4,21 @@ import (
 	"github.com/twmb/algoimpl/go/graph"
 	"github.tamu.edu/April1989/go_tools/go/ssa"
 	"go/token"
-	"strings"
 )
 
 // insToCallStack will return the callStack of the input instructions that called a function but did not return
-func insToCallStack(allIns []ssa.Instruction) ([]string, string) {
-	var callStack []string
-	var csStr string
+func insToCallStack(allIns []ssa.Instruction) ([]*ssa.Function, string) {
+	var callStack []*ssa.Function
+	//var csStr string
 	for _, anIns := range allIns {
 		if fnCall, ok := anIns.(*ssa.Call); ok {
-			callStack = append(callStack, fnCall.Call.Value.Name())
+			callStack = append(callStack, fnCall.Call.StaticCallee())
 		} else if _, ok1 := anIns.(*ssa.Return); ok1 && len(callStack) > 0 { // TODO: need to consider function with multiple return statements
 			callStack = callStack[:len(callStack)-1]
 		}
 	}
-	csStr = strings.Join(callStack, "...") // combine into one string because slices are not comparable
-	return callStack, csStr
+	//csStr = strings.Join(callStack, "...") // combine into one string because slices are not comparable
+	return callStack, ""
 }
 
 // sliceContains if the e value is present in the slice, s, of ssa values that true, and false otherwise
@@ -39,6 +38,16 @@ func sliceContainsFn(s []*ssa.Function, e *ssa.Function) bool {
 		}
 	}
 	return false
+}
+
+func sliceContainsFnCtr(s []*ssa.Function, e *ssa.Function) int {
+	ctr := 0
+	for _, a := range s {
+		if a.Pos() == e.Pos() {
+			ctr++
+		}
+	}
+	return ctr
 }
 
 func sliceContainsRcv(s []*ssa.UnOp, e *ssa.UnOp) bool {
