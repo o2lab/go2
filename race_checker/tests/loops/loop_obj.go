@@ -66,7 +66,7 @@ func main() {
 
 	var wg sync.WaitGroup
 	for i := 0; i < len(array) - 1; i++ {
-	//for ii, e1 := range array {
+	//for _, e1 := range array {
 		//bz: ii, e1, e2 declared in loop, but values are passed from array
 		ii := i
 		//runtime.ReadMemStats(&m5)

@@ -58,11 +58,11 @@ func main() {
 	//fmt.Println("----------------------------")
 
 	var wg sync.WaitGroup
-	//for i := 0; i < len(array) - 1; i++ {
-	for ii, e1 := range array {
-		////bz: ii, e1, e2 declared in loop, but values are passed from array
-		//ii := i
-		//e1 := array[ii]
+	for i := 0; i < len(array) - 1; i++ {
+	//for ii, e1 := range array {
+		//bz: ii, e1, e2 declared in loop, but values are passed from array
+		ii := i
+		e1 := array[ii]
 		e2 := array[ii+1]
 
 		////bz: check the following addresses are different if array element is object
