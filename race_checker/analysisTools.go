@@ -518,11 +518,12 @@ func (a *analysis) goNames(goIns *ssa.Go) string {
 	case *ssa.Function:
 		goName = anonFn.Name()
 	case *ssa.TypeAssert:
-		switch paramType := a.paramFunc.(type) {
-		case *ssa.Function:
-			goName = paramType.Name()
-		case *ssa.MakeClosure:
-			goName = paramType.Fn.Name()
+		switch anonFn.X.(type) {
+		case *ssa.Parameter:
+			a.pointerAnalysis(anonFn.X, 0, nil)
+			if a.paramFunc != nil {
+				goName = a.paramFunc.Name()
+			}
 		}
 	}
 	return goName
@@ -559,7 +560,7 @@ func (a *analysis) newGoroutine(info goroutineInfo) {
 	case *ssa.MakeClosure:
 		a.visitAllInstructions(info.goIns.Call.StaticCallee(), info.goID)
 	case *ssa.TypeAssert:
-		a.visitAllInstructions(a.paramFunc.(*ssa.MakeClosure).Fn.(*ssa.Function), info.goID)
+		a.visitAllInstructions(a.paramFunc, info.goID)
 	default:
 		a.visitAllInstructions(info.goIns.Call.StaticCallee(), info.goID)
 	}

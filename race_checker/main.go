@@ -42,7 +42,8 @@ type analysis struct {
 	lockSet      map[int][]*lockInfo               // active lockset, to be maintained along instruction traversal
 	RlockMap     map[ssa.Instruction][]ssa.Value // map each read/write access to a snapshot of actively maintained lockset
 	RlockSet     map[int][]*lockInfo                     // active lockset, to be maintained along instruction traversal
-	paramFunc    ssa.Value
+	getParam  	 bool
+	paramFunc    *ssa.Function
 	goStack      [][]*ssa.Function
 	goCaller     map[int]int
 	goCalls         map[int]*ssa.Go

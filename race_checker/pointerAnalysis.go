@@ -5,10 +5,6 @@ import (
 	pta0 "github.tamu.edu/April1989/go_tools/go/pointer_default"
 	"github.tamu.edu/April1989/go_tools/go/ssa"
 	"go/types"
-	//"go/types"
-	//"golang.org/x/tools/go/pointer"
-	//"golang.org/x/tools/go/ssa"
-	//"strings"
 )
 
 func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Instruction) {
@@ -104,23 +100,36 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 		var fnName string
 		switch theFunc := labels[0].Value().(type) {
 		case *ssa.Function:
-			fnName = theFunc.Name()
-			if !a.exploredFunction(theFunc, goID, theIns) {
-				a.updateRecords(fnName, goID, "PUSH ", theFunc)
-				a.RWIns[goID] = append(a.RWIns[goID], theIns)
-				a.visitAllInstructions(theFunc, goID)
+			if a.getParam {
+				a.paramFunc = theFunc
+				a.getParam = !a.getParam
+			} else {
+				fnName = theFunc.Name()
+				if !a.exploredFunction(theFunc, goID, theIns) {
+					a.updateRecords(fnName, goID, "PUSH ", theFunc)
+					a.RWIns[goID] = append(a.RWIns[goID], theIns)
+					a.visitAllInstructions(theFunc, goID)
+				}
 			}
 		case *ssa.MakeInterface:
-			methodName := theIns.(*ssa.Call).Call.Method.Name()
-			if a.prog.MethodSets.MethodSet(ptr.PointsTo().DynamicTypes().Keys()[0]).Lookup(a.mains[0].Pkg, methodName) == nil { // ignore abstract methods
-				break
-			}
-			check := a.prog.LookupMethod(ptr.PointsTo().DynamicTypes().Keys()[0], a.mains[0].Pkg, methodName)
-			fnName = check.Name()
-			if !a.exploredFunction(check, goID, theIns) {
-				a.updateRecords(fnName, goID, "PUSH ", check)
-				a.RWIns[goID] = append(a.RWIns[goID], theIns)
-				a.visitAllInstructions(check, goID)
+			switch theIns.(type) {
+			case *ssa.Call:
+				methodName := theIns.(*ssa.Call).Call.Method.Name()
+				if a.prog.MethodSets.MethodSet(ptr.PointsTo().DynamicTypes().Keys()[0]).Lookup(a.mains[0].Pkg, methodName) == nil { // ignore abstract methods
+					break
+				}
+				check := a.prog.LookupMethod(ptr.PointsTo().DynamicTypes().Keys()[0], a.mains[0].Pkg, methodName)
+				fnName = check.Name()
+				if !a.exploredFunction(check, goID, theIns) {
+					a.updateRecords(fnName, goID, "PUSH ", check)
+					a.RWIns[goID] = append(a.RWIns[goID], theIns)
+					a.visitAllInstructions(check, goID)
+				}
+			case *ssa.Go:
+				switch theFunc.X.(type) {
+				case *ssa.Parameter:
+					a.pointerAnalysis(theFunc.X, goID, theIns)
+				}
 			}
 		case *ssa.MakeChan:
 			a.chanName = theFunc.Name()

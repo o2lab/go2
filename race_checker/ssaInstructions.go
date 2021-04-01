@@ -376,9 +376,9 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 		//log.Debug("***********************special case*****************************************")
 		return
 	} else if a.fromPkgsOfInterest(examIns.Call.StaticCallee()) && examIns.Call.StaticCallee().Pkg.Pkg.Name() != "sync" { // calling a function
-		if examIns.Call.Value.Name() == "AfterFunc" && examIns.Call.StaticCallee().Pkg.Pkg.Name() == "time" { // calling time.AfterFunc()
-			a.paramFunc = examIns.Call.Args[1]
-		}
+		//if examIns.Call.Value.Name() == "AfterFunc" && examIns.Call.StaticCallee().Pkg.Pkg.Name() == "time" { // calling time.AfterFunc()
+		//	a.paramFunc = examIns.Call.Args[1]
+		//}
 		for _, checkArgs := range examIns.Call.Args {
 			switch access := checkArgs.(type) {
 			case *ssa.FieldAddr:
@@ -492,21 +492,7 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 
 // insGo analyzes go calls
 func (a *analysis) insGo(examIns *ssa.Go, goID int, theIns ssa.Instruction, loopID int) {
-	var fnName string
-	switch anonFn := examIns.Call.Value.(type) {
-	case *ssa.MakeClosure: // go call for anonymous function
-		fnName = anonFn.Fn.Name()
-	case *ssa.Function:
-		fnName = anonFn.Name()
-	case *ssa.TypeAssert:
-		switch paramType := a.paramFunc.(type) {
-		case *ssa.Function:
-			fnName = paramType.Name()
-		case *ssa.MakeClosure:
-			fnName = paramType.Fn.Name()
-		}
-	}
-
+	fnName := a.goNames(examIns)
 	newGoID := goID + 1 // increment goID for child goroutine
 	if len(a.workList) > 0 { // spawned by subroutine
 		newGoID = a.workList[len(a.workList)-1].goID + 1
@@ -522,11 +508,19 @@ func (a *analysis) insGo(examIns *ssa.Go, goID int, theIns ssa.Instruction, loop
 	}
 
 	var entryMethod *ssa.Function
-	switch examIns.Call.Value.(type) {
+	switch fn := examIns.Call.Value.(type) {
 	case *ssa.MakeClosure:
 		entryMethod = examIns.Call.StaticCallee()
 	case *ssa.TypeAssert:
-		entryMethod = a.paramFunc.(*ssa.MakeClosure).Fn.(*ssa.Function)
+		switch fn.X.(type) {
+		case *ssa.Parameter:
+			a.getParam = true
+			a.pointerAnalysis(fn.X, goID, theIns)
+		}
+		if a.paramFunc != nil {
+			entryMethod = a.paramFunc
+			fnName = entryMethod.Name()
+		}
 	default:
 		entryMethod = examIns.Call.StaticCallee()
 	}
