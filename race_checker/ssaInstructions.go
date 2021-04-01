@@ -493,20 +493,6 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 // insGo analyzes go calls
 func (a *analysis) insGo(examIns *ssa.Go, goID int, theIns ssa.Instruction, loopID int) {
 	fnName := a.goNames(examIns)
-	newGoID := goID + 1 // increment goID for child goroutine
-	if len(a.workList) > 0 { // spawned by subroutine
-		newGoID = a.workList[len(a.workList)-1].goID + 1
-	}
-	if loopID > 0 {
-		a.loopIDs[newGoID] = loopID
-	} else {
-		a.loopIDs[newGoID] = 0
-	}
-	a.RWIns[goID] = append(a.RWIns[goID], theIns)
-	if goID == 0 && a.insDRA == 0 { // this is first *ssa.Go instruction in main goroutine
-		a.insDRA = len(a.RWIns[goID]) // race analysis will begin at this instruction
-	}
-
 	var entryMethod *ssa.Function
 	switch fn := examIns.Call.Value.(type) {
 	case *ssa.MakeClosure:
@@ -520,9 +506,24 @@ func (a *analysis) insGo(examIns *ssa.Go, goID int, theIns ssa.Instruction, loop
 		if a.paramFunc != nil {
 			entryMethod = a.paramFunc
 			fnName = entryMethod.Name()
+		} else {
+			return
 		}
 	default:
 		entryMethod = examIns.Call.StaticCallee()
+	}
+	newGoID := goID + 1 // increment goID for child goroutine
+	if len(a.workList) > 0 { // spawned by subroutine
+		newGoID = a.workList[len(a.workList)-1].goID + 1
+	}
+	if loopID > 0 {
+		a.loopIDs[newGoID] = loopID
+	} else {
+		a.loopIDs[newGoID] = 0
+	}
+	a.RWIns[goID] = append(a.RWIns[goID], theIns)
+	if goID == 0 && a.insDRA == 0 { // this is first *ssa.Go instruction in main goroutine
+		a.insDRA = len(a.RWIns[goID]) // race analysis will begin at this instruction
 	}
 
 	var info = goroutineInfo{examIns, entryMethod,newGoID}
