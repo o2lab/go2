@@ -44,7 +44,7 @@ func (a *analysis) buildHB() {
 					selCaseEndN = []graph.Node{} // reset slice of nodes when encountering multiple select statements
 					readys := 0
 					for ith, ch := range readyCh {
-						if ch != "" && selIns.States[ith].Dir == 1 {
+						if ith < len(selIns.States) && ch != "" && selIns.States[ith].Dir == 1 { // TODO: readyCh may be longer than selIns.States?
 							readys++
 							if _, ok0 := a.selUnknown[selIns]; ok0 && readys == 1 {
 								chanSends[ch] = currN
