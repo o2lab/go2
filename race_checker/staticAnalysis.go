@@ -34,9 +34,9 @@ func (a *analysis) fromPkgsOfInterest(fn *ssa.Function) bool {
 			return false
 		}
 	}
-	//if efficiency && a.main.Pkg.Path() != "command-line-arguments" && !strings.HasPrefix(fn.Pkg.Pkg.Path(), strings.Split(a.main.Pkg.Path(), "/")[0]) { // path is dependent on tested program
-	//	return false
-	//}
+	if efficiency && a.main.Pkg.Path() != "command-line-arguments" && !strings.HasPrefix(fn.Pkg.Pkg.Path(), strings.Split(a.main.Pkg.Path(), "/")[0]) { // path is dependent on tested program
+		return false
+	}
 	return true
 }
 
@@ -111,7 +111,7 @@ func pkgSelection(initial []*packages.Package) ([]*ssa.Package, *ssa.Program, []
 			if mainInd == "-" {
 				fmt.Print("Enter function name to begin analysis from: ")
 				fmt.Scan(&enterAt)
-				for _ , p := range pkgs {
+				for _, p := range pkgs {
 					if p != nil {
 						if fnMem, okf := p.Members[enterAt]; okf { // package contains function to enter at
 							userEP = true
@@ -188,12 +188,12 @@ func (runner *AnalysisRunner) Run(args []string) error {
 			Origin:         true, //origin
 			//shared config
 			K:          1,
-			LimitScope: true,  //bz: only consider app methods now -> no import will be considered
-			DEBUG:      false, //bz: rm all printed out info in console
+			LimitScope: true,         //bz: only consider app methods now -> no import will be considered
+			DEBUG:      false,        //bz: rm all printed out info in console
 			Scope:      scope,        //bz: analyze scope
-			Exclusion: excludedPkgs, //bz: copied from race_checker if any
-			TrackMore: true,         //bz: track pointers with all types
-			Level:     0,            //bz: see pointer.Config
+			Exclusion:  excludedPkgs, //bz: copied from race_checker if any
+			TrackMore:  true,         //bz: track pointers with all types
+			Level:      0,            //bz: see pointer.Config
 		}
 		start := time.Now()                                               //performance
 		runner.ptaResult, _ = pointer.AnalyzeMultiMains(runner.ptaConfig) // conduct pointer analysis for multiple mains
@@ -215,16 +215,22 @@ func (runner *AnalysisRunner) Run(args []string) error {
 	for _, m := range mains {
 		wg.Add(1)
 		go func(main *ssa.Package) {
+			if strings.Contains(main.Pkg.Path(), "GoBench") { // for testing purposes
+				efficiency = false
+				trieLimit = 2
+			} else if !runner.goTest {
+				efficiency = true
+			}
 			defer wg.Done()
 			// Configure static analysis...
 			Analysis := &analysis{
-				ptaRes:   runner.ptaResult,
-				ptaRes0:  runner.ptaResult0,
-				ptaCfg:   runner.ptaConfig,
-				ptaCfg0:  runner.ptaConfig0,
-				prog:     runner.prog,
-				pkgs:     runner.pkgs,
-				mains:    mains,
+				ptaRes:          runner.ptaResult,
+				ptaRes0:         runner.ptaResult0,
+				ptaCfg:          runner.ptaConfig,
+				ptaCfg0:         runner.ptaConfig0,
+				prog:            runner.prog,
+				pkgs:            runner.pkgs,
+				mains:           mains,
 				main:            main,
 				RWinsMap:        make(map[goIns]graph.Node),
 				trieMap:         make(map[fnInfo]*trie),
@@ -233,7 +239,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 				lockMap:         make(map[ssa.Instruction][]ssa.Value),
 				lockSet:         make(map[int][]*lockInfo),
 				RlockMap:        make(map[ssa.Instruction][]ssa.Value),
-				RlockSet:   	 make(map[int][]*lockInfo),
+				RlockSet:        make(map[int][]*lockInfo),
 				goCaller:        make(map[int]int),
 				goCalls:         make(map[int]*ssa.Go),
 				chanToken:       make(map[string]string),
@@ -253,7 +259,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 				inLoop:          false,
 				goInLoop:        make(map[int]bool),
 				loopIDs:         make(map[int]int),
-				allocLoop:   	 make(map[*ssa.Function][]string),
+				allocLoop:       make(map[*ssa.Function][]string),
 				bindingFV:       make(map[*ssa.Go][]*ssa.FreeVar),
 			}
 			if !allEntries {
@@ -270,6 +276,9 @@ func (runner *AnalysisRunner) Run(args []string) error {
 			}
 			if !allEntries {
 				log.Info("Done  -- ", len(Analysis.RWIns), " goroutines analyzed! ", totalIns, " instructions of interest detected! ")
+			}
+			if len(mains) > 1 {
+				getGo = false // turn off debug logging if running in parallel
 			}
 			if getGo {
 				for i := 0; i < len(Analysis.RWIns); i++ {

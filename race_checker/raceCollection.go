@@ -76,10 +76,10 @@ func (a *analysis) checkRacyPairs() []*raceInfo {
 							!a.selectMutEx(insSlice[0], insSlice[1]) {
 							a.reportedAddr = append(a.reportedAddr, addressPair[0])
 							ri = &raceInfo{
-								insPair: 	insSlice,
-								addrPair: 	addressPair,
-								goIDs: 		[]int{i, j},
-								insInd: 	[]int{ii, jj},
+								insPair:  insSlice,
+								addrPair: addressPair,
+								goIDs:    []int{i, j},
+								insInd:   []int{ii, jj},
 							}
 							if !allEntries {
 								a.printRace(len(a.reportedAddr), insSlice, addressPair, []int{i, j}, []int{ii, jj})
@@ -134,7 +134,7 @@ func (a *analysis) insAddress(insSlice []ssa.Instruction) [2]ssa.Value { // obta
 func (a *analysis) sameAddress(addr1 ssa.Value, addr2 ssa.Value, go1 int, go2 int) bool {
 	if global1, ok1 := addr1.(*ssa.Global); ok1 {
 		if global2, ok2 := addr2.(*ssa.Global); ok2 {
-			if global1.Pos() == global2.Pos() {// compare position of identifiers
+			if global1.Pos() == global2.Pos() { // compare position of identifiers
 				return true
 			}
 		}
@@ -184,31 +184,6 @@ func (a *analysis) sameAddress(addr1 ssa.Value, addr2 ssa.Value, go1 int, go2 in
 
 // reachable determines if 2 input instructions are connected in the Happens-Before Graph
 func (a *analysis) reachable(fromIns ssa.Instruction, fromGo int, toIns ssa.Instruction, toGo int) bool {
-	//fromBlock := fromIns.Block().Index
-	//if strings.HasPrefix(fromIns.Block().Comment, "rangeindex") && toIns.Parent() != nil && toIns.Parent().Parent() != nil { // checking both instructions belong to same forloop
-	//	if fromIns.Block().Comment == toIns.Parent().Parent().Blocks[fromBlock].Comment {
-	//		return false
-	//	}
-	//}
-	//addrPair := a.insAddress([]ssa.Instruction{fromIns, toIns})
-	//addr1, addr2 := addrPair[0], addrPair[1]
-	//if addr1.String() == "new ConstraintToValidate (c)" && addr2.String() == "parameter checkName : *string" && fromGo == 1 && toGo == 2 {
-	//	var pt1 pointer.PointerWCtx
-	//	var pt2 pointer.PointerWCtx
-	//	if fromGo == 0 {
-	//		pt1 = a.ptaRes[a.main].PointsToByGoWithLoopID(addr1, nil, a.loopIDs[fromGo])
-	//	} else {
-	//		pt1 = a.ptaRes[a.main].PointsToByGoWithLoopID(addr1, a.RWIns[fromGo][0].(*ssa.Go), a.loopIDs[fromGo])
-	//	}
-	//	if toGo == 0 {
-	//		pt2 = a.ptaRes[a.main].PointsToByGoWithLoopID(addr2, nil, a.loopIDs[toGo])
-	//	} else {
-	//		pt2 = a.ptaRes[a.main].PointsToByGoWithLoopID(addr2, a.RWIns[toGo][0].(*ssa.Go), a.loopIDs[toGo])
-	//	}
-	//	fmt.Println(pt1.GetMyGoAndLoopID().GoInstr, pt1.GetMyGoAndLoopID().LoopID) // loopID should be >0 ?
-	//	fmt.Println(pt2.GetMyGoAndLoopID().GoInstr, pt2.GetMyGoAndLoopID().LoopID)
-	//}
-
 	fromInsKey := goIns{ins: fromIns, goID: fromGo}
 	toInsKey := goIns{ins: toIns, goID: toGo}
 	fromNode := a.RWinsMap[fromInsKey] // starting node
@@ -273,7 +248,7 @@ func (a *analysis) lockSetsIntersect(insA ssa.Instruction, insB ssa.Instruction,
 
 func (a *analysis) bothAtomic(insA ssa.Instruction, insB ssa.Instruction) bool {
 	if aCall, ok := insA.(*ssa.Call); ok && aCall.Call.StaticCallee() != nil {
-		if bCall, ok0 := insB.(*ssa.Call); ok0 && bCall.Call.StaticCallee() != nil{
+		if bCall, ok0 := insB.(*ssa.Call); ok0 && bCall.Call.StaticCallee() != nil {
 			if aCall.Call.StaticCallee().Pkg.Pkg.Name() == "atomic" && bCall.Call.StaticCallee().Pkg.Pkg.Name() == "atomic" {
 				return true
 			}
@@ -335,37 +310,19 @@ func (a *analysis) printRace(counter int, insPair []ssa.Instruction, addrPair [2
 		log.Print(errMsg)
 		var printStack []string // store functions in stack and pop terminated functions
 		var printPos []token.Pos
-		if !allEntries {
-			for p, everyIns := range a.RWIns[goIDs[i]] {
-				if p < insInd[i]-1 {
-					if isFunc, ok := everyIns.(*ssa.Call); ok {
-						printName := isFunc.Call.Value.Name()
-						printName = checkTokenName(printName, everyIns.(*ssa.Call))
-						printStack = append(printStack, printName)
-						printPos = append(printPos, everyIns.Pos())
-					} else if _, ok1 := everyIns.(*ssa.Return); ok1 && len(printStack) > 0 {
-						printStack = printStack[:len(printStack)-1]
-						printPos = printPos[:len(printPos)-1]
-					}
-				} else {
-					continue
+		for p, everyIns := range a.RWIns[goIDs[i]] {
+			if p < insInd[i]-1 {
+				if isFunc, ok := everyIns.(*ssa.Call); ok {
+					printName := isFunc.Call.Value.Name()
+					printName = checkTokenName(printName, everyIns.(*ssa.Call))
+					printStack = append(printStack, printName)
+					printPos = append(printPos, everyIns.Pos())
+				} else if _, ok1 := everyIns.(*ssa.Return); ok1 && len(printStack) > 0 {
+					printStack = printStack[:len(printStack)-1]
+					printPos = printPos[:len(printPos)-1]
 				}
-			}
-		} else {
-			for p, everyIns := range a.RWIns[goIDs[i]] {
-				if p < insInd[i]-1 {
-					if isFunc, ok := everyIns.(*ssa.Call); ok {
-						printName := isFunc.Call.Value.Name()
-						printName = checkTokenName(printName, everyIns.(*ssa.Call))
-						printStack = append(printStack, printName)
-						printPos = append(printPos, everyIns.Pos())
-					} else if _, ok1 := everyIns.(*ssa.Return); ok1 && len(printStack) > 0 {
-						printStack = printStack[:len(printStack)-1]
-						printPos = printPos[:len(printPos)-1]
-					}
-				} else {
-					continue
-				}
+			} else {
+				continue
 			}
 		}
 		if goIDs[i] == 0 { // main goroutine
@@ -386,95 +343,3 @@ func (a *analysis) printRace(counter int, insPair []ssa.Instruction, addrPair [2
 	log.Println("Locks acquired before Read  access: ", readLocks)
 	log.Println(strings.Repeat("=", 100))
 }
-//
-//
-//func (r *raceReport) printRace(counter int, insPair []ssa.Instruction, addrPair [2]ssa.Value, goIDs []int, insInd []int) {
-//	log.Printf("Data race #%d", counter)
-//	log.Println(strings.Repeat("=", 100))
-//	var writeLocks []ssa.Value
-//	var readLocks []ssa.Value
-//	for i, anIns := range insPair {
-//		var errMsg string
-//		var access string
-//		if isWriteIns(anIns) {
-//			access = " Write of "
-//			//if _, ok := anIns.(*ssa.Call); ok {
-//			//	if allEntries {
-//			//		errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].String()), " in function ", aurora.BrightGreen(anIns.Parent().Name()))
-//			//	} else {
-//			//		errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].String()), " in function ", aurora.BrightGreen(anIns.Parent().Name()), " at ", r.prog.Fset.Position(insPair[i].Pos()))
-//			//	}
-//			//} else {
-//				if allEntries {
-//					errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].String()), " in function ", aurora.BrightGreen(anIns.Parent().Name()))
-//				} else {
-//					errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].String()), " in function ", aurora.BrightGreen(anIns.Parent().Name()), " at ", r.prog.Fset.Position(insPair[i].Pos()))
-//				}
-//			//}
-//			writeLocks = r.lockMap[anIns]
-//		} else {
-//			access = " Read of "
-//			if allEntries {
-//				errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].String()), " in function ", aurora.BrightGreen(anIns.Parent().Name()))
-//			} else {
-//				errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].String()), " in function ", aurora.BrightGreen(anIns.Parent().Name()), " at ", r.prog.Fset.Position(anIns.Pos()))
-//			}
-//			readLocks = append(r.lockMap[anIns], r.RlockMap[anIns]...)
-//		}
-//		log.Print(errMsg)
-//		var printStack []string // store functions in stack and pop terminated functions
-//		var printPos []token.Pos
-//		if !allEntries {
-//			for p, everyIns := range r.RWIns[goIDs[i]] {
-//				if p < insInd[i]-1 {
-//					if isFunc, ok := everyIns.(*ssa.Call); ok {
-//						printName := isFunc.Call.Value.Name()
-//						printName = checkTokenName(printName, everyIns.(*ssa.Call))
-//						printStack = append(printStack, printName)
-//						printPos = append(printPos, everyIns.Pos())
-//					} else if _, ok1 := everyIns.(*ssa.Return); ok1 && len(printStack) > 0 {
-//						printStack = printStack[:len(printStack)-1]
-//						printPos = printPos[:len(printPos)-1]
-//					}
-//				} else {
-//					continue
-//				}
-//			}
-//		}
-//		if len(printStack) > 0 {
-//			log.Println("\tcalled by function[s]: ")
-//			for p, toPrint := range printStack {
-//				if len(printPos) != 0 {
-//					log.Println("\t ", strings.Repeat(" ", p), toPrint, r.prog.Fset.Position(printPos[p]))
-//				}
-//			}
-//		}
-//		if goIDs[i] > 0 { // show location where calling goroutine was spawned
-//			log.Println("\tin goroutine  ***", r.goNames[goIDs[i]], "[", goIDs[i], "] *** , with the following call stack: ")
-//		} else { // main goroutine
-//			log.Println("\tin goroutine  ***", r.goNames[goIDs[i]], "[", goIDs[i], "] *** ")
-//		}
-//		var pathGo []int
-//		j := goIDs[i]
-//		for j > 0 {
-//			pathGo = append([]int{j}, pathGo...)
-//			temp := r.goCaller[j]
-//			j = temp
-//		}
-//		if !allEntries {
-//			for q, eachGo := range pathGo {
-//				eachStack := r.goStack[eachGo]
-//				for k, eachFn := range eachStack {
-//					if k == 0 {
-//						log.Println("\t ", strings.Repeat(" ", q), "--> Goroutine: ", eachFn, "[", r.goCaller[eachGo], "]")
-//					} else {
-//						log.Println("\t   ", strings.Repeat(" ", q), strings.Repeat(" ", k), eachFn)
-//					}
-//				}
-//			}
-//		}
-//	}
-//	log.Println("Locks acquired before Write access: ", writeLocks)
-//	log.Println("Locks acquired before Read  access: ", readLocks)
-//	log.Println(strings.Repeat("=", 100))
-//}
