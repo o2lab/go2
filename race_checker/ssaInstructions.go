@@ -406,7 +406,7 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 			a.RWIns[goID] = append(a.RWIns[goID], theIns)
 			a.visitAllInstructions(examIns.Call.StaticCallee(), goID)
 		}
-	} else if examIns.Call.StaticCallee().Pkg.Pkg.Name() == "sync" {
+	} else if examIns.Call.StaticCallee().Pkg != nil && examIns.Call.StaticCallee().Pkg.Pkg.Name() == "sync" {
 		switch examIns.Call.Value.Name() {
 		case "Range":
 			fnName := examIns.Call.Value.Name()
