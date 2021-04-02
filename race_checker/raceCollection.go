@@ -84,13 +84,13 @@ func (a *analysis) checkRacyPairs() []*raceInfo {
 							if !allEntries {
 								a.printRace(len(a.reportedAddr), insSlice, addressPair, []int{i, j}, []int{ii, jj})
 							}
+							races = append(races, ri)
 						}
 					}
 				}
 			}
 		}
 	}
-	races = append(races, ri)
 	return races
 }
 
