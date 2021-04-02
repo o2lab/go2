@@ -10,6 +10,7 @@ go_tools/_mytestresult/
 go_tools/_mytests/
 grpc-go/
 race_checker/go_pta_log
+race_checker/race-checker
 race_checker/pta_summary.md
 runc/
 tidb/
