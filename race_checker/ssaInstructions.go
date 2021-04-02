@@ -92,7 +92,8 @@ func isWriteIns(ins ssa.Instruction) bool {
 }
 
 // updateRecords will print out the stack trace
-func (a *analysis) updateRecords(fnName string, goID int, pushPop string) {
+func (a *analysis) updateRecords(fn *ssa.Function, goID int, pushPop string) {
+	fnName := fn.String()
 	if pushPop == "POP  " {
 		a.storeIns = a.storeIns[:len(a.storeIns)-1]
 		a.levels[goID]--
@@ -177,7 +178,7 @@ func (a *analysis) insStore(examIns *ssa.Store, goID int, theIns ssa.Instruction
 	}
 	if theFunc, storeFn := examIns.Val.(*ssa.Function); storeFn {
 		if !a.exploredFunction(theFunc, goID, theIns) {
-			a.updateRecords(theFunc.Name(), goID, "PUSH ")
+			a.updateRecords(theFunc, goID, "PUSH ")
 			a.RWIns[goID] = append(a.RWIns[goID], theIns)
 			a.visitAllInstructions(theFunc, goID)
 		}
@@ -205,7 +206,7 @@ func (a *analysis) insUnOp(examIns *ssa.UnOp, goID int, theIns ssa.Instruction) 
 				for fnKey, member := range v.Pkg.Members {
 					if memberFn, isFn := member.(*ssa.Function); isFn && fnKey != "main" && fnKey != "init" {
 						if !a.exploredFunction(memberFn, goID, theIns) {
-							a.updateRecords(memberFn.Name(), goID, "PUSH ")
+							a.updateRecords(memberFn, goID, "PUSH ")
 							a.visitAllInstructions(memberFn, goID)
 						}
 					}
@@ -288,9 +289,8 @@ func (a *analysis) insChangeType(examIns *ssa.ChangeType, goID int, theIns ssa.I
 	case *ssa.MakeClosure: // yield closure value for *Function and free variable values supplied by Bindings
 		theFn := mc.Fn.(*ssa.Function)
 		if a.fromPkgsOfInterest(theFn) {
-			fnName := mc.Fn.Name()
 			if !a.exploredFunction(theFn, goID, theIns) {
-				a.updateRecords(fnName, goID, "PUSH ")
+				a.updateRecords(theFn, goID, "PUSH ")
 				a.RWIns[goID] = append(a.RWIns[goID], theIns)
 				a.updateLockMap(goID, theIns)
 				a.updateRLockMap(goID, theIns)
@@ -399,21 +399,20 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 		if examIns.Call.StaticCallee().Blocks == nil {
 			return
 		}
-		fnName := examIns.Call.Value.Name()
-		fnName = checkTokenName(fnName, examIns)
-		if !a.exploredFunction(examIns.Call.StaticCallee(), goID, theIns) {
-			a.updateRecords(fnName, goID, "PUSH ")
+		staticTar := examIns.Call.StaticCallee()
+		if !a.exploredFunction(staticTar, goID, theIns) {
+			a.updateRecords(staticTar, goID, "PUSH ")
 			a.RWIns[goID] = append(a.RWIns[goID], theIns)
-			a.visitAllInstructions(examIns.Call.StaticCallee(), goID)
+			a.visitAllInstructions(staticTar, goID)
 		}
 	} else if examIns.Call.StaticCallee().Pkg.Pkg.Name() == "sync" {
 		switch examIns.Call.Value.Name() {
 		case "Range":
-			fnName := examIns.Call.Value.Name()
-			if !a.exploredFunction(examIns.Call.StaticCallee(), goID, theIns) {
-				a.updateRecords(fnName, goID, "PUSH ")
+			staticTar := examIns.Call.StaticCallee()
+			if !a.exploredFunction(staticTar, goID, theIns) {
+				a.updateRecords(staticTar, goID, "PUSH ")
 				a.RWIns[goID] = append(a.RWIns[goID], theIns)
-				a.visitAllInstructions(examIns.Call.StaticCallee(), goID)
+				a.visitAllInstructions(staticTar, goID)
 			}
 		case "Lock":
 			lockLoc := examIns.Call.Args[0]         // identifier for address of lock
@@ -483,6 +482,17 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 				a.ptaCfg0.AddQuery(examIns.Call.Args[0])
 				a.mu.Unlock()
 			}
+		default:
+			//bz: other sync calls if i synthetic them
+			staticTar := examIns.Call.StaticCallee()
+			if a.ptaRes.GetMySyntheticFn(staticTar) == nil {
+				return
+			}
+			if !a.exploredFunction(staticTar, goID, theIns) {
+				a.updateRecords(staticTar, goID, "PUSH ")
+				a.RWIns[goID] = append(a.RWIns[goID], theIns)
+				a.visitAllInstructions(staticTar, goID)
+			}
 		}
 	} else {
 		return
@@ -495,15 +505,15 @@ func (a *analysis) insGo(examIns *ssa.Go, goID int, theIns ssa.Instruction, loop
 	var fnName string
 	switch anonFn := examIns.Call.Value.(type) {
 	case *ssa.MakeClosure: // go call for anonymous function
-		fnName = anonFn.Fn.Name()
+		fnName = anonFn.Fn.String()
 	case *ssa.Function:
-		fnName = anonFn.Name()
+		fnName = anonFn.String()
 	case *ssa.TypeAssert:
 		switch paramType := a.paramFunc.(type) {
 		case *ssa.Function:
-			fnName = paramType.Name()
+			fnName = paramType.String()
 		case *ssa.MakeClosure:
-			fnName = paramType.Fn.Name()
+			fnName = paramType.Fn.String()
 		}
 	}
 

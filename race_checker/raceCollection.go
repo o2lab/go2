@@ -44,6 +44,12 @@ func (a *analysis) checkRacyPairs() []*raceInfo {
 					if channelComm && sliceContainsBloc(a.omitComm, goJ.Block()) {
 						continue
 					}
+					//////!!!! bz: for my debug, please comment off, do not delete
+					//fmt.Println("goI: ", goI.String(), " (i: ", i, ")  goJ: ", goJ.String(), " (j: ", j, ")")
+					//if strings.Contains(goI.String(), "&t0.callback [#1]") && strings.Contains(goJ.String(), "&t0.callback [#1]") {
+					//	fmt.Println()
+					//}
+
 					if (isWriteIns(goI) && isWriteIns(goJ)) || (isWriteIns(goI) && a.isReadIns(goJ)) || (a.isReadIns(goI) && isWriteIns(goJ)) { // only read and write instructions
 						if isLocal(goI) && isLocal(goJ) { // both are locally declared
 							continue
@@ -203,15 +209,15 @@ func (a *analysis) sameAddress(addr1 ssa.Value, addr2 ssa.Value, go1 int, go2 in
 
 // reachable determines if 2 input instructions are connected in the Happens-Before Graph
 func (a *analysis) reachable(fromIns ssa.Instruction, fromGo int, toIns ssa.Instruction, toGo int) bool {
-	fromBlock := fromIns.Block().Index
-	if strings.HasPrefix(fromIns.Block().Comment, "rangeindex") && toIns.Parent() != nil && toIns.Parent().Parent() != nil { // checking both instructions belong to same forloop
-		//TODO: bz: this logic is too ad-hoc, need a new one -> tmp solution
-		if len(toIns.Parent().Parent().Blocks) > fromBlock {
-			if fromIns.Block().Comment == toIns.Parent().Parent().Blocks[fromBlock].Comment {
-				return false
-			}
-		}
-	}
+	////TODO: bz: this logic is too ad-hoc, need a new one -> tmp solution
+	//fromBlock := fromIns.Block().Index
+	//if strings.HasPrefix(fromIns.Block().Comment, "rangeindex") && toIns.Parent() != nil && toIns.Parent().Parent() != nil { // checking both instructions belong to same forloop
+	//	if len(toIns.Parent().Parent().Blocks) > fromBlock {
+	//		if fromIns.Block().Comment == toIns.Parent().Parent().Blocks[fromBlock].Comment {
+	//			return false
+	//		}
+	//	}
+	//}
 	fromInsKey := goIns{ins: fromIns, goID: fromGo}
 	toInsKey := goIns{ins: toIns, goID: toGo}
 	fromNode := a.RWinsMap[fromInsKey] // starting node

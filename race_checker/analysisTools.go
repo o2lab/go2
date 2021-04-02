@@ -208,13 +208,13 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 	}
 	if !isSynthetic(fn) { // if function is NOT synthetic
 		if !a.fromPkgsOfInterest(fn) {
-			a.updateRecords(fn.Name(), goID, "POP  ")
+			a.updateRecords(fn, goID, "POP  ")
 			return
 		}
 		if fn.Name() == entryFn {
 			a.levels[goID] = 0 // initialize level count at main entry
 			a.loopIDs[goID] = 0
-			a.updateRecords(fn.Name(), goID, "PUSH ")
+			a.updateRecords(fn, goID, "PUSH ")
 			a.goStack = append(a.goStack, []string{}) // initialize first interior slice for main goroutine
 		}
 	}
@@ -324,10 +324,9 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 					if deferIns.Call.StaticCallee() == nil {
 						continue
 					} else if a.fromPkgsOfInterest(deferIns.Call.StaticCallee()) && deferIns.Call.StaticCallee().Pkg.Pkg.Name() != "sync" {
-						fnName := deferIns.Call.Value.Name()
-						fnName = checkTokenNameDefer(fnName, deferIns)
-						if !a.exploredFunction(deferIns.Call.StaticCallee(), goID, theIns) {
-							a.updateRecords(fnName, goID, "PUSH ")
+						staticTar := deferIns.Call.StaticCallee()
+						if !a.exploredFunction(staticTar, goID, theIns) {
+							a.updateRecords(staticTar, goID, "PUSH ")
 							a.RWIns[goID] = append(a.RWIns[goID], dIns)
 							a.visitAllInstructions(deferIns.Call.StaticCallee(), goID)
 						}
@@ -534,9 +533,9 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 		}
 	}
 	// done with all instructions in function body, now pop the function
-	fnName := fn.Name()
+	fnName := fn.String()
 	if fnName == a.storeIns[len(a.storeIns)-1] {
-		a.updateRecords(fnName, goID, "POP  ")
+		a.updateRecords(fn, goID, "POP  ")
 	}
 	if len(a.storeIns) == 0 && len(a.workList) != 0 { // finished reporting current goroutine and workList isn't empty
 		nextGoInfo := a.workList[0] // get the goroutine info at head of workList
@@ -585,7 +584,7 @@ func (a *analysis) newGoroutine(info goroutineInfo) {
 // exploredFunction determines if we already visited this function
 func (a *analysis) exploredFunction(fn *ssa.Function, goID int, theIns ssa.Instruction) bool {
 	if efficiency && !a.fromPkgsOfInterest(fn) { // for temporary debugging purposes only
-		//bz: missing interesting synthetic fn
+		//bz: missing my synthetic fn
 		if isSynthetic(fn) && fn.IsFromApp {
 			return false
 		}
@@ -594,7 +593,7 @@ func (a *analysis) exploredFunction(fn *ssa.Function, goID int, theIns ssa.Instr
 	if sliceContainsInsAt(a.RWIns[goID], theIns) >= 0 {
 		return true
 	}
-	if efficiency && sliceContainsStr(a.storeIns, fn.Name()) { // for temporary debugging purposes only
+	if efficiency && sliceContainsStr(a.storeIns, fn.String()) { // for temporary debugging purposes only
 		return true
 	}
 	visitedIns := []ssa.Instruction{}
@@ -602,18 +601,18 @@ func (a *analysis) exploredFunction(fn *ssa.Function, goID int, theIns ssa.Instr
 		visitedIns = a.RWIns[goID]
 	}
 	csSlice, csStr := insToCallStack(visitedIns)
-	if sliceContainsStrCtr(csSlice, fn.Name()) > trieLimit {
+	if sliceContainsStrCtr(csSlice, fn.String()) > trieLimit {
 		return true
 	}
 	fnKey := fnInfo{
-		fnName:     fn.Name(),
+		fnName:     fn.String(),
 		contextStr: csStr,
 	}
 	if existingTrieNode, ok := a.trieMap[fnKey]; ok {
 		existingTrieNode.budget++ // increment the number of times for calling the function under the current context by one
 	} else {
 		newTrieNode := trie{
-			fnName:    fn.Name(),
+			fnName:    fn.String(),
 			budget:    1,
 			fnContext: csSlice,
 		}

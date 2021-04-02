@@ -13,7 +13,7 @@ func insToCallStack(allIns []ssa.Instruction) ([]string, string) {
 	var csStr string
 	for _, anIns := range allIns {
 		if fnCall, ok := anIns.(*ssa.Call); ok {
-			callStack = append(callStack, fnCall.Call.Value.Name())
+			callStack = append(callStack, fnCall.Call.Value.String())
 		} else if _, ok1 := anIns.(*ssa.Return); ok1 && len(callStack) > 0 { // TODO: need to consider function with multiple return statements
 			callStack = callStack[:len(callStack)-1]
 		}
