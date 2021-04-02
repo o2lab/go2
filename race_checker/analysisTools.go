@@ -583,11 +583,8 @@ func (a *analysis) newGoroutine(info goroutineInfo) {
 
 // exploredFunction determines if we already visited this function
 func (a *analysis) exploredFunction(fn *ssa.Function, goID int, theIns ssa.Instruction) bool {
-	if efficiency && !a.fromPkgsOfInterest(fn) { // for temporary debugging purposes only
-		//bz: missing my synthetic fn
-		if isSynthetic(fn) && fn.IsFromApp {
-			return false
-		}
+	//bz: missing my synthetic fn
+	if efficiency && !a.fromPkgsOfInterest(fn) && !(isSynthetic(fn) && fn.IsFromApp) { // for temporary debugging purposes only
 		return true
 	}
 	if sliceContainsInsAt(a.RWIns[goID], theIns) >= 0 {

@@ -14,7 +14,7 @@ import (
 func checkTokenName(fnName string, theIns *ssa.Call) string {
 	if strings.HasPrefix(fnName, "t") { // function name begins with letter t
 		if _, err := strconv.Atoi(string([]rune(fnName)[1:])); err == nil { // function name after first character look like an integer
-			switch callVal := theIns.Call.Value.(type) {
+			switch callVal := theIns.Call.Value.(type) { //TODO: bz: should check call graph maybe
 			case *ssa.MakeClosure:
 				fnName = callVal.Fn.Name()
 			default:
@@ -163,7 +163,7 @@ func (a *analysis) insSend(examIns *ssa.Send, goID int, theIns ssa.Instruction) 
 // insStore  ???
 func (a *analysis) insStore(examIns *ssa.Store, goID int, theIns ssa.Instruction) {
 	if !isLocalAddr(examIns.Addr) {
-		//if len(a.storeIns) > 1 {
+		//if len(a.storeIns) > 1 { //bz: i need this synthetic fn
 		//	if a.storeIns[len(a.storeIns)-2] == "AfterFunc" { // ignore this write instruction as AfterFunc is analyzed elsewhere
 		//		return
 		//	}
