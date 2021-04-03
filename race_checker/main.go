@@ -87,6 +87,7 @@ type raceInfo struct {
 }
 
 type raceReport struct {
+	a        *analysis
 	entryInfo		string
 	racePairs		[]*raceInfo
 	noGoroutines	int

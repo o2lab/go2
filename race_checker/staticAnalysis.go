@@ -352,6 +352,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 				log.Info("Checking for data races... ")
 			}
 			rr := &raceReport{
+				a: Analysis, //bz: a lot of fields from analysis are missing when creating rr, e.g., goNames, goCallers, etc
 				entryInfo: main.Pkg.Path(),
 			}
 			rr.racePairs = Analysis.checkRacyPairs()
@@ -368,9 +369,11 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		for k, e := range runner.finalReport {
 			if len(e.racePairs) > 0 && e.racePairs[0] != nil {
 				log.Info(len(e.racePairs), " races found for entry point No.", k, ": ", e.entryInfo, "...")
+				a := e.a
 				for i, r := range e.racePairs {
 					if r != nil {
-						e.printRace(i+1, r.insPair, r.addrPair, r.goIDs, r.insInd)
+						//e.printRace(i+1, r.insPair, r.addrPair, r.goIDs, r.insInd) //bz: no detail
+						a.printRace(i+1, r.insPair, r.addrPair, r.goIDs, r.insInd) //bz: with details
 						raceCount++
 					}
 				}
