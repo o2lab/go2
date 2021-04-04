@@ -232,6 +232,12 @@ func (runner *AnalysisRunner) Run(args []string) error {
 	for _, main := range mains {
 		//wg.Add(1)
 		//go func(main *ssa.Package) {
+		//if strings.Contains(main.Pkg.Path(), "GoBench") { // for testing purposes
+		//	efficiency = false
+		//	trieLimit = 2
+		//} else if !runner.goTest {
+		//	efficiency = true
+		//}
 			//defer wg.Done()
 			// Configure static analysis...
 		fmt.Println("Detect ... ", main)
@@ -253,9 +259,9 @@ func (runner *AnalysisRunner) Run(args []string) error {
 				lockMap:         make(map[ssa.Instruction][]ssa.Value),
 				lockSet:         make(map[int][]*lockInfo),
 				RlockMap:        make(map[ssa.Instruction][]ssa.Value),
-				RlockSet:   	 make(map[int][]*lockInfo),
+				RlockSet:        make(map[int][]*lockInfo),
 				goCaller:        make(map[int]int),
-				goNames:         make(map[int]string),
+				goCalls:         make(map[int]*ssa.Go),
 				chanToken:       make(map[string]string),
 				chanBuf:         make(map[string]int),
 				chanRcvs:        make(map[string][]*ssa.UnOp),
@@ -295,11 +301,13 @@ func (runner *AnalysisRunner) Run(args []string) error {
 				for i := 0; i < len(Analysis.RWIns); i++ {
 					name := "main"
 					if i > 0 {
-						name = Analysis.goNames[i]
+						name = Analysis.goNames(Analysis.goCalls[i])
 					}
 					log.Debug("Goroutine ", i, "  --  ", name)
 					if Analysis.goInLoop[i] {
-						log.Debug(strings.Repeat(" ", 10), strings.Repeat("*", 10), "spawned by a loop")
+						log.Debug("Goroutine ", i, "  --  ", name, strings.Repeat(" *", 10), " spawned by a loop", strings.Repeat(" *", 10))
+					}else {
+						log.Debug("Goroutine ", i, "  --  ", name)
 					}
 					if i > 0 {
 						log.Debug("call stack: ")
@@ -316,9 +324,9 @@ func (runner *AnalysisRunner) Run(args []string) error {
 							eachStack := Analysis.goStack[eachGo]
 							for k, eachFn := range eachStack {
 								if k == 0 {
-									log.Debug("\t ", strings.Repeat(" ", q), "--> Goroutine: ", eachFn, "[", Analysis.goCaller[eachGo], "]")
+									log.Debug("\t ", strings.Repeat(" ", q), "--> Goroutine: ", eachFn.Name(), "[", Analysis.goCaller[eachGo], "] ", Analysis.prog.Fset.Position(eachFn.Pos()))
 								} else {
-									log.Debug("\t   ", strings.Repeat(" ", q), strings.Repeat(" ", k), eachFn)
+									log.Debug("\t   ", strings.Repeat(" ", q), strings.Repeat(" ", k), eachFn.Name(), " ", Analysis.prog.Fset.Position(eachFn.Pos()))
 								}
 							}
 						}
@@ -352,7 +360,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 				log.Info("Checking for data races... ")
 			}
 			rr := &raceReport{
-				a: Analysis, //bz: a lot of fields from analysis are missing when creating rr, e.g., goNames, goCallers, etc
+				a: Analysis, //bz: a lot of fields from analysis are missing when creating rr, e.g., goCalls, goCallers, etc
 				entryInfo: main.Pkg.Path(),
 			}
 			rr.racePairs = Analysis.checkRacyPairs()
@@ -369,12 +377,11 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		for k, e := range runner.finalReport {
 			if len(e.racePairs) > 0 && e.racePairs[0] != nil {
 				log.Info(len(e.racePairs), " races found for entry point No.", k, ": ", e.entryInfo, "...")
+				raceCount += len(e.racePairs)
 				a := e.a
 				for i, r := range e.racePairs {
 					if r != nil {
-						//e.printRace(i+1, r.insPair, r.addrPair, r.goIDs, r.insInd) //bz: no detail
 						a.printRace(i+1, r.insPair, r.addrPair, r.goIDs, r.insInd) //bz: with details
-						raceCount++
 					}
 				}
 			} else {

@@ -42,7 +42,7 @@ func (a *analysis) buildHB() {
 					selCaseEndN = []graph.Node{} // reset slice of nodes when encountering multiple select statements
 					readys := 0
 					for ith, ch := range readyCh {
-						if ch != "" && selIns.States[ith].Dir == 1 {
+						if ith < len(selIns.States) && ch != "" && selIns.States[ith].Dir == 1 { // TODO: readyCh may be longer than selIns.States?
 							readys++
 							if _, ok0 := a.selUnknown[selIns]; ok0 && readys == 1 {
 								chanSends[ch] = currN
@@ -215,7 +215,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 			a.levels[goID] = 0 // initialize level count at main entry
 			a.loopIDs[goID] = 0
 			a.updateRecords(fn, goID, "PUSH ")
-			a.goStack = append(a.goStack, []string{}) // initialize first interior slice for main goroutine
+			a.goStack = append(a.goStack, []*ssa.Function{}) // initialize first interior slice for main goroutine
 		}
 	}
 	//for call back code: check if fn has a synthetic replacement
@@ -233,42 +233,11 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 		a.RWIns = append(a.RWIns, []ssa.Instruction{})
 	}
 	fnBlocks := fn.Blocks
-	bCap := 1
-	if len(fnBlocks) > 1 {
-		bCap = len(fnBlocks)
-	} else if len(fnBlocks) == 0 {
-		return
+	bVisit0 := make([]int, len(fn.DomPreorder()))
+	for i, bb := range fn.DomPreorder() {
+		bVisit0[i] = bb.Index
 	}
-	bVisit := make([]int, 1, bCap) // create ordering at which blocks are visited
-	k := 0                         // ----> !!! SEE HERE: bz: from line 235 to 262, the functionality inside the code block can be separated outside by creating a function to do this (and return bVisit since you need later )
-	b := fnBlocks[0]
-	bVisit[k] = 0
-	for k < len(bVisit) {
-		b = fnBlocks[bVisit[k]]
-		if len(b.Succs) == 0 {
-			k++
-			continue
-		}
-		j := k
-		for s, bNext := range b.Succs {
-			j += s
-			i := sliceContainsIntAt(bVisit, bNext.Index)
-			if i < k {
-				if j == len(bVisit)-1 {
-					bVisit = append(bVisit, bNext.Index)
-				} else if j < len(bVisit)-1 {
-					bVisit = append(bVisit[:j+2], bVisit[j+1:]...)
-					bVisit[j+1] = bNext.Index
-				}
-				if i != -1 { // visited block
-					bVisit = append(bVisit[:i], bVisit[i+1:]...)
-					j--
-				}
-			}
-		}
-		k++
-	}
-	//bVisit := fn.DomPreorder()
+	bVisit := bVisit0
 
 	var toDefer []ssa.Instruction // stack storing deferred calls
 	var toUnlock []ssa.Value
@@ -533,11 +502,11 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 		}
 	}
 	// done with all instructions in function body, now pop the function
-	fnName := fn.String()
-	if fnName == a.storeIns[len(a.storeIns)-1] {
+	//bz: updateRecords will push real fn but pop my synthetic fn, use string match
+	if fn.String() == a.storeFns[len(a.storeFns)-1].String() {
 		a.updateRecords(fn, goID, "POP  ")
 	}
-	if len(a.storeIns) == 0 && len(a.workList) != 0 { // finished reporting current goroutine and workList isn't empty
+	if len(a.storeFns) == 0 && len(a.workList) != 0 { // finished reporting current goroutine and workList isn't empty
 		nextGoInfo := a.workList[0] // get the goroutine info at head of workList
 		a.workList = a.workList[1:] // pop goroutine info from head of workList
 		a.newGoroutine(nextGoInfo)
@@ -545,17 +514,36 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 	}
 }
 
+func (a *analysis) goNames(goIns *ssa.Go) string {
+	var goName string
+	switch anonFn := goIns.Call.Value.(type) {
+	case *ssa.MakeClosure: // go call for anonymous function
+		goName = anonFn.Fn.String()
+	case *ssa.Function:
+		goName = anonFn.String()
+	case *ssa.TypeAssert:
+		switch anonFn.X.(type) {
+		case *ssa.Parameter:
+			a.pointerAnalysis(anonFn.X, 0, nil)
+			if a.paramFunc != nil {
+				goName = a.paramFunc.String()
+			}
+		}
+	}
+	return goName
+}
+
 // newGoroutine goes through the goroutine, logs its info, and goes through the instructions within
 func (a *analysis) newGoroutine(info goroutineInfo) {
-	if info.entryMethod == a.goNames[a.goCaller[info.goID]] {
+	if info.goIns == a.goCalls[a.goCaller[info.goID]] {
 		return // recursive spawning of same goroutine
 	}
-	a.storeIns = append(a.storeIns, info.entryMethod)
+	a.storeFns = append(a.storeFns, info.entryMethod)
 	if info.goID >= len(a.RWIns) { // initialize interior slice for new goroutine
 		a.RWIns = append(a.RWIns, []ssa.Instruction{})
 	}
 	a.RWIns[info.goID] = append(a.RWIns[info.goID], info.goIns)
-	a.goNames[info.goID] = info.entryMethod
+	a.goCalls[info.goID] = info.goIns
 	if !allEntries {
 		if a.loopIDs[info.goID] > 0 {
 			a.goInLoop[info.goID] = true
@@ -575,7 +563,7 @@ func (a *analysis) newGoroutine(info goroutineInfo) {
 	case *ssa.MakeClosure:
 		a.visitAllInstructions(info.goIns.Call.StaticCallee(), info.goID)
 	case *ssa.TypeAssert:
-		a.visitAllInstructions(a.paramFunc.(*ssa.MakeClosure).Fn.(*ssa.Function), info.goID)
+		a.visitAllInstructions(a.paramFunc, info.goID)
 	default:
 		a.visitAllInstructions(info.goIns.Call.StaticCallee(), info.goID)
 	}
@@ -590,7 +578,7 @@ func (a *analysis) exploredFunction(fn *ssa.Function, goID int, theIns ssa.Instr
 	if sliceContainsInsAt(a.RWIns[goID], theIns) >= 0 {
 		return true
 	}
-	if efficiency && sliceContainsStr(a.storeIns, fn.String()) { // for temporary debugging purposes only
+	if efficiency && sliceContainsFn(a.storeFns, fn) { // for temporary debugging purposes only
 		return true
 	}
 	visitedIns := []ssa.Instruction{}
@@ -598,18 +586,18 @@ func (a *analysis) exploredFunction(fn *ssa.Function, goID int, theIns ssa.Instr
 		visitedIns = a.RWIns[goID]
 	}
 	csSlice, csStr := insToCallStack(visitedIns)
-	if sliceContainsStrCtr(csSlice, fn.String()) > trieLimit {
+	if sliceContainsFnCtr(csSlice, fn) > trieLimit {
 		return true
 	}
 	fnKey := fnInfo{
-		fnName:     fn.String(),
+		fnName:     fn,
 		contextStr: csStr,
 	}
 	if existingTrieNode, ok := a.trieMap[fnKey]; ok {
 		existingTrieNode.budget++ // increment the number of times for calling the function under the current context by one
 	} else {
 		newTrieNode := trie{
-			fnName:    fn.String(),
+			fnName:    fn,
 			budget:    1,
 			fnContext: csSlice,
 		}

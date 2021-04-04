@@ -93,16 +93,15 @@ func isWriteIns(ins ssa.Instruction) bool {
 
 // updateRecords will print out the stack trace
 func (a *analysis) updateRecords(fn *ssa.Function, goID int, pushPop string) {
-	fnName := fn.String()
 	if pushPop == "POP  " {
-		a.storeIns = a.storeIns[:len(a.storeIns)-1]
+		a.storeFns = a.storeFns[:len(a.storeFns)-1]
 		a.levels[goID]--
 	}
 	if !allEntries {
-		log.Debug(strings.Repeat(" ", a.levels[goID]), pushPop, fnName, " at lvl ", a.levels[goID])
+		log.Debug(strings.Repeat(" ", a.levels[goID]), pushPop, fn.String(), " at lvl ", a.levels[goID])
 	}
 	if pushPop == "PUSH " {
-		a.storeIns = append(a.storeIns, fnName)
+		a.storeFns = append(a.storeFns, fn)
 		a.levels[goID]++
 	}
 }
@@ -163,8 +162,8 @@ func (a *analysis) insSend(examIns *ssa.Send, goID int, theIns ssa.Instruction) 
 // insStore  ???
 func (a *analysis) insStore(examIns *ssa.Store, goID int, theIns ssa.Instruction) {
 	if !isLocalAddr(examIns.Addr) {
-		//if len(a.storeIns) > 1 { //bz: i need this synthetic fn
-		//	if a.storeIns[len(a.storeIns)-2] == "AfterFunc" { // ignore this write instruction as AfterFunc is analyzed elsewhere
+		//if len(a.storeFns) > 1 { //bz: i need this synthetic fn
+		//	if a.storeFns[len(a.storeFns)-2] == "AfterFunc" { // ignore this write instruction as AfterFunc is analyzed elsewhere
 		//		return
 		//	}
 		//}
@@ -376,9 +375,9 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 		//log.Debug("***********************special case*****************************************")
 		return
 	} else if a.fromPkgsOfInterest(examIns.Call.StaticCallee()) && examIns.Call.StaticCallee().Pkg.Pkg.Name() != "sync" { // calling a function
-		if examIns.Call.Value.Name() == "AfterFunc" && examIns.Call.StaticCallee().Pkg.Pkg.Name() == "time" { // calling time.AfterFunc()
-			a.paramFunc = examIns.Call.Args[1]
-		}
+		//if examIns.Call.Value.Name() == "AfterFunc" && examIns.Call.StaticCallee().Pkg.Pkg.Name() == "time" { // calling time.AfterFunc()
+		//	a.paramFunc = examIns.Call.Args[1]
+		//}
 		for _, checkArgs := range examIns.Call.Args {
 			switch access := checkArgs.(type) {
 			case *ssa.FieldAddr:
@@ -405,7 +404,7 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 			a.RWIns[goID] = append(a.RWIns[goID], theIns)
 			a.visitAllInstructions(staticTar, goID)
 		}
-	} else if examIns.Call.StaticCallee().Pkg.Pkg.Name() == "sync" {
+	} else if examIns.Call.StaticCallee().Pkg != nil && examIns.Call.StaticCallee().Pkg.Pkg.Name() == "sync" {
 		switch examIns.Call.Value.Name() {
 		case "Range":
 			staticTar := examIns.Call.StaticCallee()
@@ -502,21 +501,26 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 
 // insGo analyzes go calls
 func (a *analysis) insGo(examIns *ssa.Go, goID int, theIns ssa.Instruction, loopID int) {
-	var fnName string
-	switch anonFn := examIns.Call.Value.(type) {
-	case *ssa.MakeClosure: // go call for anonymous function
-		fnName = anonFn.Fn.String()
-	case *ssa.Function:
-		fnName = anonFn.String()
+	fnName := a.goNames(examIns)
+	var entryMethod *ssa.Function
+	switch fn := examIns.Call.Value.(type) {
+	case *ssa.MakeClosure:
+		entryMethod = examIns.Call.StaticCallee()
 	case *ssa.TypeAssert:
-		switch paramType := a.paramFunc.(type) {
-		case *ssa.Function:
-			fnName = paramType.String()
-		case *ssa.MakeClosure:
-			fnName = paramType.Fn.String()
+		switch fn.X.(type) {
+		case *ssa.Parameter:
+			a.getParam = true
+			a.pointerAnalysis(fn.X, goID, theIns)
 		}
+		if a.paramFunc != nil {
+			entryMethod = a.paramFunc
+			fnName = entryMethod.Name()
+		} else {
+			return
+		}
+	default:
+		entryMethod = examIns.Call.StaticCallee()
 	}
-
 	newGoID := goID + 1 // increment goID for child goroutine
 	if len(a.workList) > 0 { // spawned by subroutine
 		newGoID = a.workList[len(a.workList)-1].goID + 1
@@ -531,13 +535,17 @@ func (a *analysis) insGo(examIns *ssa.Go, goID int, theIns ssa.Instruction, loop
 		a.insDRA = len(a.RWIns[goID]) // race analysis will begin at this instruction
 	}
 
-	var info = goroutineInfo{examIns, fnName, newGoID}
-	a.goStack = append(a.goStack, []string{}) // initialize interior slice
+	var info = goroutineInfo{examIns, entryMethod,newGoID}
+	a.goStack = append(a.goStack, []*ssa.Function{}) // initialize interior slice
 	a.goCaller[newGoID] = goID                // map caller goroutine
-	a.goStack[newGoID] = append(a.goStack[newGoID], a.storeIns...)
+	a.goStack[newGoID] = append(a.goStack[newGoID], a.storeFns...)
 	a.workList = append(a.workList, info) // store encountered goroutines
 	if !allEntries {
-		log.Debug(strings.Repeat(" ", a.levels[goID]), "spawning Goroutine ----->  ", fnName)
+		if loopID > 0 {
+			log.Debug(strings.Repeat(" ", a.levels[goID]), "spawning Goroutine (in loop) ----->  ", fnName)
+		} else {
+			log.Debug(strings.Repeat(" ", a.levels[goID]), "spawning Goroutine ----->  ", fnName)
+		}
 	}
 }
 

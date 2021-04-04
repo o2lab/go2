@@ -4,21 +4,24 @@ import (
 	"github.com/twmb/algoimpl/go/graph"
 	"github.tamu.edu/April1989/go_tools/go/ssa"
 	"go/token"
-	"strings"
 )
 
 // insToCallStack will return the callStack of the input instructions that called a function but did not return
-func insToCallStack(allIns []ssa.Instruction) ([]string, string) {
-	var callStack []string
-	var csStr string
+func insToCallStack(allIns []ssa.Instruction) ([]*ssa.Function, string) {
+	var callStack []*ssa.Function
 	for _, anIns := range allIns {
 		if fnCall, ok := anIns.(*ssa.Call); ok {
-			callStack = append(callStack, fnCall.Call.Value.String())
+			callStack = append(callStack, fnCall.Call.StaticCallee())
 		} else if _, ok1 := anIns.(*ssa.Return); ok1 && len(callStack) > 0 { // TODO: need to consider function with multiple return statements
 			callStack = callStack[:len(callStack)-1]
 		}
 	}
-	csStr = strings.Join(callStack, "...") // combine into one string because slices are not comparable
+	csStr := ""
+	for _, fn := range callStack { // combine into one string because slices are not comparable
+		if fn != nil {
+			csStr += fn.Name()
+		}
+	}
 	return callStack, csStr
 }
 
@@ -68,6 +71,28 @@ func sliceContainsIntAt(s []int, e int) int {
 	}
 	return -1
 }
+
+func sliceContainsFn(s []*ssa.Function, e *ssa.Function) bool {
+	for _, a := range s {
+		if a.Pos() == e.Pos() {
+			return true
+		}
+	}
+	return false
+}
+
+func sliceContainsFnCtr(s []*ssa.Function, e *ssa.Function) int {
+	ctr := 0
+	if e != nil {
+		for _, a := range s {
+			if a != nil && a.Pos() == e.Pos() {
+				ctr++
+			}
+		}
+	}
+	return ctr
+}
+
 
 // sliceContainsStr will determine if slice s has an element e of type string
 func sliceContainsStr(s []string, e string) bool {
