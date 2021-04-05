@@ -568,13 +568,13 @@ func (a *analysis) newGoroutine(info goroutineInfo) {
 
 // exploredFunction determines if we already visited this function
 func (a *analysis) exploredFunction(fn *ssa.Function, goID int, theIns ssa.Instruction) bool {
-	if efficiency && !a.fromPkgsOfInterest(fn) { // for temporary debugging purposes only
+	if a.efficiency && !a.fromPkgsOfInterest(fn) { // for temporary debugging purposes only
 		return true
 	}
 	if sliceContainsInsAt(a.RWIns[goID], theIns) >= 0 {
 		return true
 	}
-	if efficiency && sliceContainsFn(a.storeFns, fn) { // for temporary debugging purposes only
+	if a.efficiency && sliceContainsFn(a.storeFns, fn) { // for temporary debugging purposes only
 		return true
 	}
 	visitedIns := []ssa.Instruction{}

@@ -215,12 +215,6 @@ func (runner *AnalysisRunner) Run(args []string) error {
 	for _, m := range mains {
 		wg.Add(1)
 		go func(main *ssa.Package) {
-			if strings.Contains(main.Pkg.Path(), "GoBench") { // for testing purposes
-				efficiency = false
-				trieLimit = 2
-			} else if !runner.goTest {
-				efficiency = true
-			}
 			defer wg.Done()
 			// Configure static analysis...
 			Analysis := &analysis{
@@ -228,6 +222,9 @@ func (runner *AnalysisRunner) Run(args []string) error {
 				ptaRes0:         runner.ptaResult0,
 				ptaCfg:          runner.ptaConfig,
 				ptaCfg0:         runner.ptaConfig0,
+				efficiency:      efficiency,
+				trieLimit:   	 trieLimit,
+				getGo:   		 getGo,
 				prog:            runner.prog,
 				pkgs:            runner.pkgs,
 				mains:           mains,
@@ -262,6 +259,12 @@ func (runner *AnalysisRunner) Run(args []string) error {
 				allocLoop:       make(map[*ssa.Function][]string),
 				bindingFV:       make(map[*ssa.Go][]*ssa.FreeVar),
 			}
+			if strings.Contains(main.Pkg.Path(), "GoBench") { // for testing purposes
+				Analysis.efficiency = false
+				Analysis.trieLimit = 2
+			} else if !runner.goTest {
+				Analysis.efficiency = true
+			}
 			if !allEntries {
 				log.Info("Compiling stack trace for every Goroutine... ")
 				log.Debug(strings.Repeat("-", 35), "Stack trace begins", strings.Repeat("-", 35))
@@ -278,9 +281,9 @@ func (runner *AnalysisRunner) Run(args []string) error {
 				log.Info("Done  -- ", len(Analysis.RWIns), " goroutines analyzed! ", totalIns, " instructions of interest detected! ")
 			}
 			if len(mains) > 1 {
-				getGo = false // turn off debug logging if running in parallel
+				Analysis.getGo = false // turn off debug logging if running in parallel
 			}
-			if getGo {
+			if Analysis.getGo { // print call stack of each goroutine
 				for i := 0; i < len(Analysis.RWIns); i++ {
 					name := "main"
 					if i > 0 {
