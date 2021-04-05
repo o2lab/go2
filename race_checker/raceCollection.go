@@ -179,6 +179,22 @@ func (a *analysis) sameAddress(addr1 ssa.Value, addr2 ssa.Value, go1 int, go2 in
 	} else {
 		pt2 = a.ptaRes[a.main].PointsToByGoWithLoopID(addr2, a.RWIns[go2][0].(*ssa.Go), a.loopIDs[go2])
 	}
+	//!!!!!!!!!!!!!!!!!!! object creation not tracked by context-sensitive analysis?
+	// In Kubernetes/80284, context shows
+	if go1 != 0 && go2 != 0 &&
+		a.RWIns[go1][0].(*ssa.Go) ==  a.RWIns[go2][0].(*ssa.Go) && // in twin goroutine
+		pt1.GetMyGoAndLoopID().GoInstr == pt2.GetMyGoAndLoopID().GoInstr &&
+		pt1.GetMyGoAndLoopID().GoInstr == a.RWIns[go1][0].(*ssa.Go) && // declaration and racy location in same goroutine
+		pt1.GetMyGoAndLoopID().LoopID > 0 && pt2.GetMyGoAndLoopID().LoopID > 0 &&
+		a.loopIDs[go1] > 0 && a.loopIDs[go2] > 0 {
+		//if pt1.MayAlias(pt2) {
+		//	fmt.Println(pt1.GetMyGoAndLoopID().GoInstr) // out: go t4()
+		//	fmt.Println(pt1.GetMyGoAndLoopID().LoopID) // out: 1
+		//	fmt.Println(pt2.GetMyGoAndLoopID().GoInstr) // out: go t4()
+		//	fmt.Println(pt2.GetMyGoAndLoopID().LoopID) // out: 2
+		//} !!!!!!!!!!! shouldn't GoInstr be nil (main goroutine) and LoopID be zero?
+		return false
+	}
 	return pt1.MayAlias(pt2)
 }
 
