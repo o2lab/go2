@@ -195,14 +195,6 @@ func (a *analysis) sameAddress(addr1 ssa.Value, addr2 ssa.Value, go1 int, go2 in
 	} else {
 		pt2 = a.ptaRes.PointsToByGoWithLoopID(addr2, a.RWIns[go2][0].(*ssa.Go), a.loopIDs[go2])
 	}
-	//if DEBUG {
-	//	if strings.Contains(addr1.String(), "new int (i2)") {
-	//		fmt.Println(pt1.PointsTo().String(), " ", pt2.PointsTo().String())
-	//	}
-	//	if strings.Contains(addr2.String(), "new int (i2)") {
-	//		fmt.Println(pt1.PointsTo().String(), " ", pt2.PointsTo().String())
-	//	}
-	//}
 	return pt1.MayAlias(pt2)
 }
 
