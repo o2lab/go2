@@ -578,7 +578,7 @@ func (a *analysis) exploredFunction(fn *ssa.Function, goID int, theIns ssa.Instr
 	if sliceContainsInsAt(a.RWIns[goID], theIns) >= 0 {
 		return true
 	}
-	if efficiency && sliceContainsFn(a.storeFns, fn) { // for temporary debugging purposes only
+	if a.efficiency && sliceContainsFn(a.storeFns, fn) { // for temporary debugging purposes only
 		return true
 	}
 	visitedIns := []ssa.Instruction{}

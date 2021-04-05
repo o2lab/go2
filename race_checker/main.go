@@ -26,6 +26,9 @@ type analysis struct {
 	ptaCfg0 *pta0.Config
 	ptaRes0 *pta0.Result
 	//race-checker uses
+	efficiency 		bool
+	trieLimit 		int
+	getGo  			bool // flag
 	prog            *ssa.Program
 	pkgs            []*ssa.Package
 	main            *ssa.Package
@@ -156,6 +159,7 @@ var (
 
 var useNewPTA = true
 var trieLimit = 2      // set as user config option later, an integer that dictates how many times a function can be called under identical context
+var mu sync.Mutex
 var efficiency = true  // configuration setting to avoid recursion in tested program
 var channelComm = true // analyze channel communication
 var entryFn = "main"
@@ -166,7 +170,7 @@ var getGo = false
 func init() {
 	excludedPkgs = []string{
 		"fmt",
-		//"reflect",
+		"logrus",
 	}
 }
 

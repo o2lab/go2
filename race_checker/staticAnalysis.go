@@ -12,6 +12,8 @@ import (
 	"github.tamu.edu/April1989/go_tools/go/ssa/ssautil"
 	"go/token"
 	"go/types"
+	"sync"
+
 	//"sync"
 
 	//"golang.org/x/tools/go/pointer"
@@ -226,17 +228,11 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		allEntries = true
 	}
 	// Iterate each entry point...
-	//var wg sync.WaitGroup
-	for _, main := range mains {
-		//wg.Add(1)
-		//go func(main *ssa.Package) {
-		//if strings.Contains(main.Pkg.Path(), "GoBench") { // for testing purposes
-		//	efficiency = false
-		//	trieLimit = 2
-		//} else if !runner.goTest {
-		//	efficiency = true
-		//}
-			//defer wg.Done()
+	var wg sync.WaitGroup
+	for _, m := range mains {
+		wg.Add(1)
+		go func(main *ssa.Package) {
+			defer wg.Done()
 			// Configure static analysis...
 		fmt.Println("Detect ... ", main)
 			Analysis := &analysis{
@@ -249,6 +245,9 @@ func (runner *AnalysisRunner) Run(args []string) error {
 				//race-checker uses
 				prog:     runner.prog,
 				pkgs:     runner.pkgs,
+				efficiency:      efficiency,
+				trieLimit:   	 trieLimit,
+				getGo:   		 getGo,
 				main:            main,
 				RWinsMap:        make(map[goIns]graph.Node),
 				trieMap:         make(map[fnInfo]*trie),
@@ -280,6 +279,12 @@ func (runner *AnalysisRunner) Run(args []string) error {
 				allocLoop:   	 make(map[*ssa.Function][]string),
 				bindingFV:       make(map[*ssa.Go][]*ssa.FreeVar),
 			}
+			if strings.Contains(main.Pkg.Path(), "GoBench") { // for testing purposes
+				Analysis.efficiency = false
+				Analysis.trieLimit = 2
+			} else if !runner.goTest {
+				Analysis.efficiency = true
+			}
 			if !allEntries {
 				log.Info("Compiling stack trace for every Goroutine... ")
 				log.Debug(strings.Repeat("-", 35), "Stack trace begins", strings.Repeat("-", 35))
@@ -295,7 +300,10 @@ func (runner *AnalysisRunner) Run(args []string) error {
 			if !allEntries {
 				log.Info("Done  -- ", len(Analysis.RWIns), " goroutines analyzed! ", totalIns, " instructions of interest detected! ")
 			}
-			if getGo {
+			if len(mains) > 1 {
+				Analysis.getGo = false // turn off debug logging if running in parallel
+			}
+			if Analysis.getGo { // print call stack of each goroutine
 				for i := 0; i < len(Analysis.RWIns); i++ {
 					name := "main"
 					if i > 0 {
@@ -366,9 +374,9 @@ func (runner *AnalysisRunner) Run(args []string) error {
 			runner.racyStackTops = Analysis.racyStackTops
 			runner.finalReport = append(runner.finalReport, rr)
 			runner.mu.Unlock()
-		//}(m)
+		}(m)
 	}
-	//wg.Wait()
+	wg.Wait()
 
 	if allEntries {
 		raceCount := 0
