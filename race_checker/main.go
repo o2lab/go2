@@ -151,7 +151,6 @@ var (
 
 var useNewPTA = true
 var trieLimit = 2      // set as user config option later, an integer that dictates how many times a function can be called under identical context
-var mu sync.Mutex
 var efficiency = true  // configuration setting to avoid recursion in tested program
 var channelComm = true // analyze channel communication
 var entryFn = "main"
@@ -159,6 +158,7 @@ var allEntries = false
 var useDefaultPTA = false
 var getGo = false
 var goTest bool // running test script
+var fromPath = ""
 
 func init() {
 	excludedPkgs = []string{
@@ -180,11 +180,13 @@ func main() { //default: -useNewPTA
 	analyzeAll := flag.Bool("analyzeAll", false, "Analyze all main() entry-points. ")
 	runTest := flag.Bool("runTest", false, "For micro-benchmark debugging... ")
 	showGo := flag.Bool("showGo", true, "Show goroutine info in analyzed program. ")
+	projPath := flag.String("path", "", "Designated project filepath. ")
 	//setTrie := flag.Int("trieLimit", 1, "Set trie limit... ")
 	flag.Parse()
 	//if *setTrie > 1 {
 	//	trieLimit = *setTrie
 	//}
+	fromPath = *projPath
 	if *showGo {
 		getGo = true
 	}

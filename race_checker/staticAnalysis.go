@@ -171,9 +171,13 @@ func (runner *AnalysisRunner) Run(args []string) error {
 
 	startExec := time.Now() // measure total duration of running entire code base
 	// Configure pointer analysis...
-	if useNewPTA { // default PTA
+	if useNewPTA {
 		scope := make([]string, 1)
-		scope[0] = pkgs[0].Pkg.Path() //bz: the 1st pkg has the scope info == the root pkg or default .go input
+		if fromPath == "" {
+			scope[0] = pkgs[0].Pkg.Path() //bz: the 1st pkg has the scope info == the root pkg or default .go input
+		} else {
+			scope[0] = fromPath
+		}
 		runner.ptaConfig = &pointer.Config{
 			Mains:          mains, //bz: all mains in a project
 			Reflection:     false,
