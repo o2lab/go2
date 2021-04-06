@@ -336,49 +336,39 @@ func (a *analysis) printRace(counter int, insPair []ssa.Instruction, addrPair [2
 		}
 		log.Print(errMsg)
 		var printStack []string // store functions in stack and pop terminated functions
-		var printPos []token.Pos
+		fnPos := make(map[string]token.Pos)
 		for p, everyIns := range a.RWIns[goIDs[i]] {
 			if p < insInd[i]-1 {
 				if isFunc, ok := everyIns.(*ssa.Call); ok {
-					printName := isFunc.Call.Value.Name()
-					printName = checkTokenName(printName, everyIns.(*ssa.Call))
-					printStack = append(printStack, printName)
-					printPos = append(printPos, everyIns.Pos())
-				} else if _, ok1 := everyIns.(*ssa.Return); ok1 && len(printStack) > 0 {
-					printStack = printStack[:len(printStack)-1]
-					printPos = printPos[:len(printPos)-1]
+					funcName := checkTokenName(isFunc.Call.Value.Name(), everyIns.(*ssa.Call))
+					printStack = append(printStack, funcName)
+					fnPos[funcName] = everyIns.Pos()
+				} else if aFunc, ok1 := everyIns.(*ssa.Return); ok1 && len(printStack) > 0 {
+					funcName := aFunc.Parent().Name()
+					ii := len(printStack)-1
+					for ii >= 0 && funcName != printStack[ii] {
+						ii--
+					}
+					if ii > -1  {
+						printStack = printStack[:ii]
+					}
+					if _, ok2 := fnPos[funcName]; ok2 {
+						delete(fnPos, funcName)
+					}
 				}
 			} else {
-				continue
+				break
 			}
 		}
 
 		if goIDs[i] == 0 { // main goroutine
-			log.Println("\tunder goroutine  ***  main  [", goIDs[i], "] *** ")
+			log.Println("\tin goroutine  ***  main  [", goIDs[i], "] *** ")
 		} else {
-			log.Println("\tunder goroutine  ***", a.goNames(a.goCalls[goIDs[i]]), "[", goIDs[i], "] *** ")
+			log.Println("\tin goroutine  ***", a.goNames(a.goCalls[goIDs[i]]), "[", goIDs[i], "] *** ", a.prog.Fset.Position(a.goCalls[goIDs[i]].Pos()))
 		}
 		if len(printStack) > 0 {
-			log.Println("\tcalled by function[s]: ")
 			for p, toPrint := range printStack {
-				log.Println("\t ", strings.Repeat(" ", p), toPrint, a.getLocation3(printPos[p]))
-			}
-		}
-		var pathGo []int
-		j := goIDs[i]
-		for j > 0 {
-			pathGo = append([]int{j}, pathGo...)
-			temp := a.goCaller[j]
-			j = temp
-		}
-		for q, eachGo := range pathGo {
-			eachStack := a.goStack[eachGo]
-			for k, eachFn := range eachStack {
-				if k == 0 {
-					log.Println("\t ", strings.Repeat(" ", q), "--> Goroutine: ", eachFn, "[", a.goCaller[eachGo], "] at ", a.getLocation(eachFn))
-				} else {
-					log.Println("\t   ", strings.Repeat(" ", q), strings.Repeat(" ", k), eachFn, " at ", a.getLocation(eachFn))
-				}
+				log.Println("\t ", strings.Repeat(" ", p), toPrint, a.prog.Fset.Position(fnPos[toPrint]))
 			}
 		}
 	}
