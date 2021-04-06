@@ -340,7 +340,15 @@ func (a *analysis) printRace(counter int, insPair []ssa.Instruction, addrPair [2
 		for p, everyIns := range a.RWIns[goIDs[i]] {
 			if p < insInd[i]-1 {
 				if isFunc, ok := everyIns.(*ssa.Call); ok {
-					funcName := checkTokenName(isFunc.Call.Value.Name(), everyIns.(*ssa.Call))
+					var funcName string
+					if isFunc.Call.StaticCallee() == nil && isFunc.Call.Method == nil {
+						funcName = isFunc.Call.Value.Name()
+					} else if isFunc.Call.Method != nil && isFunc.Call.Method.Pkg() != nil {
+						funcName = isFunc.Call.Method.Name()
+					} else {
+						funcName = checkTokenName(isFunc.Call.Value.Name(), everyIns.(*ssa.Call))
+					}
+
 					printStack = append(printStack, funcName)
 					fnPos[funcName] = everyIns.Pos()
 				} else if aFunc, ok1 := everyIns.(*ssa.Return); ok1 && len(printStack) > 0 {

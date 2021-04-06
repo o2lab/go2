@@ -72,7 +72,7 @@ var tests = []string{
 	"tests/waitgroup.go",
 	"tests/wrong_waitgroup.go",
 	"tests/GoBench/Cockroach/27659/main.go",
-	"tests/GoBench/Cockroach/35501/main.go",
+	//"tests/GoBench/Cockroach/35501/main.go", // considered special case due to Go compiler's handling of for-each loops
 	"tests/GoBench/Etcd/4876/main.go",
 	"tests/GoBench/Etcd/8149/main.go", // multiple select handling
 	"tests/GoBench/Etcd/9446/main.go",
