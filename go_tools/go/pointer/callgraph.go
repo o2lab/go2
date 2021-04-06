@@ -161,6 +161,11 @@ type callsite struct {
 	goInstr *ssa.Go             // TODO: bz: do we add this to match goID in race_checker ??
 }
 
+//bz: user api: race checke uses
+func (c *callsite) GetLoopID() int {
+	return c.loopID
+}
+
 //bz: to see if two callsites are the same
 //tmp solution, to compare string ... otherwise too strict ...
 //e.g., return c.targets == other.targets && c.instr.String() == other.instr.String() ----->  this might be too strict ...

@@ -837,6 +837,39 @@ func (r *Result) PointsToByGoWithLoopID(v ssa.Value, goInstr *ssa.Go, loopID int
 	return PointerWCtx{a: nil}
 }
 
+//bz: user api, return an array of *Site {*ssa.Function, []*callsite}
+func (r *Result) GetAllocations(p PointerWCtx) []*Site {
+	var allocs []*Site
+	pts := p.PointsTo().pts
+	if pts.IsEmpty() {
+		return allocs
+	}
+
+	a := r.a
+	var space [100]int
+	for _, nid := range pts.AppendTo(space[:0]) {
+		if nid == 0 {
+			continue
+		}
+		obj := a.nodes[nodeid(nid)].obj
+		if obj == nil {
+			continue
+		}
+		site := &Site{
+			Fn: obj.cgn.fn,
+			Ctx: obj.cgn.callersite,
+		}
+		allocs = append(allocs, site)
+	}
+	return allocs
+}
+
+//bz: user api used by GetAllocations()
+type Site struct {
+	Fn   *ssa.Function
+	Ctx  []*callsite
+}
+
 // A Pointer is an equivalence class of pointer-like values.
 //
 // A Pointer doesn't have a unique type because pointers of distinct
