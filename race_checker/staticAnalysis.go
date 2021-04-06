@@ -171,13 +171,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 
 	startExec := time.Now() // measure total duration of running entire code base
 	// Configure pointer analysis...
-	if useDefaultPTA { // default PTA
-		runner.ptaConfig0 = &pta0.Config{
-			Mains:          mains,
-			BuildCallGraph: false,
-		}
-		runner.ptaResult0, _ = pta0.Analyze(runner.ptaConfig0)
-	} else { // new PTA
+	if useNewPTA { // default PTA
 		scope := make([]string, 1)
 		scope[0] = pkgs[0].Pkg.Path() //bz: the 1st pkg has the scope info == the root pkg or default .go input
 		runner.ptaConfig = &pointer.Config{
@@ -206,7 +200,14 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		//	fmt.Println("Receive ptaRes (#Queries: ", len(ptaRes.Queries), ", #IndirectQueries: ", len(ptaRes.IndirectQueries), ") for main: ", mainEntry.String())
 		//	ptaRes.DumpAll()
 		//}
+	} else {
+		runner.ptaConfig0 = &pta0.Config{
+			Mains:          mains,
+			BuildCallGraph: false,
+		}
+		runner.ptaResult0, _ = pta0.Analyze(runner.ptaConfig0)
 	}
+
 	if len(mains) > 1 {
 		allEntries = true
 	}
@@ -217,7 +218,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		go func(main *ssa.Package) {
 			defer wg.Done()
 			// Configure static analysis...
-			Analysis := &analysis{
+			Analysis := analysis{
 				ptaRes:          runner.ptaResult,
 				ptaRes0:         runner.ptaResult0,
 				ptaCfg:          runner.ptaConfig,
