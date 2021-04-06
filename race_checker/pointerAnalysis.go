@@ -4,7 +4,6 @@ import (
 	"github.tamu.edu/April1989/go_tools/go/pointer"
 	pta0 "github.tamu.edu/April1989/go_tools/go/pointer_default"
 	"github.tamu.edu/April1989/go_tools/go/ssa"
-	"github.tamu.edu/April1989/go_tools/go/ssa/interp/testdata/src/fmt"
 	"go/types"
 )
 
@@ -99,16 +98,19 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 		}
 
 		//bz: an example use of new api
-		allocSites := a.ptaRes[a.main].GetAllocations(ptr)
-		for _, site := range allocSites {
-			fn := site.Fn //which fn allocates the obj
-			ctx := site.Ctx //context of this obj, context is an array of *callsite; but you cannot directly access them
-			for _, c := range ctx {
-				loopID := c.GetLoopID() //this is the loop id you want
-				str := c.String()
-				fmt.Println(fn, " ", loopID, " ", str)
-			}
-		}
+		//allocSites := a.ptaRes[a.main].GetAllocations(ptr)
+		//for _, site := range allocSites {
+		//	fn := site.Fn //which fn allocates the obj
+		//	ctx := site.Ctx //context of this obj, context is an array of *callsite; but you cannot directly access them
+		//	for _, c := range ctx {
+				//loopID := c.GetLoopID() //this is the loop id you want
+				//str := c.String()
+				//_ = fn
+				//_ = loopID
+				//_ = str
+				//fmt.Println(fn, " ", loopID, " ", str) // fmt package does not work
+		//	}
+		//}
 		//bz: end
 
 		var fnName string
