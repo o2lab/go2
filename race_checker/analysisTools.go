@@ -232,12 +232,50 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 	if goID >= len(a.RWIns) { // initialize interior slice for new goroutine
 		a.RWIns = append(a.RWIns, []ssa.Instruction{})
 	}
+
 	fnBlocks := fn.Blocks
-	bVisit0 := make([]int, len(fn.DomPreorder()))
-	for i, bb := range fn.DomPreorder() {
-		bVisit0[i] = bb.Index
+	bCap := 1
+	if len(fnBlocks) > 1 {
+		bCap = len(fnBlocks)
+	} else if len(fnBlocks) == 0 {
+		return
 	}
-	bVisit := bVisit0
+	bVisit := make([]int, 1, bCap) // create ordering at which blocks are visited
+	k := 0
+	b := fnBlocks[0]
+	bVisit[k] = 0
+	for k < len(bVisit) {
+		b = fnBlocks[bVisit[k]]
+		if len(b.Succs) == 0 {
+			k++
+			continue
+		}
+		j := k
+		for s, bNext := range b.Succs {
+			j += s
+			i := sliceContainsIntAt(bVisit, bNext.Index)
+			if i < k {
+				if j == len(bVisit)-1 {
+					bVisit = append(bVisit, bNext.Index)
+				} else if j < len(bVisit)-1 {
+					bVisit = append(bVisit[:j+2], bVisit[j+1:]...)
+					bVisit[j+1] = bNext.Index
+				}
+				if i != -1 { // visited block
+					bVisit = append(bVisit[:i], bVisit[i+1:]...)
+					j--
+				}
+			}
+		}
+		k++
+	}
+
+	//fnBlocks := fn.Blocks
+	//bVisit0 := make([]int, len(fn.DomPreorder()))
+	//for i, bb := range fn.DomPreorder() {
+	//	bVisit0[i] = bb.Index
+	//}
+	//bVisit := bVisit0
 
 	var toDefer []ssa.Instruction // stack storing deferred calls
 	var toUnlock []ssa.Value
