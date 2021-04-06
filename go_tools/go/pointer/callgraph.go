@@ -161,8 +161,11 @@ type callsite struct {
 	goInstr *ssa.Go             // TODO: bz: do we add this to match goID in race_checker ??
 }
 
-//bz: user api: race checke uses
+//bz: user api: race checke uses; assume k = 1
 func (c *callsite) GetLoopID() int {
+	if c == nil {
+		return -1 //shared contour
+	}
 	return c.loopID
 }
 
