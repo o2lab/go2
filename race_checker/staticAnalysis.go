@@ -34,7 +34,7 @@ func (a *analysis) fromPkgsOfInterest(fn *ssa.Function) bool {
 			return false
 		}
 	}
-	if efficiency && a.main.Pkg.Path() != "command-line-arguments" && !strings.HasPrefix(fn.Pkg.Pkg.Path(), strings.Split(a.main.Pkg.Path(), "/")[0]) { // path is dependent on tested program
+	if a.efficiency && a.main.Pkg.Path() != "command-line-arguments" && !strings.HasPrefix(fn.Pkg.Pkg.Path(), strings.Split(a.main.Pkg.Path(), "/")[0]) { // path is dependent on tested program
 		return false
 	}
 	return true
@@ -92,7 +92,7 @@ func pkgSelection(initial []*packages.Package) ([]*ssa.Package, *ssa.Program, []
 	var enterAt string
 	var mains []*ssa.Package
 	userEP := false // user specified entry function
-	if efficiency && len(mainPkgs) > 1 {
+	if len(mainPkgs) > 1 {
 		// Provide entry-point options and retrieve user selection
 		fmt.Println(len(mainPkgs), "main() entry-points identified: ")
 		for i, ep := range mainPkgs {
@@ -262,7 +262,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 			if strings.Contains(main.Pkg.Path(), "GoBench") { // for testing purposes
 				Analysis.efficiency = false
 				Analysis.trieLimit = 2
-			} else if !runner.goTest {
+			} else if !goTest {
 				Analysis.efficiency = true
 			}
 			if !allEntries {

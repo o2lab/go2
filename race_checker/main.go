@@ -115,7 +115,6 @@ type AnalysisRunner struct {
 	efficiency    bool // configuration setting to avoid recursion in tested program
 	racyStackTops []string
 	finalReport   []*raceReport
-	goTest        bool // running test script
 }
 
 type fnInfo struct { // all fields must be comparable for fnInfo to be used as key to trieMap
@@ -159,6 +158,7 @@ var entryFn = "main"
 var allEntries = false
 var useDefaultPTA = false
 var getGo = false
+var goTest bool // running test script
 
 func init() {
 	excludedPkgs = []string{
@@ -191,6 +191,7 @@ func main() { //default: -useNewPTA
 	if *runTest {
 		efficiency = false
 		trieLimit = 2
+		goTest = true
 	}
 	if *help {
 		flag.PrintDefaults()

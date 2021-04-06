@@ -234,7 +234,7 @@ func runChecker(t *testing.T, filenames []string) ([]*ast.File, []error) {
 	runner := &AnalysisRunner{}
 	runner.trieLimit = 2
 	runner.efficiency = false
-	runner.goTest = true
+	goTest = true
 	err := runner.Run(filenames)
 	if err != nil {
 		t.Fatal(err)
