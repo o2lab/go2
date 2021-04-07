@@ -38,6 +38,7 @@ type analysis struct {
 	RWIns           [][]ssa.Instruction // instructions grouped by goroutine
 	insDRA          int                 // index of instruction (in main goroutine) at which to begin data race analysis
 	storeFns        []*ssa.Function
+	stackMap		map[*ssa.Function][]*ssa.Function
 	workList        []goroutineInfo
 	reportedAddr    []ssa.Value // stores already reported addresses
 	levels          map[int]int

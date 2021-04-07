@@ -236,6 +236,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 				main:            main,
 				RWinsMap:        make(map[goIns]graph.Node),
 				trieMap:         make(map[fnInfo]*trie),
+				stackMap:  		 make(map[*ssa.Function][]*ssa.Function),
 				insDRA:          0,
 				levels:          make(map[int]int),
 				lockMap:         make(map[ssa.Instruction][]ssa.Value),
