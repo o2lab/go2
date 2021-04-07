@@ -319,7 +319,28 @@ func (a *analysis) printRace(counter int, insPair []ssa.Instruction, addrPair [2
 		for p, everyFn := range a.stackMap[insPair[i].Parent()] {
 			log.Println("\t ", strings.Repeat(" ", p), everyFn.Name(), a.prog.Fset.Position(everyFn.Pos()))
 		}
-
+		if goIDs[i] > 0 { // subroutines
+			log.Debug("call stack: ")
+		}
+		var pathGo []int
+		goID := i
+		for goID > 0 {
+			pathGo = append([]int{goID}, pathGo...)
+			temp := a.goCaller[goID]
+			goID = temp
+		}
+		if !allEntries {
+			for q, eachGo := range pathGo {
+				eachStack := a.goStack[eachGo]
+				for k, eachFn := range eachStack {
+					if k == 0 {
+						log.Debug("\t ", strings.Repeat(" ", q), "--> Goroutine: ", eachFn.Name(), "[", a.goCaller[eachGo], "] ", a.prog.Fset.Position(eachFn.Pos()))
+					} else {
+						log.Debug("\t   ", strings.Repeat(" ", q), strings.Repeat(" ", k), eachFn.Name(), " ", a.prog.Fset.Position(eachFn.Pos()))
+					}
+				}
+			}
+		}
 
 	}
 	log.Println("Locks acquired before Write access: ", writeLocks)
