@@ -335,49 +335,16 @@ func (a *analysis) printRace(counter int, insPair []ssa.Instruction, addrPair [2
 			a.racyStackTops = append(a.racyStackTops, colorOutput.ReplaceAllString(errMsg, ""))
 		}
 		log.Print(errMsg)
-		var printStack []string // store functions in stack and pop terminated functions
-		fnPos := make(map[string]token.Pos)
-		for p, everyIns := range a.RWIns[goIDs[i]] {
-			if p < insInd[i]-1 {
-				if isFunc, ok := everyIns.(*ssa.Call); ok {
-					var funcName string
-					if isFunc.Call.StaticCallee() == nil && isFunc.Call.Method == nil {
-						funcName = isFunc.Call.Value.Name()
-					} else if isFunc.Call.Method != nil && isFunc.Call.Method.Pkg() != nil {
-						funcName = isFunc.Call.Method.Name()
-					} else {
-						funcName = checkTokenName(isFunc.Call.Value.Name(), everyIns.(*ssa.Call))
-					}
 
-					printStack = append(printStack, funcName)
-					fnPos[funcName] = everyIns.Pos()
-				} else if aFunc, ok1 := everyIns.(*ssa.Return); ok1 && len(printStack) > 0 {
-					funcName := aFunc.Parent().Name()
-					ii := len(printStack)-1
-					for ii >= 0 && funcName != printStack[ii] {
-						ii--
-					}
-					if ii > -1  {
-						printStack = printStack[:ii]
-					}
-					if _, ok2 := fnPos[funcName]; ok2 {
-						delete(fnPos, funcName)
-					}
-				}
-			} else {
-				break
-			}
-		}
+
 
 		if goIDs[i] == 0 { // main goroutine
 			log.Println("\tin goroutine  ***  main  [", goIDs[i], "] *** ")
 		} else {
 			log.Println("\tin goroutine  ***", a.goNames(a.goCalls[goIDs[i]]), "[", goIDs[i], "] *** ", a.prog.Fset.Position(a.goCalls[goIDs[i]].Pos()))
 		}
-		if len(printStack) > 0 {
-			for p, toPrint := range printStack {
-				log.Println("\t ", strings.Repeat(" ", p), toPrint, a.prog.Fset.Position(fnPos[toPrint]))
-			}
+		for p, everyFn := range a.stackMap[insPair[i].Parent()] {
+			log.Println("\t ", strings.Repeat(" ", p), everyFn.Name(), a.prog.Fset.Position(everyFn.Pos()))
 		}
 	}
 	log.Println("Locks acquired before Write access: ", writeLocks)

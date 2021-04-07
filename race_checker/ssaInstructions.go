@@ -101,6 +101,7 @@ func (a *analysis) updateRecords(fn *ssa.Function, goID int, pushPop string) {
 		log.Debug(strings.Repeat(" ", a.levels[goID]), pushPop, fn.String(), " at lvl ", a.levels[goID])
 	}
 	if pushPop == "PUSH " {
+		a.stackMap[fn] = a.storeFns
 		a.storeFns = append(a.storeFns, fn)
 		a.levels[goID]++
 	}
