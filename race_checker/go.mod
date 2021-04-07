@@ -32,7 +32,6 @@ require (
 	github.com/uber/jaeger-client-go v2.25.0+incompatible // indirect
 	github.com/uber/jaeger-lib v2.4.0+incompatible // indirect
 	github.com/urfave/cli v1.22.5
-	github.tamu.edu/April1989/go_tools v0.0.0
 	go.uber.org/zap v1.16.0 // indirect
 	golang.org/x/sync v0.0.0-20201207232520-09787c993a3a
 	golang.org/x/sys v0.0.0-20201221093633-bc327ba9c2f0
