@@ -362,7 +362,12 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 			}
 		}
 		if aBlock.Comment == "for.body" || aBlock.Comment == "rangeindex.body"  {
-			a.inLoop = true // TODO: consider nested loops
+			if repeatSwitch == false {
+				repeatSwitch = true // repeat analysis of current block
+				bInd--
+			} else { // repetition conducted
+				repeatSwitch = false
+			}
 		}
 		for ii, theIns := range aBlock.Instrs { // examine each instruction
 			if theIns.String() == "rundefers" { // execute deferred calls at this index
