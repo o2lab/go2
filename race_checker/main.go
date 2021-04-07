@@ -187,7 +187,7 @@ func main() { //default: -useNewPTA
 	withComm := flag.Bool("withComm", false, "Show analysis results with communication consideration.")
 	analyzeAll := flag.Bool("analyzeAll", false, "Analyze all main() entry-points. ")
 	runTest := flag.Bool("runTest", false, "For micro-benchmark debugging... ")
-	showGo := flag.Bool("showGo", true, "Show goroutine info in analyzed program. ")
+	showGo := flag.Bool("showGo", false, "Show goroutine info in analyzed program. ")
 	projPath := flag.String("path", "", "Designated project filepath. ")
 	//setTrie := flag.Int("trieLimit", 1, "Set trie limit... ")
 	flag.Parse()

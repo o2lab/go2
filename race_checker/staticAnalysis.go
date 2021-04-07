@@ -181,7 +181,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		scope := make([]string, 1)
 		if fromPath == "" {
 			scope[0] = pkgs[0].Pkg.Path() //bz: the 1st pkg has the scope info == the root pkg or default .go input
-		} else {
+		} else { // scope is used for pta in determining context-sensitive fns
 			scope[0] = fromPath //bz: just a reminder:  "google.golang.org/grpc"
 		}
 		runner.ptaConfig = &pointer.Config{
