@@ -35,8 +35,6 @@ func (a *analysis) fromPkgsOfInterest(fn *ssa.Function) bool {
 			return false
 		}
 	}
-	//TODO: bz: for grpc, the reported races when comment on/off are very different,
-	//      some hb relations/locksets are missing when excluding traversing the excluded funcs
 	if efficiency && a.main.Pkg.Path() != "command-line-arguments" && !strings.HasPrefix(fn.Pkg.Pkg.Path(), strings.Split(a.main.Pkg.Path(), "/")[0]) { // path is dependent on tested program
 		if a.ptaRes.GetMySyntheticFn(fn) != nil {
 			return true //bz: want the synthetic fn and its target

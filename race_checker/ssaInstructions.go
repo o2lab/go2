@@ -594,6 +594,9 @@ func (a *analysis) insSelect(examIns *ssa.Select, goID int, theIns ssa.Instructi
 			}
 		case *ssa.Parameter:
 			a.pointerAnalysis(ch, goID, theIns)
+			if a.chanName == "" {
+				continue //bz: a.chanName cannot be determined inside pointerAnalysis, due to callback, will trigger out of scope index; skip this
+			}
 			readyChans[i] = a.chanToken[a.chanName]
 			a.selReady[examIns] = append(a.selReady[examIns], readyChans[i])
 			if _, ex := a.selUnknown[examIns]; !ex {

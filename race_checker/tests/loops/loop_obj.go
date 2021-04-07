@@ -37,7 +37,7 @@ func (r Myobj) compare(o Myobj, loopid int)  {
 //}
 
 
-func main() {
+func main() { //all stack
 	str := Myfobj{"im clear"}
 
 	//bz: show the memory size of myType

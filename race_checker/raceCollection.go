@@ -44,10 +44,10 @@ func (a *analysis) checkRacyPairs() []*raceInfo {
 						continue
 					}
 					////!!!! bz: for my debug, please comment off, do not delete
-					fmt.Println("goI: ", goI.String(), " (i: ", i, ")  goJ: ", goJ.String(), " (j: ", j, ")")
-					if strings.Contains(goI.String(), "&t0.callback [#1]") && strings.Contains(goJ.String(), "&t0.callback [#1]") {
-						fmt.Println()
-					}
+					//fmt.Println("goI: ", goI.String(), " (i: ", i, ")  goJ: ", goJ.String(), " (j: ", j, ")")
+					//if strings.Contains(goI.String(), "&t6[t9]") && strings.Contains(goJ.String(), "*checkName") {
+					//	fmt.Println() //goI:  &t6[t9]  (i:  1 )  goJ:  *checkName  (j:  3 )
+					//}
 
 					if (isWriteIns(goI) && isWriteIns(goJ)) || (isWriteIns(goI) && a.isReadIns(goJ)) || (a.isReadIns(goI) && isWriteIns(goJ)) { // only read and write instructions
 						if isLocal(goI) && isLocal(goJ) { // both are locally declared
@@ -328,14 +328,14 @@ func (a *analysis) printRace(counter int, insPair []ssa.Instruction, addrPair [2
 		if isWriteIns(anIns) {
 			access = " Write of "
 			if _, ok := anIns.(*ssa.Call); ok {
-				errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].String()), " in function ", aurora.BrightGreen(anIns.Parent().Name()), " at ", a.prog.Fset.Position(addrPair[i].Pos()))
+				errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].String()), " in function ", aurora.BrightGreen(anIns.Parent().Name()), " at ", a.getLocation(addrPair[i]))
 			} else {
-				errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].String()), " in function ", aurora.BrightGreen(anIns.Parent().Name()), " at ", a.prog.Fset.Position(insPair[i].Pos()))
+				errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].String()), " in function ", aurora.BrightGreen(anIns.Parent().Name()), " at ", a.getLocation2(insPair[i]))
 			}
 			writeLocks = a.lockMap[anIns]
 		} else {
 			access = " Read of "
-			errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].String()), " in function ", aurora.BrightGreen(anIns.Parent().Name()), " at ", a.prog.Fset.Position(anIns.Pos()))
+			errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].String()), " in function ", aurora.BrightGreen(anIns.Parent().Name()), " at ", a.getLocation2(anIns))
 			readLocks = append(a.lockMap[anIns], a.RlockMap[anIns]...)
 		}
 		if testMode {
@@ -369,7 +369,7 @@ func (a *analysis) printRace(counter int, insPair []ssa.Instruction, addrPair [2
 		if len(printStack) > 0 {
 			log.Println("\tcalled by function[s]: ")
 			for p, toPrint := range printStack {
-				log.Println("\t ", strings.Repeat(" ", p), toPrint, a.prog.Fset.Position(printPos[p]))
+				log.Println("\t ", strings.Repeat(" ", p), toPrint, a.getLocation3(printPos[p]))
 			}
 		}
 		var pathGo []int
@@ -383,9 +383,9 @@ func (a *analysis) printRace(counter int, insPair []ssa.Instruction, addrPair [2
 			eachStack := a.goStack[eachGo]
 			for k, eachFn := range eachStack {
 				if k == 0 {
-					log.Println("\t ", strings.Repeat(" ", q), "--> Goroutine: ", eachFn, "[", a.goCaller[eachGo], "]")
+					log.Println("\t ", strings.Repeat(" ", q), "--> Goroutine: ", eachFn, "[", a.goCaller[eachGo], "] at ", a.getLocation(eachFn))
 				} else {
-					log.Println("\t   ", strings.Repeat(" ", q), strings.Repeat(" ", k), eachFn)
+					log.Println("\t   ", strings.Repeat(" ", q), strings.Repeat(" ", k), eachFn, " at ", a.getLocation(eachFn))
 				}
 			}
 		}
@@ -395,3 +395,15 @@ func (a *analysis) printRace(counter int, insPair []ssa.Instruction, addrPair [2
 	log.Println(strings.Repeat("=", 100))
 }
 
+//bz: i want all locations
+func (a *analysis) getLocation(val ssa.Value) token.Position {
+	return a.prog.Fset.Position(val.Pos())
+}
+
+func (a *analysis) getLocation2(inst ssa.Instruction) token.Position {
+	return a.prog.Fset.Position(inst.Pos())
+}
+
+func (a *analysis) getLocation3(tok token.Pos) token.Position {
+	return a.prog.Fset.Position(tok)
+}
