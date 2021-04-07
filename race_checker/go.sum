@@ -114,6 +114,8 @@ github.com/andybalholm/brotli v1.0.0/go.mod h1:loMXtMfwqflxFJPmdbJO0a3KNoPuLBgiu
 github.com/antihax/optional v0.0.0-20180407024304-ca021399b1a6/go.mod h1:V8iCPQYkqmusNa815XgQio277wI47sdRh1dUOLdyC6Q=
 github.com/apache/thrift v0.12.0/go.mod h1:cp2SuWMxlEZw2r+iP2GNCdIi4C1qmUzdZFSVb+bacwQ=
 github.com/apache/thrift v0.13.0/go.mod h1:cp2SuWMxlEZw2r+iP2GNCdIi4C1qmUzdZFSVb+bacwQ=
+github.com/april1989/origin-go-tools v0.0.6 h1:i+VtL6PZbTTZG82Ov29iYO2WdX6jFTfVtGXHEblT95g=
+github.com/april1989/origin-go-tools v0.0.6/go.mod h1:nngo2wmiBL6xYjFa/sdagpNSeov3L73TBFjOHBKp4OE=
 github.com/armon/circbuf v0.0.0-20150827004946-bbbad097214e/go.mod h1:3U/XgcO3hCbHZ8TKRvWD2dDTCfh9M9ya+I9JpbB7O8o=
 github.com/armon/consul-api v0.0.0-20180202201655-eb2c6b5be1b6/go.mod h1:grANhF5doyWs3UAsr3K4I6qtAmlQcZDesFNEHPZAzj8=
 github.com/armon/go-metrics v0.0.0-20180917152333-f0300d1749da/go.mod h1:Q73ZrmVTwzkszR9V5SSuryQ31EELlFMUz1kKyl939pY=
@@ -925,17 +927,8 @@ github.com/yvasiyarov/go-metrics v0.0.0-20140926110328-57bccd1ccd43/go.mod h1:aX
 github.com/yvasiyarov/gorelic v0.0.0-20141212073537-a9bba5b9ab50/go.mod h1:NUSPSUX/bi6SeDMUh6brw0nXpxHnc96TguQh0+r/ssA=
 github.com/yvasiyarov/newrelic_platform_go v0.0.0-20140908184405-b21fdbd4370f/go.mod h1:GlGEuHIJweS1mbCqG+7vt2nvWLzLLnRHbXz5JKd/Qbg=
 github.com/ziutek/mymysql v1.5.4/go.mod h1:LMSpPZ6DbqWFxNCHW77HeMg9I646SAhApZ/wKdgO/C0=
+github.tamu.edu/April1989/go_tools v0.0.0 h1:WLMGOP1zewjshBCTPg4OKF3009dGYMVpFrIlj/+qxTA=
 github.tamu.edu/April1989/go_tools v0.0.0/go.mod h1:of9rObS18DZM5+gdWTPNvaXpClFGpg0fjFYb7mi2AH8=
-github.tamu.edu/April1989/go_tools v0.0.1 h1:Fix/LTDP1tAVyK5JcTrltEOlfW7WfAvflxV6KGZpW5k=
-github.tamu.edu/April1989/go_tools v0.0.1/go.mod h1:of9rObS18DZM5+gdWTPNvaXpClFGpg0fjFYb7mi2AH8=
-github.tamu.edu/April1989/go_tools v0.0.2 h1:so5X4SWxSWc3bqSY81aUpTVcMCVR68l8mHr3xRNJSn4=
-github.tamu.edu/April1989/go_tools v0.0.2/go.mod h1:of9rObS18DZM5+gdWTPNvaXpClFGpg0fjFYb7mi2AH8=
-github.tamu.edu/April1989/go_tools v0.0.3 h1:yktpkUheFnPQ4j7ufRzItuIArTqGAObqCV6gb/dtmow=
-github.tamu.edu/April1989/go_tools v0.0.3/go.mod h1:of9rObS18DZM5+gdWTPNvaXpClFGpg0fjFYb7mi2AH8=
-github.tamu.edu/April1989/go_tools v0.0.4 h1:b2/2Z/DlY2LFvrAfnwYjxijrgKYpYeN2gD36WBehhP0=
-github.tamu.edu/April1989/go_tools v0.0.4/go.mod h1:of9rObS18DZM5+gdWTPNvaXpClFGpg0fjFYb7mi2AH8=
-github.tamu.edu/April1989/go_tools v0.0.5 h1:18ANX7th/evfuCPpsuBOY6Eix/qrfFiVmAw9RmDfDIM=
-github.tamu.edu/April1989/go_tools v0.0.5/go.mod h1:of9rObS18DZM5+gdWTPNvaXpClFGpg0fjFYb7mi2AH8=
 go.etcd.io/bbolt v1.3.2/go.mod h1:IbVyRI1SCnLcuJnV2u8VeU0CEYM7e686BmAb1XKL+uU=
 go.etcd.io/bbolt v1.3.3/go.mod h1:IbVyRI1SCnLcuJnV2u8VeU0CEYM7e686BmAb1XKL+uU=
 go.etcd.io/bbolt v1.3.5/go.mod h1:G5EMThwa9y8QZGBClrRx5EY+Yw9kAhnjy3bSjsnlVTQ=

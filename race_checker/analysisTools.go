@@ -2,9 +2,9 @@ package main
 
 import (
 	"fmt"
+	"github.com/april1989/origin-go-tools/go/ssa"
 	log "github.com/sirupsen/logrus"
 	"github.com/twmb/algoimpl/go/graph"
-	"github.tamu.edu/April1989/go_tools/go/ssa"
 	"strings"
 )
 

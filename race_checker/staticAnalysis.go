@@ -2,14 +2,14 @@ package main
 
 import (
 	"fmt"
+	"github.com/april1989/origin-go-tools/go/myutil"
+	"github.com/april1989/origin-go-tools/go/packages"
+	"github.com/april1989/origin-go-tools/go/pointer"
+	pta0 "github.com/april1989/origin-go-tools/go/pointer_default"
+	"github.com/april1989/origin-go-tools/go/ssa"
+	"github.com/april1989/origin-go-tools/go/ssa/ssautil"
 	log "github.com/sirupsen/logrus"
 	"github.com/twmb/algoimpl/go/graph"
-	"github.tamu.edu/April1989/go_tools/go/myutil"
-	"github.tamu.edu/April1989/go_tools/go/packages"
-	"github.tamu.edu/April1989/go_tools/go/pointer"
-	pta0 "github.tamu.edu/April1989/go_tools/go/pointer_default"
-	"github.tamu.edu/April1989/go_tools/go/ssa"
-	"github.tamu.edu/April1989/go_tools/go/ssa/ssautil"
 	"go/token"
 	"go/types"
 	"sync"
@@ -255,7 +255,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 				main:            main,
 				RWinsMap:        make(map[goIns]graph.Node),
 				trieMap:         make(map[fnInfo]*trie),
-				stackMap:  		 make(map[*ssa.Function][]*ssa.Function),
+				stackMap:  		 make([]*stackInfo, 0),
 				insDRA:          0,
 				levels:          make(map[int]int),
 				lockMap:         make(map[ssa.Instruction][]ssa.Value),

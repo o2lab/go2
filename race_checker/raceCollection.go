@@ -2,11 +2,11 @@ package main
 
 import (
 	"fmt"
+	"github.com/april1989/origin-go-tools/go/pointer"
+	"github.com/april1989/origin-go-tools/go/ssa"
 	"github.com/logrusorgru/aurora"
 	log "github.com/sirupsen/logrus"
 	"github.com/twmb/algoimpl/go/graph"
-	"github.tamu.edu/April1989/go_tools/go/pointer"
-	"github.tamu.edu/April1989/go_tools/go/ssa"
 	"go/token"
 	"regexp"
 	"strings"
@@ -342,6 +342,7 @@ func (a *analysis) printRace(counter int, insPair []ssa.Instruction, addrPair [2
 			log.Println("\tin goroutine  ***", a.goNames(a.goCalls[goIDs[i]]), "[", goIDs[i], "] *** ", a.prog.Fset.Position(a.goCalls[goIDs[i]].Pos()))
 		}
 		for p, everyFn := range a.stackMap[insPair[i].Parent()] {
+			log.Println("\t ", strings.Repeat(" ", p), "->", insPair[i].String(), "@", a.prog.Fset.Position(insPair[i].Pos()))
 			log.Println("\t ", strings.Repeat(" ", p), everyFn.Name(), a.prog.Fset.Position(everyFn.Pos()))
 		}
 		if goIDs[i] > 0 { // subroutines

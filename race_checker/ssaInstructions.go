@@ -1,8 +1,8 @@
 package main
 
 import (
+	"github.com/april1989/origin-go-tools/go/ssa"
 	log "github.com/sirupsen/logrus"
-	"github.tamu.edu/April1989/go_tools/go/ssa"
 	"go/constant"
 	"go/token"
 	"go/types"
@@ -92,7 +92,7 @@ func isWriteIns(ins ssa.Instruction) bool {
 }
 
 // updateRecords will print out the stack trace
-func (a *analysis) updateRecords(fn *ssa.Function, goID int, pushPop string) {
+func (a *analysis) updateRecords(invoke ssa.Instruction, fn *ssa.Function, goID int, pushPop string) {
 	if pushPop == "POP  " {
 		a.storeFns = a.storeFns[:len(a.storeFns)-1]
 		a.levels[goID]--
@@ -101,7 +101,11 @@ func (a *analysis) updateRecords(fn *ssa.Function, goID int, pushPop string) {
 		log.Debug(strings.Repeat(" ", a.levels[goID]), pushPop, fn.String(), " at lvl ", a.levels[goID])
 	}
 	if pushPop == "PUSH " {
-		a.stackMap[fn] = a.storeFns
+		info := &stackInfo{
+			invoke: invoke, //maybe the same
+			fn: fn,  //the same
+		}
+		a.stackMap = append(a.stackMap, info)
 		a.storeFns = append(a.storeFns, fn)
 		a.levels[goID]++
 	}

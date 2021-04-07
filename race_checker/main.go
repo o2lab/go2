@@ -5,16 +5,16 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/april1989/origin-go-tools/go/pointer"
+	pta0 "github.com/april1989/origin-go-tools/go/pointer_default"
 	"github.com/o2lab/race-checker/stats"
 	log "github.com/sirupsen/logrus"
 	"github.com/twmb/algoimpl/go/graph"
-	"github.tamu.edu/April1989/go_tools/go/pointer"
-	pta0 "github.tamu.edu/April1989/go_tools/go/pointer_default"
 	"sync"
 	"syscall"
 
 	//"golang.org/x/tools/go/pointer"
-	"github.tamu.edu/April1989/go_tools/go/ssa"
+	"github.com/april1989/origin-go-tools/go/ssa"
 )
 
 type analysis struct {
@@ -26,9 +26,9 @@ type analysis struct {
 	ptaCfg0 *pta0.Config
 	ptaRes0 *pta0.Result
 	//race-checker uses
-	efficiency 		bool
-	trieLimit 		int
-	getGo  			bool // flag
+	efficiency      bool
+	trieLimit       int
+	getGo           bool // flag
 	prog            *ssa.Program
 	pkgs            []*ssa.Package
 	main            *ssa.Package
@@ -39,7 +39,7 @@ type analysis struct {
 	RWIns           [][]ssa.Instruction // instructions grouped by goroutine
 	insDRA          int                 // index of instruction (in main goroutine) at which to begin data race analysis
 	storeFns        []*ssa.Function
-	stackMap		map[*ssa.Function][]*ssa.Function
+	stackMap        []*stackInfo //bz: update
 	workList        []goroutineInfo
 	reportedAddr    []ssa.Value // stores already reported addresses
 	levels          map[int]int
@@ -76,7 +76,17 @@ type analysis struct {
 	allocLoop       map[*ssa.Function][]string
 	bindingFV       map[*ssa.Go][]*ssa.FreeVar
 	pbr             *ssa.Alloc
-	commIDs 		map[int][]int
+	commIDs         map[int][]int
+}
+
+type RWNode struct {
+	node  ssa.Instruction
+	stack []*stackInfo //deep copy
+}
+
+type stackInfo struct {
+	invoke ssa.Instruction
+	fn     *ssa.Function
 }
 
 type lockInfo struct {
@@ -102,7 +112,7 @@ type raceReport struct {
 	lockMap      map[ssa.Instruction][]ssa.Value
 	RlockMap     map[ssa.Instruction][]ssa.Value
 	RWIns        [][]ssa.Instruction
-	goCalls	        map[int]*ssa.Go
+	goCalls      map[int]*ssa.Go
 	goCaller     map[int]int
 	goStack      [][]string
 }
