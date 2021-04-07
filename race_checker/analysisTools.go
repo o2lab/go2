@@ -481,12 +481,24 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 					}
 				}
 				loopID := 0
+				twin := make([]int, 2)
 				if aBlock.Comment == "for.body" || aBlock.Comment == "rangeindex.body" {
 					loopID++
-					a.insGo(examIns, goID, theIns, loopID)
+					newGoID1 := a.insGo(examIns, goID, theIns, loopID)
+					if newGoID1 != -1 {
+						twin[0] = newGoID1
+					}
 					loopID++
 				}
-				a.insGo(examIns, goID, theIns, loopID)
+				newGoID2 := a.insGo(examIns, goID, theIns, loopID)
+				if loopID != 0 && newGoID2 != -1 { //bz: record the twin goroutines
+					exist := a.twinGoID[examIns]
+					if exist == nil { //fill in the blank
+						twin[1] = newGoID2
+						a.twinGoID[examIns] = twin
+					}//else: already exist
+				}
+
 			case *ssa.Call:
 				unlockOps, runlockOps := a.insCall(examIns, goID, theIns)
 				toUnlock = append(toUnlock, unlockOps...)

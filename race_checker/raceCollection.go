@@ -72,18 +72,18 @@ func (a *analysis) checkRacyPairs() []*raceInfo {
 						//	goJinstr = a.RWIns[j][0].String()
 						//}
 						//fmt.Println(addressPair[0], " Go: ", goIinstr, " loopid: ", a.loopIDs[i], ";  ", addressPair[1], " Go: ", goJinstr, " loopid: ", a.loopIDs[j])
-						//if strings.Contains(addressPair[0].String(), "&fp.numFilterCalled [#0]") &&
-						//	strings.Contains(addressPair[1].String(), "&fp.numFilterCalled [#0]") {
+						//if strings.Contains(addressPair[0].String(), "&a.onRotate [#0]") &&
+						//	strings.Contains(addressPair[1].String(), "&a.onRotate [#0]") {
 						//	fmt.Println()
 						//}
 						if a.sameAddress(addressPair[0], addressPair[1], i, j) &&
-							!sliceContains(a.reportedAddr, addressPair[0]) &&
+							!sliceContains(a.reportedAddr, addressPair) &&
 							!a.reachable(goI, i, goJ, j) &&
 							!a.reachable(goJ, j, goI, i) &&
 							!a.bothAtomic(insSlice[0], insSlice[1]) &&
 							!a.lockSetsIntersect(goI, goJ, i, j) &&
 							!a.selectMutEx(insSlice[0], insSlice[1]) {
-							a.reportedAddr = append(a.reportedAddr, addressPair[0])
+							a.reportedAddr = append(a.reportedAddr, addressPair)
 							ri := &raceInfo{
 								insPair: 	insSlice,
 								addrPair: 	addressPair,
@@ -341,10 +341,9 @@ func (a *analysis) printRace(counter int, insPair []ssa.Instruction, addrPair [2
 		} else {
 			log.Println("\tin goroutine  ***", a.goNames(a.goCalls[goIDs[i]]), "[", goIDs[i], "] *** ", a.prog.Fset.Position(a.goCalls[goIDs[i]].Pos()))
 		}
-		for p, everyFn := range a.stackMap[insPair[i].Parent()] {
-			log.Println("\t ", strings.Repeat(" ", p), "->", insPair[i].String(), "@", a.prog.Fset.Position(insPair[i].Pos()))
-			log.Println("\t ", strings.Repeat(" ", p), everyFn.Name(), a.prog.Fset.Position(everyFn.Pos()))
-		}
+		//for p, everyFn := range a.stackMap[insPair[i].Parent()] {
+		//	log.Println("\t ", strings.Repeat(" ", p), everyFn.Name(), a.prog.Fset.Position(everyFn.Pos()))
+		//}
 		if goIDs[i] > 0 { // subroutines
 			log.Debug("call stack: ")
 		}

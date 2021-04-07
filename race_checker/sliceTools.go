@@ -26,9 +26,9 @@ func insToCallStack(allIns []ssa.Instruction) ([]*ssa.Function, string) {
 }
 
 // sliceContains if the e value is present in the slice, s, of ssa values that true, and false otherwise
-func sliceContains(s []ssa.Value, e ssa.Value) bool {
-	for _, a := range s {
-		if a == e {
+func sliceContains(exist [][2]ssa.Value, e [2]ssa.Value) bool {
+	for _, a := range exist {
+		if (a[0] == e[0] && a[1] == e[1]) || (a[1] == e[0] && a[0] == e[1]) {
 			return true
 		}
 	}

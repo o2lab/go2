@@ -92,7 +92,7 @@ func isWriteIns(ins ssa.Instruction) bool {
 }
 
 // updateRecords will print out the stack trace
-func (a *analysis) updateRecords(invoke ssa.Instruction, fn *ssa.Function, goID int, pushPop string) {
+func (a *analysis) updateRecords(fn *ssa.Function, goID int, pushPop string) {//invoke ssa.Instruction,
 	if pushPop == "POP  " {
 		a.storeFns = a.storeFns[:len(a.storeFns)-1]
 		a.levels[goID]--
@@ -102,7 +102,7 @@ func (a *analysis) updateRecords(invoke ssa.Instruction, fn *ssa.Function, goID 
 	}
 	if pushPop == "PUSH " {
 		info := &stackInfo{
-			invoke: invoke, //maybe the same
+			//invoke: invoke, //maybe the same
 			fn: fn,  //the same
 		}
 		a.stackMap = append(a.stackMap, info)
@@ -505,7 +505,7 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 }
 
 // insGo analyzes go calls
-func (a *analysis) insGo(examIns *ssa.Go, goID int, theIns ssa.Instruction, loopID int) {
+func (a *analysis) insGo(examIns *ssa.Go, goID int, theIns ssa.Instruction, loopID int) int {
 	fnName := a.goNames(examIns)
 	var entryMethod *ssa.Function
 	switch fn := examIns.Call.Value.(type) {
@@ -521,7 +521,7 @@ func (a *analysis) insGo(examIns *ssa.Go, goID int, theIns ssa.Instruction, loop
 			entryMethod = a.paramFunc
 			fnName = entryMethod.Name()
 		} else {
-			return
+			return -1
 		}
 	default:
 		entryMethod = examIns.Call.StaticCallee()
@@ -552,6 +552,7 @@ func (a *analysis) insGo(examIns *ssa.Go, goID int, theIns ssa.Instruction, loop
 			log.Debug(strings.Repeat(" ", a.levels[goID]), "spawning Goroutine ----->  ", fnName)
 		}
 	}
+	return newGoID
 }
 
 func (a *analysis) insMapUpdate(examIns *ssa.MapUpdate, goID int, theIns ssa.Instruction) {

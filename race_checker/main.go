@@ -41,7 +41,7 @@ type analysis struct {
 	storeFns        []*ssa.Function
 	stackMap        []*stackInfo //bz: update
 	workList        []goroutineInfo
-	reportedAddr    []ssa.Value // stores already reported addresses
+	reportedAddr    [][2]ssa.Value // stores already reported addresses -> bz: make sure both are not presented together as a pair
 	levels          map[int]int
 	lockMap         map[ssa.Instruction][]ssa.Value // map each read/write access to a snapshot of actively maintained lockset
 	lockSet         map[int][]*lockInfo             // active lockset, to be maintained along instruction traversal
@@ -77,6 +77,7 @@ type analysis struct {
 	bindingFV       map[*ssa.Go][]*ssa.FreeVar
 	pbr             *ssa.Alloc
 	commIDs         map[int][]int
+	twinGoID        map[*ssa.Go][]int   //bz: whether two goroutines are spawned by the same loop; this might not be useful now since !sliceContains(a.reportedAddr, addressPair) && already filtered out the duplicate race check
 }
 
 type RWNode struct {

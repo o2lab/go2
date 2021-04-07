@@ -284,6 +284,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 				allocLoop:   	 make(map[*ssa.Function][]string),
 				bindingFV:       make(map[*ssa.Go][]*ssa.FreeVar),
 				commIDs:  		 make(map[int][]int),
+				twinGoID:        make(map[*ssa.Go][]int),
 			}
 			if strings.Contains(main.Pkg.Path(), "GoBench") { // for testing purposes
 				Analysis.efficiency = false
