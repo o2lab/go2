@@ -138,6 +138,19 @@ func (a *analysis) buildHB() {
 					for wKey, wNode := range waitingN {
 						if a.sameAddress(callIns.Call.Args[0], wKey.ins.(*ssa.Call).Call.Args[0], nGo, wKey.goID) {
 							err := a.HBgraph.MakeEdge(prevN, wNode) // create edge from Done node to Wait node
+							var fromName string
+							var toName string
+							if nGo == 0 {
+								fromName = "main"
+							} else {
+								fromName = a.goNames(a.RWIns[nGo][0].(*ssa.Go))
+							}
+							if (*wNode.Value).(goIns).goID == 0 {
+								toName = "main"
+							} else {
+								toName = a.goNames(a.RWIns[(*wNode.Value).(goIns).goID][0].(*ssa.Go))
+							}
+							log.Debug("WaitGroup edge from Goroutine ", fromName, " [", nGo, "] to Goroutine ", toName, " [", (*wNode.Value).(goIns).goID, "]")
 							if err != nil {
 								log.Fatal(err)
 							}
@@ -149,6 +162,19 @@ func (a *analysis) buildHB() {
 					for wKey, wNode := range waitingN {
 						if a.sameAddress(dIns.Call.Args[0], wKey.ins.(*ssa.Call).Call.Args[0], nGo, wKey.goID) {
 							err := a.HBgraph.MakeEdge(prevN, wNode) // create edge from Done node to Wait node
+							var fromName string
+							var toName string
+							if nGo == 0 {
+								fromName = "main"
+							} else {
+								fromName = a.goNames(a.RWIns[nGo][0].(*ssa.Go))
+							}
+							if (*wNode.Value).(goIns).goID == 0 {
+								toName = "main"
+							} else {
+								toName = a.goNames(a.RWIns[(*wNode.Value).(goIns).goID][0].(*ssa.Go))
+							}
+							log.Debug("WaitGroup edge from Goroutine ", fromName, " [", nGo, "] to Goroutine ", toName, " [", (*wNode.Value).(goIns).goID, "]")
 							if err != nil {
 								log.Fatal(err)
 							}
@@ -160,10 +186,22 @@ func (a *analysis) buildHB() {
 				for ch, sIns := range a.chanSnds {
 					if rcvN, matching := chanRecvs[ch]; matching && sliceContainsSnd(sIns, sendIns) {
 						err := a.HBgraph.MakeEdge(prevN, rcvN) // create edge from Send node to Receive node
+						var fromName, toName string
+						if nGo == 0 {
+							fromName = "main"
+						} else {
+							fromName = a.goNames(a.RWIns[nGo][0].(*ssa.Go))
+						}
+						if (*rcvN.Value).(goIns).goID == 0 {
+							toName = "main"
+						} else {
+							toName = a.goNames(a.RWIns[(*rcvN.Value).(goIns).goID][0].(*ssa.Go))
+						}
+						log.Debug("Channel comm edge from Goroutine ", fromName, " [", nGo, "] to Goroutine ", toName, " [", (*rcvN.Value).(goIns).goID, "]")
 						if err != nil {
 							log.Fatal(err)
 						}
-						err1 := a.HBgraph.MakeEdge(rcvN, prevN) // create edge from Send node to Receive node
+						err1 := a.HBgraph.MakeEdge(rcvN, prevN) // create edge from Receive node to Send node
 						if err1 != nil {
 							log.Fatal(err1)
 						}
@@ -173,10 +211,22 @@ func (a *analysis) buildHB() {
 				if ch := a.getRcvChan(rcvIns); ch != "" {
 					if sndN, matching := chanSends[ch]; matching {
 						err := a.HBgraph.MakeEdge(sndN, prevN) // create edge from Send node to Receive node
+						var fromName, toName string
+						if (*sndN.Value).(goIns).goID == 0 {
+							fromName = "main"
+						} else {
+							fromName = a.goNames(a.RWIns[(*sndN.Value).(goIns).goID][0].(*ssa.Go))
+						}
+						if nGo == 0 {
+							toName = "main"
+						} else {
+							toName = a.goNames(a.RWIns[nGo][0].(*ssa.Go))
+						}
+						log.Debug("Channel comm edge from Goroutine ", fromName, " [", (*sndN.Value).(goIns).goID, "] to Goroutine ", toName, " [", nGo, "]")
 						if err != nil {
 							log.Fatal(err)
 						}
-						err1 := a.HBgraph.MakeEdge(prevN, sndN) // create edge from Send node to Receive node
+						err1 := a.HBgraph.MakeEdge(prevN, sndN) // create edge from Receive node to Send node
 						if err1 != nil {
 							log.Fatal(err1)
 						}
@@ -269,13 +319,6 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 		}
 		k++
 	}
-
-	//fnBlocks := fn.Blocks
-	//bVisit0 := make([]int, len(fn.DomPreorder()))
-	//for i, bb := range fn.DomPreorder() {
-	//	bVisit0[i] = bb.Index
-	//}
-	//bVisit := bVisit0
 
 	var toDefer []ssa.Instruction // stack storing deferred calls
 	var toUnlock []ssa.Value
@@ -500,13 +543,8 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				}
 			}
 		}
-		if aBlock.Comment == "for.body" || aBlock.Comment == "rangeindex.body" { // repeat unrolling of forloop
-			if repeatSwitch == false {
-				//repeatSwitch = true // repeat analysis of current block
-				//bInd--
-			} else { // repetition conducted
-				repeatSwitch = false
-			}
+		if (aBlock.Comment == "for.body" || aBlock.Comment == "rangeindex.body") && a.inLoop {
+			a.inLoop = false
 		}
 		if activeCase && readyChans[selCount] != "defaultCase" && readyChans[selCount] != "timeOut" {
 			selCount++

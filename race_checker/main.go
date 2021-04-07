@@ -76,6 +76,7 @@ type analysis struct {
 	allocLoop       map[*ssa.Function][]string
 	bindingFV       map[*ssa.Go][]*ssa.FreeVar
 	pbr             *ssa.Alloc
+	commIDs 		map[int][]int
 }
 
 type lockInfo struct {
