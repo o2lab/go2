@@ -309,8 +309,6 @@ func (a *analysis) printRace(counter int, insPair []ssa.Instruction, addrPair [2
 		}
 		log.Print(errMsg)
 
-
-
 		if goIDs[i] == 0 { // main goroutine
 			log.Println("\tin goroutine  ***  main  [", goIDs[i], "] *** ")
 		} else {
@@ -323,7 +321,7 @@ func (a *analysis) printRace(counter int, insPair []ssa.Instruction, addrPair [2
 			log.Debug("call stack: ")
 		}
 		var pathGo []int
-		goID := i
+		goID := goIDs[i]
 		for goID > 0 {
 			pathGo = append([]int{goID}, pathGo...)
 			temp := a.goCaller[goID]
