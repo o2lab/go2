@@ -63,8 +63,8 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 		switch theFunc := PT0Set[rightLoc].Value().(type) {
 		case *ssa.Function:
 			if !a.exploredFunction(theFunc, goID, theIns) {
-				a.updateRecords(theFunc, goID, "PUSH ")
-				a.RWIns[goID] = append(a.RWIns[goID], theIns)
+				a.updateRecords(theIns, theFunc, goID, "PUSH ")
+				a.recordAccess(goID, theIns)
 				a.visitAllInstructions(theFunc, goID)
 			}
 		case *ssa.MakeInterface:
@@ -74,8 +74,8 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 			}
 			check := a.prog.LookupMethod(pta0Set[location].PointsTo().DynamicTypes().Keys()[0], a.main.Pkg, methodName)
 			if !a.exploredFunction(check, goID, theIns) {
-				a.updateRecords(check, goID, "PUSH ")
-				a.RWIns[goID] = append(a.RWIns[goID], theIns)
+				a.updateRecords(theIns, check, goID, "PUSH ")
+				a.recordAccess(goID, theIns)
 				a.visitAllInstructions(check, goID)
 			}
 		case *ssa.MakeChan:
@@ -88,7 +88,7 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 		if goID == 0 {
 			ptr = a.ptaRes.PointsToByGoWithLoopID(location, nil, a.loopIDs[0])
 		} else {
-			ptr = a.ptaRes.PointsToByGoWithLoopID(location, a.RWIns[goID][0].(*ssa.Go), a.loopIDs[goID])
+			ptr = a.ptaRes.PointsToByGoWithLoopID(location, a.RWIns[goID][0].node.(*ssa.Go), a.loopIDs[goID])
 		}
 		labels := ptr.PointsTo().Labels()
 		if labels == nil {
@@ -122,8 +122,8 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 				a.getParam = !a.getParam
 			} else {
 				if !a.exploredFunction(theFunc, goID, theIns) {
-					a.updateRecords(theFunc, goID, "PUSH ")
-					a.RWIns[goID] = append(a.RWIns[goID], theIns)
+					a.updateRecords(theIns, theFunc, goID, "PUSH ")
+					a.recordAccess(goID, theIns)
 					a.visitAllInstructions(theFunc, goID)
 				}
 			}
@@ -136,8 +136,8 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 				}
 				check := a.prog.LookupMethod(ptr.PointsTo().DynamicTypes().Keys()[0], a.main.Pkg, methodName)
 				if !a.exploredFunction(check, goID, theIns) {
-					a.updateRecords(check, goID, "PUSH ")
-					a.RWIns[goID] = append(a.RWIns[goID], theIns)
+					a.updateRecords(theIns, check, goID, "PUSH ")
+					a.recordAccess(goID, theIns)
 					a.visitAllInstructions(check, goID)
 				}
 			case *ssa.Go:

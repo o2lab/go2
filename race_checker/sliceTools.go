@@ -7,9 +7,10 @@ import (
 )
 
 // insToCallStack will return the callStack of the input instructions that called a function but did not return
-func insToCallStack(allIns []ssa.Instruction) ([]*ssa.Function, string) {
+func insToCallStack(allIns []*RWNode) ([]*ssa.Function, string) {
 	var callStack []*ssa.Function
-	for _, anIns := range allIns {
+	for _, rwnode := range allIns {
+		anIns := rwnode.node
 		if fnCall, ok := anIns.(*ssa.Call); ok {
 			callStack = append(callStack, fnCall.Call.StaticCallee())
 		} else if _, ok1 := anIns.(*ssa.Return); ok1 && len(callStack) > 0 { // TODO: need to consider function with multiple return statements
@@ -128,6 +129,15 @@ func sliceContainsStrCtr(s []string, e string) int {
 func sliceContainsInsAt(s []ssa.Instruction, e ssa.Instruction) int {
 	for i := 0; i < len(s); i++ {
 		if s[i] == e {
+			return i
+		}
+	}
+	return -1
+}
+
+func sliceContainsRWNodeAt(s []*RWNode, e ssa.Instruction) int {
+	for i := 0; i < len(s); i++ {
+		if s[i].node == e {
 			return i
 		}
 	}

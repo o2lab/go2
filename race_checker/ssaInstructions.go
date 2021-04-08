@@ -92,7 +92,7 @@ func isWriteIns(ins ssa.Instruction) bool {
 }
 
 // updateRecords will print out the stack trace
-func (a *analysis) updateRecords(fn *ssa.Function, goID int, pushPop string) {//invoke ssa.Instruction,
+func (a *analysis) updateRecords(invoke ssa.Instruction, fn *ssa.Function, goID int, pushPop string) {
 	if pushPop == "POP  " {
 		a.storeFns = a.storeFns[:len(a.storeFns)-1]
 		a.levels[goID]--
@@ -102,11 +102,11 @@ func (a *analysis) updateRecords(fn *ssa.Function, goID int, pushPop string) {//
 	}
 	if pushPop == "PUSH " {
 		info := &stackInfo{
-			//invoke: invoke, //maybe the same
-			fn: fn,  //the same
+			invoke: invoke,
+			fn: fn,
 		}
-		a.stackMap = append(a.stackMap, info)
-		a.storeFns = append(a.storeFns, fn)
+		a.curStack = append(a.curStack, info)
+		a.storeFns = append(a.storeFns, fn) //TODO: remove it
 		a.levels[goID]++
 	}
 }
@@ -134,7 +134,7 @@ func (a *analysis) insMakeChan(examIns *ssa.MakeChan, insInd int) {
 
 // insSend ???
 func (a *analysis) insSend(examIns *ssa.Send, goID int, theIns ssa.Instruction) string {
-	a.RWIns[goID] = append(a.RWIns[goID], theIns)
+	a.recordAccess(goID, theIns)
 	ch := examIns.Chan.Name()
 	if _, ok := a.chanBuf[ch]; !ok {
 		switch chN := examIns.Chan.(type) {
@@ -172,7 +172,7 @@ func (a *analysis) insStore(examIns *ssa.Store, goID int, theIns ssa.Instruction
 		//		return
 		//	}
 		//}
-		a.RWIns[goID] = append(a.RWIns[goID], theIns)
+		a.recordAccess(goID, theIns)
 		a.updateLockMap(goID, theIns)
 		if !useNewPTA {
 			a.mu.Lock()
@@ -182,11 +182,24 @@ func (a *analysis) insStore(examIns *ssa.Store, goID int, theIns ssa.Instruction
 	}
 	if theFunc, storeFn := examIns.Val.(*ssa.Function); storeFn {
 		if !a.exploredFunction(theFunc, goID, theIns) {
-			a.updateRecords(theFunc, goID, "PUSH ")
-			a.RWIns[goID] = append(a.RWIns[goID], theIns)
+			a.updateRecords(theIns, theFunc, goID, "PUSH ")
+			a.recordAccess(goID, theIns)
 			a.visitAllInstructions(theFunc, goID)
 		}
 	}
+}
+
+//bz: update a.RWIns for read and write access
+func (a *analysis) recordAccess(goID int, theIns ssa.Instruction) {
+	rwnode := &RWNode{
+		node:  theIns,
+	}
+	if doStack {
+		cpy := make([]*stackInfo, len(a.curStack))
+		copy(cpy, a.curStack)
+		rwnode.stack = cpy
+	}
+	a.RWIns[goID] = append(a.RWIns[goID], rwnode)
 }
 
 // insUnOp ???
@@ -210,14 +223,14 @@ func (a *analysis) insUnOp(examIns *ssa.UnOp, goID int, theIns ssa.Instruction) 
 				for fnKey, member := range v.Pkg.Members {
 					if memberFn, isFn := member.(*ssa.Function); isFn && fnKey != "main" && fnKey != "init" {
 						if !a.exploredFunction(memberFn, goID, theIns) {
-							a.updateRecords(memberFn, goID, "PUSH ")
+							a.updateRecords(theIns, memberFn, goID, "PUSH ")
 							a.visitAllInstructions(memberFn, goID)
 						}
 					}
 				}
 			}
 		}
-		a.RWIns[goID] = append(a.RWIns[goID], theIns)
+		a.recordAccess(goID, theIns)
 	} else if examIns.Op == token.ARROW { // channel receive op (not waited on by select)
 		ch := examIns.X.Name()
 		if _, ok := a.chanBuf[ch]; !ok {
@@ -245,14 +258,14 @@ func (a *analysis) insUnOp(examIns *ssa.UnOp, goID int, theIns ssa.Instruction) 
 		} else {
 			a.chanRcvs[ch] = append(a.chanRcvs[ch], examIns)
 		}
-		a.RWIns[goID] = append(a.RWIns[goID], theIns)
+		a.recordAccess(goID, theIns)
 	}
 }
 
 // insFieldAddr ???
 func (a *analysis) insFieldAddr(examIns *ssa.FieldAddr, goID int, theIns ssa.Instruction) {
 	if !isLocalAddr(examIns.X) {
-		a.RWIns[goID] = append(a.RWIns[goID], theIns)
+		a.recordAccess(goID, theIns)
 		a.updateLockMap(goID, theIns)
 		a.updateRLockMap(goID, theIns)
 		if !useNewPTA {
@@ -268,14 +281,14 @@ func (a *analysis) insLookUp(examIns *ssa.Lookup, goID int, theIns ssa.Instructi
 	switch readIns := examIns.X.(type) {
 	case *ssa.UnOp:
 		if readIns.Op == token.MUL && !isLocalAddr(readIns.X) {
-			a.RWIns[goID] = append(a.RWIns[goID], theIns)
+			a.recordAccess(goID, theIns)
 			a.updateLockMap(goID, theIns)
 			a.updateRLockMap(goID, theIns)
 			//a.ptaConfig0.AddQuery(readIns.X)
 		}
 	case *ssa.Parameter:
 		if !isLocalAddr(readIns) {
-			a.RWIns[goID] = append(a.RWIns[goID], theIns)
+			a.recordAccess(goID, theIns)
 			a.updateLockMap(goID, theIns)
 			a.updateRLockMap(goID, theIns)
 			if !useNewPTA {
@@ -294,8 +307,8 @@ func (a *analysis) insChangeType(examIns *ssa.ChangeType, goID int, theIns ssa.I
 		theFn := mc.Fn.(*ssa.Function)
 		if a.fromPkgsOfInterest(theFn) {
 			if !a.exploredFunction(theFn, goID, theIns) {
-				a.updateRecords(theFn, goID, "PUSH ")
-				a.RWIns[goID] = append(a.RWIns[goID], theIns)
+				a.updateRecords(theIns, theFn, goID, "PUSH ")
+				a.recordAccess(goID, theIns)
 				a.updateLockMap(goID, theIns)
 				a.updateRLockMap(goID, theIns)
 				if !useNewPTA {
@@ -340,7 +353,7 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 		} else if examIns.Call.Value.Name() == "delete" { // built-in delete op
 			if theVal, ok := examIns.Call.Args[0].(*ssa.UnOp); ok {
 				if theVal.Op == token.MUL && !isLocalAddr(theVal.X) {
-					a.RWIns[goID] = append(a.RWIns[goID], theIns)
+					a.recordAccess(goID, theIns)
 					a.updateLockMap(goID, theIns)
 					a.updateRLockMap(goID, theIns)
 					if !useNewPTA {
@@ -387,7 +400,7 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 			switch access := checkArgs.(type) {
 			case *ssa.FieldAddr:
 				if !isLocalAddr(access.X) && strings.HasPrefix(examIns.Call.Value.Name(), "Add") {
-					a.RWIns[goID] = append(a.RWIns[goID], theIns)
+					a.recordAccess(goID, theIns)
 					a.updateLockMap(goID, theIns)
 					a.updateRLockMap(goID, theIns)
 					if !useNewPTA {
@@ -405,8 +418,8 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 		}
 		staticTar := examIns.Call.StaticCallee()
 		if !a.exploredFunction(staticTar, goID, theIns) {
-			a.updateRecords(staticTar, goID, "PUSH ")
-			a.RWIns[goID] = append(a.RWIns[goID], theIns)
+			a.updateRecords(theIns, staticTar, goID, "PUSH ")
+			a.recordAccess(goID, theIns)
 			a.visitAllInstructions(staticTar, goID)
 		}
 	} else if examIns.Call.StaticCallee().Pkg != nil && examIns.Call.StaticCallee().Pkg.Pkg.Name() == "sync" {
@@ -414,8 +427,8 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 		case "Range":
 			staticTar := examIns.Call.StaticCallee()
 			if !a.exploredFunction(staticTar, goID, theIns) {
-				a.updateRecords(staticTar, goID, "PUSH ")
-				a.RWIns[goID] = append(a.RWIns[goID], theIns)
+				a.updateRecords(theIns, staticTar, goID, "PUSH ")
+				a.recordAccess(goID, theIns)
 				a.visitAllInstructions(staticTar, goID)
 			}
 		case "Lock":
@@ -473,14 +486,14 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 				a.RlockSet[goID][a.lockSetContainsAt(a.RlockSet, RlockLoc, goID)].locFreeze = true
 			}
 		case "Wait":
-			a.RWIns[goID] = append(a.RWIns[goID], theIns)
+			a.recordAccess(goID, theIns)
 			if !useNewPTA {
 				a.mu.Lock()
 				a.ptaCfg0.AddQuery(examIns.Call.Args[0])
 				a.mu.Unlock()
 			}
 		case "Done":
-			a.RWIns[goID] = append(a.RWIns[goID], theIns)
+			a.recordAccess(goID, theIns)
 			if !useNewPTA {
 				a.mu.Lock()
 				a.ptaCfg0.AddQuery(examIns.Call.Args[0])
@@ -493,8 +506,8 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 				return
 			}
 			if !a.exploredFunction(staticTar, goID, theIns) {
-				a.updateRecords(staticTar, goID, "PUSH ")
-				a.RWIns[goID] = append(a.RWIns[goID], theIns)
+				a.updateRecords(theIns, staticTar, goID, "PUSH ")
+				a.recordAccess(goID, theIns)
 				a.visitAllInstructions(staticTar, goID)
 			}
 		}
@@ -535,7 +548,7 @@ func (a *analysis) insGo(examIns *ssa.Go, goID int, theIns ssa.Instruction, loop
 	} else {
 		a.loopIDs[newGoID] = 0
 	}
-	a.RWIns[goID] = append(a.RWIns[goID], theIns)
+	a.recordAccess(goID, theIns)
 	if goID == 0 && a.insDRA == 0 { // this is first *ssa.Go instruction in main goroutine
 		a.insDRA = len(a.RWIns[goID]) // race analysis will begin at this instruction
 	}
@@ -556,7 +569,7 @@ func (a *analysis) insGo(examIns *ssa.Go, goID int, theIns ssa.Instruction, loop
 }
 
 func (a *analysis) insMapUpdate(examIns *ssa.MapUpdate, goID int, theIns ssa.Instruction) {
-	a.RWIns[goID] = append(a.RWIns[goID], theIns)
+	a.recordAccess(goID, theIns)
 	a.updateLockMap(goID, theIns)
 	switch ptType := examIns.Map.(type) {
 	case *ssa.UnOp:
@@ -570,7 +583,7 @@ func (a *analysis) insMapUpdate(examIns *ssa.MapUpdate, goID int, theIns ssa.Ins
 }
 
 func (a *analysis) insSelect(examIns *ssa.Select, goID int, theIns ssa.Instruction) []string {
-	a.RWIns[goID] = append(a.RWIns[goID], theIns)
+	a.recordAccess(goID, theIns)
 	defaultCase := 0
 	if !examIns.Blocking { defaultCase++ } // non-blocking select
 	readyChans := make([]string, len(examIns.States) + defaultCase) // name of ready channels

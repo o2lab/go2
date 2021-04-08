@@ -29,27 +29,27 @@ type analysis struct {
 	efficiency      bool
 	trieLimit       int
 	getGo           bool // flag
-	prog            *ssa.Program
-	pkgs            []*ssa.Package
-	main            *ssa.Package
-	analysisStat    stat
-	HBgraph         *graph.Graph
-	RWinsMap        map[goIns]graph.Node
-	trieMap         map[fnInfo]*trie    // map each function to a trie node
-	RWIns           [][]ssa.Instruction // instructions grouped by goroutine
-	insDRA          int                 // index of instruction (in main goroutine) at which to begin data race analysis
-	storeFns        []*ssa.Function
-	stackMap        []*stackInfo //bz: update
-	workList        []goroutineInfo
-	reportedAddr    [][2]ssa.Value // stores already reported addresses -> bz: make sure both are not presented together as a pair
-	levels          map[int]int
-	lockMap         map[ssa.Instruction][]ssa.Value // map each read/write access to a snapshot of actively maintained lockset
-	lockSet         map[int][]*lockInfo             // active lockset, to be maintained along instruction traversal
-	RlockMap        map[ssa.Instruction][]ssa.Value // map each read/write access to a snapshot of actively maintained lockset
-	RlockSet        map[int][]*lockInfo             // active lockset, to be maintained along instruction traversal
-	getParam        bool
-	paramFunc       *ssa.Function
-	goStack         [][]*ssa.Function
+	prog         *ssa.Program
+	pkgs         []*ssa.Package
+	main         *ssa.Package
+	analysisStat stat
+	HBgraph      *graph.Graph
+	RWinsMap     map[goIns]graph.Node
+	trieMap      map[fnInfo]*trie    // map each function to a trie node
+	RWIns        [][]*RWNode // instructions grouped by goroutine
+	insDRA       int                 // index of instruction (in main goroutine) at which to begin data race analysis
+	storeFns     []*ssa.Function
+	curStack     []*stackInfo //bz: current stack
+	workList     []goroutineInfo
+	reportedAddr [][2]ssa.Value // stores already reported addresses -> bz: make sure both are not presented together as a pair
+	levels       map[int]int
+	lockMap      map[ssa.Instruction][]ssa.Value // map each read/write access to a snapshot of actively maintained lockset
+	lockSet      map[int][]*lockInfo             // active lockset, to be maintained along instruction traversal
+	RlockMap     map[ssa.Instruction][]ssa.Value // map each read/write access to a snapshot of actively maintained lockset
+	RlockSet     map[int][]*lockInfo             // active lockset, to be maintained along instruction traversal
+	getParam     bool
+	paramFunc    *ssa.Function
+	goStack      [][]*ssa.Function
 	goCaller        map[int]int
 	goCalls         map[int]*ssa.Go
 	chanToken       map[string]string      // map token number to channel name
@@ -82,11 +82,11 @@ type analysis struct {
 
 type RWNode struct {
 	node  ssa.Instruction
-	stack []*stackInfo //deep copy
+	stack []*stackInfo
 }
 
 type stackInfo struct {
-	invoke ssa.Instruction
+	invoke ssa.Instruction //is nil if fn == main
 	fn     *ssa.Function
 }
 
@@ -102,6 +102,7 @@ type raceInfo struct {
 	addrPair [2]ssa.Value
 	goIDs    []int
 	insInd   []int
+	stacks   [][]*stackInfo //is nil if doStack = false
 }
 
 type raceReport struct {
@@ -163,6 +164,7 @@ type trie struct {
 }
 
 var (
+	doStack = true  //bz: whether to record the []*stackInfo for each rwnode
 	excludedPkgs []string
 	testMode     = false // Used by race_test.go for collecting output.
 	//bz: my code

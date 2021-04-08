@@ -36,11 +36,11 @@ func (a *analysis) checkRacyPairs() []*raceInfo {
 	for i := 0; i < len(a.RWIns); i++ {
 		for j := i + 1; j < len(a.RWIns); j++ { // must be in different goroutines, j always greater than i
 			for ii, goI := range a.RWIns[i] {
-				if (i == 0 && ii < a.insDRA) || (channelComm && sliceContainsBloc(a.omitComm, goI.Block())) {
+				if (i == 0 && ii < a.insDRA) || (channelComm && sliceContainsBloc(a.omitComm, goI.node.Block())) {
 					continue
 				}
 				for jj, goJ := range a.RWIns[j] {
-					if channelComm && sliceContainsBloc(a.omitComm, goJ.Block()) {
+					if channelComm && sliceContainsBloc(a.omitComm, goJ.node.Block()) {
 						continue
 					}
 					////!!!! bz: for my debug, please comment off, do not delete
@@ -49,11 +49,13 @@ func (a *analysis) checkRacyPairs() []*raceInfo {
 					//	fmt.Println() //goI:  &t6[t9]  (i:  1 )  goJ:  *checkName  (j:  3 )
 					//}
 
-					if (isWriteIns(goI) && isWriteIns(goJ)) || (isWriteIns(goI) && a.isReadIns(goJ)) || (a.isReadIns(goI) && isWriteIns(goJ)) { // only read and write instructions
-						if isLocal(goI) && isLocal(goJ) { // both are locally declared
+					goINode := goI.node
+					goJNode := goJ.node
+					if (isWriteIns(goINode) && isWriteIns(goJNode)) || (isWriteIns(goINode) && a.isReadIns(goJNode)) || (a.isReadIns(goINode) && isWriteIns(goJNode)) { // only read and write instructions
+						if isLocal(goINode) && isLocal(goJNode) { // both are locally declared
 							continue
 						}
-						insSlice := []ssa.Instruction{goI, goJ}
+						insSlice := []ssa.Instruction{goINode, goJNode}
 						addressPair := a.insAddress(insSlice) // one instruction from each goroutine
 						if addressPair[0] == nil || addressPair[1] == nil {
 							continue
@@ -78,20 +80,26 @@ func (a *analysis) checkRacyPairs() []*raceInfo {
 						//}
 						if a.sameAddress(addressPair[0], addressPair[1], i, j) &&
 							!sliceContains(a.reportedAddr, addressPair) &&
-							!a.reachable(goI, i, goJ, j) &&
-							!a.reachable(goJ, j, goI, i) &&
+							!a.reachable(goINode, i, goJNode, j) &&
+							!a.reachable(goJNode, j, goINode, i) &&
 							!a.bothAtomic(insSlice[0], insSlice[1]) &&
-							!a.lockSetsIntersect(goI, goJ, i, j) &&
+							!a.lockSetsIntersect(goINode, goJNode, i, j) &&
 							!a.selectMutEx(insSlice[0], insSlice[1]) {
 							a.reportedAddr = append(a.reportedAddr, addressPair)
+
+							stacks := make([][]*stackInfo, 2)
+							stacks[0] = goI.stack
+							stacks[1] = goJ.stack
 							ri := &raceInfo{
 								insPair: 	insSlice,
 								addrPair: 	addressPair,
 								goIDs: 		[]int{i, j},
 								insInd: 	[]int{ii, jj},
+								stacks:     stacks,
 							}
+
 							if !allEntries {
-								a.printRace(len(a.reportedAddr), insSlice, addressPair, []int{i, j}, []int{ii, jj})
+								a.printRace(len(a.reportedAddr), ri)
 							}
 							races = append(races, ri)
 						}
@@ -157,7 +165,7 @@ func (a *analysis) sameAddress(addr1 ssa.Value, addr2 ssa.Value, go1 int, go2 in
 				} else {
 					nonZeroGoID = go1
 				}
-				if !sliceContainsFreeVar(a.bindingFV[a.RWIns[nonZeroGoID][0].(*ssa.Go)], freevar1) {
+				if !sliceContainsFreeVar(a.bindingFV[a.RWIns[nonZeroGoID][0].node.(*ssa.Go)], freevar1) {
 					return true
 				} else {
 					return false
@@ -188,12 +196,12 @@ func (a *analysis) sameAddress(addr1 ssa.Value, addr2 ssa.Value, go1 int, go2 in
 	if go1 == 0 {
 		pt1 = a.ptaRes.PointsToByGoWithLoopID(addr1, nil, a.loopIDs[go1])
 	} else {
-		pt1 = a.ptaRes.PointsToByGoWithLoopID(addr1, a.RWIns[go1][0].(*ssa.Go), a.loopIDs[go1])
+		pt1 = a.ptaRes.PointsToByGoWithLoopID(addr1, a.RWIns[go1][0].node.(*ssa.Go), a.loopIDs[go1])
 	}
 	if go2 == 0 {
 		pt2 = a.ptaRes.PointsToByGoWithLoopID(addr2, nil, a.loopIDs[go2])
 	} else {
-		pt2 = a.ptaRes.PointsToByGoWithLoopID(addr2, a.RWIns[go2][0].(*ssa.Go), a.loopIDs[go2])
+		pt2 = a.ptaRes.PointsToByGoWithLoopID(addr2, a.RWIns[go2][0].node.(*ssa.Go), a.loopIDs[go2])
 	}
 	return pt1.MayAlias(pt2)
 }
@@ -309,7 +317,13 @@ func getSrcPos(address ssa.Value) token.Pos {
 //func (a *analysis) reportRace
 
 // printRace will print the details of a data race such as the write/read of a variable and other helpful information
-func (a *analysis) printRace(counter int, insPair []ssa.Instruction, addrPair [2]ssa.Value, goIDs []int, insInd []int) {
+func (a *analysis) printRace(counter int, race *raceInfo) {
+	insPair := race.insPair
+	addrPair := race.addrPair
+	goIDs := race.goIDs
+	//insInd := race.insInd //bz: not used
+	stacks := race.stacks
+
 	log.Printf("Data race #%d", counter)
 	log.Println(strings.Repeat("=", 100))
 	var writeLocks []ssa.Value
@@ -341,9 +355,16 @@ func (a *analysis) printRace(counter int, insPair []ssa.Instruction, addrPair [2
 		} else {
 			log.Println("\tin goroutine  ***", a.goNames(a.goCalls[goIDs[i]]), "[", goIDs[i], "] *** ", a.prog.Fset.Position(a.goCalls[goIDs[i]].Pos()))
 		}
-		//for p, everyFn := range a.stackMap[insPair[i].Parent()] {
-		//	log.Println("\t ", strings.Repeat(" ", p), everyFn.Name(), a.prog.Fset.Position(everyFn.Pos()))
-		//}
+		if doStack {//bz: only print if true -> for performance purpose
+			for p, stack := range stacks[i] {
+				everyFn := stack.fn
+				invoke := stack.invoke
+				if invoke != nil { //main has nil invoke
+					log.Println("\t ", strings.Repeat(" ", p), "@", invoke.String(), a.prog.Fset.Position(invoke.Pos())) //bz: this is the invoke instruction location
+				}
+				log.Println("\t ", strings.Repeat(" ", p + 1), everyFn.Name(), a.prog.Fset.Position(everyFn.Pos())) //bz: this is the callee func location
+			}
+		}
 		if goIDs[i] > 0 { // subroutines
 			log.Debug("call stack: ")
 		}

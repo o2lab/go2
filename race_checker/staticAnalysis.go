@@ -247,25 +247,25 @@ func (runner *AnalysisRunner) Run(args []string) error {
 				ptaRes0:  runner.ptaResult0,
 				ptaCfg0:  runner.ptaConfig0,
 				//race-checker uses
-				prog:     runner.prog,
-				pkgs:     runner.pkgs,
-				efficiency:      efficiency,
-				trieLimit:   	 trieLimit,
-				getGo:   		 getGo,
-				main:            main,
-				RWinsMap:        make(map[goIns]graph.Node),
-				trieMap:         make(map[fnInfo]*trie),
-				stackMap:  		 make([]*stackInfo, 0),
-				insDRA:          0,
-				levels:          make(map[int]int),
-				lockMap:         make(map[ssa.Instruction][]ssa.Value),
-				lockSet:         make(map[int][]*lockInfo),
-				RlockMap:        make(map[ssa.Instruction][]ssa.Value),
-				RlockSet:        make(map[int][]*lockInfo),
-				goCaller:        make(map[int]int),
-				goCalls:         make(map[int]*ssa.Go),
-				chanToken:       make(map[string]string),
-				chanBuf:         make(map[string]int),
+				prog:       runner.prog,
+				pkgs:       runner.pkgs,
+				efficiency: efficiency,
+				trieLimit:  trieLimit,
+				getGo:      getGo,
+				main:       main,
+				RWinsMap:   make(map[goIns]graph.Node),
+				trieMap:    make(map[fnInfo]*trie),
+				curStack:   make([]*stackInfo, 0),
+				insDRA:     0,
+				levels:     make(map[int]int),
+				lockMap:    make(map[ssa.Instruction][]ssa.Value),
+				lockSet:    make(map[int][]*lockInfo),
+				RlockMap:   make(map[ssa.Instruction][]ssa.Value),
+				RlockSet:   make(map[int][]*lockInfo),
+				goCaller:   make(map[int]int),
+				goCalls:    make(map[int]*ssa.Go),
+				chanToken:  make(map[string]string),
+				chanBuf:    make(map[string]int),
 				chanRcvs:        make(map[string][]*ssa.UnOp),
 				chanSnds:        make(map[string][]*ssa.Send),
 				selectBloc:      make(map[int]*ssa.Select),
@@ -394,7 +394,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 				a := e.a
 				for i, r := range e.racePairs {
 					if r != nil {
-						a.printRace(i+1, r.insPair, r.addrPair, r.goIDs, r.insInd) //bz: with details
+						a.printRace(i+1, r) //bz: with details
 					}
 				}
 			} else {
