@@ -164,23 +164,24 @@ type trie struct {
 }
 
 var (
-	doStack = true  //bz: whether to record the []*stackInfo for each rwnode
+	useNewPTA = true
+	trieLimit = 2      // set as user config option later, an integer that dictates how many times a function can be called under identical context
+	efficiency = true  // configuration setting to avoid recursion in tested program
+	channelComm = true // analyze channel communication
+	entryFn = "main"
+	allEntries = false
+	useDefaultPTA = false
+	getGo = false
+	goTest bool // running test script
+	fromPath = ""
+
 	excludedPkgs []string
 	testMode     = false // Used by race_test.go for collecting output.
-	//bz: my code
-	doneInitialChecker = false //bz: whether i've initialized checker for test mode
-)
+	doStack      = true //bz: whether to record the []*stackInfo for each rwnode
 
-var useNewPTA = true
-var trieLimit = 2      // set as user config option later, an integer that dictates how many times a function can be called under identical context
-var efficiency = true  // configuration setting to avoid recursion in tested program
-var channelComm = true // analyze channel communication
-var entryFn = "main"
-var allEntries = false
-var useDefaultPTA = false
-var getGo = false
-var goTest bool // running test script
-var fromPath = ""
+	//bz: for pta use
+	doneInitialChecker = false //bz: whether i've already initialized checker for test mode
+)
 
 func init() {
 	excludedPkgs = []string{

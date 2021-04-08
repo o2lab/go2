@@ -35,15 +35,27 @@ func (a *analysis) fromPkgsOfInterest(fn *ssa.Function) bool {
 		return true
 	}
 	for _, excluded := range excludedPkgs {
-		if fn.Pkg.Pkg.Name() == excluded {
+		if fn.Pkg.Pkg.Name() == excluded || fn.Pkg.Pkg.Path() == excluded {//bz: some lib's Pkg.Name() == "Package", not the used import xxx; if so, check Pkg.Path()
 			return false
 		}
 	}
-	if a.efficiency && a.main.Pkg.Path() != "command-line-arguments" && !strings.HasPrefix(fn.Pkg.Pkg.Path(), strings.Split(a.main.Pkg.Path(), "/")[0]) { // path is dependent on tested program
-		if a.ptaRes.GetMySyntheticFn(fn) != nil {
-			return true //bz: want the synthetic fn and its target
+	//if a.efficiency && a.main.Pkg.Path() != "command-line-arguments" && !strings.HasPrefix(fn.Pkg.Pkg.Path(), strings.Split(a.main.Pkg.Path(), "/")[0]) { // path is dependent on tested program
+	if a.efficiency && a.main.Pkg.Path() != "command-line-arguments" {
+		if fromPath == "" {//no scope specified
+			if !strings.HasPrefix(fn.Pkg.Pkg.Path(), a.main.Pkg.Path()) { // path is dependent on tested program
+				if a.ptaRes.GetMySyntheticFn(fn) != nil {
+					return true //bz: want the synthetic fn and its target
+				}
+				return false
+			}
+		}else{//bz: make this traversal the same with scope == fromPath
+			if !strings.HasPrefix(fn.Pkg.Pkg.Path(), fromPath) { // path is dependent on tested program
+				if a.ptaRes.GetMySyntheticFn(fn) != nil {
+					return true //bz: want the synthetic fn and its target
+				}
+				return false
+			}
 		}
-		return false
 	}
 	return true
 }
@@ -119,7 +131,7 @@ func pkgSelection(initial []*packages.Package) ([]*ssa.Package, *ssa.Program, []
 			if mainInd == "-" {
 				fmt.Print("Enter function name to begin analysis from: ")
 				fmt.Scan(&enterAt)
-				for _ , p := range pkgs {
+				for _, p := range pkgs {
 					if p != nil {
 						if fnMem, okf := p.Members[enterAt]; okf { // package contains function to enter at
 							userEP = true
@@ -194,13 +206,13 @@ func (runner *AnalysisRunner) Run(args []string) error {
 			Origin:         true, //origin
 			//shared config
 			K:          1,
-			LimitScope: true,  //bz: only consider app methods now -> no import will be considered
-			DEBUG:      false, //bz: rm all printed out info in console
+			LimitScope: true,         //bz: only consider app methods now -> no import will be considered
+			DEBUG:      false,        //bz: rm all printed out info in console
 			Scope:      scope,        //bz: analyze scope
-			Exclusion: excludedPkgs, //bz: copied from race_checker if any
-			TrackMore: true,         //bz: track pointers with all types
-			Level:     1,            //bz: see pointer.Config
-			DoCallback: true,        //bz: simplified callback
+			Exclusion:  excludedPkgs, //bz: copied from race_checker if any
+			TrackMore:  true,         //bz: track pointers with all types
+			Level:      1,            //bz: see pointer.Config
+			DoCallback: true,         //bz: simplified callback
 		}
 		//bz: setup callback stuff
 		_, filename, _, ok := runtime.Caller(1)
@@ -213,7 +225,8 @@ func (runner *AnalysisRunner) Run(args []string) error {
 				myutil.InitialChecker(filepath, runner.ptaConfig)
 				doneInitialChecker = true
 			}
-		}else {
+			doStack = false
+		} else {
 			myutil.InitialChecker(filepath, runner.ptaConfig)
 		}
 		start := time.Now()                                               //performance
@@ -245,34 +258,34 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		go func(main *ssa.Package) {
 			defer wg.Done()
 			// Configure static analysis...
-		fmt.Println("Detect ... ", main)
+			fmt.Println("Detect ... ", main)
 			Analysis := &analysis{
 				//bz: mine
-				ptaRes:   runner.ptaResult[main],
-				ptaCfg:   runner.ptaConfig,
+				ptaRes: runner.ptaResult[main],
+				ptaCfg: runner.ptaConfig,
 				//bz: default
-				ptaRes0:  runner.ptaResult0,
-				ptaCfg0:  runner.ptaConfig0,
+				ptaRes0: runner.ptaResult0,
+				ptaCfg0: runner.ptaConfig0,
 				//race-checker uses
-				prog:       runner.prog,
-				pkgs:       runner.pkgs,
-				efficiency: efficiency,
-				trieLimit:  trieLimit,
-				getGo:      getGo,
-				main:       main,
-				RWinsMap:   make(map[goIns]graph.Node),
-				trieMap:    make(map[fnInfo]*trie),
-				curStack:   make([]*stackInfo, 0),
-				insDRA:     0,
-				levels:     make(map[int]int),
-				lockMap:    make(map[ssa.Instruction][]ssa.Value),
-				lockSet:    make(map[int][]*lockInfo),
-				RlockMap:   make(map[ssa.Instruction][]ssa.Value),
-				RlockSet:   make(map[int][]*lockInfo),
-				goCaller:   make(map[int]int),
-				goCalls:    make(map[int]*ssa.Go),
-				chanToken:  make(map[string]string),
-				chanBuf:    make(map[string]int),
+				prog:            runner.prog,
+				pkgs:            runner.pkgs,
+				efficiency:      efficiency,
+				trieLimit:       trieLimit,
+				getGo:           getGo,
+				main:            main,
+				RWinsMap:        make(map[goIns]graph.Node),
+				trieMap:         make(map[fnInfo]*trie),
+				curStack:        make([]*stackInfo, 0),
+				insDRA:          0,
+				levels:          make(map[int]int),
+				lockMap:         make(map[ssa.Instruction][]ssa.Value),
+				lockSet:         make(map[int][]*lockInfo),
+				RlockMap:        make(map[ssa.Instruction][]ssa.Value),
+				RlockSet:        make(map[int][]*lockInfo),
+				goCaller:        make(map[int]int),
+				goCalls:         make(map[int]*ssa.Go),
+				chanToken:       make(map[string]string),
+				chanBuf:         make(map[string]int),
 				chanRcvs:        make(map[string][]*ssa.UnOp),
 				chanSnds:        make(map[string][]*ssa.Send),
 				selectBloc:      make(map[int]*ssa.Select),
@@ -288,9 +301,9 @@ func (runner *AnalysisRunner) Run(args []string) error {
 				inLoop:          false,
 				goInLoop:        make(map[int]bool),
 				loopIDs:         make(map[int]int),
-				allocLoop:   	 make(map[*ssa.Function][]string),
+				allocLoop:       make(map[*ssa.Function][]string),
 				bindingFV:       make(map[*ssa.Go][]*ssa.FreeVar),
-				commIDs:  		 make(map[int][]int),
+				commIDs:         make(map[int][]int),
 				twinGoID:        make(map[*ssa.Go][]int),
 			}
 			if strings.Contains(main.Pkg.Path(), "GoBench") { // for testing purposes
@@ -326,7 +339,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 					log.Debug("Goroutine ", i, "  --  ", name)
 					if Analysis.goInLoop[i] {
 						log.Debug("Goroutine ", i, "  --  ", name, strings.Repeat(" *", 10), " spawned by a loop", strings.Repeat(" *", 10))
-					}else {
+					} else {
 						log.Debug("Goroutine ", i, "  --  ", name)
 					}
 					if i > 0 {
@@ -380,7 +393,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 				log.Info("Checking for data races... ")
 			}
 			rr := &raceReport{
-				a: Analysis, //bz: a lot of fields from analysis are missing when creating rr, e.g., goCalls, goCallers, etc
+				a:         Analysis, //bz: a lot of fields from analysis are missing when creating rr, e.g., goCalls, goCallers, etc
 				entryInfo: main.Pkg.Path(),
 			}
 			rr.racePairs = Analysis.checkRacyPairs()

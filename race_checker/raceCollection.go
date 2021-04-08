@@ -91,11 +91,11 @@ func (a *analysis) checkRacyPairs() []*raceInfo {
 							stacks[0] = goI.stack
 							stacks[1] = goJ.stack
 							ri := &raceInfo{
-								insPair: 	insSlice,
-								addrPair: 	addressPair,
-								goIDs: 		[]int{i, j},
-								insInd: 	[]int{ii, jj},
-								stacks:     stacks,
+								insPair:  insSlice,
+								addrPair: addressPair,
+								goIDs:    []int{i, j},
+								insInd:   []int{ii, jj},
+								stacks:   stacks,
 							}
 
 							if !allEntries {
@@ -151,7 +151,7 @@ func (a *analysis) insAddress(insSlice []ssa.Instruction) [2]ssa.Value { // obta
 func (a *analysis) sameAddress(addr1 ssa.Value, addr2 ssa.Value, go1 int, go2 int) bool {
 	if global1, ok1 := addr1.(*ssa.Global); ok1 {
 		if global2, ok2 := addr2.(*ssa.Global); ok2 {
-			if global1.Pos() == global2.Pos() {// compare position of identifiers
+			if global1.Pos() == global2.Pos() { // compare position of identifiers
 				return true
 			}
 		}
@@ -281,7 +281,7 @@ func (a *analysis) lockSetsIntersect(insA ssa.Instruction, insB ssa.Instruction,
 
 func (a *analysis) bothAtomic(insA ssa.Instruction, insB ssa.Instruction) bool {
 	if aCall, ok := insA.(*ssa.Call); ok && aCall.Call.StaticCallee() != nil {
-		if bCall, ok0 := insB.(*ssa.Call); ok0 && bCall.Call.StaticCallee() != nil{
+		if bCall, ok0 := insB.(*ssa.Call); ok0 && bCall.Call.StaticCallee() != nil {
 			if aCall.Call.StaticCallee().Pkg.Pkg.Name() == "atomic" && bCall.Call.StaticCallee().Pkg.Pkg.Name() == "atomic" {
 				return true
 			}
@@ -332,16 +332,24 @@ func (a *analysis) printRace(counter int, race *raceInfo) {
 		var errMsg string
 		var access string
 		if isWriteIns(anIns) {
-			access = " Write of "
+			access = "Write of "
 			if _, ok := anIns.(*ssa.Call); ok {
-				errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].String()), " in function ", aurora.BrightGreen(anIns.Parent().Name()), " at ", a.getLocation(addrPair[i]))
+				errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].String()), " in function ", aurora.BrightGreen(anIns.Parent().Name()), " at ", a.getValueLOC(addrPair[i]))
 			} else {
-				errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].String()), " in function ", aurora.BrightGreen(anIns.Parent().Name()), " at ", a.getLocation2(insPair[i]))
+				errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].String()), " in function ", aurora.BrightGreen(anIns.Parent().Name()), " at ", a.getInstLOC(insPair[i]))
 			}
 			writeLocks = a.lockMap[anIns]
 		} else {
-			access = " Read of "
-			errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].String()), " in function ", aurora.BrightGreen(anIns.Parent().Name()), " at ", a.getLocation2(anIns))
+			access = "Read of "
+			if testMode {
+				errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].String()), " in function ", aurora.BrightGreen(anIns.Parent().Name()), " at ", a.getInstLOC(anIns))
+			}else{
+				if _, ok := anIns.(*ssa.Call); ok {
+					errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].String()), " in function ", aurora.BrightGreen(anIns.Parent().Name()), " at ", a.getValueLOC(addrPair[i]))
+				} else {
+					errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].String()), " in function ", aurora.BrightGreen(anIns.Parent().Name()), " at ", a.getInstLOC(insPair[i]))
+				}
+			}
 			readLocks = append(a.lockMap[anIns], a.RlockMap[anIns]...)
 		}
 		if testMode {
@@ -353,16 +361,18 @@ func (a *analysis) printRace(counter int, race *raceInfo) {
 		if goIDs[i] == 0 { // main goroutine
 			log.Println("\tin goroutine  ***  main  [", goIDs[i], "] *** ")
 		} else {
-			log.Println("\tin goroutine  ***", a.goNames(a.goCalls[goIDs[i]]), "[", goIDs[i], "] *** ", a.prog.Fset.Position(a.goCalls[goIDs[i]].Pos()))
+			log.Println("\tin goroutine  ***", a.goNames(a.goCalls[goIDs[i]]), "[", goIDs[i], "] *** ", a.getInstLOC(a.goCalls[goIDs[i]]))
 		}
-		if doStack {//bz: only print if true -> for performance purpose
+		if doStack { //bz: only print if true -> for performance purpose
 			for p, stack := range stacks[i] {
 				everyFn := stack.fn
 				invoke := stack.invoke
 				if invoke != nil { //main has nil invoke
-					log.Println("\t ", strings.Repeat(" ", p), "@", invoke.String(), a.prog.Fset.Position(invoke.Pos())) //bz: this is the invoke instruction location
+					log.Println("\t ", strings.Repeat(" ", p), "@", invoke.String(), a.getInstLOC(invoke)) //bz: this is the invoke instruction location
+					//log.Println("\t  @", invoke.String(), a.prog.Fset.Position(invoke.Pos())) //bz: this is the invoke instruction location
 				}
-				log.Println("\t ", strings.Repeat(" ", p + 1), everyFn.Name(), a.prog.Fset.Position(everyFn.Pos())) //bz: this is the callee func location
+				log.Println("\t ", strings.Repeat(" ", p), "->", everyFn.Name(), a.getValueLOC(everyFn)) //bz: this is the callee func location
+				//log.Println("\t  ->", everyFn.Name(), a.prog.Fset.Position(everyFn.Pos())) //bz: this is the callee func location
 			}
 		}
 		if goIDs[i] > 0 { // subroutines
@@ -380,9 +390,9 @@ func (a *analysis) printRace(counter int, race *raceInfo) {
 				eachStack := a.goStack[eachGo]
 				for k, eachFn := range eachStack {
 					if k == 0 {
-						log.Debug("\t ", strings.Repeat(" ", q), "--> Goroutine: ", eachFn.Name(), "[", a.goCaller[eachGo], "] ", a.prog.Fset.Position(eachFn.Pos()))
+						log.Debug("\t ", strings.Repeat(" ", q), "--> Goroutine: ", eachFn.Name(), "[", a.goCaller[eachGo], "] ", a.getValueLOC(eachFn))
 					} else {
-						log.Debug("\t   ", strings.Repeat(" ", q), strings.Repeat(" ", k), eachFn.Name(), " ", a.prog.Fset.Position(eachFn.Pos()))
+						log.Debug("\t   ", strings.Repeat(" ", q), strings.Repeat(" ", k), eachFn.Name(), " ", a.getValueLOC(eachFn))
 					}
 				}
 			}
@@ -393,15 +403,32 @@ func (a *analysis) printRace(counter int, race *raceInfo) {
 	log.Println(strings.Repeat("=", 100))
 }
 
-//bz: i want all locations
-func (a *analysis) getLocation(val ssa.Value) token.Position {
+//bz: locations of ssa.Value
+func (a *analysis) getValueLOC(val ssa.Value) token.Position {
 	return a.prog.Fset.Position(val.Pos())
 }
 
-func (a *analysis) getLocation2(inst ssa.Instruction) token.Position {
-	return a.prog.Fset.Position(inst.Pos())
-}
-
-func (a *analysis) getLocation3(tok token.Pos) token.Position {
-	return a.prog.Fset.Position(tok)
+//bz: locations of ssa.Instruction
+func (a *analysis) getInstLOC(inst ssa.Instruction) token.Position {
+	pos := a.prog.Fset.Position(inst.Pos())
+	if testMode {
+		return pos
+	}
+ 	if !pos.IsValid() {
+		switch v := inst.(type) {
+		case *ssa.UnOp:
+			pos = a.prog.Fset.Position(v.X.Pos())
+		case *ssa.Send:
+			pos = a.prog.Fset.Position(v.X.Pos())
+		case *ssa.Call:
+			pos = a.prog.Fset.Position(v.Call.Pos())
+		case *ssa.RunDefers:
+			pos = a.prog.Fset.Position((*v.Referrers())[0].Pos())
+		case *ssa.Go:
+			pos = a.prog.Fset.Position(v.Call.Pos())
+		default:
+			panic("Handle Me: Cannot find pos: type: " + v.String())
+		}
+	}
+	return pos
 }

@@ -94,6 +94,7 @@ func isWriteIns(ins ssa.Instruction) bool {
 // updateRecords will print out the stack trace
 func (a *analysis) updateRecords(invoke ssa.Instruction, fn *ssa.Function, goID int, pushPop string) {
 	if pushPop == "POP  " {
+		a.curStack = a.curStack[:len(a.curStack)-1]
 		a.storeFns = a.storeFns[:len(a.storeFns)-1]
 		a.levels[goID]--
 	}

@@ -112,7 +112,7 @@ var posMsgRx = regexp.MustCompile(`^ (.*) at (.*:[0-9]+:[0-9]+)$`)
 //
 func splitError(err error) (pos, msg string) {
 	msg = err.Error()
-	if m := posMsgRx.FindStringSubmatch(msg); len(m) == 3 {
+	if m := posMsgRx.FindStringSubmatch(msg); len(m) == 3 { //TODO: bz: this cannot separate msg as before
 		msg = m[1]
 		pos = m[2]
 	}

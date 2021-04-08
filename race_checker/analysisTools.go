@@ -632,7 +632,14 @@ func (a *analysis) newGoroutine(info goroutineInfo) {
 	if info.goIns == a.goCalls[a.goCaller[info.goID]] {
 		return // recursive spawning of same goroutine
 	}
+	//bz: update both
 	a.storeFns = append(a.storeFns, info.entryMethod)
+	sInfo := &stackInfo{
+		invoke: info.goIns,
+		fn: info.entryMethod,
+	}
+	a.curStack = append(a.curStack, sInfo)
+
 	if info.goID >= len(a.RWIns) { // initialize interior slice for new goroutine
 		a.RWIns = append(a.RWIns, []*RWNode{})
 	}
