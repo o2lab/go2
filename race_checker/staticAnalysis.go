@@ -357,9 +357,9 @@ func (runner *AnalysisRunner) Run(args []string) error {
 							eachStack := Analysis.goStack[eachGo]
 							for k, eachFn := range eachStack {
 								if k == 0 {
-									log.Debug("\t ", strings.Repeat(" ", q), "--> Goroutine: ", eachFn.Name(), "[", Analysis.goCaller[eachGo], "] ", Analysis.prog.Fset.Position(eachFn.Pos()))
+									log.Debug("\t ", strings.Repeat(" ", q), "--> Goroutine: ", eachFn.Name(), "[", Analysis.goCaller[eachGo], "] ", Analysis.getValueLOC(eachFn))
 								} else {
-									log.Debug("\t   ", strings.Repeat(" ", q), strings.Repeat(" ", k), eachFn.Name(), " ", Analysis.prog.Fset.Position(eachFn.Pos()))
+									log.Debug("\t   ", strings.Repeat(" ", q), strings.Repeat(" ", k), eachFn.Name(), " ", Analysis.getValueLOC(eachFn))
 								}
 							}
 						}

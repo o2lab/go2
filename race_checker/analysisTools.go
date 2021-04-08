@@ -597,10 +597,10 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 	}
 	// done with all instructions in function body, now pop the function
 	//bz: updateRecords will push real fn but pop my synthetic fn, use string match
-	if fn.String() == a.storeFns[len(a.storeFns)-1].String() {
+	if fn.String() == a.curStack[len(a.curStack)-1].fn.String() {
 		a.updateRecords(nil, fn, goID, "POP  ")
 	}
-	if len(a.storeFns) == 0 && len(a.workList) != 0 { // finished reporting current goroutine and workList isn't empty
+	if len(a.curStack) == 0 && len(a.workList) != 0 { // finished reporting current goroutine and workList isn't empty
 		nextGoInfo := a.workList[0] // get the goroutine info at head of workList
 		a.workList = a.workList[1:] // pop goroutine info from head of workList
 		a.newGoroutine(nextGoInfo)
@@ -632,8 +632,6 @@ func (a *analysis) newGoroutine(info goroutineInfo) {
 	if info.goIns == a.goCalls[a.goCaller[info.goID]] {
 		return // recursive spawning of same goroutine
 	}
-	//bz: update both
-	a.storeFns = append(a.storeFns, info.entryMethod)
 	sInfo := &stackInfo{
 		invoke: info.goIns,
 		fn: info.entryMethod,
@@ -679,7 +677,7 @@ func (a *analysis) exploredFunction(fn *ssa.Function, goID int, theIns ssa.Instr
 	if sliceContainsRWNodeAt(a.RWIns[goID], theIns) >= 0 {
 		return true
 	}
-	if a.efficiency && sliceContainsFn(a.storeFns, fn) { // for temporary debugging purposes only
+	if a.efficiency && sliceContainsStackInfo(a.curStack, fn) { // for temporary debugging purposes only
 		return true
 	}
 	visitedNodes := make([]*RWNode, 0)

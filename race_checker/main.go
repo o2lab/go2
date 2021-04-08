@@ -38,7 +38,6 @@ type analysis struct {
 	trieMap      map[fnInfo]*trie    // map each function to a trie node
 	RWIns        [][]*RWNode // instructions grouped by goroutine
 	insDRA       int                 // index of instruction (in main goroutine) at which to begin data race analysis
-	storeFns     []*ssa.Function
 	curStack     []*stackInfo //bz: current stack
 	workList     []goroutineInfo
 	reportedAddr [][2]ssa.Value // stores already reported addresses -> bz: make sure both are not presented together as a pair

@@ -82,6 +82,15 @@ func sliceContainsFn(s []*ssa.Function, e *ssa.Function) bool {
 	return false
 }
 
+func sliceContainsStackInfo(s []*stackInfo, e *ssa.Function) bool {
+	for _, a := range s {
+		if a.fn.Pos() == e.Pos() {
+			return true
+		}
+	}
+	return false
+}
+
 func sliceContainsFnCtr(s []*ssa.Function, e *ssa.Function) int {
 	ctr := 0
 	if e != nil {
@@ -93,7 +102,6 @@ func sliceContainsFnCtr(s []*ssa.Function, e *ssa.Function) int {
 	}
 	return ctr
 }
-
 
 // sliceContainsStr will determine if slice s has an element e of type string
 func sliceContainsStr(s []string, e string) bool {

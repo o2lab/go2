@@ -341,14 +341,10 @@ func (a *analysis) printRace(counter int, race *raceInfo) {
 			writeLocks = a.lockMap[anIns]
 		} else {
 			access = "Read of "
-			if testMode {
-				errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].String()), " in function ", aurora.BrightGreen(anIns.Parent().Name()), " at ", a.getInstLOC(anIns))
-			}else{
-				if _, ok := anIns.(*ssa.Call); ok {
-					errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].String()), " in function ", aurora.BrightGreen(anIns.Parent().Name()), " at ", a.getValueLOC(addrPair[i]))
-				} else {
-					errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].String()), " in function ", aurora.BrightGreen(anIns.Parent().Name()), " at ", a.getInstLOC(insPair[i]))
-				}
+			if _, ok := anIns.(*ssa.Call); ok {
+				errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].String()), " in function ", aurora.BrightGreen(anIns.Parent().Name()), " at ", a.getValueLOC(addrPair[i]))
+			} else {
+				errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].String()), " in function ", aurora.BrightGreen(anIns.Parent().Name()), " at ", a.getInstLOC(insPair[i]))
 			}
 			readLocks = append(a.lockMap[anIns], a.RlockMap[anIns]...)
 		}
@@ -392,7 +388,7 @@ func (a *analysis) printRace(counter int, race *raceInfo) {
 					if k == 0 {
 						log.Debug("\t ", strings.Repeat(" ", q), "--> Goroutine: ", eachFn.Name(), "[", a.goCaller[eachGo], "] ", a.getValueLOC(eachFn))
 					} else {
-						log.Debug("\t   ", strings.Repeat(" ", q), strings.Repeat(" ", k), eachFn.Name(), " ", a.getValueLOC(eachFn))
+						log.Debug("\t   ", strings.Repeat(" ", q), "->",  strings.Repeat(" ", k), eachFn.Name(), " ", a.getValueLOC(eachFn))
 					}
 				}
 			}

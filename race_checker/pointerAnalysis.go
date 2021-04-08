@@ -48,7 +48,7 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 					parent := eachTarget.Value().Parent()
 					fns = append(fns, parent.String())
 					//log.Trace("*****target No.", ind+1, " - ", eachTarget.Value().Name(), " from function ", eachTarget.Value().Parent().Name())
-					if sliceContainsFn(a.storeFns, parent) { // calling function is in current goroutine
+					if sliceContainsStackInfo(a.curStack, parent) { // calling function is in current goroutine
 						rightLoc = ind
 						break
 					}
