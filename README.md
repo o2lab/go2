@@ -43,3 +43,11 @@ or if you would like to analyze the entry point **google.golang.org/grpc/example
 as shown in screenshot above. 
 
 *Your option number may be different for this specific entry point. 
+
+
+
+or use the `-analyzeAll` flag since the very beginning if trying to run all entry points, 
+```
+race-checker -analyzeAll
+```
+but process may get killed if running out of memory...
