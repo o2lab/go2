@@ -1,3 +1,36 @@
 # Go2 Race Detector (new pta version)
 
  
+## Build and install race-checker
+
+Make sure Go is installed in the system. In go2/race_checker, execute
+```
+go build
+```
+Dependencies will be automatically downloaded. By default, the built artifact is named `race-checker`.
+
+Install the race-checker in the PATH by executing
+```
+go install
+```
+
+### Running on gRPC
+
+After installing race-checker, go to the root directory of the gRPC repo, 
+
+Execute race-checker,
+```
+race-checker 
+```
+or go to the subdirectory of your choice instead, but then please include `-path` flag as follows, 
+```
+race-checker -path=google.golang.org/grpc
+```
+
+When running in the root directory where multiple entry points will be identified, race-checker will request your input for which entry-points to analyze
+
+For example, if you would like to analyze entry points 1 to 20, just enter
+`1-20`
+or if you would like to analyze the entry point **google.golang.org/grpc/examples/helloworld/greeter_client**, just enter
+`40` 
+as shown in screenshot above. *Your option number may be different for this specific entry point. 
