@@ -107,7 +107,7 @@ func (a *analysis) updateRecords(invoke ssa.Instruction, fn *ssa.Function, goID 
 			fn: fn,
 		}
 		a.curStack = append(a.curStack, info)
-		a.storeFns = append(a.storeFns, fn) //TODO: remove it
+		a.storeFns = append(a.storeFns, fn) //TODO: bz: remove it later
 		a.levels[goID]++
 	}
 }
