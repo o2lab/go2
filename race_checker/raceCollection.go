@@ -374,29 +374,34 @@ func (a *analysis) printRace(counter int, race *raceInfo) {
 		if goIDs[i] > 0 { // subroutines
 			log.Debug("call stack: ")
 		}
-		var pathGo []int
 		goID := goIDs[i]
-		for goID > 0 {
-			pathGo = append([]int{goID}, pathGo...)
-			temp := a.goCaller[goID]
-			goID = temp
-		}
-		if !allEntries {
-			for q, eachGo := range pathGo {
-				eachStack := a.goStack[eachGo]
-				for k, eachFn := range eachStack {
-					if k == 0 {
-						log.Debug("\t ", strings.Repeat(" ", q), "--> Goroutine: ", eachFn.Name(), "[", a.goCaller[eachGo], "] ", a.getValueLOC(eachFn))
-					} else {
-						log.Debug("\t   ", strings.Repeat(" ", q), "->",  strings.Repeat(" ", k), eachFn.Name(), " ", a.getValueLOC(eachFn))
-					}
-				}
-			}
-		}
+		a.printGoStack(goID)
 	}
 	log.Println("Locks acquired before Write access: ", writeLocks)
 	log.Println("Locks acquired before Read  access: ", readLocks)
 	log.Println(strings.Repeat("=", 100))
+}
+
+//bz: print the call stack of go routine
+func (a *analysis) printGoStack(goID int) {
+	var pathGo []int
+	for goID > 0 {
+		pathGo = append([]int{goID}, pathGo...)
+		temp := a.goCaller[goID]
+		goID = temp
+	}
+	if !allEntries {
+		for q, eachGo := range pathGo {
+			eachStack := a.goStack[eachGo]
+			for k, eachFn := range eachStack {
+				if k == 0 {
+					log.Debug("\t ", strings.Repeat(" ", q), "--> Goroutine: ", eachFn.Name(), "[", a.goCaller[eachGo], "] ", a.getValueLOC(eachFn))
+				} else {
+					log.Debug("\t   ", strings.Repeat(" ", q), "->",  strings.Repeat(" ", k), eachFn.Name(), " ", a.getValueLOC(eachFn))
+				}
+			}
+		}
+	}
 }
 
 //bz: locations of ssa.Value

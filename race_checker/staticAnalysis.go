@@ -345,25 +345,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 					if i > 0 {
 						log.Debug("call stack: ")
 					}
-					var pathGo []int
-					goID := i
-					for goID > 0 {
-						pathGo = append([]int{goID}, pathGo...)
-						temp := Analysis.goCaller[goID]
-						goID = temp
-					}
-					if !allEntries {
-						for q, eachGo := range pathGo {
-							eachStack := Analysis.goStack[eachGo]
-							for k, eachFn := range eachStack {
-								if k == 0 {
-									log.Debug("\t ", strings.Repeat(" ", q), "--> Goroutine: ", eachFn.Name(), "[", Analysis.goCaller[eachGo], "] ", Analysis.getValueLOC(eachFn))
-								} else {
-									log.Debug("\t   ", strings.Repeat(" ", q), strings.Repeat(" ", k), eachFn.Name(), " ", Analysis.getValueLOC(eachFn))
-								}
-							}
-						}
-					}
+					Analysis.printGoStack(i)
 				}
 			}
 			if useDefaultPTA {
