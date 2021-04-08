@@ -3,7 +3,11 @@
  
 ## Build and install race-checker
 
-Make sure Go is installed in the system. In go2/race_checker, execute
+Make sure Go is installed in the system. In the go2 repo, checkout this branch with new PTA. 
+```
+git checkout pta_replaced
+```
+In go2/race_checker, execute
 ```
 go build
 ```
@@ -29,8 +33,13 @@ race-checker -path=google.golang.org/grpc
 
 When running in the root directory where multiple entry points will be identified, race-checker will request your input for which entry-points to analyze
 
+![Image of screenshot](race_checker/tests/grpc.png)
+
 For example, if you would like to analyze entry points 1 to 20, just enter
 `1-20`
+
 or if you would like to analyze the entry point **google.golang.org/grpc/examples/helloworld/greeter_client**, just enter
 `40` 
-as shown in screenshot above. *Your option number may be different for this specific entry point. 
+as shown in screenshot above. 
+
+*Your option number may be different for this specific entry point. 
