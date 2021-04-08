@@ -60,24 +60,26 @@ func (a *analysis) checkRacyPairs() []*raceInfo {
 						if addressPair[0] == nil || addressPair[1] == nil {
 							continue
 						}
-						////!!!! bz: for my debug, please comment off, do not delete
+						//////!!!! bz: for my debug, please comment off, do not delete
 						//var goIinstr string
 						//var goJinstr string
 						//if i == 0 {
 						//	goIinstr = "main"
 						//} else {
-						//	goIinstr = a.RWIns[i][0].String()
+						//	goIinstr = a.RWIns[i][0].node.String()
 						//}
 						//if j == 0 {
 						//	goJinstr = "main"
 						//} else {
-						//	goJinstr = a.RWIns[j][0].String()
+						//	goJinstr = a.RWIns[j][0].node.String()
 						//}
 						//fmt.Println(addressPair[0], " Go: ", goIinstr, " loopid: ", a.loopIDs[i], ";  ", addressPair[1], " Go: ", goJinstr, " loopid: ", a.loopIDs[j])
-						//if strings.Contains(addressPair[0].String(), "&a.onRotate [#0]") &&
-						//	strings.Contains(addressPair[1].String(), "&a.onRotate [#0]") {
+						////&t151[t148]  Go:  go t144(t142)  loopid:  1 ;   &t12[goID]  Go:  go t144(t142)  loopid:  2
+						//if strings.Contains(addressPair[0].String(), "&t151[t148]") &&
+						//	strings.Contains(addressPair[1].String(), "&t12[goID]") {
 						//	fmt.Println()
 						//}
+
 						if a.sameAddress(addressPair[0], addressPair[1], i, j) &&
 							!sliceContains(a.reportedAddr, addressPair) &&
 							!a.reachable(goINode, i, goJNode, j) &&
@@ -179,7 +181,7 @@ func (a *analysis) sameAddress(addr1 ssa.Value, addr2 ssa.Value, go1 int, go2 in
 		return ptsets[addr1].PointsTo().Intersects(ptsets[addr2].PointsTo())
 	}
 	// new PTA
-	if go1 == 0 && go2 == 0 {
+	if go1 == 0 && go2 == 0 { //bz: ??
 		ptset1 := a.ptaRes.Queries[addr1]
 		ptset2 := a.ptaRes.Queries[addr2]
 		for _, ptrCtx1 := range ptset1 {
@@ -193,17 +195,65 @@ func (a *analysis) sameAddress(addr1 ssa.Value, addr2 ssa.Value, go1 int, go2 in
 	}
 	var pt1 pointer.PointerWCtx
 	var pt2 pointer.PointerWCtx
+	var goIns1 *ssa.Go
+	var goIns2 *ssa.Go
+	loopID1 := a.loopIDs[go1]
+	loopID2 := a.loopIDs[go2]
 	if go1 == 0 {
-		pt1 = a.ptaRes.PointsToByGoWithLoopID(addr1, nil, a.loopIDs[go1])
+		goIns1 = nil
 	} else {
-		pt1 = a.ptaRes.PointsToByGoWithLoopID(addr1, a.RWIns[go1][0].node.(*ssa.Go), a.loopIDs[go1])
+		goIns1 = a.RWIns[go1][0].node.(*ssa.Go)
 	}
+	pt1 = a.ptaRes.PointsToByGoWithLoopID(addr1, goIns1, loopID1)
 	if go2 == 0 {
-		pt2 = a.ptaRes.PointsToByGoWithLoopID(addr2, nil, a.loopIDs[go2])
+		goIns2 = nil
 	} else {
-		pt2 = a.ptaRes.PointsToByGoWithLoopID(addr2, a.RWIns[go2][0].node.(*ssa.Go), a.loopIDs[go2])
+		goIns2 = a.RWIns[go2][0].node.(*ssa.Go)
 	}
-	return pt1.MayAlias(pt2)
+	pt2 = a.ptaRes.PointsToByGoWithLoopID(addr2, goIns2, loopID2)
+	alias := pt1.MayAlias(pt2)
+
+	if alias {
+		alias = a.heuristics(addr1, goIns1, loopID1, addr2, goIns2, loopID2)
+	}
+	return alias
+}
+
+//bz: these are heuristics that cannot always be true -> we may miss races here
+func (a *analysis) heuristics(addr1 ssa.Value, ins1 *ssa.Go, id1 int, addr2 ssa.Value, ins2 *ssa.Go, id2 int) bool {
+	////array heuristics: if the base vars of these ssa.IndexAddr are declared in a loop with goroutines, assume they cannot be alias
+	//idxAccess1, ok1 := addr1.(*ssa.IndexAddr)
+	//idxAccess2, ok2 := addr2.(*ssa.IndexAddr)
+	//if ok1 && ok2 {
+	//	base1 := idxAccess1.X
+	//	base2 := idxAccess2.X
+	//	baseFn1 := a.getBase(base1)
+	//	baseFn2 := a.getBase(base2)
+	//
+	//}
+
+	return true //same result as before do heuristics
+}
+
+//bz: get the fn that declares the base var of val
+func (a *analysis) getBase(val ssa.Value) *ssa.Function {
+	for (true) {
+		switch v := val.(type) {
+		case *ssa.IndexAddr:
+			val = v.X
+		case *ssa.UnOp:
+			val = v.X
+		case *ssa.FieldAddr:
+			val = v.X
+		case *ssa.Alloc:
+			return v.Parent()
+		case *ssa.Parameter:
+			return v.Parent()
+		default:
+			return nil
+		}
+	}
+	return nil
 }
 
 // reachable determines if 2 input instructions are connected in the Happens-Before Graph
@@ -397,7 +447,7 @@ func (a *analysis) printGoStack(goID int) {
 				if k == 0 {
 					log.Debug("\t ", strings.Repeat(" ", q), "--> Goroutine: ", eachFn.Name(), "[", a.goCaller[eachGo], "] ", a.getValueLOC(eachFn))
 				} else {
-					log.Debug("\t   ", strings.Repeat(" ", q), "->",  strings.Repeat(" ", k), eachFn.Name(), " ", a.getValueLOC(eachFn))
+					log.Debug("\t   ", strings.Repeat(" ", q), "->", strings.Repeat(" ", k), eachFn.Name(), " ", a.getValueLOC(eachFn))
 				}
 			}
 		}
@@ -415,7 +465,7 @@ func (a *analysis) getInstLOC(inst ssa.Instruction) token.Position {
 	if testMode {
 		return pos
 	}
- 	if !pos.IsValid() {
+	if !pos.IsValid() {
 		switch v := inst.(type) {
 		case *ssa.UnOp:
 			pos = a.prog.Fset.Position(v.X.Pos())

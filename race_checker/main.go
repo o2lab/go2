@@ -28,7 +28,7 @@ type analysis struct {
 	//race-checker uses
 	efficiency      bool
 	trieLimit       int
-	getGo           bool // flag
+	getGo           bool // flag {n4009, n7024, n11375, n15044, n19011, n21086}
 	prog         *ssa.Program
 	pkgs         []*ssa.Package
 	main         *ssa.Package

@@ -198,6 +198,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		} else { // scope is used for pta in determining context-sensitive fns
 			scope[0] = fromPath //bz: just a reminder:  "google.golang.org/grpc"
 		}
+		//logfile, _ := os.Create("/Users/bozhen/Documents/GO2/go2/race_checker/pta_log") //bz: debug, please comment off
 		runner.ptaConfig = &pointer.Config{
 			Mains:          mains, //bz: all mains in a project
 			Reflection:     false,
