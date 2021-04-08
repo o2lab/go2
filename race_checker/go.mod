@@ -3,7 +3,7 @@ module github.com/o2lab/race-checker
 go 1.13
 
 require (
-    github.com/april1989/origin-go-tools v0.0.9
+    github.com/april1989/origin-go-tools v0.0.10
 	github.com/boltdb/bolt v1.3.1
 	github.com/coreos/etcd v3.3.25+incompatible // indirect
 	github.com/cznic/mathutil v0.0.0-20181122101859-297441e03548 // indirect

@@ -12,6 +12,8 @@ import (
 	"github.com/twmb/algoimpl/go/graph"
 	"go/token"
 	"go/types"
+	"path"
+	"runtime"
 	"sync"
 
 	//"sync"
@@ -203,11 +205,16 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		//bz: setup callback stuff
 		if testMode { //bz: -> skip repetitive redundant initialization
 			if !doneInitialChecker {
-				myutil.InitialChecker(runner.ptaConfig)
+				myutil.InitialChecker("", runner.ptaConfig)
 				doneInitialChecker = true
 			}
 		}else {
-			myutil.InitialChecker(runner.ptaConfig)
+			_, filename, _, ok := runtime.Caller(1)
+			if !ok {
+				panic("runtime.Caller(1): panic.")
+			}
+			filepath := path.Join(path.Dir(filename))
+			myutil.InitialChecker(filepath, runner.ptaConfig)
 		}
 		start := time.Now()                                               //performance
 		runner.ptaResult, _ = pointer.AnalyzeMultiMains(runner.ptaConfig) // conduct pointer analysis for multiple mains
