@@ -203,17 +203,17 @@ func (runner *AnalysisRunner) Run(args []string) error {
 			DoCallback: true,        //bz: simplified callback
 		}
 		//bz: setup callback stuff
+		_, filename, _, ok := runtime.Caller(1)
+		if !ok {
+			panic("runtime.Caller(1): panic.")
+		}
+		filepath := path.Join(path.Dir(filename))
 		if testMode { //bz: -> skip repetitive redundant initialization
 			if !doneInitialChecker {
-				myutil.InitialChecker("", runner.ptaConfig)
+				myutil.InitialChecker(filepath, runner.ptaConfig)
 				doneInitialChecker = true
 			}
 		}else {
-			_, filename, _, ok := runtime.Caller(1)
-			if !ok {
-				panic("runtime.Caller(1): panic.")
-			}
-			filepath := path.Join(path.Dir(filename))
 			myutil.InitialChecker(filepath, runner.ptaConfig)
 		}
 		start := time.Now()                                               //performance
