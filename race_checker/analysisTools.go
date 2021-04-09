@@ -5,8 +5,37 @@ import (
 	"github.com/april1989/origin-go-tools/go/ssa"
 	log "github.com/sirupsen/logrus"
 	"github.com/twmb/algoimpl/go/graph"
+	//topograph "gonum.org/v1/gonum/graph"
+	//toposimple "gonum.org/v1/gonum/graph/simple"
+	//topoalgo "gonum.org/v1/gonum/graph/topo"
 	"strings"
 )
+
+//bz: this one works best
+func (a *analysis) sort(bbs []*ssa.BasicBlock) []int {
+	result := make([]int, 0)
+	visited := make(map[int]int)
+	for _, bb := range bbs {
+		idx := bb.Index
+		if _, ok := visited[idx]; ok {
+			continue
+		}
+		result = append(result, idx)
+		visited[idx] = idx
+		for _, bbnext := range bb.Succs {
+			nextidx := bbnext.Index
+			if _, ok := visited[nextidx]; ok {
+				continue
+			}
+			result = append(result, nextidx)
+			visited[nextidx] = nextidx
+		}
+	}
+	if len(result) != len(bbs) {
+		panic("Not equal length in sort. ")
+	}
+	return result
+}
 
 func (a *analysis) buildHB() {
 	var prevN graph.Node
@@ -15,11 +44,23 @@ func (a *analysis) buildHB() {
 	var selCaseEndN []graph.Node
 	var ifN []graph.Node
 	var ifSuccEndN []graph.Node
-	goCaller := make(map[*ssa.Go]graph.Node)
+	go2Node := make(map[*ssa.Go]graph.Node) //bz: update: this had a duplicate name with a.go2Node
 	waitingN := make(map[goIns]graph.Node)
 	chanRecvs := make(map[string]graph.Node) // map channel name to graph node
 	chanSends := make(map[string]graph.Node) // map channel name to graph node
+	//bz: summarize all instructions that requires to be jumpped to
+	//it is highly possible that when we traverse jump instruction, the graph.Node of its target instruction has not been traversed
+	//so we create edges for all them together at the end
+	jumpTar2Node := make(map[ssa.Instruction]graph.Node)     //bz: map the above tar to its graph.Node
+	jump2Node := make(map[*ssa.Jump]graph.Node)              //bz: map jump instr to its graph.Node
+	sumJumpTars := make(map[ssa.Instruction]ssa.Instruction) //bz: check existence later
+	for _, tar := range a.jumpNext {
+		sumJumpTars[tar] = tar
+	}
+
+	//officially start
 	for nGo, insSlice := range a.RWIns {
+		var firstNode graph.Node //the 1st graph.Node of non-main goroutine
 		for i, rwnode := range insSlice {
 			anIns := rwnode.node
 			disjoin := false // detach select case statement from subsequent instruction
@@ -28,15 +69,19 @@ func (a *analysis) buildHB() {
 				prevN = a.HBgraph.MakeNode() // initiate for future nodes
 				*prevN.Value = insKey
 				if goInstr, ok := anIns.(*ssa.Go); ok {
-					goCaller[goInstr] = prevN // sequentially store go calls in the same goroutine
+					go2Node[goInstr] = prevN // sequentially store go calls in the same goroutine
 				}
 			} else {
 				currN := a.HBgraph.MakeNode()
 				*currN.Value = insKey
+				if firstNode.Value == nil {
+					firstNode = currN
+				}
+
 				if nGo != 0 && i == 0 { // worker goroutine, first instruction
-					prevN = goCaller[anIns.(*ssa.Go)] // first node in subroutine
+					prevN = go2Node[anIns.(*ssa.Go)] // first node in subroutine
 				} else if goInstr, ok := anIns.(*ssa.Go); ok {
-					goCaller[goInstr] = currN // store go calls in the same goroutine
+					go2Node[goInstr] = currN // store go calls in the same goroutine
 				} else if selIns, ok1 := anIns.(*ssa.Select); ok1 {
 					selectN = append(selectN, currN) // select node
 					readyCh = a.selReady[selIns]
@@ -61,6 +106,8 @@ func (a *analysis) buildHB() {
 					chanSends[a.getSndChan(insS)] = currN
 				} else if _, isIf := anIns.(*ssa.If); isIf {
 					ifN = append([]graph.Node{currN}, ifN...) // store if statements
+				} else if jumpIns, ok2 := anIns.(*ssa.Jump); ok2 {
+					jump2Node[jumpIns] = currN
 				}
 				if ch, ok0 := a.selectCaseEnd[anIns]; ok0 && sliceContainsStr(readyCh, ch) {
 					selCaseEndN = append(selCaseEndN, currN)
@@ -128,7 +175,12 @@ func (a *analysis) buildHB() {
 				if !disjoin {
 					prevN = currN
 				}
+				if _, ok := sumJumpTars[anIns]; ok { //bz: update
+					jumpTar2Node[anIns] = currN
+					//fmt.Println("tar: ", ((*(currN.Value)).(goIns)).ins.String())
+				}
 			}
+
 			// Create additional edges:
 			if a.isReadIns(anIns) || isWriteIns(anIns) {
 				a.RWinsMap[insKey] = prevN
@@ -248,6 +300,33 @@ func (a *analysis) buildHB() {
 				}
 			}
 		}
+		//bz: create edge: go call -> 1st inst
+		if nGo > 0 {
+			goInfo := a.goID2goInfo[nGo]
+			goNode := go2Node[goInfo.goIns]
+			err := a.HBgraph.MakeEdge(goNode, firstNode)
+			if err != nil {
+				log.Fatal(err)
+			}
+		}
+
+		//bz: do jump hb edge together
+		for jumpIns, jumpNode := range jump2Node {
+			tarIns := a.jumpNext[jumpIns]
+			if tarIns == nil {
+				//fmt.Println("no mapping in a.jumpNext for: ", jumpIns.String(), "@", jumpIns.Parent().String())
+				continue
+			}
+			tarNode := jumpTar2Node[tarIns]
+			if tarNode.Value == nil {
+				//fmt.Println("want: ", tarIns.String(), "; but nil node in graph: ", tarNode.Value)
+				continue
+			}
+			err := a.HBgraph.MakeEdge(jumpNode, tarNode)
+			if err != nil {
+				log.Fatal(err)
+			}
+		}
 	}
 }
 
@@ -285,41 +364,43 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 	}
 
 	fnBlocks := fn.Blocks
-	bCap := 1
-	if len(fnBlocks) > 1 {
-		bCap = len(fnBlocks)
-	} else if len(fnBlocks) == 0 {
-		return
-	}
-	bVisit := make([]int, 1, bCap) // create ordering at which blocks are visited
-	k := 0
-	b := fnBlocks[0]
-	bVisit[k] = 0
-	for k < len(bVisit) {
-		b = fnBlocks[bVisit[k]]
-		if len(b.Succs) == 0 {
-			k++
-			continue
-		}
-		j := k
-		for s, bNext := range b.Succs {
-			j += s
-			i := sliceContainsIntAt(bVisit, bNext.Index)
-			if i < k {
-				if j == len(bVisit)-1 {
-					bVisit = append(bVisit, bNext.Index)
-				} else if j < len(bVisit)-1 {
-					bVisit = append(bVisit[:j+2], bVisit[j+1:]...)
-					bVisit[j+1] = bNext.Index
-				}
-				if i != -1 { // visited block
-					bVisit = append(bVisit[:i], bVisit[i+1:]...)
-					j--
-				}
-			}
-		}
-		k++
-	}
+	//bCap := 1
+	//if len(fnBlocks) > 1 {
+	//	bCap = len(fnBlocks)
+	//} else if len(fnBlocks) == 0 {
+	//	return
+	//}
+	//bVisit := make([]int, 1, bCap) // create ordering at which blocks are visited
+	//k := 0
+	//b := fnBlocks[0]
+	//bVisit[k] = 0
+	//for k < len(bVisit) { //bz: len() causes missing basicblocks in bVisit that will not be traversed
+	//	b = fnBlocks[bVisit[k]]
+	//	if len(b.Succs) == 0 {
+	//		k++
+	//		continue
+	//	}
+	//	j := k
+	//	for s, bNext := range b.Succs {
+	//		j += s
+	//		i := sliceContainsIntAt(bVisit, bNext.Index)
+	//		if i < k {
+	//			if j == len(bVisit)-1 {
+	//				bVisit = append(bVisit, bNext.Index)
+	//			} else if j < len(bVisit)-1 {
+	//				bVisit = append(bVisit[:j+2], bVisit[j+1:]...)
+	//				bVisit[j+1] = bNext.Index
+	//			}
+	//			if i != -1 { // visited block
+	//				bVisit = append(bVisit[:i], bVisit[i+1:]...)
+	//				j--
+	//			}
+	//		}
+	//	}
+	//	k++
+	//}
+	//bVisit := a.topoSort(fnBlocks)
+	bVisit := a.sort(fnBlocks)
 
 	var toDefer []ssa.Instruction // stack storing deferred calls
 	var toUnlock []ssa.Value
@@ -333,10 +414,12 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 	var selDone bool
 	var ifIns *ssa.If
 	var ifEnds []ssa.Instruction
+	idx2FirstInst := make(map[int]ssa.Instruction) //bz: for jump
+	jumps := make([]*ssa.Jump, 0)
 	for bInd := 0; bInd < len(bVisit); bInd++ {
 		activeCase, selDone = false, false
 		aBlock := fnBlocks[bVisit[bInd]]
-		if aBlock.Comment == "recover" {// ----> !!! SEE HERE: bz: the same as above, from line 279 to 293 (or even 304) can be separated out
+		if aBlock.Comment == "recover" { // ----> !!! SEE HERE: bz: the same as above, from line 279 to 293 (or even 304) can be separated out
 			continue
 		}
 		if aBlock.Comment == "select.done" {
@@ -362,17 +445,18 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				ifEnds = append(ifEnds, aBlock.Instrs[len(aBlock.Instrs)-1])
 			}
 		}
-		if aBlock.Comment == "for.body" || aBlock.Comment == "rangeindex.body"  {
+		if aBlock.Comment == "for.body" || aBlock.Comment == "rangeindex.body" {
 			if repeatSwitch == false {
 				repeatSwitch = true // repeat analysis of current block
-				bInd--
+				//bInd-- //bz: this triggers index panic when using topo sort
 			} else { // repetition conducted
 				repeatSwitch = false
 			}
 		}
+		a.isFirst = true                        //bz: indicator
 		for ii, theIns := range aBlock.Instrs { // examine each instruction
 			if theIns.String() == "rundefers" { // execute deferred calls at this index
-				for _, dIns := range toDefer {  // ----> !!! SEE HERE: bz: the same as above, from line 307 to 347 can be separated out
+				for _, dIns := range toDefer { // ----> !!! SEE HERE: bz: the same as above, from line 307 to 347 can be separated out
 					deferIns := dIns.(*ssa.Defer)
 					if _, ok := deferIns.Call.Value.(*ssa.Builtin); ok {
 						continue
@@ -497,7 +581,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 					if exist == nil { //fill in the blank
 						twin[1] = newGoID2
 						a.twinGoID[examIns] = twin
-					}//else: already exist
+					} //else: already exist
 				}
 
 			case *ssa.Call:
@@ -519,9 +603,14 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 			case *ssa.If:
 				a.recordAccess(goID, theIns)
 				ifIns = examIns
+			case *ssa.Jump: //bz: record jump
+				a.recordAccess(goID, theIns)
+				jump := theIns.(*ssa.Jump)
+				jumps = append(jumps, jump)
 			default:
 				a.recordAccess(goID, theIns) // TODO: consolidate
 			}
+
 			if ii == len(aBlock.Instrs)-1 && len(toUnlock) > 0 { // TODO: this can happen too early
 				for _, l := range toUnlock {
 					if a.lockSetContainsAt(a.lockSet, l, goID) != -1 {
@@ -561,6 +650,9 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				}
 			}
 		}
+		//bz: record 1st instr for this bb
+		idx2FirstInst[bVisit[bInd]] = a.firstInst
+
 		if (aBlock.Comment == "for.body" || aBlock.Comment == "rangeindex.body") && a.inLoop {
 			a.inLoop = false
 		}
@@ -573,7 +665,16 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 			}
 		}
 	}
-	if len(toUnlock) > 0 {// ----> !!! SEE HERE: bz: the same as above, from line 488 to 501 can be separated out
+
+	//bz: do this all together at the end, since tarIns probably has not been traversed in the above order
+	for _, jump := range jumps {
+		tarIdx := jump.Block().Succs[0].Index //bz: should only have one succs
+		tarIns := idx2FirstInst[tarIdx]
+		a.jumpNext[jump] = tarIns
+		//fmt.Println("jump: ", jump.String(), " -> inst: ", tarIns.String())
+	}
+
+	if len(toUnlock) > 0 { // ----> !!! SEE HERE: bz: the same as above, from line 488 to 501 can be separated out
 		for _, loc := range toUnlock {
 			if z := a.lockSetContainsAt(a.lockSet, loc, goID); z >= 0 {
 				log.Trace("Unlocking ", loc.String(), "  (", a.lockSet[goID][z].locAddr.Pos(), ") removing index ", z, " from: ", lockSetVal(a.lockSet, goID))
@@ -587,7 +688,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 			}
 		}
 	}
-	if len(toRUnlock) > 0 {// ----> !!! SEE HERE: bz: the same as above, from line 502 to 509 can be separated out
+	if len(toRUnlock) > 0 { // ----> !!! SEE HERE: bz: the same as above, from line 502 to 509 can be separated out
 		for _, rloc := range toRUnlock {
 			if z := a.lockSetContainsAt(a.RlockSet, rloc, goID); z >= 0 {
 				log.Trace("RUnlocking ", rloc.String(), "  (", a.RlockSet[goID][z].locAddr.Pos(), ") removing index ", z, " from: ", lockSetVal(a.RlockSet, goID))
@@ -634,7 +735,7 @@ func (a *analysis) newGoroutine(info goroutineInfo) {
 	}
 	sInfo := &stackInfo{
 		invoke: info.goIns,
-		fn: info.entryMethod,
+		fn:     info.entryMethod,
 	}
 	a.curStack = append(a.curStack, sInfo)
 
@@ -712,3 +813,79 @@ func (t trie) isBudgetExceeded() bool {
 	}
 	return false
 }
+
+
+////bz: topological sort bb by idx -> not working, why idx == 0 is in the middle ...
+//func (a *analysis) topoSort(bbs []*ssa.BasicBlock) []int {
+//	result := make([]int, len(bbs))
+//	//creat graph
+//	bgraph := toposimple.NewDirectedGraph()
+//	id2node := make(map[int]topograph.Node)
+//	for i := 0; i < len(bbs); i++ {
+//		n := bgraph.NewNode() //for this bb: bbnode.idx == bb.idx
+//		id2node[i] = n
+//		bgraph.AddNode(n)
+//	}
+//	for _, bb := range bbs {
+//		bbnode := id2node[bb.Index]
+//		for _, bbnext := range bb.Succs {
+//			bbnextnode := id2node[bbnext.Index]
+//			bgraph.NewEdge(bbnode, bbnextnode)
+//		}
+//	}
+//	//tarjan
+//	tmp := topoalgo.TarjanSCC(bgraph)
+//	if len(tmp) == len(bbs) { //acyclic
+//		//topo sort
+//		sorted, _ := topoalgo.Sort(bgraph)
+//		for i, n := range sorted {
+//			result[i] = int(n.ID())
+//		}
+//		return a.reverse(result)
+//	}
+//	//handle cycles
+//	id2scc := make(map[int][]topograph.Node)
+//	for _, scc := range tmp {
+//		if len(scc) > 1 { //real scc
+//			id := int(scc[0].ID()) //use the smalles id as scc's id
+//			id2scc[id] = scc
+//			for _, node := range scc { //remove all nodes in scc from graph
+//				bgraph.RemoveNode(node.ID())
+//			}
+//		}
+//	}
+//	//topo sort now
+//	sorted, _ := topoalgo.Sort(bgraph)
+//	tmp2 := make([]int, len(sorted))
+//	for i, n := range sorted {
+//		tmp2[i] = int(n.ID())
+//	}
+//	tmp2 = a.reverse(tmp2)
+//	i := 0
+//	for _, id := range tmp2 {
+//		//check if can insert scc here
+//		for _, bbnext := range bbs[id].Succs {
+//			nextID := bbnext.Index
+//			for sid, scc := range id2scc {
+//				if sid == nextID { // id -> sid: insert scc here
+//					for _, node := range scc {
+//						result[i] = int(node.ID())
+//						i++
+//					}
+//				}
+//			}
+//		}
+//		result[i] = id
+//		i++
+//	}
+//	return result
+//}
+//
+////bz: reverse an array, no need to be virtual
+//func (a *analysis) reverse(numbers []int) []int {
+//	newNumbers := make([]int, len(numbers))
+//	for i, j := 0, len(numbers)-1; i <= j; i, j = i+1, j-1 {
+//		newNumbers[i], newNumbers[j] = numbers[j], numbers[i]
+//	}
+//	return newNumbers
+//}

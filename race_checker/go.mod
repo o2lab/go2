@@ -3,7 +3,7 @@ module github.com/o2lab/race-checker
 go 1.13
 
 require (
-    github.com/april1989/origin-go-tools v0.0.10
+	github.com/april1989/origin-go-tools v0.0.10
 	github.com/boltdb/bolt v1.3.1
 	github.com/coreos/etcd v3.3.25+incompatible // indirect
 	github.com/cznic/mathutil v0.0.0-20181122101859-297441e03548 // indirect
@@ -34,8 +34,9 @@ require (
 	github.com/urfave/cli v1.22.5
 	go.uber.org/zap v1.16.0 // indirect
 	golang.org/x/sync v0.0.0-20201207232520-09787c993a3a
-	golang.org/x/sys v0.0.0-20201221093633-bc327ba9c2f0
+	golang.org/x/sys v0.0.0-20210304124612-50617c2ba197
 	golang.org/x/tools v0.0.0-20210106214847-113979e3529a
+	gonum.org/v1/gonum v0.9.1
 	google.golang.org/grpc v1.34.0
 	istio.io/istio v0.0.0-20210129100137-fc1367f5ecdb
 	k8s.io/api v0.20.2

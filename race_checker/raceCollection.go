@@ -49,8 +49,8 @@ func (a *analysis) checkRacyPairs() []*raceInfo {
 					//	fmt.Println() //goI:  &t6[t9]  (i:  1 )  goJ:  *checkName  (j:  3 )
 					//}
 
-					goINode := goI.node
-					goJNode := goJ.node
+					goINode := goI.node //bz: read/write of goI
+					goJNode := goJ.node //bz: read/write of goJ
 					if (isWriteIns(goINode) && isWriteIns(goJNode)) || (isWriteIns(goINode) && a.isReadIns(goJNode)) || (a.isReadIns(goINode) && isWriteIns(goJNode)) { // only read and write instructions
 						if isLocal(goINode) && isLocal(goJNode) { // both are locally declared
 							continue
@@ -82,12 +82,18 @@ func (a *analysis) checkRacyPairs() []*raceInfo {
 
 						if a.sameAddress(addressPair[0], addressPair[1], i, j) &&
 							!sliceContains(a.reportedAddr, addressPair) &&
-							!a.reachable(goINode, i, goJNode, j) &&
-							!a.reachable(goJNode, j, goINode, i) &&
+							!a.reachable(goINode, i, goJNode, j, false) &&
+							!a.reachable(goJNode, j, goINode, i, false) &&
 							!a.bothAtomic(insSlice[0], insSlice[1]) &&
 							!a.lockSetsIntersect(goINode, goJNode, i, j) &&
 							!a.selectMutEx(insSlice[0], insSlice[1]) {
 							a.reportedAddr = append(a.reportedAddr, addressPair)
+
+							////bz: for my debug, please comment off, do not delete
+							//if!a.reachable(goINode, i, goJNode, j, true) &&
+							//	!a.reachable(goJNode, j, goINode, i, true) {
+							//	fmt.Println()
+							//}
 
 							stacks := make([][]*stackInfo, 2)
 							stacks[0] = goI.stack
@@ -257,7 +263,8 @@ func (a *analysis) getBase(val ssa.Value) *ssa.Function {
 }
 
 // reachable determines if 2 input instructions are connected in the Happens-Before Graph
-func (a *analysis) reachable(fromIns ssa.Instruction, fromGo int, toIns ssa.Instruction, toGo int) bool {
+func (a *analysis) reachable(fromIns ssa.Instruction, fromGo int, toIns ssa.Instruction, toGo int, debug bool) bool {
+	////TODO: bz: remove debug if open source
 	////TODO: bz: this logic is too ad-hoc, need a new one -> tmp solution
 	//fromBlock := fromIns.Block().Index
 	//if strings.HasPrefix(fromIns.Block().Comment, "rangeindex") && toIns.Parent() != nil && toIns.Parent().Parent() != nil { // checking both instructions belong to same forloop
@@ -272,6 +279,13 @@ func (a *analysis) reachable(fromIns ssa.Instruction, fromGo int, toIns ssa.Inst
 	fromNode := a.RWinsMap[fromInsKey] // starting node
 	toNode := a.RWinsMap[toInsKey]     // target node
 
+	if debug {
+		fmt.Println("Start HBNode: ", fromInsKey.String(), "\nEnd HBNode: ", toInsKey.String())
+		if strings.Contains(fromInsKey.String(), "*doStack = false:bool@GoID: 0") {
+			fmt.Println()
+		}
+	}
+
 	//use breadth-first-search to traverse the Happens-Before Graph
 	var visited []graph.Node
 	q := &queue{}
@@ -280,9 +294,17 @@ func (a *analysis) reachable(fromIns ssa.Instruction, fromGo int, toIns ssa.Inst
 		for size := q.size(); size > 0; size-- {
 			node := q.deQueue()
 			if node == toNode {
+				if debug {
+					tmp := (*node.Value).(goIns)
+					fmt.Println("  reach* -> ", (&tmp).String())
+				}
 				return true
 			}
 			for _, neighbor := range a.HBgraph.Neighbors(node) {
+				if debug {
+					tmp := (*neighbor.Value).(goIns)
+					fmt.Println("  reach -> ", (&tmp).String())
+				}
 				if sliceContainsNode(visited, neighbor) {
 					continue
 				}
@@ -474,6 +496,9 @@ func (a *analysis) getInstLOC(inst ssa.Instruction) token.Position {
 		case *ssa.Call:
 			pos = a.prog.Fset.Position(v.Call.Pos())
 		case *ssa.RunDefers:
+			if v.Referrers() == nil {
+				return pos
+			}
 			pos = a.prog.Fset.Position((*v.Referrers())[0].Pos())
 		case *ssa.Go:
 			pos = a.prog.Fset.Position(v.Call.Pos())

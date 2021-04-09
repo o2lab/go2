@@ -10,6 +10,7 @@ import (
 	"github.com/o2lab/race-checker/stats"
 	log "github.com/sirupsen/logrus"
 	"github.com/twmb/algoimpl/go/graph"
+	"strconv"
 	"sync"
 	"syscall"
 
@@ -66,6 +67,7 @@ type analysis struct {
 	ifSuccBegin     map[ssa.Instruction]*ssa.If     // map beginning of succ block to if statement
 	ifFnReturn      map[*ssa.Function]*ssa.Return   // map "if-containing" function to its final return
 	ifSuccEnd       map[ssa.Instruction]*ssa.Return // map ending of successor block to final return statement
+	jumpNext        map[*ssa.Jump]ssa.Instruction   // bz: map jump instruction to the first instruction of its target basicblock
 	commIfSucc      []ssa.Instruction               // store first ins of succ block that contains channel communication
 	omitComm        []*ssa.BasicBlock               // omit these blocks as they are race-free due to channel communication
 	racyStackTops   []string
@@ -76,7 +78,10 @@ type analysis struct {
 	bindingFV       map[*ssa.Go][]*ssa.FreeVar
 	pbr             *ssa.Alloc
 	commIDs         map[int][]int
-	twinGoID        map[*ssa.Go][]int   //bz: whether two goroutines are spawned by the same loop; this might not be useful now since !sliceContains(a.reportedAddr, addressPair) && already filtered out the duplicate race check
+	twinGoID        map[*ssa.Go][]int //bz: whether two goroutines are spawned by the same loop; this might not be useful now since !sliceContains(a.reportedAddr, addressPair) && already filtered out the duplicate race check
+	isFirst         bool              //bz: cannot find a better way to do so -> mark the 1st recorded instruction for each basicblock
+	firstInst       ssa.Instruction   //bz: 1st recorded instruction for each basicblock
+	goID2goInfo     map[int]*goroutineInfo  //bz:
 }
 
 type RWNode struct {
@@ -143,6 +148,10 @@ type fnInfo struct { // all fields must be comparable for fnInfo to be used as k
 type goIns struct { // an ssa.Instruction with goroutine info
 	ins  ssa.Instruction
 	goID int
+}
+
+func (i *goIns) String() string {
+	return i.ins.String() + "@GoID: " + strconv.Itoa(i.goID)
 }
 
 type goroutineInfo struct {

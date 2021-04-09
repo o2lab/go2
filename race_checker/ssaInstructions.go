@@ -199,6 +199,10 @@ func (a *analysis) recordAccess(goID int, theIns ssa.Instruction) {
 		rwnode.stack = cpy
 	}
 	a.RWIns[goID] = append(a.RWIns[goID], rwnode)
+	if a.isFirst {
+		a.firstInst = theIns
+		a.isFirst = false
+	}
 }
 
 // insUnOp ???
@@ -553,6 +557,7 @@ func (a *analysis) insGo(examIns *ssa.Go, goID int, theIns ssa.Instruction, loop
 	}
 
 	var info = goroutineInfo{examIns, entryMethod, newGoID}
+	a.goID2goInfo[newGoID] = &info
 	a.goStack = append(a.goStack, []*ssa.Function{}) // initialize interior slice
 	a.goCaller[newGoID] = goID                       // map caller goroutine
 	//bz: translate a.curStack to []*ssa.Function

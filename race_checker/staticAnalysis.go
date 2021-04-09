@@ -299,6 +299,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 				ifSuccBegin:     make(map[ssa.Instruction]*ssa.If),
 				ifFnReturn:      make(map[*ssa.Function]*ssa.Return),
 				ifSuccEnd:       make(map[ssa.Instruction]*ssa.Return),
+				jumpNext:        make(map[*ssa.Jump]ssa.Instruction),
 				inLoop:          false,
 				goInLoop:        make(map[int]bool),
 				loopIDs:         make(map[int]int),
@@ -306,6 +307,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 				bindingFV:       make(map[*ssa.Go][]*ssa.FreeVar),
 				commIDs:         make(map[int][]int),
 				twinGoID:        make(map[*ssa.Go][]int),
+				goID2goInfo:     make(map[int]*goroutineInfo),
 			}
 			if strings.Contains(main.Pkg.Path(), "GoBench") { // for testing purposes
 				Analysis.efficiency = false
