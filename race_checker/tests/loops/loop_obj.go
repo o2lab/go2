@@ -36,7 +36,7 @@ func (r Myobj) compare(o Myobj, loopid int)  {
 //		"#HeapObject:", m2.HeapObjects, " (bytes)")
 //}
 
-
+//bz: this example has no race
 func main() { //all stack
 	str := Myfobj{"im clear"}
 

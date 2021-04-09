@@ -16,12 +16,16 @@ func (r *myType) compare(o *myType, loopid int) {
 	//bz: this print out the addresses that we are going to read/write in the following ifelse branch
 	//-> run default race checker multiple times, most times it misses the races
 	//fmt.Println("loop  ", loopid, ": r.f: ", &r.f, "\t o.f: ", &o.f)
-	if r.f.s == o.f.s { //read r.f.s, read o.f.s
-		r.f = o.f //read o.f, write r.f
-	} else {
-		o.f = r.f //read r.f, write o.f
-	}
+	//if r.f.s == o.f.s { //read r.f.s, read o.f.s
+	//	r.f = o.f //read o.f, write r.f
+	//} else {
+	//	o.f = r.f //read r.f, write o.f
+	//}
 	//fmt.Println("after ", loopid, ": r.f: ", &r.f, "\t o.f: ", &o.f)
+
+	//bz: simplified from the above if else branch
+	//TODO: bz: the pair of write/write race on r.f is FP, hard to remove
+	r.f /* RACE Write */ /* RACE Write */ /* RACE Write */ = o.f /* RACE Read */
 }
 
 //func memUsage2(m1, m2 *runtime.MemStats) { //bytes
@@ -83,7 +87,8 @@ func main() {
 	wg.Wait()
 
 }
-/*
-go run -gcflags -m loop_pointer.go -> escape analysis
-go run -race loop_pointer.go
-*/
+
+//bz: try the following commands to trigger race and check its memory usage
+// go run -gcflags -m loop_pointer.go -> escape analysis
+// go run -race loop_pointer.go
+

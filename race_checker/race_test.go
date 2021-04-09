@@ -97,6 +97,8 @@ var tests = []string{
 	"tests/godel2/simple-race/main.go",
 	//"tests/godel2/dine3-chan-race/main.go", // multiple nested selects
 	//"tests/godel2/dine5-chan-race/main.go",
+	"tests/loops/loop_obj.go", //bz: loop tests
+	"tests/loops/loop_pointer.go",
 }
 
 var passed int32 = 0
