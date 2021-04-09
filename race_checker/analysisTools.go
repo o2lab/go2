@@ -314,6 +314,8 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 		k++
 	}
 
+
+
 	var toDefer []ssa.Instruction // stack storing deferred calls
 	var toUnlock []ssa.Value
 	var toRUnlock []ssa.Value
@@ -359,7 +361,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 			a.inLoop = true // TODO: consider nested loops
 		}
 		for ii, theIns := range aBlock.Instrs { // examine each instruction
-			if theIns.String() == "rundefers" { // execute deferred calls at this index
+			if theIns.String() == "rundefers" && theIns.Block().Comment!="if.then" &&  theIns.Block().Comment!="if.else" { // execute deferred calls at this index
 				for _, dIns := range toDefer {  // ----> !!! SEE HERE: bz: the same as above, from line 307 to 347 can be separated out
 					deferIns := dIns.(*ssa.Defer)
 					if _, ok := deferIns.Call.Value.(*ssa.Builtin); ok {
@@ -370,7 +372,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 					} else if a.fromPkgsOfInterest(deferIns.Call.StaticCallee()) && deferIns.Call.StaticCallee().Pkg.Pkg.Name() != "sync" {
 						fnName := deferIns.Call.Value.Name()
 						fnName = checkTokenNameDefer(fnName, deferIns)
-						if !a.exploredFunction(deferIns.Call.StaticCallee(), goID, theIns) {
+						if !a.exploredFunction(deferIns.Call.StaticCallee(), goID, dIns) {
 							a.updateRecords(fnName, goID, "PUSH ", deferIns.Call.StaticCallee())
 							a.RWIns[goID] = append(a.RWIns[goID], dIns)
 							a.visitAllInstructions(deferIns.Call.StaticCallee(), goID)
@@ -399,6 +401,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 							a.mu.Unlock()
 						}
 					}
+					toDefer = []ssa.Instruction{}
 				}
 			}
 			for _, ex := range excludedPkgs { // TODO: need revision
@@ -570,6 +573,49 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				log.Trace("RUnlocking ", rloc.String(), "  (", a.RlockSet[goID][z].locAddr.Pos(), ") removing index ", z, " from: ", lockSetVal(a.RlockSet, goID))
 				a.RlockSet[goID] = append(a.RlockSet[goID][:z], a.RlockSet[goID][z+1:]...)
 			} //TODO : modify for unlock in diff thread
+		}
+	}
+	if len(toDefer) > 0 {
+		for _, dIns := range toDefer {  // ----> !!! SEE HERE: bz: the same as above, from line 307 to 347 can be separated out
+			deferIns := dIns.(*ssa.Defer)
+			if _, ok := deferIns.Call.Value.(*ssa.Builtin); ok {
+				continue
+			}
+			if deferIns.Call.StaticCallee() == nil {
+				continue
+			} else if a.fromPkgsOfInterest(deferIns.Call.StaticCallee()) && deferIns.Call.StaticCallee().Pkg.Pkg.Name() != "sync" {
+				fnName := deferIns.Call.Value.Name()
+				fnName = checkTokenNameDefer(fnName, deferIns)
+				if !a.exploredFunction(deferIns.Call.StaticCallee(), goID, dIns) {
+					a.updateRecords(fnName, goID, "PUSH ", deferIns.Call.StaticCallee())
+					a.RWIns[goID] = append(a.RWIns[goID], dIns)
+					a.visitAllInstructions(deferIns.Call.StaticCallee(), goID)
+				}
+			} else if deferIns.Call.StaticCallee().Name() == "Unlock" {
+				lockLoc := deferIns.Call.Args[0]
+				if !useNewPTA {
+					a.mu.Lock()
+					a.ptaCfg0.AddQuery(lockLoc)
+					a.mu.Unlock()
+				}
+				toUnlock = append(toUnlock, lockLoc)
+			} else if deferIns.Call.StaticCallee().Name() == "RUnlock" {
+				RlockLoc := deferIns.Call.Args[0]
+				if !useNewPTA {
+					a.mu.Lock()
+					a.ptaCfg0.AddQuery(RlockLoc)
+					a.mu.Unlock()
+				}
+				toRUnlock = append(toRUnlock, RlockLoc)
+			} else if deferIns.Call.Value.Name() == "Done" {
+				a.RWIns[goID] = append(a.RWIns[goID], dIns)
+				if !useNewPTA {
+					a.mu.Lock()
+					a.ptaCfg0.AddQuery(deferIns.Call.Args[0])
+					a.mu.Unlock()
+				}
+			}
+			toDefer = []ssa.Instruction{}
 		}
 	}
 	// done with all instructions in function body, now pop the function

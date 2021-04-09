@@ -36,8 +36,12 @@ func DContext(input string) *ClientCon {
 		return cc
 	}
 
+
 	defer func() { // DContext$2
 		someBool = false
+		go func() {
+			someBool = true
+		}()
 	}()
 	fmt.Println(someBool)
 	return cc
