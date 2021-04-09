@@ -386,7 +386,19 @@ func getSrcPos(address ssa.Value) token.Pos {
 	return position
 }
 
-//func (a *analysis) reportRace
+//bz: whether two goIDs are twins from the same *ssa.GO
+func (a *analysis) areWeTwins(goI, goJ int) (*ssa.Go, int) {
+	for goIns, twins := range a.twinGoID {
+		if (twins[0] == goI && twins[1] == goJ) || (twins[1] == goI && twins[2] == goJ) { //bz: should only be possible for first brackets, since we put them in array in order
+			for goID, goInfo := range a.goID2goInfo {
+				if goInfo.goIns == goIns {
+					return goIns, goID
+				}
+			}
+		}
+	}
+	return nil, -1
+}
 
 // printRace will print the details of a data race such as the write/read of a variable and other helpful information
 func (a *analysis) printRace(counter int, race *raceInfo) {
@@ -396,7 +408,13 @@ func (a *analysis) printRace(counter int, race *raceInfo) {
 	//insInd := race.insInd //bz: not used
 	stacks := race.stacks
 
-	log.Printf("Data race #%d", counter)
+	parentGo, parentGoID := a.areWeTwins(goIDs[0], goIDs[1]) //bz: debug purpose
+	if parentGo == nil {
+		log.Printf("Data race #%d", counter)
+	}else {
+		log.Printf("Data race #%d (twin goroutines from parent %s with goID = %d)", counter, parentGo, parentGoID)
+	}
+
 	log.Println(strings.Repeat("=", 100))
 	var writeLocks []ssa.Value
 	var readLocks []ssa.Value
@@ -444,7 +462,7 @@ func (a *analysis) printRace(counter int, race *raceInfo) {
 			}
 		}
 		if goIDs[i] > 0 { // subroutines
-			log.Debug("call stack: ")
+			log.Debug("call stack of: ")
 		}
 		goID := goIDs[i]
 		a.printGoStack(goID)

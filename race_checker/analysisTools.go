@@ -300,15 +300,15 @@ func (a *analysis) buildHB() {
 				}
 			}
 		}
-		//bz: create edge: go call -> 1st inst
-		if nGo > 0 {
-			goInfo := a.goID2goInfo[nGo]
-			goNode := go2Node[goInfo.goIns]
-			err := a.HBgraph.MakeEdge(goNode, firstNode)
-			if err != nil {
-				log.Fatal(err)
-			}
-		}
+		////bz: create edge: go call -> 1st inst
+		//if nGo > 0 {
+		//	goInfo := a.goID2goInfo[nGo]
+		//	goNode := go2Node[goInfo.goIns]
+		//	err := a.HBgraph.MakeEdge(goNode, firstNode)
+		//	if err != nil {
+		//		log.Fatal(err)
+		//	}
+		//}
 
 		//bz: do jump hb edge together
 		for jumpIns, jumpNode := range jump2Node {
@@ -405,7 +405,6 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 	var toDefer []ssa.Instruction // stack storing deferred calls
 	var toUnlock []ssa.Value
 	var toRUnlock []ssa.Value
-	repeatSwitch := false // triggered when encountering basic blocks for body of a forloop
 	var readyChans []string
 	var selIns *ssa.Select // current select statement
 	var selCount int       // total cases in a select statement
@@ -446,14 +445,9 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 			}
 		}
 		if aBlock.Comment == "for.body" || aBlock.Comment == "rangeindex.body" {
-			if repeatSwitch == false {
-				repeatSwitch = true // repeat analysis of current block
-				//bInd-- //bz: this triggers index panic when using topo sort
-			} else { // repetition conducted
-				repeatSwitch = false
-			}
+			a.inLoop = true // TODO: consider nested loops
 		}
-		a.isFirst = true                        //bz: indicator
+		a.isFirst = true                        //bz: indicator for bb
 		for ii, theIns := range aBlock.Instrs { // examine each instruction
 			if theIns.String() == "rundefers" { // execute deferred calls at this index
 				for _, dIns := range toDefer { // ----> !!! SEE HERE: bz: the same as above, from line 307 to 347 can be separated out
