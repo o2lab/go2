@@ -102,14 +102,16 @@ func (a *analysis) insAddress(insSlice []ssa.Instruction) [2]ssa.Value { // obta
 		case *ssa.Store: // write
 			theAddrs[i] = theIns.Addr
 		case *ssa.Call:
-			if theIns.Call.Value.Name() == "delete" { // write
-				theAddrs[i] = theIns.Call.Args[0].(*ssa.UnOp).X
-			} else if strings.HasPrefix(theIns.Call.Value.Name(), "Add") && theIns.Call.StaticCallee().Pkg.Pkg.Name() == "atomic" { // write
-				theAddrs[i] = theIns.Call.Args[0].(*ssa.FieldAddr).X
-			} else if len(theIns.Call.Args) > 0 { // read
-				for _, anArg := range theIns.Call.Args {
-					if readAcc, ok := anArg.(*ssa.FieldAddr); ok {
-						theAddrs[i] = readAcc.X
+			if len(theIns.Call.Args) > 0 {
+				if writeArg, ok := theIns.Call.Args[0].(*ssa.UnOp); ok && theIns.Call.Value.Name() == "delete" { // write
+					theAddrs[i] = writeArg.X
+				} else if writeArg1, ok1 := theIns.Call.Args[0].(*ssa.FieldAddr); ok1 && strings.HasPrefix(theIns.Call.Value.Name(), "Add") && theIns.Call.StaticCallee().Pkg.Pkg.Name() == "atomic" { // write
+					theAddrs[i] = writeArg1.X
+				} else { // read
+					for _, anArg := range theIns.Call.Args {
+						if readAcc, ok2 := anArg.(*ssa.FieldAddr); ok2 {
+							theAddrs[i] = readAcc.X
+						}
 					}
 				}
 			}
