@@ -319,7 +319,6 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 	var toDefer []ssa.Instruction // stack storing deferred calls
 	var toUnlock []ssa.Value
 	var toRUnlock []ssa.Value
-	//repeatSwitch := false // triggered when encountering basic blocks for body of a forloop
 	var readyChans []string
 	var selIns *ssa.Select // current select statement
 	var selCount int       // total cases in a select statement
@@ -361,7 +360,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 			a.inLoop = true // TODO: consider nested loops
 		}
 		for ii, theIns := range aBlock.Instrs { // examine each instruction
-			if theIns.String() == "rundefers" && theIns.Block().Comment!="if.then" &&  theIns.Block().Comment!="if.else" { // execute deferred calls at this index
+			if theIns.String() == "rundefers" { // execute deferred calls at this index
 				for _, dIns := range toDefer {  // ----> !!! SEE HERE: bz: the same as above, from line 307 to 347 can be separated out
 					deferIns := dIns.(*ssa.Defer)
 					if _, ok := deferIns.Call.Value.(*ssa.Builtin); ok {
