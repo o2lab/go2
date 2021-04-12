@@ -184,13 +184,11 @@ func main() { //default: -useNewPTA
 	analyzeAll := flag.Bool("analyzeAll", false, "Analyze all main() entry-points. ")
 	runTest := flag.Bool("runTest", false, "For micro-benchmark debugging... ")
 	showGo := flag.Bool("showGo", false, "Show goroutine info in analyzed program. ")
-	projPath := flag.String("path", "", "Designated project filepath. ")
 	//setTrie := flag.Int("trieLimit", 1, "Set trie limit... ")
 	flag.Parse()
 	//if *setTrie > 1 {
 	//	trieLimit = *setTrie
 	//}
-	fromPath = *projPath
 	if *showGo {
 		getGo = true
 	}
