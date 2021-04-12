@@ -10,6 +10,8 @@ import (
 	"github.com/twmb/algoimpl/go/graph"
 	"github.tamu.edu/April1989/go_tools/go/pointer"
 	pta0 "github.tamu.edu/April1989/go_tools/go/pointer_default"
+	"os"
+	"path/filepath"
 	"sync"
 	"syscall"
 
@@ -223,6 +225,23 @@ func main() { //default: -useNewPTA
 	}
 	if *analyzeAll {
 		allEntries = true
+	}
+	// from Dr. H
+	analysisDirectories := flag.Args()
+	var directoryName = ""
+	if len(analysisDirectories) != 1 {
+		fmt.Fprintf(os.Stderr, "Must provide one analysis directory: %v\n", analysisDirectories)
+		os.Exit(1)
+	} else {
+		directoryName = analysisDirectories[0]
+		//JEFF: check if directory exists
+		_, err := os.Stat(directoryName)
+		if err != nil {
+			//println("os.Stat(): error for directory name ", directoryName)
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err.Error())
+		} else {
+			directoryName, _ = filepath.Abs(directoryName)
+		}
 	}
 
 	log.SetFormatter(&log.TextFormatter{
