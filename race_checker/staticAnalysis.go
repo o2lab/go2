@@ -173,8 +173,13 @@ func (runner *AnalysisRunner) Run(args []string) error {
 	// Configure pointer analysis...
 	if useNewPTA {
 		scope := make([]string, 1)
-		if fromPath == "" {
+		if fromPath == "" && pkgs[0] != nil { // Note: only if main dir contains main.go
 			scope[0] = pkgs[0].Pkg.Path() //bz: the 1st pkg has the scope info == the root pkg or default .go input
+		} else if pkgs[0] == nil {
+			fmt.Println("Please enter path under which to analyze packages from: ")
+			fmt.Println("eg. google.golang.org/grpc")
+			fmt.Println("github.com/dgraph-io")
+			fmt.Scan(&scope[0])
 		} else { // scope is used for pta in determining context-sensitive fns
 			scope[0] = fromPath
 		}
