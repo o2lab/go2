@@ -277,45 +277,45 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 		a.RWIns = append(a.RWIns, []ssa.Instruction{})
 	}
 
-	fnBlocks := fn.Blocks
-	bCap := 1
-	if len(fnBlocks) > 1 {
-		bCap = len(fnBlocks)
-	} else if len(fnBlocks) == 0 {
-		return
-	}
-	bVisit := make([]int, 1, bCap) // create ordering at which blocks are visited
-	k := 0
-	b := fnBlocks[0]
-	bVisit[k] = 0
-	for k < len(bVisit) {
-		b = fnBlocks[bVisit[k]]
-		if len(b.Succs) == 0 {
-			k++
-			continue
-		}
-		j := k
-		for s, bNext := range b.Succs {
-			j += s
-			i := sliceContainsIntAt(bVisit, bNext.Index)
-			if i < k {
-				if j == len(bVisit)-1 {
-					bVisit = append(bVisit, bNext.Index)
-				} else if j < len(bVisit)-1 {
-					bVisit = append(bVisit[:j+2], bVisit[j+1:]...)
-					bVisit[j+1] = bNext.Index
-				}
-				if i != -1 { // visited block
-					bVisit = append(bVisit[:i], bVisit[i+1:]...)
-					j--
-				}
-			}
-		}
-		k++
-	}
+	//fnBlocks := fn.Blocks
+	//bCap := 1
+	//if len(fnBlocks) > 1 {
+	//	bCap = len(fnBlocks)
+	//} else if len(fnBlocks) == 0 {
+	//	return
+	//}
+	//bVisit := make([]int, 1, bCap) // create ordering at which blocks are visited
+	//k := 0
+	//b := fnBlocks[0]
+	//bVisit[k] = 0
+	//for k < len(bVisit) {
+	//	b = fnBlocks[bVisit[k]]
+	//	if len(b.Succs) == 0 {
+	//		k++
+	//		continue
+	//	}
+	//	j := k
+	//	for s, bNext := range b.Succs {
+	//		j += s
+	//		i := sliceContainsIntAt(bVisit, bNext.Index)
+	//		if i < k {
+	//			if j == len(bVisit)-1 {
+	//				bVisit = append(bVisit, bNext.Index)
+	//			} else if j < len(bVisit)-1 {
+	//				bVisit = append(bVisit[:j+2], bVisit[j+1:]...)
+	//				bVisit[j+1] = bNext.Index
+	//			}
+	//			if i != -1 { // visited block
+	//				bVisit = append(bVisit[:i], bVisit[i+1:]...)
+	//				j--
+	//			}
+	//		}
+	//	}
+	//	k++
+	//}
 
 
-
+	bVisit := fn.DomPreorder()
 	var toDefer []ssa.Instruction // stack storing deferred calls
 	var toUnlock []ssa.Value
 	var toRUnlock []ssa.Value
@@ -327,9 +327,8 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 	var selDone bool
 	var ifIns *ssa.If
 	var ifEnds []ssa.Instruction
-	for bInd := 0; bInd < len(bVisit); bInd++ {
+	for bInd, aBlock := range bVisit {
 		activeCase, selDone = false, false
-		aBlock := fnBlocks[bVisit[bInd]]
 		if aBlock.Comment == "recover" {// ----> !!! SEE HERE: bz: the same as above, from line 279 to 293 (or even 304) can be separated out
 			continue
 		}
