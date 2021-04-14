@@ -22,16 +22,16 @@ go install
 
 After installing race-checker, go to the root directory of the gRPC repo, 
 
-Execute race-checker,
+Execute race-checker in the **main** directory of a Go program, followed by the path with which to start analysis from, 
 ```
-race-checker 
+race-checker ./
 ```
-or go to the subdirectory of your choice instead, but then please include `-path` flag as follows, 
+or 
 ```
-race-checker -path=google.golang.org/grpc
+race-checker ./examples/helloworld/greeter_client
 ```
 
-When running in the root directory where multiple entry points will be identified, race-checker will request your input for which entry-points to analyze
+When multiple entry points are identified, race-checker will request your input for which entry-points to analyze
 
 ![Image of screenshot](race_checker/tests/grpc.png)
 
