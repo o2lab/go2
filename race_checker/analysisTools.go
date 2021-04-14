@@ -277,45 +277,26 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 		a.RWIns = append(a.RWIns, []ssa.Instruction{})
 	}
 
-	//fnBlocks := fn.Blocks
-	//bCap := 1
-	//if len(fnBlocks) > 1 {
-	//	bCap = len(fnBlocks)
-	//} else if len(fnBlocks) == 0 {
-	//	return
-	//}
-	//bVisit := make([]int, 1, bCap) // create ordering at which blocks are visited
-	//k := 0
-	//b := fnBlocks[0]
-	//bVisit[k] = 0
-	//for k < len(bVisit) {
-	//	b = fnBlocks[bVisit[k]]
-	//	if len(b.Succs) == 0 {
-	//		k++
-	//		continue
-	//	}
-	//	j := k
-	//	for s, bNext := range b.Succs {
-	//		j += s
-	//		i := sliceContainsIntAt(bVisit, bNext.Index)
-	//		if i < k {
-	//			if j == len(bVisit)-1 {
-	//				bVisit = append(bVisit, bNext.Index)
-	//			} else if j < len(bVisit)-1 {
-	//				bVisit = append(bVisit[:j+2], bVisit[j+1:]...)
-	//				bVisit[j+1] = bNext.Index
-	//			}
-	//			if i != -1 { // visited block
-	//				bVisit = append(bVisit[:i], bVisit[i+1:]...)
-	//				j--
-	//			}
-	//		}
-	//	}
-	//	k++
-	//}
-
-
-	bVisit := fn.DomPreorder()
+	bVisit0 := fn.DomPreorder()
+	var bVisit []*ssa.BasicBlock
+	var pushBack []*ssa.BasicBlock
+	statement := ""
+	for i, b := range bVisit0 {
+		if strings.Contains(b.Comment, ".done") && i < len(bVisit0)-1 {
+			statement = strings.Split(b.Comment, ".done")[0]
+			pushBack = append([]*ssa.BasicBlock{b}, pushBack...)
+		} else {
+			if len(pushBack) > 0 && !strings.Contains(b.Comment, statement) {
+				bVisit = append(bVisit, pushBack...)
+				pushBack = []*ssa.BasicBlock{}
+				statement = ""
+			}
+			bVisit = append(bVisit, b)
+			if i == len(bVisit0)-1 && len(pushBack) > 0 && strings.Contains(b.Comment, statement) {
+				bVisit = append(bVisit, pushBack...)
+			}
+		}
+	}
 	var toDefer []ssa.Instruction // stack storing deferred calls
 	var toUnlock []ssa.Value
 	var toRUnlock []ssa.Value

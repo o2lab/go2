@@ -10,8 +10,6 @@ import (
 	"github.com/twmb/algoimpl/go/graph"
 	"github.tamu.edu/April1989/go_tools/go/pointer"
 	pta0 "github.tamu.edu/April1989/go_tools/go/pointer_default"
-	"os"
-	"path/filepath"
 	"sync"
 	"syscall"
 
@@ -118,7 +116,7 @@ type AnalysisRunner struct {
 	trieLimit     int  // set as user config option later, an integer that dictates how many times a function can be called under identical context
 	efficiency    bool // configuration setting to avoid recursion in tested program
 	racyStackTops []string
-	finalReport   []*raceReport
+	finalReport   []raceReport
 }
 
 type fnInfo struct { // all fields must be comparable for fnInfo to be used as key to trieMap
@@ -225,22 +223,22 @@ func main() { //default: -useNewPTA
 		allEntries = true
 	}
 	// from Dr. H
-	analysisDirectories := flag.Args()
-	var directoryName = ""
-	if len(analysisDirectories) != 1 {
-		fmt.Fprintf(os.Stderr, "Must provide one analysis directory: %v\n", analysisDirectories)
-		os.Exit(1)
-	} else {
-		directoryName = analysisDirectories[0]
-		//JEFF: check if directory exists
-		_, err := os.Stat(directoryName)
-		if err != nil {
-			//println("os.Stat(): error for directory name ", directoryName)
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err.Error())
-		} else {
-			directoryName, _ = filepath.Abs(directoryName)
-		}
-	}
+	//analysisDirectories := flag.Args()
+	//var directoryName = ""
+	//if len(analysisDirectories) != 1 {
+	//	fmt.Fprintf(os.Stderr, "Must provide one analysis directory: %v\n", analysisDirectories)
+	//	os.Exit(1)
+	//} else {
+	//	directoryName = analysisDirectories[0]
+	//	//JEFF: check if directory exists
+	//	_, err := os.Stat(directoryName)
+	//	if err != nil {
+	//		//println("os.Stat(): error for directory name ", directoryName)
+	//		fmt.Fprintf(os.Stderr, "Error: %v\n", err.Error())
+	//	} else {
+	//		directoryName, _ = filepath.Abs(directoryName)
+	//	}
+	//}
 
 	log.SetFormatter(&log.TextFormatter{
 		FullTimestamp:   true,

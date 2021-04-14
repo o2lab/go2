@@ -222,7 +222,6 @@ func (runner *AnalysisRunner) Run(args []string) error {
 	for _, m := range mains {
 		wg.Add(1)
 		go func(main *ssa.Package) {
-			defer wg.Done()
 			// Configure static analysis...
 			Analysis := analysis{
 				ptaRes:          runner.ptaResult,
@@ -353,7 +352,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 				log.Info("Done  -- Happens-Before graph built ")
 				log.Info("Checking for data races... ")
 			}
-			rr := &raceReport{
+			rr := raceReport{
 				entryInfo: main.Pkg.Path(),
 			}
 			rr.racePairs = Analysis.checkRacyPairs()
@@ -361,6 +360,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 			runner.racyStackTops = Analysis.racyStackTops
 			runner.finalReport = append(runner.finalReport, rr)
 			runner.mu.Unlock()
+			wg.Done()
 		}(m)
 	}
 	wg.Wait()
