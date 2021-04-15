@@ -166,7 +166,7 @@ var allEntries = false
 var useDefaultPTA = false
 var getGo = false
 var goTest bool // running test script
-var fromPath = ""
+var debugFlag bool
 
 func init() {
 	excludedPkgs = []string{
@@ -179,7 +179,7 @@ func init() {
 func main() { //default: -useNewPTA
 	newPTA := flag.Bool("useNewPTA", false, "Use the new pointer analysis in go_tools.")
 	builtinPTA := flag.Bool("useDefaultPTA", false, "Use the built-in pointer analysis.")
-	debug := flag.Bool("debug", true, "Prints log.Debug messages.")
+	debug := flag.Bool("debug", false, "Prints log.Debug messages.")
 	lockOps := flag.Bool("lockOps", false, "Prints lock and unlock operations. ")
 	flag.BoolVar(&stats.CollectStats, "collectStats", false, "Collect analysis statistics.")
 	help := flag.Bool("help", false, "Show all command-line options.")
@@ -214,6 +214,7 @@ func main() { //default: -useNewPTA
 		useNewPTA = false
 	}
 	if *debug {
+		debugFlag = true
 		log.SetLevel(log.DebugLevel)
 	}
 	if *lockOps {
