@@ -138,7 +138,8 @@ func (a *analysis) buildHB() {
 					waitingN[insKey] = prevN // store Wait node for later edge creation TO this node
 				} else if callIns.Call.Value.Name() == "Done" {
 					for wKey, wNode := range waitingN {
-						if a.sameAddress(callIns.Call.Args[0], wKey.ins.(*ssa.Call).Call.Args[0], nGo, wKey.goID) {
+						if a.sameAddress(callIns.Call.Args[0], wKey.ins.(*ssa.Call).Call.Args[0], nGo, wKey.goID) &&
+							(*(prevN.Value)).(goIns).goID != (*(wNode.Value)).(goIns).goID {
 							err := a.HBgraph.MakeEdge(prevN, wNode) // create edge from Done node to Wait node
 							var fromName string
 							var toName string
@@ -162,7 +163,8 @@ func (a *analysis) buildHB() {
 			} else if dIns, ok1 := anIns.(*ssa.Defer); ok1 {
 				if dIns.Call.Value.Name() == "Done" {
 					for wKey, wNode := range waitingN {
-						if a.sameAddress(dIns.Call.Args[0], wKey.ins.(*ssa.Call).Call.Args[0], nGo, wKey.goID) {
+						if a.sameAddress(dIns.Call.Args[0], wKey.ins.(*ssa.Call).Call.Args[0], nGo, wKey.goID) &&
+							(*(prevN.Value)).(goIns).goID != (*(wNode.Value)).(goIns).goID {
 							err := a.HBgraph.MakeEdge(prevN, wNode) // create edge from Done node to Wait node
 							var fromName string
 							var toName string
@@ -186,7 +188,8 @@ func (a *analysis) buildHB() {
 			}
 			if sendIns, ok := anIns.(*ssa.Send); ok && channelComm { // detect matching channel send operations
 				for ch, sIns := range a.chanSnds {
-					if rcvN, matching := chanRecvs[ch]; matching && sliceContainsSnd(sIns, sendIns) {
+					if rcvN, matching := chanRecvs[ch]; matching && sliceContainsSnd(sIns, sendIns) &&
+						(*(prevN.Value)).(goIns).goID != (*(rcvN.Value)).(goIns).goID {
 						err := a.HBgraph.MakeEdge(prevN, rcvN) // create edge from Send node to Receive node
 						var fromName, toName string
 						if nGo == 0 {
@@ -211,7 +214,8 @@ func (a *analysis) buildHB() {
 				}
 			} else if rcvIns, chR := anIns.(*ssa.UnOp); chR && channelComm {
 				if ch := a.getRcvChan(rcvIns); ch != "" {
-					if sndN, matching := chanSends[ch]; matching {
+					if sndN, matching := chanSends[ch]; matching &&
+						(*(sndN.Value)).(goIns).goID != (*(prevN.Value)).(goIns).goID {
 						err := a.HBgraph.MakeEdge(sndN, prevN) // create edge from Send node to Receive node
 						var fromName, toName string
 						if (*sndN.Value).(goIns).goID == 0 {
