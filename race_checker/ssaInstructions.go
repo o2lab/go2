@@ -529,8 +529,7 @@ func (a *analysis) insGo(examIns *ssa.Go, goID int, theIns ssa.Instruction, loop
 	if goID == 0 && a.insDRA == 0 { // this is first *ssa.Go instruction in main goroutine
 		a.insDRA = len(a.RWIns[goID]) // race analysis will begin at this instruction
 	}
-
-	var info = goroutineInfo{examIns, entryMethod, newGoID}
+	var info = goroutineInfo{theIns, examIns, entryMethod, newGoID}
 	a.goStack = append(a.goStack, []*ssa.Function{}) // initialize interior slice
 	a.goCaller[newGoID] = goID                       // map caller goroutine
 	a.goStack[newGoID] = append(a.goStack[newGoID], a.storeFns...)

@@ -173,13 +173,14 @@ func (runner *AnalysisRunner) Run(args []string) error {
 	// Configure pointer analysis...
 	if useNewPTA {
 		scope := make([]string, 1)
-		if pkgs[0] != nil { // Note: only if main dir contains main.go
-			scope[0] = pkgs[0].Pkg.Path() //bz: the 1st pkg has the scope info == the root pkg or default .go input
-		} else if pkgs[0] == nil && len(pkgs) == 1 {
-			log.Fatal("Error: No packages detected. Please verify directory provided contains Go Files. ")
-		} else {
-			scope[0] = strings.Split(pkgs[1].Pkg.Path(), "/")[0] + strings.Split(pkgs[1].Pkg.Path(), "/")[1]
-		}
+		scope[0] = "google.golang.org/grpc"
+		//if pkgs[0] != nil { // Note: only if main dir contains main.go
+		//	scope[0] = pkgs[0].Pkg.Path() //bz: the 1st pkg has the scope info == the root pkg or default .go input
+		//} else if pkgs[0] == nil && len(pkgs) == 1 {
+		//	log.Fatal("Error: No packages detected. Please verify directory provided contains Go Files. ")
+		//} else {
+		//	scope[0] = strings.Split(pkgs[1].Pkg.Path(), "/")[0] + strings.Split(pkgs[1].Pkg.Path(), "/")[1]
+		//}
 		runner.ptaConfig = &pointer.Config{
 			Mains:          mains, //bz: all mains in a project
 			Reflection:     false,
@@ -245,7 +246,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 				RlockMap:        make(map[ssa.Instruction][]ssa.Value),
 				RlockSet:        make(map[int][]*lockInfo),
 				goCaller:        make(map[int]int),
-				goCalls:         make(map[int]*ssa.Go),
+				goCalls:         make(map[int]goCallInfo),
 				chanToken:       make(map[string]string),
 				chanBuf:         make(map[string]int),
 				chanRcvs:        make(map[string][]*ssa.UnOp),
@@ -295,7 +296,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 				for i := 0; i < len(Analysis.RWIns); i++ {
 					name := "main"
 					if i > 0 {
-						name = Analysis.goNames(Analysis.goCalls[i])
+						name = Analysis.goNames(Analysis.goCalls[i].goIns)
 					}
 					if Analysis.goInLoop[i] {
 						log.Debug("Goroutine ", i, "  --  ", name, strings.Repeat(" *", 10), " spawned by a loop", strings.Repeat(" *", 10))

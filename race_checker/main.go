@@ -50,7 +50,7 @@ type analysis struct {
 	paramFunc       *ssa.Function
 	goStack         [][]*ssa.Function
 	goCaller        map[int]int
-	goCalls         map[int]*ssa.Go
+	goCalls         map[int]goCallInfo
 	chanToken       map[string]string      // map token number to channel name
 	chanBuf         map[string]int         // map each channel to its buffer length
 	chanRcvs        map[string][]*ssa.UnOp // map each channel to receive instructions
@@ -124,12 +124,18 @@ type fnInfo struct { // all fields must be comparable for fnInfo to be used as k
 	contextStr string
 }
 
+type goCallInfo struct {
+	ssaIns ssa.Instruction
+	goIns  *ssa.Go
+}
+
 type goIns struct { // an ssa.Instruction with goroutine info
 	ins  ssa.Instruction
 	goID int
 }
 
 type goroutineInfo struct {
+	ssaIns 		ssa.Instruction
 	goIns       *ssa.Go
 	entryMethod *ssa.Function
 	goID        int

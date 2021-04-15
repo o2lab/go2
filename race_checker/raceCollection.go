@@ -30,12 +30,71 @@ func isLocal(ins ssa.Instruction) bool {
 	return false
 }
 
+func minOfTwo(numA int, numB int) int {
+	if numA < numB {
+		return numA
+	}
+	return numB
+}
+
+func (a *analysis) canRunInParallel(goID1 int, goID2 int) bool {
+	var commonStack bool
+	paths := [2][]int{}
+	stacks := [2][]*ssa.Function{}
+	goIDs := []int{goID1, goID2}
+	var divFn *ssa.Function
+	for i, ID := range goIDs {
+		for ID > 0 {
+			paths[i] = append([]int{ID}, paths[i]...)
+			temp := a.goCaller[ID]
+			ID = temp
+		}
+		for _, eachGo := range paths[i] {
+			stacks[i] = append(stacks[i], a.goStack[eachGo]...)
+		}
+	}
+	for j, fn := range stacks[0] {
+		if j == 0 {
+			if fn != stacks[1][0] {
+				return true
+			} else {
+				commonStack = !commonStack // switch ON - may share call stack
+			}
+		}
+		if fn == stacks[1][j] {
+			if j == minOfTwo(len(stacks[0]), len(stacks[1]))-1 { // entire stack is identical
+				divFn = fn
+			}
+		} else if commonStack { // divergence happened
+			divFn = stacks[0][j-1]
+			break
+		}
+		if j == len(stacks[1])-1 {
+			break
+		}
+	}
+	ins1 := a.goCalls[goID1].ssaIns
+	ins2 := a.goCalls[goID2].ssaIns
+	if divFn != nil && ins1.Parent() == ins2.Parent() { // both go calls in same function
+		b1 := ins1.Block()
+		b2 := ins2.Block()
+		if !b1.Dominates(b2) && !b2.Dominates(b1) {
+			return false
+		}
+	}
+
+	return true
+}
+
 // checkRacyPairs checks accesses among two concurrent goroutines
 func (a *analysis) checkRacyPairs() []*raceInfo {
 	var races []*raceInfo
 	var ri *raceInfo
 	for i := 0; i < len(a.RWIns); i++ {
 		for j := i + 1; j < len(a.RWIns); j++ { // must be in different goroutines, j always greater than i
+			if !a.canRunInParallel(i, j) {
+				continue
+			}
 			for ii, goI := range a.RWIns[i] {
 				if (i == 0 && ii < a.insDRA) || (channelComm && sliceContainsBloc(a.omitComm, goI.Block())) {
 					continue
@@ -314,7 +373,7 @@ func (a *analysis) printRace(counter int, insPair []ssa.Instruction, addrPair [2
 		if goIDs[i] == 0 { // main goroutine
 			log.Println("\tin goroutine  ***  main  [", goIDs[i], "] *** ")
 		} else {
-			log.Println("\tin goroutine  ***", a.goNames(a.goCalls[goIDs[i]]), "[", goIDs[i], "] *** ", a.prog.Fset.Position(a.goCalls[goIDs[i]].Pos()))
+			log.Println("\tin goroutine  ***", a.goNames(a.goCalls[goIDs[i]].goIns), "[", goIDs[i], "] *** ", a.prog.Fset.Position(a.goCalls[goIDs[i]].ssaIns.Pos()))
 		}
 		for p, everyFn := range a.stackMap[insPair[i].Parent()] {
 			log.Println("\t ", strings.Repeat(" ", p), everyFn.Name(), a.prog.Fset.Position(everyFn.Pos()))

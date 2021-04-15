@@ -631,7 +631,7 @@ func (a *analysis) goNames(goIns *ssa.Go) string {
 
 // newGoroutine goes through the goroutine, logs its info, and goes through the instructions within
 func (a *analysis) newGoroutine(info goroutineInfo) {
-	if info.goIns == a.goCalls[a.goCaller[info.goID]] {
+	if info.goIns == a.goCalls[a.goCaller[info.goID]].goIns {
 		return // recursive spawning of same goroutine
 	}
 
@@ -639,8 +639,9 @@ func (a *analysis) newGoroutine(info goroutineInfo) {
 	if info.goID >= len(a.RWIns) { // initialize interior slice for new goroutine
 		a.RWIns = append(a.RWIns, []ssa.Instruction{})
 	}
-	a.RWIns[info.goID] = append(a.RWIns[info.goID], info.goIns)
-	a.goCalls[info.goID] = info.goIns
+	a.RWIns[info.goID] = append(a.RWIns[info.goID], info.ssaIns)
+	newGoInfo := goCallInfo{goIns: info.goIns, ssaIns: info.ssaIns}
+	a.goCalls[info.goID] = newGoInfo
 	if !allEntries {
 		if a.loopIDs[info.goID] > 0 {
 			a.goInLoop[info.goID] = true
