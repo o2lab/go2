@@ -37,8 +37,8 @@ type analysis struct {
 	trieMap         map[fnInfo]*trie    // map each function to a trie node
 	RWIns           [][]ssa.Instruction // instructions grouped by goroutine
 	insDRA          int                 // index of instruction (in main goroutine) at which to begin data race analysis
-	storeFns        []*ssa.Function
-	stackMap		map[*ssa.Function][]*ssa.Function
+	storeFns        []fnCallInfo
+	stackMap		map[fnCallIns][]fnCallInfo
 	workList        []goroutineInfo
 	reportedAddr    []ssa.Value // stores already reported addresses
 	levels          map[int]int
@@ -48,7 +48,7 @@ type analysis struct {
 	RlockSet        map[int][]*lockInfo             // active lockset, to be maintained along instruction traversal
 	getParam        bool
 	paramFunc       *ssa.Function
-	goStack         [][]*ssa.Function
+	goStack         [][]fnCallInfo
 	goCaller        map[int]int
 	goCalls         map[int]goCallInfo
 	chanToken       map[string]string      // map token number to channel name
@@ -124,9 +124,19 @@ type fnInfo struct { // all fields must be comparable for fnInfo to be used as k
 	contextStr string
 }
 
+type fnCallInfo struct {
+	fnIns 	*ssa.Function
+	ssaIns 	ssa.Instruction
+}
+
 type goCallInfo struct {
 	ssaIns ssa.Instruction
 	goIns  *ssa.Go
+}
+
+type fnCallIns struct {
+	fnIns 	*ssa.Function
+	goID  	int
 }
 
 type goIns struct { // an ssa.Instruction with goroutine info

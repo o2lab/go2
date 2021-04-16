@@ -272,14 +272,14 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 	}
 	if !isSynthetic(fn) { // if function is NOT synthetic
 		if !a.fromPkgsOfInterest(fn) {
-			a.updateRecords(fn.Name(), goID, "POP  ", fn)
+			a.updateRecords(fn.Name(), goID, "POP  ", fn, nil)
 			return
 		}
 		if fn.Name() == entryFn {
 			a.levels[goID] = 0 // initialize level count at main entry
 			a.loopIDs[goID] = 0
-			a.updateRecords(fn.Name(), goID, "PUSH ", fn)
-			a.goStack = append(a.goStack, []*ssa.Function{}) // initialize first interior slice for main goroutine
+			a.updateRecords(fn.Name(), goID, "PUSH ", fn, nil)
+			a.goStack = append(a.goStack, []fnCallInfo{}) // initialize first interior slice for main goroutine
 		}
 	}
 	if _, ok := a.levels[goID]; !ok && goID > 0 { // initialize level counter for new goroutine
@@ -364,7 +364,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 						fnName := deferIns.Call.Value.Name()
 						fnName = checkTokenNameDefer(fnName, deferIns)
 						if !a.exploredFunction(deferIns.Call.StaticCallee(), goID, dIns) {
-							a.updateRecords(fnName, goID, "PUSH ", deferIns.Call.StaticCallee())
+							a.updateRecords(fnName, goID, "PUSH ", deferIns.Call.StaticCallee(), theIns)
 							a.RWIns[goID] = append(a.RWIns[goID], dIns)
 							a.visitAllInstructions(deferIns.Call.StaticCallee(), goID)
 						}
@@ -578,7 +578,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				fnName := deferIns.Call.Value.Name()
 				fnName = checkTokenNameDefer(fnName, deferIns)
 				if !a.exploredFunction(deferIns.Call.StaticCallee(), goID, dIns) {
-					a.updateRecords(fnName, goID, "PUSH ", deferIns.Call.StaticCallee())
+					a.updateRecords(fnName, goID, "PUSH ", deferIns.Call.StaticCallee(), dIns)
 					a.RWIns[goID] = append(a.RWIns[goID], dIns)
 					a.visitAllInstructions(deferIns.Call.StaticCallee(), goID)
 				}
@@ -611,8 +611,8 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 	}
 	// done with all instructions in function body, now pop the function
 	fnName := fn.Name()
-	if fnName == a.storeFns[len(a.storeFns)-1].Name() {
-		a.updateRecords(fnName, goID, "POP  ", fn)
+	if fnName == a.storeFns[len(a.storeFns)-1].fnIns.Name() {
+		a.updateRecords(fnName, goID, "POP  ", fn, nil)
 	}
 	if len(a.storeFns) == 0 && len(a.workList) != 0 { // finished reporting current goroutine and workList isn't empty
 		nextGoInfo := a.workList[0] // get the goroutine info at head of workList
@@ -646,8 +646,8 @@ func (a *analysis) newGoroutine(info goroutineInfo) {
 	if info.goIns == a.goCalls[a.goCaller[info.goID]].goIns {
 		return // recursive spawning of same goroutine
 	}
-
-	a.storeFns = append(a.storeFns, info.entryMethod)
+	newFn := fnCallInfo{fnIns: info.entryMethod, ssaIns: info.ssaIns}
+	a.storeFns = append(a.storeFns, newFn)
 	if info.goID >= len(a.RWIns) { // initialize interior slice for new goroutine
 		a.RWIns = append(a.RWIns, []ssa.Instruction{})
 	}
@@ -687,7 +687,8 @@ func (a *analysis) exploredFunction(fn *ssa.Function, goID int, theIns ssa.Instr
 	if sliceContainsInsAt(a.RWIns[goID], theIns) >= 0 {
 		return true
 	}
-	if a.efficiency && sliceContainsFn(a.storeFns, fn) { // for temporary debugging purposes only
+	theFn := fnCallInfo{fn, theIns}
+	if a.efficiency && sliceContainsFnCall(a.storeFns, theFn) { // for temporary debugging purposes only
 		return true
 	}
 	visitedIns := []ssa.Instruction{}

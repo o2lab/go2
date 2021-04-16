@@ -39,19 +39,20 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 		rightLoc := 0       // initialize index for the right points-to location
 		if len(PT0Set) > 1 { // multiple targets returned by pointer analysis
 			//log.Trace("***Pointer Analysis revealed ", len(PTSet), " targets for location - ", a.prog.Fset.Position(location.Pos()))
-			var fns []string
-			for ind, eachTarget := range PT0Set { // check each target
-				if eachTarget.Value().Parent() != nil {
-					fns = append(fns, eachTarget.Value().Parent().Name())
-					//log.Trace("*****target No.", ind+1, " - ", eachTarget.Value().Name(), " from function ", eachTarget.Value().Parent().Name())
-					if sliceContainsFn(a.storeFns, eachTarget.Value().Parent()) { // calling function is in current goroutine
-						rightLoc = ind
-						break
-					}
-				} else {
-					continue
-				}
-			}
+			//var fns []string
+			//for ind, eachTarget := range PT0Set { // check each target
+			//	if eachTarget.Value().Parent() != nil {
+			//		fns = append(fns, eachTarget.Value().Parent().Name())
+			//		//log.Trace("*****target No.", ind+1, " - ", eachTarget.Value().Name(), " from function ", eachTarget.Value().Parent().Name())
+			//		targetFn := fnCallInfo{eachTarget.Value().Parent(), }
+			//		if sliceContainsFn(a.storeFns, ) { // calling function is in current goroutine
+			//			rightLoc = ind
+			//			break
+			//		}
+			//	} else {
+			//		continue
+			//	}
+			//}
 			//log.Trace("***Executing target No.", rightLoc+1)
 		} else if len(PT0Set) == 0 {
 			return
@@ -60,7 +61,7 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 		case *ssa.Function:
 			fnName = theFunc.Name()
 			if !a.exploredFunction(theFunc, goID, theIns) {
-				a.updateRecords(fnName, goID, "PUSH ", theFunc)
+				a.updateRecords(fnName, goID, "PUSH ", theFunc, theIns)
 				a.RWIns[goID] = append(a.RWIns[goID], theIns)
 				a.visitAllInstructions(theFunc, goID)
 			}
@@ -72,7 +73,7 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 			check := a.prog.LookupMethod(pta0Set[location].PointsTo().DynamicTypes().Keys()[0], a.mains[0].Pkg, methodName)
 			fnName = check.Name()
 			if !a.exploredFunction(check, goID, theIns) {
-				a.updateRecords(fnName, goID, "PUSH ", check)
+				a.updateRecords(fnName, goID, "PUSH ", check, theIns)
 				a.RWIns[goID] = append(a.RWIns[goID], theIns)
 				a.visitAllInstructions(check, goID)
 			}
@@ -122,7 +123,7 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 			} else {
 				fnName = theFunc.Name()
 				if !a.exploredFunction(theFunc, goID, theIns) {
-					a.updateRecords(fnName, goID, "PUSH ", theFunc)
+					a.updateRecords(fnName, goID, "PUSH ", theFunc, theIns)
 					a.RWIns[goID] = append(a.RWIns[goID], theIns)
 					a.visitAllInstructions(theFunc, goID)
 				}
@@ -137,7 +138,7 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 				check := a.prog.LookupMethod(ptr.PointsTo().DynamicTypes().Keys()[0], a.mains[0].Pkg, methodName)
 				fnName = check.Name()
 				if !a.exploredFunction(check, goID, theIns) {
-					a.updateRecords(fnName, goID, "PUSH ", check)
+					a.updateRecords(fnName, goID, "PUSH ", check, theIns)
 					a.RWIns[goID] = append(a.RWIns[goID], theIns)
 					a.visitAllInstructions(check, goID)
 				}

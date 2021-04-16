@@ -35,9 +35,9 @@ func sliceContains(s []ssa.Value, e ssa.Value) bool {
 	return false
 }
 
-func sliceContainsFn(s []*ssa.Function, e *ssa.Function) bool {
+func sliceContainsFnCall(s []fnCallInfo, e fnCallInfo) bool {
 	for _, a := range s {
-		if a.Pos() == e.Pos() {
+		if a.fnIns.Pos() == e.fnIns.Pos() && a.ssaIns.Pos() == e.ssaIns.Pos() {
 			return true
 		}
 	}

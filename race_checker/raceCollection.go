@@ -40,9 +40,9 @@ func minOfTwo(numA int, numB int) int {
 func (a *analysis) canRunInParallel(goID1 int, goID2 int) bool {
 	var commonStack bool
 	paths := [2][]int{}
-	stacks := [2][]*ssa.Function{}
+	stacks := [2][]fnCallInfo{}
 	goIDs := []int{goID1, goID2}
-	var divFn *ssa.Function
+	divFn := fnCallInfo{nil, nil}
 	for i, ID := range goIDs {
 		for ID > 0 {
 			paths[i] = append([]int{ID}, paths[i]...)
@@ -75,14 +75,13 @@ func (a *analysis) canRunInParallel(goID1 int, goID2 int) bool {
 	}
 	ins1 := a.goCalls[goID1].ssaIns
 	ins2 := a.goCalls[goID2].ssaIns
-	if divFn != nil && ins1.Parent() == ins2.Parent() { // both go calls in same function
+	if divFn.fnIns != nil && ins1.Parent() == ins2.Parent() { // both go calls in same function
 		b1 := ins1.Block()
 		b2 := ins2.Block()
 		if !b1.Dominates(b2) && !b2.Dominates(b1) {
 			return false
 		}
 	}
-
 	return true
 }
 
@@ -373,10 +372,15 @@ func (a *analysis) printRace(counter int, insPair []ssa.Instruction, addrPair [2
 		if goIDs[i] == 0 { // main goroutine
 			log.Println("\tin goroutine  ***  main  [", goIDs[i], "] *** ")
 		} else {
-			log.Println("\tin goroutine  ***", a.goNames(a.goCalls[goIDs[i]].goIns), "[", goIDs[i], "] *** ", a.prog.Fset.Position(a.goCalls[goIDs[i]].ssaIns.Pos()))
+			log.Println("\tin goroutine  ***", a.goNames(a.goCalls[goIDs[i]].goIns), "[", goIDs[i], "] *** ")
 		}
-		for p, everyFn := range a.stackMap[insPair[i].Parent()] {
-			log.Println("\t ", strings.Repeat(" ", p), everyFn.Name(), a.prog.Fset.Position(everyFn.Pos()))
+		fnCall := fnCallIns{insPair[i].Parent(), goIDs[i]}
+		for p, everyFn := range a.stackMap[fnCall] {
+			if everyFn.ssaIns == nil {
+				log.Println("\t ", strings.Repeat(" ", p), everyFn.fnIns.Name(), a.prog.Fset.Position(everyFn.fnIns.Pos()))
+			} else {
+				log.Println("\t ", strings.Repeat(" ", p), everyFn.fnIns.Name(), a.prog.Fset.Position(everyFn.ssaIns.Pos()))
+			}
 		}
 		if goIDs[i] > 0 { // subroutines
 			log.Debug("call stack: ")
@@ -393,9 +397,18 @@ func (a *analysis) printRace(counter int, insPair []ssa.Instruction, addrPair [2
 				eachStack := a.goStack[eachGo]
 				for k, eachFn := range eachStack {
 					if k == 0 {
-						log.Debug("\t ", strings.Repeat(" ", q), "--> Goroutine: ", eachFn.Name(), "[", a.goCaller[eachGo], "] ", a.prog.Fset.Position(eachFn.Pos()))
+						if eachFn.ssaIns == nil {
+							log.Debug("\t ", strings.Repeat(" ", q), "--> Goroutine: ", eachFn.fnIns.Name(), "[", a.goCaller[eachGo], "] ", a.prog.Fset.Position(eachFn.fnIns.Pos()))
+						} else {
+							log.Debug("\t ", strings.Repeat(" ", q), "--> Goroutine: ", eachFn.fnIns.Name(), "[", a.goCaller[eachGo], "] ", a.prog.Fset.Position(eachFn.ssaIns.Pos()))
+						}
 					} else {
-						log.Debug("\t   ", strings.Repeat(" ", q), strings.Repeat(" ", k), eachFn.Name(), " ", a.prog.Fset.Position(eachFn.Pos()))
+						if eachFn.ssaIns == nil {
+							log.Debug("\t   ", strings.Repeat(" ", q), strings.Repeat(" ", k), eachFn.fnIns.Name(), " ", a.prog.Fset.Position(eachFn.fnIns.Pos()))
+						} else {
+							log.Debug("\t   ", strings.Repeat(" ", q), strings.Repeat(" ", k), eachFn.fnIns.Name(), " ", a.prog.Fset.Position(eachFn.ssaIns.Pos()))
+						}
+
 					}
 				}
 			}
