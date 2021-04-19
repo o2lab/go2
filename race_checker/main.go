@@ -38,7 +38,7 @@ type analysis struct {
 	RWIns           [][]ssa.Instruction // instructions grouped by goroutine
 	insDRA          int                 // index of instruction (in main goroutine) at which to begin data race analysis
 	storeFns        []fnCallInfo
-	stackMap		map[fnCallIns][]fnCallInfo
+	stackMap		map[fnCallIns]stackInfo
 	workList        []goroutineInfo
 	reportedAddr    []ssa.Value // stores already reported addresses
 	levels          map[int]int
@@ -50,7 +50,7 @@ type analysis struct {
 	paramFunc       *ssa.Function
 	goStack         [][]fnCallInfo
 	goCaller        map[int]int
-	goCalls         map[int]goCallInfo
+	goCalls         map[int]*goCallInfo
 	chanToken       map[string]string      // map token number to channel name
 	chanBuf         map[string]int         // map each channel to its buffer length
 	chanRcvs        map[string][]*ssa.UnOp // map each channel to receive instructions
@@ -124,6 +124,10 @@ type fnInfo struct { // all fields must be comparable for fnInfo to be used as k
 	contextStr string
 }
 
+type stackInfo struct {
+	fnCalls 	[]fnCallInfo
+}
+
 type fnCallInfo struct {
 	fnIns 	*ssa.Function
 	ssaIns 	ssa.Instruction
@@ -138,6 +142,8 @@ type fnCallIns struct {
 	fnIns 	*ssa.Function
 	goID  	int
 }
+
+var debugIns fnCallIns
 
 type goIns struct { // an ssa.Instruction with goroutine info
 	ins  ssa.Instruction

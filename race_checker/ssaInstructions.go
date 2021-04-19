@@ -104,7 +104,9 @@ func (a *analysis) updateRecords(fnName string, goID int, pushPop string, theFn 
 		fnCall := fnCallIns{fnIns: theFn, goID: goID}
 		newFn := fnCallInfo{ssaIns: theIns, fnIns: theFn}
 		a.storeFns = append(a.storeFns, newFn)
-		a.stackMap[fnCall] = a.storeFns
+		stack := make([]fnCallInfo, len(a.storeFns))
+		copy(stack, a.storeFns)
+		a.stackMap[fnCall] = stackInfo{fnCalls: stack}
 		a.levels[goID]++
 	}
 }
@@ -528,7 +530,7 @@ func (a *analysis) insGo(examIns *ssa.Go, goID int, theIns ssa.Instruction, loop
 		a.loopIDs[newGoID] = 0
 	}
 	a.RWIns[goID] = append(a.RWIns[goID], theIns)
-	if goID == 0 && a.insDRA == 0 { // this is first *ssa.Go instruction in main goroutine
+	if goID == 0 && a.insDRA == -1 { // this is first *ssa.Go instruction in main goroutine
 		a.insDRA = len(a.RWIns[goID]) // race analysis will begin at this instruction
 	}
 	var info = goroutineInfo{theIns, examIns, entryMethod, newGoID}

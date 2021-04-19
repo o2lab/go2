@@ -30,57 +30,46 @@ func isLocal(ins ssa.Instruction) bool {
 	return false
 }
 
-func minOfTwo(numA int, numB int) int {
-	if numA < numB {
-		return numA
-	}
-	return numB
-}
-
 func (a *analysis) canRunInParallel(goID1 int, goID2 int) bool {
-	var commonStack bool
-	paths := [2][]int{}
-	stacks := [2][]fnCallInfo{}
+	paths := [2][]int{} // thread traversal
+	stacks := [2][]fnCallInfo{} // fn traversal
 	goIDs := []int{goID1, goID2}
-	divFn := fnCallInfo{nil, nil}
-	for i, ID := range goIDs {
-		for ID > 0 {
-			paths[i] = append([]int{ID}, paths[i]...)
+	divFn := fnCallInfo{nil, nil} // fn where divergence happens
+	for i, ID := range goIDs { // for each thread
+		for ID > 0 { // traverse up the call chain
+			paths[i] = append([]int{ID}, paths[i]...) // prepend
 			temp := a.goCaller[ID]
 			ID = temp
 		}
-		for _, eachGo := range paths[i] {
+		for _, eachGo := range paths[i] { // concatenate call chain from each thread
 			stacks[i] = append(stacks[i], a.goStack[eachGo]...)
 		}
 	}
-	for j, fn := range stacks[0] {
-		if j == 0 {
-			if fn != stacks[1][0] {
-				return true
-			} else {
-				commonStack = !commonStack // switch ON - may share call stack
-			}
+	var b1, b2 *ssa.BasicBlock
+	for j, fn := range stacks[0] { // take one of the two call stacks
+		if j == 0 { // share main entry
+			continue
 		}
-		if fn == stacks[1][j] {
-			if j == minOfTwo(len(stacks[0]), len(stacks[1]))-1 { // entire stack is identical
-				divFn = fn
+		if fn == stacks[1][j] { // common call
+			if j == len(stacks[0])-1 { // end of this stack reached
+				//divFn = fn // examine last common call
+				break
+			} else if j == len(stacks[0])-1 { // end of other stack reached
+				//divFn = fn
+				break
 			}
-		} else if commonStack { // divergence happened
-			divFn = stacks[0][j-1]
-			break
-		}
-		if j == len(stacks[1])-1 {
+		} else { // divergence happened
+			divFn = stacks[0][j-1] // examine caller function
+			log.Debug(divFn)
+			b1 = stacks[0][j].ssaIns.Block()
+			b2 = stacks[1][j].ssaIns.Block()
 			break
 		}
 	}
-	ins1 := a.goCalls[goID1].ssaIns
-	ins2 := a.goCalls[goID2].ssaIns
-	if divFn.fnIns != nil && ins1.Parent() == ins2.Parent() { // both go calls in same function
-		b1 := ins1.Block()
-		b2 := ins2.Block()
-		if !b1.Dominates(b2) && !b2.Dominates(b1) {
-			return false
-		}
+
+	if b1 != nil && b2 != nil && !b1.Dominates(b2) && !b2.Dominates(b1) {
+		log.Debug("here")
+		return false
 	}
 	return true
 }
@@ -374,17 +363,7 @@ func (a *analysis) printRace(counter int, insPair []ssa.Instruction, addrPair [2
 		} else {
 			log.Println("\tin goroutine  ***", a.goNames(a.goCalls[goIDs[i]].goIns), "[", goIDs[i], "] *** ")
 		}
-		fnCall := fnCallIns{insPair[i].Parent(), goIDs[i]}
-		for p, everyFn := range a.stackMap[fnCall] {
-			if everyFn.ssaIns == nil {
-				log.Println("\t ", strings.Repeat(" ", p), everyFn.fnIns.Name(), a.prog.Fset.Position(everyFn.fnIns.Pos()))
-			} else {
-				log.Println("\t ", strings.Repeat(" ", p), everyFn.fnIns.Name(), a.prog.Fset.Position(everyFn.ssaIns.Pos()))
-			}
-		}
-		if goIDs[i] > 0 { // subroutines
-			log.Debug("call stack: ")
-		}
+		log.Debug("call stack: ")
 		var pathGo []int
 		goID := goIDs[i]
 		for goID > 0 {
@@ -398,18 +377,35 @@ func (a *analysis) printRace(counter int, insPair []ssa.Instruction, addrPair [2
 				for k, eachFn := range eachStack {
 					if k == 0 {
 						if eachFn.ssaIns == nil {
-							log.Debug("\t ", strings.Repeat(" ", q), "--> Goroutine: ", eachFn.fnIns.Name(), "[", a.goCaller[eachGo], "] ", a.prog.Fset.Position(eachFn.fnIns.Pos()))
+							log.Println("\t ", strings.Repeat(" ", q), "--> Goroutine: ", eachFn.fnIns.Name(), "[", a.goCaller[eachGo], "] ", a.prog.Fset.Position(eachFn.fnIns.Pos()))
 						} else {
-							log.Debug("\t ", strings.Repeat(" ", q), "--> Goroutine: ", eachFn.fnIns.Name(), "[", a.goCaller[eachGo], "] ", a.prog.Fset.Position(eachFn.ssaIns.Pos()))
+							log.Println("\t ", strings.Repeat(" ", q), "--> Goroutine: ", eachFn.fnIns.Name(), "[", a.goCaller[eachGo], "] ", a.prog.Fset.Position(eachFn.ssaIns.Pos()))
 						}
 					} else {
 						if eachFn.ssaIns == nil {
-							log.Debug("\t   ", strings.Repeat(" ", q), strings.Repeat(" ", k), eachFn.fnIns.Name(), " ", a.prog.Fset.Position(eachFn.fnIns.Pos()))
+							log.Println("\t   ", strings.Repeat(" ", q), strings.Repeat(" ", k), eachFn.fnIns.Name(), " ", a.prog.Fset.Position(eachFn.fnIns.Pos()))
 						} else {
-							log.Debug("\t   ", strings.Repeat(" ", q), strings.Repeat(" ", k), eachFn.fnIns.Name(), " ", a.prog.Fset.Position(eachFn.ssaIns.Pos()))
+							log.Println("\t   ", strings.Repeat(" ", q), strings.Repeat(" ", k), eachFn.fnIns.Name(), " ", a.prog.Fset.Position(eachFn.ssaIns.Pos()))
 						}
 
 					}
+				}
+			}
+			fnCall := fnCallIns{insPair[i].Parent(), goIDs[i]}
+			for p, everyFn := range a.stackMap[fnCall].fnCalls {
+				if everyFn.ssaIns == nil {
+					if p == 0 {
+						log.Println("\t ", strings.Repeat(" ", p+len(pathGo)), "--> Goroutine: ", everyFn.fnIns.Name(), "[", goIDs[i], "] ", a.prog.Fset.Position(everyFn.fnIns.Pos()))
+					} else {
+						log.Println("\t ", strings.Repeat(" ", p+len(pathGo)), everyFn.fnIns.Name(), a.prog.Fset.Position(everyFn.fnIns.Pos()))
+					}
+				} else {
+					if p == 0 {
+						log.Println("\t ", strings.Repeat(" ", p+len(pathGo)), "--> Goroutine: ", everyFn.fnIns.Name(), "[", goIDs[i], "] ", a.prog.Fset.Position(everyFn.ssaIns.Pos()))
+					} else {
+						log.Println("\t ", strings.Repeat(" ", p+len(pathGo)), everyFn.fnIns.Name(), a.prog.Fset.Position(everyFn.ssaIns.Pos()))
+					}
+
 				}
 			}
 		}

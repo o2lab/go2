@@ -364,7 +364,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 						fnName := deferIns.Call.Value.Name()
 						fnName = checkTokenNameDefer(fnName, deferIns)
 						if !a.exploredFunction(deferIns.Call.StaticCallee(), goID, dIns) {
-							a.updateRecords(fnName, goID, "PUSH ", deferIns.Call.StaticCallee(), theIns)
+							a.updateRecords(fnName, goID, "PUSH ", deferIns.Call.StaticCallee(), dIns)
 							a.RWIns[goID] = append(a.RWIns[goID], dIns)
 							a.visitAllInstructions(deferIns.Call.StaticCallee(), goID)
 						}
@@ -643,7 +643,7 @@ func (a *analysis) goNames(goIns *ssa.Go) string {
 
 // newGoroutine goes through the goroutine, logs its info, and goes through the instructions within
 func (a *analysis) newGoroutine(info goroutineInfo) {
-	if info.goIns == a.goCalls[a.goCaller[info.goID]].goIns {
+	if a.goCalls[a.goCaller[info.goID]] != nil && info.goIns == a.goCalls[a.goCaller[info.goID]].goIns {
 		return // recursive spawning of same goroutine
 	}
 	newFn := fnCallInfo{fnIns: info.entryMethod, ssaIns: info.ssaIns}
@@ -652,7 +652,7 @@ func (a *analysis) newGoroutine(info goroutineInfo) {
 		a.RWIns = append(a.RWIns, []ssa.Instruction{})
 	}
 	a.RWIns[info.goID] = append(a.RWIns[info.goID], info.ssaIns)
-	newGoInfo := goCallInfo{goIns: info.goIns, ssaIns: info.ssaIns}
+	newGoInfo := &goCallInfo{goIns: info.goIns, ssaIns: info.ssaIns}
 	a.goCalls[info.goID] = newGoInfo
 	if !allEntries {
 		if a.loopIDs[info.goID] > 0 {
@@ -667,6 +667,10 @@ func (a *analysis) newGoroutine(info goroutineInfo) {
 	}
 	if !allEntries {
 		log.Debug(strings.Repeat(" ", a.levels[info.goID]), "PUSH ", info.entryMethod.Name(), " at lvl ", a.levels[info.goID])
+		fnCall := fnCallIns{fnIns: info.entryMethod, goID: info.goID}
+		stack := make([]fnCallInfo, len(a.storeFns))
+		copy(stack, a.storeFns)
+		a.stackMap[fnCall] = stackInfo{fnCalls: stack}
 	}
 	a.levels[info.goID]++
 	switch info.goIns.Call.Value.(type) {
@@ -691,7 +695,7 @@ func (a *analysis) exploredFunction(fn *ssa.Function, goID int, theIns ssa.Instr
 	if a.efficiency && sliceContainsFnCall(a.storeFns, theFn) { // for temporary debugging purposes only
 		return true
 	}
-	visitedIns := []ssa.Instruction{}
+	var visitedIns []ssa.Instruction
 	if len(a.RWIns) > 0 {
 		visitedIns = a.RWIns[goID]
 	}
