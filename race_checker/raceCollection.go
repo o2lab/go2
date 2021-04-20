@@ -48,30 +48,93 @@ func (a *analysis) canRunInParallel(goID1 int, goID2 int) bool {
 	var b1, b2 *ssa.BasicBlock
 	for j, fn := range stacks[0] { // take one of the two call stacks
 		if j == 0 { // share main entry
+			if j == len(stacks[0])-1 || j == len(stacks[1])-1 {
+				return true
+			}
 			continue
 		}
 		if fn == stacks[1][j] { // common call
 			if j == len(stacks[0])-1 { // end of this stack reached
-				//divFn = fn // examine last common call
-				break
+				return true
 			} else if j == len(stacks[0])-1 { // end of other stack reached
-				//divFn = fn
-				break
+				return true
 			}
 		} else { // divergence happened
 			divFn = stacks[0][j-1] // examine caller function
-			log.Debug(divFn)
 			b1 = stacks[0][j].ssaIns.Block()
 			b2 = stacks[1][j].ssaIns.Block()
 			break
 		}
 	}
 
-	if b1 != nil && b2 != nil && !b1.Dominates(b2) && !b2.Dominates(b1) {
-		log.Debug("here")
+	if b1 != nil && b2 != nil && b1.Parent() == divFn.fnIns && b2.Parent() == divFn.fnIns &&
+		!b1.Dominates(b2) && !b2.Dominates(b1) {
 		return false
 	}
 	return true
+}
+
+func (a *analysis) mutuallyExcluded(goI ssa.Instruction, I int, goJ ssa.Instruction, J int) bool {
+	paths := [2][]int{} // thread traversal
+	stacks := [2][]fnCallInfo{} // fn traversal
+	goIDs := []int{I, J}
+	insPair := []ssa.Instruction{goI, goJ}
+	divFn := fnCallInfo{nil, nil} // fn where divergence happens
+	for i, ID := range goIDs { // for each thread
+		for ID > 0 { // traverse up the call chain
+			paths[i] = append([]int{ID}, paths[i]...) // prepend
+			temp := a.goCaller[ID]
+			ID = temp
+		}
+		for _, eachGo := range paths[i] { // concatenate call chain from each thread
+			stacks[i] = append(stacks[i], a.goStack[eachGo]...)
+		}
+		fnCall := fnCallIns{insPair[i].Parent(), ID}
+		for _, everyFn := range a.stackMap[fnCall].fnCalls {
+			stacks[i] = append(stacks[i], everyFn)
+		}
+	}
+
+	var b1, b2 *ssa.BasicBlock
+	for j, fn := range stacks[0] { // take one of the two call stacks
+		if j == 0 { // share main entry
+			if j == len(stacks[0])-1 {
+				divFn = fn
+				b1 = goI.Block()
+				b2 = stacks[1][j+1].ssaIns.Block()
+			} else if j == len(stacks[1])-1 {
+				divFn = fn
+				b2 = goJ.Block()
+				b1 = stacks[0][j+1].ssaIns.Block()
+			}
+			continue
+		}
+		if fn == stacks[1][j] { // common call
+			if j == len(stacks[0])-1 { // end of this stack reached
+				divFn = fn
+				b1 = goI.Block()
+				if j == len(stacks[1])-1 {
+					b2 = goJ.Block()
+				} else {
+					b2 = stacks[1][j+1].ssaIns.Block()
+				}
+			} else if j == len(stacks[0])-1 { // end of other stack reached
+				divFn = fn
+				b2 = goJ.Block()
+				b1 = stacks[0][j+1].ssaIns.Block()
+			}
+		} else { // divergence happened
+			divFn = stacks[0][j-1] // examine caller function
+			b1 = stacks[0][j].ssaIns.Block()
+			b2 = stacks[1][j].ssaIns.Block()
+			break
+		}
+	}
+	if b1 != nil && b2 != nil && b1.Parent() == divFn.fnIns && b2.Parent() == divFn.fnIns &&
+		!b1.Dominates(b2) && !b2.Dominates(b1) {
+		return true
+	}
+	return false
 }
 
 // checkRacyPairs checks accesses among two concurrent goroutines
@@ -120,7 +183,8 @@ func (a *analysis) checkRacyPairs() []*raceInfo {
 							!a.reachable(goJ, j, goI, i) &&
 							!a.bothAtomic(insSlice[0], insSlice[1]) &&
 							!a.lockSetsIntersect(goI, goJ, i, j) &&
-							!a.selectMutEx(insSlice[0], insSlice[1]) {
+							!a.selectMutEx(insSlice[0], insSlice[1]) &&
+							!a.mutuallyExcluded(goI, i, goJ, j) {
 							a.reportedAddr = append(a.reportedAddr, addressPair[0])
 							ri = &raceInfo{
 								insPair:  insSlice,
@@ -198,6 +262,7 @@ func (a *analysis) sameAddress(addr1 ssa.Value, addr2 ssa.Value, go1 int, go2 in
 			}
 		}
 	}
+
 	// check points-to set to see if they can point to the same object
 	if useDefaultPTA {
 		ptsets := a.ptaRes0.Queries
@@ -218,6 +283,11 @@ func (a *analysis) sameAddress(addr1 ssa.Value, addr2 ssa.Value, go1 int, go2 in
 	}
 	var pt1 pointer.PointerWCtx
 	var pt2 pointer.PointerWCtx
+	//allocSites1 := a.ptaRes[a.main].GetAllocations(pt1)
+	//for _, site := range allocSites1 {
+	//	fn := site.Fn //which fn allocates the obj
+	//	fmt.Println(fn.Name())
+	//}
 	if go1 == 0 {
 		pt1 = a.ptaRes[a.main].PointsToByGoWithLoopID(addr1, nil, a.loopIDs[go1])
 	} else {
@@ -363,7 +433,6 @@ func (a *analysis) printRace(counter int, insPair []ssa.Instruction, addrPair [2
 		} else {
 			log.Println("\tin goroutine  ***", a.goNames(a.goCalls[goIDs[i]].goIns), "[", goIDs[i], "] *** ")
 		}
-		log.Debug("call stack: ")
 		var pathGo []int
 		goID := goIDs[i]
 		for goID > 0 {
@@ -373,7 +442,7 @@ func (a *analysis) printRace(counter int, insPair []ssa.Instruction, addrPair [2
 		}
 		if !allEntries {
 			for q, eachGo := range pathGo {
-				eachStack := a.goStack[eachGo]
+				eachStack := a.goStack[eachGo][:len(a.goStack[eachGo])-1]
 				for k, eachFn := range eachStack {
 					if k == 0 {
 						if eachFn.ssaIns == nil {

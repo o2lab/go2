@@ -456,6 +456,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				toUnlock = append(toUnlock, unlockOps...)
 				toRUnlock = append(toRUnlock, runlockOps...)
 			case *ssa.Alloc:
+				a.RWIns[goID] = append(a.RWIns[goID], theIns)
 				if a.inLoop {
 					a.allocLoop[examIns.Parent()] = append(a.allocLoop[examIns.Parent()], examIns.Comment)
 				}

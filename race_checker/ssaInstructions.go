@@ -537,6 +537,8 @@ func (a *analysis) insGo(examIns *ssa.Go, goID int, theIns ssa.Instruction, loop
 	a.goStack = append(a.goStack, []fnCallInfo{}) // initialize interior slice
 	a.goCaller[newGoID] = goID                       // map caller goroutine
 	a.goStack[newGoID] = append(a.goStack[newGoID], a.storeFns...)
+	theGoCall := fnCallInfo{ssaIns: theIns, fnIns: entryMethod}
+	a.goStack[newGoID] = append(a.goStack[newGoID], theGoCall)
 	a.workList = append(a.workList, info) // store encountered goroutines
 	if !allEntries {
 		if loopID > 0 {
