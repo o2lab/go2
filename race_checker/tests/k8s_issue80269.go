@@ -26,7 +26,7 @@ func mayRace() {
 	case <-ch2:
 		fmt.Print("ch2 ")
 	}
-	fmt.Print(i2 /* RACE Read */, "\n")
+	fmt.Print(i2 /* RACE Read */ , "\n")
 }
 
 func showBB(j int) int {

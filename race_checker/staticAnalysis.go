@@ -173,14 +173,14 @@ func (runner *AnalysisRunner) Run(args []string) error {
 	// Configure pointer analysis...
 	if useNewPTA {
 		scope := make([]string, 1)
-		scope[0] = "google.golang.org/grpc"
-		//if pkgs[0] != nil { // Note: only if main dir contains main.go
-		//	scope[0] = pkgs[0].Pkg.Path() //bz: the 1st pkg has the scope info == the root pkg or default .go input
-		//} else if pkgs[0] == nil && len(pkgs) == 1 {
-		//	log.Fatal("Error: No packages detected. Please verify directory provided contains Go Files. ")
-		//} else {
-		//	scope[0] = strings.Split(pkgs[1].Pkg.Path(), "/")[0] + strings.Split(pkgs[1].Pkg.Path(), "/")[1]
-		//}
+		//scope[0] = "google.golang.org/grpc"
+		if pkgs[0] != nil { // Note: only if main dir contains main.go
+			scope[0] = pkgs[0].Pkg.Path() //bz: the 1st pkg has the scope info == the root pkg or default .go input
+		} else if pkgs[0] == nil && len(pkgs) == 1 {
+			log.Fatal("Error: No packages detected. Please verify directory provided contains Go Files. ")
+		} else {
+			scope[0] = strings.Split(pkgs[1].Pkg.Path(), "/")[0] + strings.Split(pkgs[1].Pkg.Path(), "/")[1]
+		}
 		runner.ptaConfig = &pointer.Config{
 			Mains:          mains, //bz: all mains in a project
 			Reflection:     false,

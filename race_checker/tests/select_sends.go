@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"k8s.io/apimachinery/pkg/util/rand"
+	"sync"
 	"time"
 
 	//"time"
@@ -20,7 +21,7 @@ func main() {
 		shared = 1
 		msg := <-ch2 // corresponding channel receive
 		fmt.Println("received ", msg)
-		x99 /* RACE Write */ = 2
+		x99 /* RACE Write */ /* RACE Write */ = 2
 	}()
 	fmt.Println(x99)
 	worker(ch1, ch2, ch3)
@@ -29,9 +30,13 @@ func main() {
 	} else {
 		x99 /* RACE Read */ ++
 	}
+	var wg sync.WaitGroup
+	wg.Add(1)
 	go func() {
-		x99--
+		x99 /* RACE Read */ --
+		wg.Done()
 	}()
+	wg.Wait()
 }
 
 func worker(ch1 chan string, chx chan string, ch3 chan string) {
