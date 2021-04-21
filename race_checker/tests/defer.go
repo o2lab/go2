@@ -24,7 +24,7 @@ func DContext(input string) *ClientCon {
 		if someInt > 0 {
 			cc.Close()
 			go func() { // DContext$1$1
-				someBool = false
+				someBool /* RACE Write */ = false
 			}()
 		}
 	}()
@@ -40,7 +40,7 @@ func DContext(input string) *ClientCon {
 	defer func() { // DContext$2
 		someBool = false
 		go func() {
-			someBool = true
+			someBool /* RACE Write */ = true
 		}()
 	}()
 	fmt.Println(someBool)
