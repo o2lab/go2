@@ -283,11 +283,6 @@ func (a *analysis) sameAddress(addr1 ssa.Value, addr2 ssa.Value, go1 int, go2 in
 	}
 	var pt1 pointer.PointerWCtx
 	var pt2 pointer.PointerWCtx
-	//allocSites1 := a.ptaRes[a.main].GetAllocations(pt1)
-	//for _, site := range allocSites1 {
-	//	fn := site.Fn //which fn allocates the obj
-	//	fmt.Println(fn.Name())
-	//}
 	if go1 == 0 {
 		pt1 = a.ptaRes[a.main].PointsToByGoWithLoopID(addr1, nil, a.loopIDs[go1])
 	} else {
