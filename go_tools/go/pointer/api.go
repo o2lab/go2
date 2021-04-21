@@ -802,17 +802,15 @@ func (r *Result) PointsToByGoWithLoopID(v ssa.Value, goInstr *ssa.Go, loopID int
 	_, ok1 := v.(*ssa.FreeVar)
 	_, ok2 := v.(*ssa.Global)
 	_, ok3 := v.(*ssa.UnOp)
-	if (ok1 || ok2 || ok3) && len(ptss) == 1 { //free var: only one pts available
+	if ok1 || ok2 {//free var: only one pts available
+		return ptss[0]
+	} else if ok3 && len(ptss) == 1 { //this is hard to say ...
 		return ptss[0]
 	}
 
 	if goInstr == nil {
 		return r.a.result.pointsToByMain(v)
 	}
-
-	//if strings.Contains(v.String(), "fp.numFilterCalled") {
-	//	fmt.Print()
-	//}
 
 	//others
 	for _, pts := range ptss {
