@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	log "github.com/sirupsen/logrus"
 	"github.com/twmb/algoimpl/go/graph"
@@ -173,14 +174,40 @@ func (runner *AnalysisRunner) Run(args []string) error {
 	// Configure pointer analysis...
 	if useNewPTA {
 		scope := make([]string, 1)
-		//scope[0] = "google.golang.org/grpc"
-		if pkgs[0] != nil { // Note: only if main dir contains main.go
-			scope[0] = pkgs[0].Pkg.Path() //bz: the 1st pkg has the scope info == the root pkg or default .go input
-		} else if pkgs[0] == nil && len(pkgs) == 1 {
-			log.Fatal("Error: No packages detected. Please verify directory provided contains Go Files. ")
-		} else {
-			scope[0] = strings.Split(pkgs[1].Pkg.Path(), "/")[0] + strings.Split(pkgs[1].Pkg.Path(), "/")[1]
+		//if pkgs[0] != nil { // Note: only if main dir contains main.go
+		//	scope[0] = pkgs[0].Pkg.Path() //bz: the 1st pkg has the scope info == the root pkg or default .go input
+		//} else if pkgs[0] == nil && len(pkgs) == 1 {
+		//	log.Fatal("Error: No packages detected. Please verify directory provided contains Go Files. ")
+		//} else {
+		//	scope[0] = strings.Split(pkgs[1].Pkg.Path(), "/")[0] + strings.Split(pkgs[1].Pkg.Path(), "/")[1]
+		//}
+		path, err := os.Getwd() //current working directory == project path
+		if err != nil {
+			panic("Error while os.Getwd: " + err.Error())
 		}
+		gomodFile, err := os.Open(path + "/go.mod") // For read access.
+		if err != nil {
+			panic("Error while reading go.mod: " + err.Error())
+		}
+		defer gomodFile.Close()
+		scanner := bufio.NewScanner(gomodFile)
+		var mod string
+		for scanner.Scan() {
+			s := scanner.Text()
+			if strings.HasPrefix(s, "module ") {
+				mod = s
+				break //this is the line "module xxx.xxx.xx/xxx"
+			}
+		}
+		if mod == "" {
+			fmt.Println("Cannot find go.mod in default location: ", gomodFile)
+			return nil
+		}
+		if err2 := scanner.Err(); err2 != nil {
+			panic("Error while scanning go.mod: " + err2.Error())
+		}
+		parts := strings.Split(mod, " ")
+		scope = append(scope, parts[1])
 		runner.ptaConfig = &pointer.Config{
 			Mains:          mains, //bz: all mains in a project
 			Reflection:     false,
