@@ -802,7 +802,7 @@ func (r *Result) PointsToByGoWithLoopID(v ssa.Value, goInstr *ssa.Go, loopID int
 	_, ok1 := v.(*ssa.FreeVar)
 	_, ok2 := v.(*ssa.Global)
 	_, ok3 := v.(*ssa.UnOp)
-	if ok1 || ok2 || ok3 { //free var: only one pts available
+	if (ok1 || ok2 || ok3) && len(ptss) == 1 { //free var: only one pts available
 		return ptss[0]
 	}
 
