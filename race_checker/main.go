@@ -143,8 +143,6 @@ type fnCallIns struct {
 	goID  	int
 }
 
-var debugIns fnCallIns
-
 type goIns struct { // an ssa.Instruction with goroutine info
 	ins  ssa.Instruction
 	goID int

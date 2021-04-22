@@ -98,8 +98,8 @@ func (a *analysis) mutuallyExcluded(goI ssa.Instruction, I int, goJ ssa.Instruct
 	var b1, b2 *ssa.BasicBlock
 	for j, fn := range stacks[0] { // take one of the two call stacks
 		if j == 0 { // share main entry
-			if j == len(stacks[0])-1 {
-				divFn = fn
+			if j == len(stacks[0])-1 { // this access is in main function
+				divFn = fn // divergence happened in main
 				b1 = goI.Block()
 				b2 = stacks[1][j+1].ssaIns.Block()
 			} else if j == len(stacks[1])-1 {
@@ -107,24 +107,24 @@ func (a *analysis) mutuallyExcluded(goI ssa.Instruction, I int, goJ ssa.Instruct
 				b2 = goJ.Block()
 				b1 = stacks[0][j+1].ssaIns.Block()
 			}
-			continue
+			break
 		}
 		if j == len(stacks[0])-1 { // end of this stack reached
 			if fn == stacks[1][j] { // common call
 				divFn = fn
 				b1 = goI.Block()
-				if j == len(stacks[1])-1 {
-					b2 = goJ.Block()
-				} else {
+				//if j == len(stacks[1])-1 {
+				//	b2 = goJ.Block()
+				//} else {
 					b2 = stacks[1][j+1].ssaIns.Block()
-				}
+				//}
 			} else { // divergence happened
 				divFn = stacks[0][j-1] // examine caller function
 				b1 = stacks[0][j].ssaIns.Block()
 				b2 = stacks[1][j].ssaIns.Block()
 				break
 			}
-		} else if j == len(stacks[0])-1 { // end of other stack reached
+		} else if j == len(stacks[1])-1 { // end of other stack reached
 			if fn == stacks[1][j] { // common call
 				divFn = fn
 				b2 = goJ.Block()
@@ -135,11 +135,12 @@ func (a *analysis) mutuallyExcluded(goI ssa.Instruction, I int, goJ ssa.Instruct
 				b2 = stacks[1][j].ssaIns.Block()
 				break
 			}
-		} else { // divergence at middle of both stacks
+		} else if fn != stacks[1][j] { // mid-stack divergence for both threads
 			divFn = stacks[0][j-1] // examine caller function
 			b1 = stacks[0][j].ssaIns.Block()
 			b2 = stacks[1][j].ssaIns.Block()
-		}
+			break
+		} // otherwise it's common fn call mid-stack
 	}
 	if b1 != nil && b2 != nil && b1.Parent() == divFn.fnIns && b2.Parent() == divFn.fnIns &&
 		!b1.Dominates(b2) && !b2.Dominates(b1) {
