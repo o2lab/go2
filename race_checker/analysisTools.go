@@ -289,26 +289,37 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 		a.RWIns = append(a.RWIns, []ssa.Instruction{})
 	}
 
-	bVisit0 := fn.DomPreorder()
-	var bVisit []*ssa.BasicBlock
-	var pushBack []*ssa.BasicBlock
-	statement := ""
-	for i, b := range bVisit0 {
-		if strings.Contains(b.Comment, ".done") && i < len(bVisit0)-1 {
-			statement = strings.Split(b.Comment, ".done")[0]
-			pushBack = append([]*ssa.BasicBlock{b}, pushBack...)
-		} else {
-			if len(pushBack) > 0 && !strings.Contains(b.Comment, statement) {
-				bVisit = append(bVisit, pushBack...)
-				pushBack = []*ssa.BasicBlock{}
-				statement = ""
-			}
-			bVisit = append(bVisit, b)
-			if i == len(bVisit0)-1 && len(pushBack) > 0 && strings.Contains(b.Comment, statement) {
-				bVisit = append(bVisit, pushBack...)
-			}
-		}
-	}
+	//bVisit0 := fn.DomPreorder()
+	//var bVisit []*ssa.BasicBlock
+	//var pushBack []*ssa.BasicBlock // stack of .done blocks
+	//statement := "" // could be if, for or rangeiter
+	//for i, b := range bVisit0 {
+	//	if strings.Contains(b.Comment, ".done") && i < len(bVisit0)-1 { // not the last block
+	//		statement = strings.Split(b.Comment, ".done")[0]
+	//		pushBack = append([]*ssa.BasicBlock{b}, pushBack...)
+		//} else if strings.Contains(b.Comment, ".else") { // ** assume only one predecessor
+		//	log.Debug(b.Preds[0].Succs)
+		//	if loc := sliceContainsBlocAt(bVisit, b.Preds[0]); loc > -1 { // location of predecessor
+		//		if loc == len(bVisit)-1 {
+		//			bVisit = append(bVisit, b)
+		//		} else {
+		//			bVisit = append(bVisit[:loc+1], bVisit[loc:]...)
+		//			bVisit[loc+1] = b // put else before if
+		//		}
+		//	}
+	//	} else {
+	//		if len(pushBack) > 0 && !strings.Contains(b.Comment, statement) { // reach end of statement blocks
+	//			bVisit = append(bVisit, pushBack...) // LIFO
+	//			pushBack = []*ssa.BasicBlock{} // empty stack
+	//			statement = "" // reinitialize
+	//		}
+	//		bVisit = append(bVisit, b)
+	//		if i == len(bVisit0)-1 && len(pushBack) > 0 && strings.Contains(b.Comment, statement) { //
+	//			bVisit = append(bVisit, pushBack...)
+	//		}
+	//	}
+	//}
+	bVisit := fn.Blocks
 	var toDefer []ssa.Instruction // stack storing deferred calls
 	var toUnlock []ssa.Value
 	var toRUnlock []ssa.Value

@@ -84,9 +84,9 @@ func sliceContainsBloc(s []*ssa.BasicBlock, e *ssa.BasicBlock) bool {
 	return false
 }
 
-func sliceContainsIntAt(s []int, e int) int {
-	for i, a := range s {
-		if a == e {
+func sliceContainsBlocAt(s []*ssa.BasicBlock, e *ssa.BasicBlock) int {
+	for i, b := range s {
+		if b == e {
 			return i
 		}
 	}
