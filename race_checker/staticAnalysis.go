@@ -224,7 +224,11 @@ func (runner *AnalysisRunner) Run(args []string) error {
 			Level:      0,            //bz: see pointer.Config
 		}
 		start := time.Now()                                               //performance
-		runner.ptaResult, _ = pointer.AnalyzeMultiMains(runner.ptaConfig) // conduct pointer analysis for multiple mains
+		runner.ptaResult, err = pointer.AnalyzeMultiMains(runner.ptaConfig) // conduct pointer analysis for multiple mains
+		if err != nil {
+			panic("Pointer Analysis Error: " + err.Error())
+		}
+
 		t := time.Now()
 		elapsed := t.Sub(start)
 		fmt.Println("\nDone  -- PTA/CG Build; Using " + elapsed.String() + ".\n ")
