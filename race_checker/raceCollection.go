@@ -109,8 +109,8 @@ func (a *analysis) mutuallyExcluded(goI ssa.Instruction, I int, goJ ssa.Instruct
 			}
 			continue
 		}
-		if fn == stacks[1][j] { // common call
-			if j == len(stacks[0])-1 { // end of this stack reached
+		if j == len(stacks[0])-1 { // end of this stack reached
+			if fn == stacks[1][j] { // common call
 				divFn = fn
 				b1 = goI.Block()
 				if j == len(stacks[1])-1 {
@@ -118,16 +118,27 @@ func (a *analysis) mutuallyExcluded(goI ssa.Instruction, I int, goJ ssa.Instruct
 				} else {
 					b2 = stacks[1][j+1].ssaIns.Block()
 				}
-			} else if j == len(stacks[0])-1 { // end of other stack reached
+			} else { // divergence happened
+				divFn = stacks[0][j-1] // examine caller function
+				b1 = stacks[0][j].ssaIns.Block()
+				b2 = stacks[1][j].ssaIns.Block()
+				break
+			}
+		} else if j == len(stacks[0])-1 { // end of other stack reached
+			if fn == stacks[1][j] { // common call
 				divFn = fn
 				b2 = goJ.Block()
 				b1 = stacks[0][j+1].ssaIns.Block()
+			} else { // divergence happened
+				divFn = stacks[0][j-1] // examine caller function
+				b1 = stacks[0][j].ssaIns.Block()
+				b2 = stacks[1][j].ssaIns.Block()
+				break
 			}
-		} else { // divergence happened
+		} else { // divergence at middle of both stacks
 			divFn = stacks[0][j-1] // examine caller function
 			b1 = stacks[0][j].ssaIns.Block()
 			b2 = stacks[1][j].ssaIns.Block()
-			break
 		}
 	}
 	if b1 != nil && b2 != nil && b1.Parent() == divFn.fnIns && b2.Parent() == divFn.fnIns &&
