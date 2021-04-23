@@ -169,7 +169,6 @@ func (runner *AnalysisRunner) Run(args []string) error {
 	mains, prog, pkgs := pkgSelection(initial)
 	runner.prog = prog
 	runner.pkgs = pkgs
-
 	startExec := time.Now() // measure total duration of running entire code base
 	// Configure pointer analysis...
 	if useNewPTA {
@@ -302,6 +301,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 				allocLoop:       make(map[*ssa.Function][]string),
 				bindingFV:       make(map[*ssa.Go][]*ssa.FreeVar),
 				commIDs:  		 make(map[int][]int),
+				deferToRet: 	 make(map[*ssa.Defer]ssa.Instruction),
 			}
 			if strings.Contains(main.Pkg.Path(), "GoBench") { // for testing purposes
 				Analysis.efficiency = false

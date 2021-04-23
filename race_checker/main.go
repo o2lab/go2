@@ -76,6 +76,7 @@ type analysis struct {
 	bindingFV       map[*ssa.Go][]*ssa.FreeVar
 	pbr             *ssa.Alloc
 	commIDs 		map[int][]int
+	deferToRet 		map[*ssa.Defer]ssa.Instruction
 }
 
 type lockInfo struct {

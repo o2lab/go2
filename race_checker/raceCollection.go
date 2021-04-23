@@ -102,26 +102,42 @@ func (a *analysis) mutuallyExcluded(goI ssa.Instruction, I int, goJ ssa.Instruct
 				divFn = fn // divergence happened in main
 				b1 = goI.Block()
 				b2 = stacks[1][j+1].ssaIns.Block()
+				if deferIns, isDefer := stacks[1][j+1].ssaIns.(*ssa.Defer); isDefer {
+					b2 = a.deferToRet[deferIns].Block()
+				}
+				break
 			} else if j == len(stacks[1])-1 {
 				divFn = fn
 				b2 = goJ.Block()
 				b1 = stacks[0][j+1].ssaIns.Block()
+				if deferIns, isDefer := stacks[0][j+1].ssaIns.(*ssa.Defer); isDefer {
+					b1 = a.deferToRet[deferIns].Block()
+				}
+				break
 			}
-			break
 		}
 		if j == len(stacks[0])-1 { // end of this stack reached
 			if fn == stacks[1][j] { // common call
 				divFn = fn
 				b1 = goI.Block()
-				//if j == len(stacks[1])-1 {
-				//	b2 = goJ.Block()
-				//} else {
+				if j == len(stacks[1])-1 { // same access in different iterations of loop
+					return false
+				} else {
 					b2 = stacks[1][j+1].ssaIns.Block()
-				//}
+					if deferIns, isDefer := stacks[1][j+1].ssaIns.(*ssa.Defer); isDefer {
+						b2 = a.deferToRet[deferIns].Block()
+					}
+				}
 			} else { // divergence happened
 				divFn = stacks[0][j-1] // examine caller function
 				b1 = stacks[0][j].ssaIns.Block()
+				if deferIns, isDefer := stacks[0][j].ssaIns.(*ssa.Defer); isDefer {
+					b1 = a.deferToRet[deferIns].Block()
+				}
 				b2 = stacks[1][j].ssaIns.Block()
+				if deferIns, isDefer := stacks[1][j].ssaIns.(*ssa.Defer); isDefer {
+					b2 = a.deferToRet[deferIns].Block()
+				}
 				break
 			}
 		} else if j == len(stacks[1])-1 { // end of other stack reached
@@ -129,23 +145,51 @@ func (a *analysis) mutuallyExcluded(goI ssa.Instruction, I int, goJ ssa.Instruct
 				divFn = fn
 				b2 = goJ.Block()
 				b1 = stacks[0][j+1].ssaIns.Block()
+				if deferIns, isDefer := stacks[0][j+1].ssaIns.(*ssa.Defer); isDefer {
+					b1 = a.deferToRet[deferIns].Block()
+				}
+				break
 			} else { // divergence happened
 				divFn = stacks[0][j-1] // examine caller function
 				b1 = stacks[0][j].ssaIns.Block()
+				if deferIns, isDefer := stacks[0][j].ssaIns.(*ssa.Defer); isDefer {
+					b1 = a.deferToRet[deferIns].Block()
+				}
 				b2 = stacks[1][j].ssaIns.Block()
+				if deferIns, isDefer := stacks[1][j].ssaIns.(*ssa.Defer); isDefer {
+					b2 = a.deferToRet[deferIns].Block()
+				}
 				break
 			}
 		} else if fn != stacks[1][j] { // mid-stack divergence for both threads
 			divFn = stacks[0][j-1] // examine caller function
 			b1 = stacks[0][j].ssaIns.Block()
+			if deferIns, isDefer := stacks[0][j].ssaIns.(*ssa.Defer); isDefer {
+				b1 = a.deferToRet[deferIns].Block()
+			}
 			b2 = stacks[1][j].ssaIns.Block()
+			if deferIns, isDefer := stacks[1][j].ssaIns.(*ssa.Defer); isDefer {
+				b2 = a.deferToRet[deferIns].Block()
+			}
 			break
 		} // otherwise it's common fn call mid-stack
 	}
+
 	if b1 != nil && b2 != nil && b1.Parent() == divFn.fnIns && b2.Parent() == divFn.fnIns &&
 		!b1.Dominates(b2) && !b2.Dominates(b1) {
 		return true
 	}
+	if b1 != nil && strings.Contains(b1.Comment, "if") {
+		if _, isRet := b1.Instrs[len(b1.Instrs)-1].(*ssa.Return); isRet && b1.Dominates(b2) {
+			return true
+		}
+	}
+	if b2 != nil && strings.Contains(b2.Comment, "if") {
+		if _, isRet1 := b2.Instrs[len(b2.Instrs)-1].(*ssa.Return); isRet1 && b2.Dominates(b1) {
+			return true
+		}
+	}
+
 	return false
 }
 

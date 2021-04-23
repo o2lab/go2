@@ -289,16 +289,15 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 		a.RWIns = append(a.RWIns, []ssa.Instruction{})
 	}
 
-	//bVisit0 := fn.DomPreorder()
-	//var bVisit []*ssa.BasicBlock
-	//var pushBack []*ssa.BasicBlock // stack of .done blocks
-	//statement := "" // could be if, for or rangeiter
-	//for i, b := range bVisit0 {
-	//	if strings.Contains(b.Comment, ".done") && i < len(bVisit0)-1 { // not the last block
-	//		statement = strings.Split(b.Comment, ".done")[0]
-	//		pushBack = append([]*ssa.BasicBlock{b}, pushBack...)
+	bVisit0 := fn.DomPreorder()
+	var bVisit []*ssa.BasicBlock
+	var pushBack []*ssa.BasicBlock // stack of .done blocks
+	statement := "" // could be if, for or rangeiter
+	for i, b := range bVisit0 {
+		if strings.Contains(b.Comment, ".done") && i < len(bVisit0)-1 { // not the last block
+			statement = strings.Split(b.Comment, ".done")[0]
+			pushBack = append([]*ssa.BasicBlock{b}, pushBack...)
 		//} else if strings.Contains(b.Comment, ".else") { // ** assume only one predecessor
-		//	log.Debug(b.Preds[0].Succs)
 		//	if loc := sliceContainsBlocAt(bVisit, b.Preds[0]); loc > -1 { // location of predecessor
 		//		if loc == len(bVisit)-1 {
 		//			bVisit = append(bVisit, b)
@@ -307,19 +306,19 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 		//			bVisit[loc+1] = b // put else before if
 		//		}
 		//	}
-	//	} else {
-	//		if len(pushBack) > 0 && !strings.Contains(b.Comment, statement) { // reach end of statement blocks
-	//			bVisit = append(bVisit, pushBack...) // LIFO
-	//			pushBack = []*ssa.BasicBlock{} // empty stack
-	//			statement = "" // reinitialize
-	//		}
-	//		bVisit = append(bVisit, b)
-	//		if i == len(bVisit0)-1 && len(pushBack) > 0 && strings.Contains(b.Comment, statement) { //
-	//			bVisit = append(bVisit, pushBack...)
-	//		}
-	//	}
-	//}
-	bVisit := fn.Blocks
+		} else {
+			bVisit = append(bVisit, b)
+			if i == len(bVisit0)-1 && len(pushBack) > 0 && strings.Contains(b.Comment, statement) {
+				bVisit = append(bVisit, pushBack...)
+			}
+		}
+		if i == len(bVisit)-1 && len(pushBack) > 0 && !strings.Contains(b.Comment, statement) { // reach end of statement blocks
+			bVisit = append(bVisit, pushBack...) // LIFO
+			pushBack = []*ssa.BasicBlock{} // empty stack
+			statement = "" // reinitialize
+		}
+	}
+
 	var toDefer []ssa.Instruction // stack storing deferred calls
 	var toUnlock []ssa.Value
 	var toRUnlock []ssa.Value
@@ -364,8 +363,10 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 		}
 		for ii, theIns := range aBlock.Instrs { // examine each instruction
 			if theIns.String() == "rundefers" { // execute deferred calls at this index
+				a.RWIns[goID] = append(a.RWIns[goID], theIns)
 				for _, dIns := range toDefer {  // ----> !!! SEE HERE: bz: the same as above, from line 307 to 347 can be separated out
 					deferIns := dIns.(*ssa.Defer)
+					a.deferToRet[deferIns] = theIns
 					if _, ok := deferIns.Call.Value.(*ssa.Builtin); ok {
 						continue
 					}
