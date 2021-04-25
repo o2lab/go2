@@ -294,6 +294,11 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 	var pushBack []*ssa.BasicBlock // stack of .done blocks
 	statement := "" // could be if, for or rangeiter
 	for i, b := range bVisit0 {
+		if len(pushBack) > 0 && (!strings.Contains(b.Comment, statement) || i == len(bVisit0)-1) { // reach end of statement blocks
+			bVisit = append(bVisit, pushBack...) // LIFO
+			pushBack = []*ssa.BasicBlock{} // empty stack
+			statement = "" // reinitialize
+		}
 		if strings.Contains(b.Comment, ".done") && i < len(bVisit0)-1 { // not the last block
 			statement = strings.Split(b.Comment, ".done")[0]
 			pushBack = append([]*ssa.BasicBlock{b}, pushBack...)
@@ -308,15 +313,8 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 		//	}
 		} else {
 			bVisit = append(bVisit, b)
-			if i == len(bVisit0)-1 && len(pushBack) > 0 && strings.Contains(b.Comment, statement) {
-				bVisit = append(bVisit, pushBack...)
-			}
 		}
-		if i == len(bVisit)-1 && len(pushBack) > 0 && !strings.Contains(b.Comment, statement) { // reach end of statement blocks
-			bVisit = append(bVisit, pushBack...) // LIFO
-			pushBack = []*ssa.BasicBlock{} // empty stack
-			statement = "" // reinitialize
-		}
+
 	}
 
 	var toDefer []ssa.Instruction // stack storing deferred calls

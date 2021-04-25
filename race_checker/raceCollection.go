@@ -179,14 +179,30 @@ func (a *analysis) mutuallyExcluded(goI ssa.Instruction, I int, goJ ssa.Instruct
 		!b1.Dominates(b2) && !b2.Dominates(b1) {
 		return true
 	}
-	if b1 != nil && strings.Contains(b1.Comment, "if") {
+	if b1 != nil && (strings.Contains(b1.Comment, "if.then") || strings.Contains(b1.Comment, "if.else")) {
 		if _, isRet := b1.Instrs[len(b1.Instrs)-1].(*ssa.Return); isRet && b1.Dominates(b2) {
-			return true
+			noDefer := true // with the way that deferred functions are handled,
+			for _, eachIns := range stacks[0] {
+				if _, isDefer := eachIns.ssaIns.(*ssa.Defer); isDefer {
+					noDefer = false
+				}
+			}
+			if noDefer {
+				return true
+			}
 		}
 	}
-	if b2 != nil && strings.Contains(b2.Comment, "if") {
+	if b2 != nil && (strings.Contains(b2.Comment, "if.then") || strings.Contains(b2.Comment, "if.else")) {
 		if _, isRet1 := b2.Instrs[len(b2.Instrs)-1].(*ssa.Return); isRet1 && b2.Dominates(b1) {
-			return true
+			noDefer := true
+			for _, eachIns := range stacks[1] {
+				if _, isDefer := eachIns.ssaIns.(*ssa.Defer); isDefer {
+					noDefer = false
+				}
+			}
+			if noDefer {
+				return true
+			}
 		}
 	}
 
