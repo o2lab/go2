@@ -87,12 +87,11 @@ func (a *analysis) mutuallyExcluded(goI ssa.Instruction, I int, goJ ssa.Instruct
 			ID = temp
 		}
 		for _, eachGo := range paths[i] { // concatenate call chain from each thread
-			stacks[i] = append(stacks[i], a.goStack[eachGo]...)
+			stacks[i] = append(stacks[i], a.goStack[eachGo][:len(a.goStack[eachGo])-1]...)
 		}
-		fnCall := fnCallIns{insPair[i].Parent(), ID}
-		for _, everyFn := range a.stackMap[fnCall].fnCalls {
-			stacks[i] = append(stacks[i], everyFn)
-		}
+		fnCall := fnCallIns{insPair[i].Parent(), goIDs[i]}
+		fnCalls := a.stackMap[fnCall].fnCalls
+		stacks[i] = append(stacks[i], fnCalls...)
 	}
 
 	var b1, b2 *ssa.BasicBlock
