@@ -314,7 +314,6 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 		} else {
 			bVisit = append(bVisit, b)
 		}
-
 	}
 
 	var toDefer []ssa.Instruction // stack storing deferred calls

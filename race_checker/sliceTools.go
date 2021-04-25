@@ -35,6 +35,15 @@ func sliceContains(s []ssa.Value, e ssa.Value) bool {
 	return false
 }
 
+func stackContainsDefer(stack []fnCallInfo) bool {
+	for _, eachIns := range stack {
+		if _, isDefer := eachIns.ssaIns.(*ssa.Defer); isDefer {
+			return true
+		}
+	}
+	return false
+}
+
 func sliceContainsFnCall(s []fnCallInfo, e fnCallInfo) bool {
 	for _, a := range s {
 		if a.fnIns.Pos() == e.fnIns.Pos() && a.ssaIns.Pos() == e.ssaIns.Pos() {

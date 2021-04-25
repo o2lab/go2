@@ -90,8 +90,7 @@ func (a *analysis) mutuallyExcluded(goI ssa.Instruction, I int, goJ ssa.Instruct
 			stacks[i] = append(stacks[i], a.goStack[eachGo][:len(a.goStack[eachGo])-1]...)
 		}
 		fnCall := fnCallIns{insPair[i].Parent(), goIDs[i]}
-		fnCalls := a.stackMap[fnCall].fnCalls
-		stacks[i] = append(stacks[i], fnCalls...)
+		stacks[i] = append(stacks[i], a.stackMap[fnCall].fnCalls...)
 	}
 
 	var b1, b2 *ssa.BasicBlock
@@ -180,31 +179,18 @@ func (a *analysis) mutuallyExcluded(goI ssa.Instruction, I int, goJ ssa.Instruct
 	}
 	if b1 != nil && (strings.Contains(b1.Comment, "if.then") || strings.Contains(b1.Comment, "if.else")) {
 		if _, isRet := b1.Instrs[len(b1.Instrs)-1].(*ssa.Return); isRet && b1.Dominates(b2) {
-			noDefer := true // with the way that deferred functions are handled,
-			for _, eachIns := range stacks[0] {
-				if _, isDefer := eachIns.ssaIns.(*ssa.Defer); isDefer {
-					noDefer = false
-				}
-			}
-			if noDefer {
+			if !stackContainsDefer(stacks[0]) {
 				return true
 			}
 		}
 	}
 	if b2 != nil && (strings.Contains(b2.Comment, "if.then") || strings.Contains(b2.Comment, "if.else")) {
 		if _, isRet1 := b2.Instrs[len(b2.Instrs)-1].(*ssa.Return); isRet1 && b2.Dominates(b1) {
-			noDefer := true
-			for _, eachIns := range stacks[1] {
-				if _, isDefer := eachIns.ssaIns.(*ssa.Defer); isDefer {
-					noDefer = false
-				}
-			}
-			if noDefer {
+			if !stackContainsDefer(stacks[1]) {
 				return true
 			}
 		}
 	}
-
 	return false
 }
 
