@@ -1948,7 +1948,7 @@ func (a *analysis) genInstr(cgn *cgnode, instr ssa.Instruction) {
 			if tTuple.At(1).Type() != tInvalid {
 				sz += ksize
 			} else {
-				odst += ksize
+				odst += 1//ksize
 				osrc += ksize
 			}
 
