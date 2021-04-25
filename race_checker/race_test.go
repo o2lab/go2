@@ -37,6 +37,7 @@ var tests = []string{
 	"tests/chan_receive.go",
 	"tests/context1.go",
 	"tests/defer.go",
+	"tests/defer_mut_ex.go",
 	"tests/fields.go",
 	"tests/fzf_wg.go",
 	"tests/global_ownership.go",

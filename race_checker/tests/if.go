@@ -23,7 +23,6 @@ func main() {
 	}
 	var wg sync.WaitGroup
 	if rand.Intn(100) != 0 {
-		wg.Add(1)
 		go BBB(sn)
 		//go func() {
 		//	go func() {

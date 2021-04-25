@@ -20,10 +20,10 @@ func DContext(input string) *ClientCon {
 		someInt++
 	}
 
-	defer func() { // DContext$1
+	defer func() {
 		if someInt > 0 {
 			cc.Close()
-			go func() { // DContext$1$1
+			go func() {
 				someBool /* RACE Write */ = false
 			}()
 		}
@@ -33,17 +33,31 @@ func DContext(input string) *ClientCon {
 		someInt++
 	} else {
 		someInt--
+		func() {
+			if someInt > 0 {
+				cc.Close()
+				go func() {
+					someBool = false
+				}()
+			}
+		}()
 		return cc
 	}
 
 
-	defer func() { // DContext$2
+	defer func() {
 		someBool = false
 		go func() {
 			someBool /* RACE Write */ = true
 		}()
 	}()
 	fmt.Println(someBool)
+	func() {
+		someBool = false
+		go func() {
+			someBool = true
+		}()
+	}()
 	return cc
 }
 
