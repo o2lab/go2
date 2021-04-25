@@ -19,6 +19,9 @@ type analysis struct {
 	ptaCfg  *pointer.Config
 	ptaCfg0 *pta0.Config
 
+	efficiency 		bool
+	trieLimit 		int
+	getGo  			bool // flag
 	prog            *ssa.Program
 	pkgs            []*ssa.Package
 	mains           []*ssa.Package
@@ -29,7 +32,8 @@ type analysis struct {
 	trieMap         map[fnInfo]*trie    // map each function to a trie node
 	RWIns           [][]ssa.Instruction // instructions grouped by goroutine
 	insDRA          int                 // index of instruction (in main goroutine) at which to begin data race analysis
-	storeFns        []*ssa.Function
+	storeFns        []fnCallInfo
+	stackMap		map[fnCallIns]stackInfo
 	workList        []goroutineInfo
 	reportedAddr    []ssa.Value // stores already reported addresses
 	levels          map[int]int
@@ -39,9 +43,9 @@ type analysis struct {
 	RlockSet        map[int][]*lockInfo             // active lockset, to be maintained along instruction traversal
 	getParam        bool
 	paramFunc       *ssa.Function
-	goStack         [][]*ssa.Function
+	goStack         [][]fnCallInfo
 	goCaller        map[int]int
-	goCalls         map[int]*ssa.Go
+	goCalls         map[int]*goCallInfo
 	chanToken       map[string]string      // map token number to channel name
 	chanBuf         map[string]int         // map each channel to its buffer length
 	chanRcvs        map[string][]*ssa.UnOp // map each channel to receive instructions
@@ -66,6 +70,8 @@ type analysis struct {
 	allocLoop       map[*ssa.Function][]string
 	bindingFV       map[*ssa.Go][]*ssa.FreeVar
 	pbr             *ssa.Alloc
+	commIDs 		map[int][]int
+	deferToRet 		map[*ssa.Defer]ssa.Instruction
 }
 
 type lockInfo struct {
@@ -106,13 +112,31 @@ type AnalysisRunner struct {
 	trieLimit     int  // set as user config option later, an integer that dictates how many times a function can be called under identical context
 	efficiency    bool // configuration setting to avoid recursion in tested program
 	racyStackTops []string
-	finalReport   []*raceReport
-	goTest        bool // running test script
+	finalReport   []raceReport
 }
 
 type fnInfo struct { // all fields must be comparable for fnInfo to be used as key to trieMap
 	fnName     *ssa.Function
 	contextStr string
+}
+
+type stackInfo struct {
+	fnCalls 	[]fnCallInfo
+}
+
+type fnCallInfo struct {
+	fnIns 	*ssa.Function
+	ssaIns 	ssa.Instruction
+}
+
+type goCallInfo struct {
+	ssaIns ssa.Instruction
+	goIns  *ssa.Go
+}
+
+type fnCallIns struct {
+	fnIns 	*ssa.Function
+	goID  	int
 }
 
 type goIns struct { // an ssa.Instruction with goroutine info
@@ -121,6 +145,7 @@ type goIns struct { // an ssa.Instruction with goroutine info
 }
 
 type goroutineInfo struct {
+	ssaIns 		ssa.Instruction
 	goIns       *ssa.Go
 	entryMethod *ssa.Function
 	goID        int
@@ -150,10 +175,13 @@ var entryFn = "main"
 var allEntries = false
 var useDefaultPTA = false
 var getGo = false
+var goTest bool // running test script
+var debugFlag bool
 
 func init() {
 	excludedPkgs = []string{
 		"fmt",
+		"logrus",
 	}
 }
 
@@ -161,7 +189,7 @@ func init() {
 func main() { //default: -useNewPTA
 	newPTA := flag.Bool("useNewPTA", false, "Use the new pointer analysis in go_tools.")
 	builtinPTA := flag.Bool("useDefaultPTA", false, "Use the built-in pointer analysis.")
-	debug := flag.Bool("debug", true, "Prints log.Debug messages.")
+	debug := flag.Bool("debug", false, "Prints log.Debug messages.")
 	lockOps := flag.Bool("lockOps", false, "Prints lock and unlock operations. ")
 	flag.BoolVar(&stats.CollectStats, "collectStats", false, "Collect analysis statistics.")
 	help := flag.Bool("help", false, "Show all command-line options.")
@@ -169,7 +197,7 @@ func main() { //default: -useNewPTA
 	withComm := flag.Bool("withComm", false, "Show analysis results with communication consideration.")
 	analyzeAll := flag.Bool("analyzeAll", false, "Analyze all main() entry-points. ")
 	runTest := flag.Bool("runTest", false, "For micro-benchmark debugging... ")
-	showGo := flag.Bool("showGo", true, "Show goroutine info in analyzed program. ")
+	showGo := flag.Bool("showGo", false, "Show goroutine info in analyzed program. ")
 	//setTrie := flag.Int("trieLimit", 1, "Set trie limit... ")
 	flag.Parse()
 	//if *setTrie > 1 {
@@ -181,6 +209,7 @@ func main() { //default: -useNewPTA
 	if *runTest {
 		efficiency = false
 		trieLimit = 2
+		goTest = true
 	}
 	if *help {
 		flag.PrintDefaults()
@@ -195,6 +224,7 @@ func main() { //default: -useNewPTA
 		useNewPTA = false
 	}
 	if *debug {
+		debugFlag = true
 		log.SetLevel(log.DebugLevel)
 	}
 	if *lockOps {
@@ -209,11 +239,29 @@ func main() { //default: -useNewPTA
 	if *analyzeAll {
 		allEntries = true
 	}
+	// from Dr. H
+	//analysisDirectories := flag.Args()
+	//var directoryName = ""
+	//if len(analysisDirectories) != 1 {
+	//	fmt.Fprintf(os.Stderr, "Must provide one analysis directory: %v\n", analysisDirectories)
+	//	os.Exit(1)
+	//} else {
+	//	directoryName = analysisDirectories[0]
+	//	//JEFF: check if directory exists
+	//	_, err := os.Stat(directoryName)
+	//	if err != nil {
+	//		//println("os.Stat(): error for directory name ", directoryName)
+	//		fmt.Fprintf(os.Stderr, "Error: %v\n", err.Error())
+	//	} else {
+	//		directoryName, _ = filepath.Abs(directoryName)
+	//	}
+	//}
 
 	log.SetFormatter(&log.TextFormatter{
 		FullTimestamp:   true,
 		TimestampFormat: "15:04:05",
 	})
+
 
 	runner := &AnalysisRunner{
 		trieLimit:  trieLimit,
