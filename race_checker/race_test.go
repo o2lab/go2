@@ -42,6 +42,7 @@ var tests = []string{
 	"tests/fzf_wg.go",
 	"tests/global_ownership.go",
 	"tests/if.go",
+	"tests/if_loop.go",
 	"tests/if_mut_ex.go",
 	"tests/ifunlockProtected.go",
 	"tests/ifunlockUnprotected.go",
