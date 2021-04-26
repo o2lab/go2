@@ -100,7 +100,7 @@ func (a *analysis) mutuallyExcluded(goI ssa.Instruction, I int, goJ ssa.Instruct
 				divFn = fn // divergence happened in main
 				b1 = goI.Block()
 				b2 = stacks[1][j+1].ssaIns.Block()
-				if deferIns, isDefer := stacks[1][j+1].ssaIns.(*ssa.Defer); isDefer {
+				if deferIns, isDefer := stacks[1][j+1].ssaIns.(*ssa.Defer); isDefer && a.deferToRet[deferIns] != nil {
 					b2 = a.deferToRet[deferIns].Block()
 				}
 				break
@@ -108,7 +108,7 @@ func (a *analysis) mutuallyExcluded(goI ssa.Instruction, I int, goJ ssa.Instruct
 				divFn = fn
 				b2 = goJ.Block()
 				b1 = stacks[0][j+1].ssaIns.Block()
-				if deferIns, isDefer := stacks[0][j+1].ssaIns.(*ssa.Defer); isDefer {
+				if deferIns, isDefer := stacks[0][j+1].ssaIns.(*ssa.Defer); isDefer && a.deferToRet[deferIns] != nil {
 					b1 = a.deferToRet[deferIns].Block()
 				}
 				break
@@ -122,18 +122,18 @@ func (a *analysis) mutuallyExcluded(goI ssa.Instruction, I int, goJ ssa.Instruct
 					return false
 				} else {
 					b2 = stacks[1][j+1].ssaIns.Block()
-					if deferIns, isDefer := stacks[1][j+1].ssaIns.(*ssa.Defer); isDefer {
+					if deferIns, isDefer := stacks[1][j+1].ssaIns.(*ssa.Defer); isDefer && a.deferToRet[deferIns] != nil {
 						b2 = a.deferToRet[deferIns].Block()
 					}
 				}
 			} else { // divergence happened
 				divFn = stacks[0][j-1] // examine caller function
 				b1 = stacks[0][j].ssaIns.Block()
-				if deferIns, isDefer := stacks[0][j].ssaIns.(*ssa.Defer); isDefer {
+				if deferIns, isDefer := stacks[0][j].ssaIns.(*ssa.Defer); isDefer && a.deferToRet[deferIns] != nil {
 					b1 = a.deferToRet[deferIns].Block()
 				}
 				b2 = stacks[1][j].ssaIns.Block()
-				if deferIns, isDefer := stacks[1][j].ssaIns.(*ssa.Defer); isDefer {
+				if deferIns, isDefer := stacks[1][j].ssaIns.(*ssa.Defer); isDefer && a.deferToRet[deferIns] != nil {
 					b2 = a.deferToRet[deferIns].Block()
 				}
 				break
@@ -143,18 +143,18 @@ func (a *analysis) mutuallyExcluded(goI ssa.Instruction, I int, goJ ssa.Instruct
 				divFn = fn
 				b2 = goJ.Block()
 				b1 = stacks[0][j+1].ssaIns.Block()
-				if deferIns, isDefer := stacks[0][j+1].ssaIns.(*ssa.Defer); isDefer {
+				if deferIns, isDefer := stacks[0][j+1].ssaIns.(*ssa.Defer); isDefer && a.deferToRet[deferIns] != nil {
 					b1 = a.deferToRet[deferIns].Block()
 				}
 				break
 			} else { // divergence happened
 				divFn = stacks[0][j-1] // examine caller function
 				b1 = stacks[0][j].ssaIns.Block()
-				if deferIns, isDefer := stacks[0][j].ssaIns.(*ssa.Defer); isDefer {
+				if deferIns, isDefer := stacks[0][j].ssaIns.(*ssa.Defer); isDefer && a.deferToRet[deferIns] != nil {
 					b1 = a.deferToRet[deferIns].Block()
 				}
 				b2 = stacks[1][j].ssaIns.Block()
-				if deferIns, isDefer := stacks[1][j].ssaIns.(*ssa.Defer); isDefer {
+				if deferIns, isDefer := stacks[1][j].ssaIns.(*ssa.Defer); isDefer && a.deferToRet[deferIns] != nil {
 					b2 = a.deferToRet[deferIns].Block()
 				}
 				break
@@ -166,7 +166,7 @@ func (a *analysis) mutuallyExcluded(goI ssa.Instruction, I int, goJ ssa.Instruct
 				b1 = a.deferToRet[deferIns].Block()
 			}
 			b2 = stacks[1][j].ssaIns.Block()
-			if deferIns, isDefer := stacks[1][j].ssaIns.(*ssa.Defer); isDefer {
+			if deferIns, isDefer := stacks[1][j].ssaIns.(*ssa.Defer); isDefer && a.deferToRet[deferIns] != nil {
 				b2 = a.deferToRet[deferIns].Block()
 			}
 			break

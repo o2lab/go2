@@ -294,7 +294,21 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 	var pushBack []*ssa.BasicBlock // stack of .done blocks
 	statement := "" // could be if, for or rangeiter
 	for i, b := range bVisit0 {
-		if len(pushBack) > 0 && (!strings.Contains(b.Comment, statement) || i == len(bVisit0)-1) { // reach end of statement blocks
+		//if len(b.Preds) > 0 && len(pushBack) > 0 {
+		//	if loc := predsContainIfDoneAt(b.Preds, pushBack); loc > -1 {
+		//		bVisit = append(bVisit, pushBack[loc])
+		//		if loc == len(pushBack)-1 {
+		//			pushBack = pushBack[:loc]
+		//		} else {
+		//			bVisit = append(bVisit, pushBack...) // LIFO
+		//		}
+		//
+		//		if len(pushBack) > 0 {
+		//			//statement = ""
+		//		}
+		//	}
+		//}
+		if len(pushBack) > 0 && !strings.Contains(b.Comment, statement) { // reach end of statement blocks
 			bVisit = append(bVisit, pushBack...) // LIFO
 			pushBack = []*ssa.BasicBlock{} // empty stack
 			statement = "" // reinitialize
@@ -313,6 +327,10 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 		//	}
 		} else {
 			bVisit = append(bVisit, b)
+		}
+		if len(pushBack) > 0 && i == len(bVisit0)-1 { // reach end of statement blocks
+			bVisit = append(bVisit, pushBack...) // LIFO
+			pushBack = []*ssa.BasicBlock{} // empty stack
 		}
 	}
 

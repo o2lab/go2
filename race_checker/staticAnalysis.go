@@ -178,7 +178,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		} else if pkgs[0] == nil && len(pkgs) == 1 {
 			log.Fatal("Error: No packages detected. Please verify directory provided contains Go Files. ")
 		} else {
-			scope[0] = strings.Split(pkgs[1].Pkg.Path(), "/")[0] + strings.Split(pkgs[1].Pkg.Path(), "/")[1]
+			scope[0] = strings.Split(pkgs[1].Pkg.Path(), "/")[0] + "/" + strings.Split(pkgs[1].Pkg.Path(), "/")[1]
 		}
 		if len(pkgs) >= 1 && !goTest {           // ** assuming more than one package detected in real programs
 			path, err := os.Getwd() //current working directory == project path
@@ -402,9 +402,9 @@ func (runner *AnalysisRunner) Run(args []string) error {
 	wg.Wait()
 
 	raceCount := 0
-	for k, e := range runner.finalReport {
+	for _, e := range runner.finalReport {
 		if len(e.racePairs) > 0 && e.racePairs[0] != nil {
-			log.Info(len(e.racePairs), " races found for entry point No.", k, ": ", e.entryInfo, "...")
+			log.Info(len(e.racePairs), " races found for entry point ", e.entryInfo, "...")
 			raceCount += len(e.racePairs)
 		} else {
 			log.Info("No races found for ", e.entryInfo, "...")

@@ -96,14 +96,6 @@ type raceInfo struct {
 type raceReport struct {
 	entryInfo    string
 	racePairs    []*raceInfo
-	noGoroutines int
-	prog         *ssa.Program
-	lockMap      map[ssa.Instruction][]ssa.Value
-	RlockMap     map[ssa.Instruction][]ssa.Value
-	RWIns        [][]ssa.Instruction
-	goCalls      map[int]*ssa.Go
-	goCaller     map[int]int
-	goStack      [][]string
 }
 
 type AnalysisRunner struct {
