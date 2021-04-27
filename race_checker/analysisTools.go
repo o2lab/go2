@@ -373,7 +373,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				ifEnds = append(ifEnds, aBlock.Instrs[len(aBlock.Instrs)-1])
 			}
 		}
-		if aBlock.Comment == "for.body" || aBlock.Comment == "rangeindex.body"  {
+		if aBlock.Comment == "for.body" || aBlock.Comment == "rangeindex.body" || aBlock.Comment == "rangeiter.body" {
 			a.inLoop = true // TODO: consider nested loops
 		}
 		for ii, theIns := range aBlock.Instrs { // examine each instruction

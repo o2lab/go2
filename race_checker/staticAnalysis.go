@@ -24,17 +24,17 @@ import (
 
 // fromPkgsOfInterest determines if a function is from a package of interest
 func (a *analysis) fromPkgsOfInterest(fn *ssa.Function) bool {
-	if fn.Pkg == nil || fn.Pkg.Pkg == nil {
-		return false
-	}
-	if fn.Pkg.Pkg.Name() == "main" || fn.Pkg.Pkg.Name() == "cli" {
-		return true
-	}
-	for _, excluded := range excludedPkgs {
-		if fn.Pkg.Pkg.Name() == excluded {
-			return false
-		}
-	}
+	//if fn.Pkg == nil || fn.Pkg.Pkg == nil {
+	//	return false
+	//}
+	//if fn.Pkg != nil && (fn.Pkg.Pkg.Name() == "main" || fn.Pkg.Pkg.Name() == "cli") {
+	//	return true
+	//}
+	//for _, excluded := range excludedPkgs {
+	//	if fn.Pkg.Pkg.Name() == excluded {
+	//		return false
+	//	}
+	//}
 	if a.efficiency && a.main.Pkg.Path() != "command-line-arguments" && !strings.HasPrefix(fn.Pkg.Pkg.Path(), strings.Split(a.main.Pkg.Path(), "/")[0]) { // path is dependent on tested program
 		return false
 	}
