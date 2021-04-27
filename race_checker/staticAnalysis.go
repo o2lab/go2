@@ -12,6 +12,8 @@ import (
 	"github.com/twmb/algoimpl/go/graph"
 	"go/token"
 	"go/types"
+	"sync"
+
 	//"golang.org/x/tools/go/pointer"
 	//"golang.org/x/tools/go/ssa"
 	"os"
@@ -254,10 +256,10 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		allEntries = true
 	}
 	// Iterate each entry point...
-	//var wg sync.WaitGroup
-	for _, main := range mains {
-		//wg.Add(1)
-		//go func(main *ssa.Package) {
+	var wg sync.WaitGroup
+	for _, m := range mains {
+		wg.Add(1)
+		go func(main *ssa.Package) {
 			// Configure static analysis...
 			Analysis := analysis{
 				ptaRes:          runner.ptaResult,
@@ -397,10 +399,10 @@ func (runner *AnalysisRunner) Run(args []string) error {
 			runner.racyStackTops = Analysis.racyStackTops
 			runner.finalReport = append(runner.finalReport, rr)
 			runner.mu.Unlock()
-		//	wg.Done()
-		//}(m)
+			wg.Done()
+		}(m)
 	}
-	//wg.Wait()
+	wg.Wait()
 
 	raceCount := 0
 	for _, e := range runner.finalReport {
