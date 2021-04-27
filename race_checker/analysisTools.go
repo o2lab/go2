@@ -294,20 +294,6 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 	var pushBack []*ssa.BasicBlock // stack of .done blocks
 	statement := "" // could be if, for or rangeiter
 	for i, b := range bVisit0 {
-		//if len(b.Preds) > 0 && len(pushBack) > 0 {
-		//	if loc := predsContainIfDoneAt(b.Preds, pushBack); loc > -1 {
-		//		bVisit = append(bVisit, pushBack[loc])
-		//		if loc == len(pushBack)-1 {
-		//			pushBack = pushBack[:loc]
-		//		} else {
-		//			bVisit = append(bVisit, pushBack...) // LIFO
-		//		}
-		//
-		//		if len(pushBack) > 0 {
-		//			//statement = ""
-		//		}
-		//	}
-		//}
 		if len(pushBack) > 0 && !strings.Contains(b.Comment, statement) { // reach end of statement blocks
 			bVisit = append(bVisit, pushBack...) // LIFO
 			pushBack = []*ssa.BasicBlock{} // empty stack
@@ -316,15 +302,6 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 		if strings.Contains(b.Comment, ".done") && i < len(bVisit0)-1 { // not the last block
 			statement = strings.Split(b.Comment, ".done")[0]
 			pushBack = append([]*ssa.BasicBlock{b}, pushBack...)
-		//} else if strings.Contains(b.Comment, ".else") { // ** assume only one predecessor
-		//	if loc := sliceContainsBlocAt(bVisit, b.Preds[0]); loc > -1 { // location of predecessor
-		//		if loc == len(bVisit)-1 {
-		//			bVisit = append(bVisit, b)
-		//		} else {
-		//			bVisit = append(bVisit[:loc+1], bVisit[loc:]...)
-		//			bVisit[loc+1] = b // put else before if
-		//		}
-		//	}
 		} else {
 			bVisit = append(bVisit, b)
 		}

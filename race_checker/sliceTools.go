@@ -44,6 +44,17 @@ func stackContainsDefer(stack []fnCallInfo) bool {
 	return false
 }
 
+func noGoAfterFn(stack []fnCallInfo, divFnAt int) bool {
+	for i := divFnAt; i < len(stack); i++ {
+		if stack[i].ssaIns != nil && i != 0 {
+			if _, isGo := stack[i].ssaIns.(*ssa.Go); isGo {
+				return false
+			}
+		}
+	}
+	return true
+}
+
 func sliceContainsFnCall(s []fnCallInfo, e fnCallInfo) bool {
 	for _, a := range s {
 		if a.fnIns.Pos() == e.fnIns.Pos() && a.ssaIns.Pos() == e.ssaIns.Pos() {
