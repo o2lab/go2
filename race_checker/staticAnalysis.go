@@ -205,7 +205,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 				}
 			}
 			if mod == "" {
-				return fmt.Errorf("Cannot find go.mod in default location: ", gomodFile)
+				return fmt.Errorf("Cannot find go.mod in default location: " + gomodFile.Name())
 			}
 			if err2 := scanner.Err(); err2 != nil {
 				return fmt.Errorf("Error while scanning go.mod: " + err2.Error())
