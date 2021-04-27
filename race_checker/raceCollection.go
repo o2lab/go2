@@ -2,11 +2,11 @@ package main
 
 import (
 	"fmt"
+	"github.com/april1989/origin-go-tools/go/pointer"
+	"github.com/april1989/origin-go-tools/go/ssa"
 	"github.com/logrusorgru/aurora"
 	log "github.com/sirupsen/logrus"
 	"github.com/twmb/algoimpl/go/graph"
-	"github.tamu.edu/April1989/go_tools/go/pointer"
-	"github.tamu.edu/April1989/go_tools/go/ssa"
 	"go/token"
 	"regexp"
 	"strings"

@@ -5,16 +5,16 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/april1989/origin-go-tools/go/pointer"
+	pta0 "github.com/april1989/origin-go-tools/go/pointer_default"
 	"github.com/o2lab/race-checker/stats"
 	log "github.com/sirupsen/logrus"
 	"github.com/twmb/algoimpl/go/graph"
-	"github.tamu.edu/April1989/go_tools/go/pointer"
-	pta0 "github.tamu.edu/April1989/go_tools/go/pointer_default"
 	"sync"
 	"syscall"
 
 	//"golang.org/x/tools/go/pointer"
-	"github.tamu.edu/April1989/go_tools/go/ssa"
+	"github.com/april1989/origin-go-tools/go/ssa"
 )
 
 type analysis struct {

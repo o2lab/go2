@@ -3,17 +3,15 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"github.com/april1989/origin-go-tools/go/packages"
+	"github.com/april1989/origin-go-tools/go/pointer"
+	pta0 "github.com/april1989/origin-go-tools/go/pointer_default"
+	"github.com/april1989/origin-go-tools/go/ssa"
+	"github.com/april1989/origin-go-tools/go/ssa/ssautil"
 	log "github.com/sirupsen/logrus"
 	"github.com/twmb/algoimpl/go/graph"
-	"github.tamu.edu/April1989/go_tools/go/packages"
-	"github.tamu.edu/April1989/go_tools/go/pointer"
-	pta0 "github.tamu.edu/April1989/go_tools/go/pointer_default"
-	"github.tamu.edu/April1989/go_tools/go/ssa"
-	"github.tamu.edu/April1989/go_tools/go/ssa/ssautil"
 	"go/token"
 	"go/types"
-	"sync"
-
 	//"golang.org/x/tools/go/pointer"
 	//"golang.org/x/tools/go/ssa"
 	"os"
@@ -155,7 +153,9 @@ func (runner *AnalysisRunner) Run(args []string) error {
 	cfg := &packages.Config{
 		Mode:  packages.LoadAllSyntax, // the level of information returned for each package
 		Dir:   "",                     // directory in which to run the build system's query tool
-		Tests: false,                  // setting Tests will include related test packages
+		//TODO: bz: change this to true if you want to analyze test
+		Tests: true,
+		//Tests: false,                  // setting Tests will include related test packages
 	}
 	log.Info("Loading input packages...")
 
@@ -177,17 +177,20 @@ func (runner *AnalysisRunner) Run(args []string) error {
 			scope[0] = pkgs[0].Pkg.Path() //bz: the 1st pkg has the scope info == the root pkg or default .go input
 		} else if pkgs[0] == nil && len(pkgs) == 1 {
 			log.Fatal("Error: No packages detected. Please verify directory provided contains Go Files. ")
+			return fmt.Errorf("Error: No packages detected. Please verify directory provided contains Go Files. ")
 		} else {
 			scope[0] = strings.Split(pkgs[1].Pkg.Path(), "/")[0] + "/" + strings.Split(pkgs[1].Pkg.Path(), "/")[1]
 		}
-		if len(pkgs) >= 1 && !goTest {           // ** assuming more than one package detected in real programs
+		//bz: update a bit to avoid duplicate scope addition, e.g., grpc
+		// return with error if error exist, skip panic
+		if len(scope) == 0 && len(pkgs) >= 1 && !goTest {           // ** assuming more than one package detected in real programs
 			path, err := os.Getwd() //current working directory == project path
 			if err != nil {
 				panic("Error while os.Getwd: " + err.Error())
 			}
 			gomodFile, err := os.Open(path + "/go.mod") // For read access.
 			if err != nil {
-				panic("Error while reading go.mod: " + err.Error())
+				return fmt.Errorf("Error while reading go.mod: " + err.Error())
 			}
 			defer gomodFile.Close()
 			scanner := bufio.NewScanner(gomodFile)
@@ -200,26 +203,24 @@ func (runner *AnalysisRunner) Run(args []string) error {
 				}
 			}
 			if mod == "" {
-				fmt.Println("Cannot find go.mod in default location: ", gomodFile)
-				return nil
+				return fmt.Errorf("Cannot find go.mod in default location: ", gomodFile)
 			}
 			if err2 := scanner.Err(); err2 != nil {
-				panic("Error while scanning go.mod: " + err2.Error())
+				return fmt.Errorf("Error while scanning go.mod: " + err2.Error())
 			}
 			parts := strings.Split(mod, " ")
 			scope = append(scope, parts[1])
 		}
 
 		runner.ptaConfig = &pointer.Config{
-			Mains:          mains, //bz: all mains in a project
+			Mains:          mains, //bz: all mains/tests in a project
 			Reflection:     false,
 			BuildCallGraph: true,
 			Log:            nil,
 			Origin:         true, //origin
 			//shared config
 			K:          1,
-			LimitScope: true,         //bz: only consider app methods now -> no import will be considered
-			DEBUG:      false,        //bz: rm all printed out info in console
+			LimitScope: true,         //bz: only consider app methods with origin
 			Scope:      scope,        //bz: analyze scope
 			Exclusion:  excludedPkgs, //bz: copied from race_checker if any
 			TrackMore:  true,         //bz: track pointers with all types
@@ -253,10 +254,10 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		allEntries = true
 	}
 	// Iterate each entry point...
-	var wg sync.WaitGroup
-	for _, m := range mains {
-		wg.Add(1)
-		go func(main *ssa.Package) {
+	//var wg sync.WaitGroup
+	for _, main := range mains {
+		//wg.Add(1)
+		//go func(main *ssa.Package) {
 			// Configure static analysis...
 			Analysis := analysis{
 				ptaRes:          runner.ptaResult,
@@ -396,10 +397,10 @@ func (runner *AnalysisRunner) Run(args []string) error {
 			runner.racyStackTops = Analysis.racyStackTops
 			runner.finalReport = append(runner.finalReport, rr)
 			runner.mu.Unlock()
-			wg.Done()
-		}(m)
+		//	wg.Done()
+		//}(m)
 	}
-	wg.Wait()
+	//wg.Wait()
 
 	raceCount := 0
 	for _, e := range runner.finalReport {

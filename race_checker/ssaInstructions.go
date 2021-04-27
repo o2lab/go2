@@ -1,8 +1,8 @@
 package main
 
 import (
+	"github.com/april1989/origin-go-tools/go/ssa"
 	log "github.com/sirupsen/logrus"
-	"github.tamu.edu/April1989/go_tools/go/ssa"
 	"go/constant"
 	"go/token"
 	"go/types"
