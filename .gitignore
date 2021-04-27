@@ -1,6 +1,6 @@
 race_checker/.*
 race_checker/go.*
-race_checker/race_checker
+race_checker/race-checker
 .DS_STORE
 .idea
 
@@ -13,3 +13,6 @@ race_checker/go_pta_log
 race_checker/pta_summary.md
 runc/
 tidb/
+
+race_checker/console.txt
+

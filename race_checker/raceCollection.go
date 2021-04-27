@@ -234,6 +234,10 @@ func (a *analysis) checkRacyPairs() []*raceInfo {
 						//		goJinstr = a.RWIns[j][0].String()
 						//	}
 						//	fmt.Println(addressPair[0], " Go: ", goIinstr, " loopid: ", a.loopIDs[i], ";  ", addressPair[1], " Go: ", goJinstr, " loopid: ", a.loopIDs[j])
+						//if strings.Contains(addressPair[0].String(), "&fp.numFilterCalled [#0]") &&
+						//	strings.Contains(addressPair[1].String(), "&fp.numFilterCalled [#0]") {
+						//	fmt.Println()
+						//}
 						if a.sameAddress(addressPair[0], addressPair[1], i, j) &&
 							!sliceContains(a.reportedAddr, addressPair[0]) &&
 							!a.reachable(goI, i, goJ, j) &&

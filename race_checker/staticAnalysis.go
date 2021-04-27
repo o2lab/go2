@@ -25,13 +25,16 @@ import (
 // fromPkgsOfInterest determines if a function is from a package of interest
 func (a *analysis) fromPkgsOfInterest(fn *ssa.Function) bool {
 	if fn.Pkg == nil || fn.Pkg.Pkg == nil {
+		if fn.IsFromApp { //bz: do not remove this ... otherwise will miss racy functions
+			return true
+		}
 		return false
 	}
 	if fn.Pkg.Pkg.Name() == "main" || fn.Pkg.Pkg.Name() == "cli" {
 		return true
 	}
 	for _, excluded := range excludedPkgs {
-		if fn.Pkg.Pkg.Name() == excluded {
+		if fn.Pkg.Pkg.Name() == excluded || fn.Pkg.Pkg.Path() == excluded {//bz: some lib's Pkg.Name() == "Package", not the used import xxx; if so, check Pkg.Path()
 			return false
 		}
 	}

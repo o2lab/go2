@@ -1,35 +1,7 @@
-[36mINFO[0m[11:31:34] Loading input packages...                    
-[36mINFO[0m[11:31:40] Done  -- 44 packages detected.               
-[36mINFO[0m[11:31:40] Building SSA code for entire program...      
-[36mINFO[0m[11:31:40] Done  -- SSA code built. 44 packages and 24805 functions detected.  
-23 main() entry-points identified: 
-Option 1 :  package github.com/o2lab/race-checker
-Option 2 :  package github.com/o2lab/race-checker
-Option 3 :  package github.com/o2lab/race-checker.test
-Option 4 :  package github.com/o2lab/race-checker/tests/pointe_analysis_test
-Option 5 :  package github.com/o2lab/race-checker/tests/GoBench/Serving/3148
-Option 6 :  package github.com/o2lab/race-checker/tests/GoBench/Istio/8144
-Option 7 :  package github.com/o2lab/race-checker/tests/GoBench/Istio/16742
-Option 8 :  package github.com/o2lab/race-checker/tests/GoBench/Istio/8214
-Option 9 :  package github.com/o2lab/race-checker/tests/GoBench/Istio/8967
-Option 10 :  package github.com/o2lab/race-checker/tests/GoBench/Grpc/1862
-Option 11 :  package github.com/o2lab/race-checker/tests/GoBench/Grpc/3090
-Option 12 :  package github.com/o2lab/race-checker/tests/GoBench/Grpc/1748
-Option 13 :  package github.com/o2lab/race-checker/tests/GoBench/Etcd/4876
-Option 14 :  package github.com/o2lab/race-checker/tests/GoBench/Etcd/9446
-Option 15 :  package github.com/o2lab/race-checker/tests/GoBench/Etcd/8149
-Option 16 :  package github.com/o2lab/race-checker/tests/GoBench/Cockroach/27659
-Option 17 :  package github.com/o2lab/race-checker/tests/GoBench/Cockroach/35501
-Option 18 :  package github.com/o2lab/race-checker/tests/GoBench/Kubernetes/88331
-Option 19 :  package github.com/o2lab/race-checker/tests/GoBench/Kubernetes/79631
-Option 20 :  package github.com/o2lab/race-checker/tests/GoBench/Kubernetes/80284
-Option 21 :  package github.com/o2lab/race-checker/tests/GoBench/Kubernetes/81148
-Option 22 :  package github.com/o2lab/race-checker/tests/GoBench/Kubernetes/81091
-Option 23 :  package github.com/o2lab/race-checker/tests/godel2/loop
-Enter option number of choice: 
-*** use space delimiter for multiple selections *** 
-*** use "-" for a range of selections *** 
-1
+[36mINFO[0m[13:19:31] Loading input packages...                    
+[36mINFO[0m[13:19:32] Done  -- 1 packages detected.                
+[36mINFO[0m[13:19:32] Building SSA code for entire program...      
+[36mINFO[0m[13:19:32] Done  -- SSA code built. 1 packages and 5084 functions detected.  
  *** MODE: 1-ORIGIN-SENSITIVE *** 
  *** Level: 0 *** 
  *** Use Queries/IndirectQueries *** 
@@ -37,1043 +9,158 @@ Enter option number of choice:
  *** Track All Types *** 
  *** No Callback *** 
  *** Analyze Scope ***************** 
- - github.com/o2lab/race-checker
+ - command-line-arguments
  *********************************** 
  *** Import Libs ******************* 
  *********************************** 
  *** Multiple Mains/Tests ********** 
-0 : package github.com/o2lab/race-checker  (use 9.920438619s)
+0 : package command-line-arguments  (use 121.717618ms)
  *********************************** 
-Total:  9.92s.
-Max:  9.920438619s.
-Min:  1s.
-Avg:  9.92 s.
+Total:  121ms.
+Max:  121.717618ms.
+Min:  121.717618ms.
+Avg:  0.121 s.
 
-Done  -- PTA/CG Build; Using 9.920507936s.
+Done  -- PTA/CG Build; Using 121.76828ms.
  
-[36mINFO[0m[11:32:29] Compiling stack trace for every Goroutine...  
-[36mINFO[0m[11:32:30] Done  -- 9 goroutines analyzed! 68572 instructions of interest detected!  
-[36mINFO[0m[11:32:30] Building Happens-Before graph...             
-[36mINFO[0m[11:32:30] Done  -- Happens-Before graph built          
-[36mINFO[0m[11:32:30] Checking for data races...                   
-[36mINFO[0m[11:32:42] Data race #1                                 
-[36mINFO[0m[11:32:42] ==================================================================================================== 
-[36mINFO[0m[11:32:42]  Write of [35mgithub.com/o2lab/race-checker.entryFn[0m in function [92mpkgSelection[0m at /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:120:8 
-[36mINFO[0m[11:32:42] 	in goroutine  ***  main  [ 0 ] ***          
-[36mINFO[0m[11:32:42] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:32:42] 	    Run /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:32:42] 	     pkgSelection /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:171:35 
-[36mINFO[0m[11:32:42]  Read of [35mgithub.com/o2lab/race-checker.entryFn[0m in function [92mRun$1[0m at /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:319:44 
-[36mINFO[0m[11:32:42] 	in goroutine  *** Run$1 [ 6 ] ***           
-[36mINFO[0m[11:32:42] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:32:42] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:32:42] 	    --> Goroutine:  Run$1 [ 6 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:32:42] Locks acquired before Write access:  []      
-[36mINFO[0m[11:32:42] Locks acquired before Read  access:  []      
-[36mINFO[0m[11:32:42] ==================================================================================================== 
-[36mINFO[0m[11:32:42] Data race #2                                 
-[36mINFO[0m[11:32:42] ==================================================================================================== 
-[36mINFO[0m[11:32:42]  Write of [35mnew []*github.com/april1989/origin-go-tools/go/ssa.Package (mains)[0m in function [92mRun[0m at /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:171:2 
-[36mINFO[0m[11:32:42] 	in goroutine  ***  main  [ 0 ] ***          
-[36mINFO[0m[11:32:42] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:32:42] 	    Run /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:32:42]  Read of [35mfreevar mains : *[]*github.com/april1989/origin-go-tools/go/ssa.Package[0m in function [92mRun$1[0m at /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:274:22 
-[36mINFO[0m[11:32:42] 	in goroutine  *** Run$1 [ 6 ] ***           
-[36mINFO[0m[11:32:42] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:32:42] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:32:42] 	    --> Goroutine:  Run$1 [ 6 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:32:42] Locks acquired before Write access:  []      
-[36mINFO[0m[11:32:42] Locks acquired before Read  access:  []      
-[36mINFO[0m[11:32:42] ==================================================================================================== 
-[36mINFO[0m[11:32:42] Data race #3                                 
-[36mINFO[0m[11:32:42] ==================================================================================================== 
-[36mINFO[0m[11:32:42]  Write of [35m&t37.prog [#1][0m in function [92mRun[0m at /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:172:9 
-[36mINFO[0m[11:32:42] 	in goroutine  ***  main  [ 0 ] ***          
-[36mINFO[0m[11:32:42] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:32:42] 	    Run /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:32:42]  Read of [35m&t24.prog [#1][0m in function [92mRun$1[0m at /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:272:29 
-[36mINFO[0m[11:32:42] 	in goroutine  *** Run$1 [ 6 ] ***           
-[36mINFO[0m[11:32:42] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:32:42] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:32:42] 	    --> Goroutine:  Run$1 [ 6 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:32:42] Locks acquired before Write access:  []      
-[36mINFO[0m[11:32:42] Locks acquired before Read  access:  []      
-[36mINFO[0m[11:32:42] ==================================================================================================== 
-[36mINFO[0m[11:32:42] Data race #4                                 
-[36mINFO[0m[11:32:42] ==================================================================================================== 
-[36mINFO[0m[11:32:42]  Write of [35m&t39.pkgs [#2][0m in function [92mRun[0m at /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:173:9 
-[36mINFO[0m[11:32:42] 	in goroutine  ***  main  [ 0 ] ***          
-[36mINFO[0m[11:32:42] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:32:42] 	    Run /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:32:42]  Read of [35m&t28.pkgs [#2][0m in function [92mRun$1[0m at /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:273:29 
-[36mINFO[0m[11:32:42] 	in goroutine  *** Run$1 [ 6 ] ***           
-[36mINFO[0m[11:32:42] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:32:42] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:32:42] 	    --> Goroutine:  Run$1 [ 6 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:32:42] Locks acquired before Write access:  []      
-[36mINFO[0m[11:32:42] Locks acquired before Read  access:  []      
-[36mINFO[0m[11:32:42] ==================================================================================================== 
-[36mINFO[0m[11:33:05] Data race #5                                 
-[36mINFO[0m[11:33:05] ==================================================================================================== 
-[36mINFO[0m[11:33:05]  Write of [35m&t16.Stdout [#5][0m in function [92mrun[0m at /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/internal/gocommand/invoke.go:175:6 
-[36mINFO[0m[11:33:05] 	in goroutine  *** goListDriver$1 [ 1 ] ***  
-[36mINFO[0m[11:33:05] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:05] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:05] 	        Load   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:165:29 
-[36mINFO[0m[11:33:05] 	         defaultDriver   /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/packages/packages.go:234:32 
-[36mINFO[0m[11:33:05] 	          goListDriver   /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/packages/packages.go:255:22 
-[36mINFO[0m[11:33:05] 	    --> Goroutine:  goListDriver$1 [ 1 ]  /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/packages/golist.go:148:3 
-[36mINFO[0m[11:33:05] 	     GetSizesGolist /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/packages/golist.go:150:51 
-[36mINFO[0m[11:33:05] 	      RunRaw /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/internal/packagesdriver/sizes.go:86:59 
-[36mINFO[0m[11:33:05] 	       runConcurrent /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/internal/gocommand/invoke.go:71:58 
-[36mINFO[0m[11:33:05] 	        runWithFriendlyError /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/internal/gocommand/invoke.go:96:46 
-[36mINFO[0m[11:33:05] 	         run /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/internal/gocommand/invoke.go:139:18 
-[36mINFO[0m[11:33:05]  Write of [35m&t1.Stdout [#5][0m in function [92mdiff[0m at /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/pointer_default/util.go:310:6 
-[36mINFO[0m[11:33:05] 	in goroutine  *** Run$1 [ 6 ] ***           
-[36mINFO[0m[11:33:05] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:05] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:05] 	    --> Goroutine:  Run$1 [ 6 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:05] 	     visitAllInstructions /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:319:33 
-[36mINFO[0m[11:33:05] 	      visitAllInstructions /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:396:30 
-[36mINFO[0m[11:33:05] 	       insStore /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:456:19 
-[36mINFO[0m[11:33:05] 	        visitAllInstructions /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/ssaInstructions.go:187:26 
-[36mINFO[0m[11:33:05] 	         insMakeInterface /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:480:23 
-[36mINFO[0m[11:33:05] 	          pointerAnalysis /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/ssaInstructions.go:322:20 
-[36mINFO[0m[11:33:05] 	           Analyze /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/pointerAnalysis.go:34:30 
-[36mINFO[0m[11:33:05] 	            diff /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/pointer_default/analysis.go:339:11 
-[36mINFO[0m[11:33:05] Locks acquired before Write access:  []      
-[36mINFO[0m[11:33:05] Locks acquired before Read  access:  []      
-[36mINFO[0m[11:33:05] ==================================================================================================== 
-[36mINFO[0m[11:33:05] Data race #6                                 
-[36mINFO[0m[11:33:05] ==================================================================================================== 
-[36mINFO[0m[11:33:05]  Write of [35m&t18.Stderr [#6][0m in function [92mrun[0m at /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/internal/gocommand/invoke.go:176:6 
-[36mINFO[0m[11:33:05] 	in goroutine  *** goListDriver$1 [ 1 ] ***  
-[36mINFO[0m[11:33:05] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:05] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:05] 	        Load   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:165:29 
-[36mINFO[0m[11:33:05] 	         defaultDriver   /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/packages/packages.go:234:32 
-[36mINFO[0m[11:33:05] 	          goListDriver   /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/packages/packages.go:255:22 
-[36mINFO[0m[11:33:05] 	    --> Goroutine:  goListDriver$1 [ 1 ]  /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/packages/golist.go:148:3 
-[36mINFO[0m[11:33:05] 	     GetSizesGolist /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/packages/golist.go:150:51 
-[36mINFO[0m[11:33:05] 	      RunRaw /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/internal/packagesdriver/sizes.go:86:59 
-[36mINFO[0m[11:33:05] 	       runConcurrent /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/internal/gocommand/invoke.go:71:58 
-[36mINFO[0m[11:33:05] 	        runWithFriendlyError /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/internal/gocommand/invoke.go:96:46 
-[36mINFO[0m[11:33:05] 	         run /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/internal/gocommand/invoke.go:139:18 
-[36mINFO[0m[11:33:05]  Write of [35m&t1.Stderr [#6][0m in function [92mdiff[0m at /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/pointer_default/util.go:311:6 
-[36mINFO[0m[11:33:05] 	in goroutine  *** Run$1 [ 6 ] ***           
-[36mINFO[0m[11:33:05] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:05] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:05] 	    --> Goroutine:  Run$1 [ 6 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:05] 	     visitAllInstructions /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:319:33 
-[36mINFO[0m[11:33:05] 	      visitAllInstructions /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:396:30 
-[36mINFO[0m[11:33:05] 	       insStore /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:456:19 
-[36mINFO[0m[11:33:05] 	        visitAllInstructions /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/ssaInstructions.go:187:26 
-[36mINFO[0m[11:33:05] 	         insMakeInterface /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:480:23 
-[36mINFO[0m[11:33:05] 	          pointerAnalysis /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/ssaInstructions.go:322:20 
-[36mINFO[0m[11:33:05] 	           Analyze /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/pointerAnalysis.go:34:30 
-[36mINFO[0m[11:33:05] 	            diff /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/pointer_default/analysis.go:339:11 
-[36mINFO[0m[11:33:05] Locks acquired before Write access:  []      
-[36mINFO[0m[11:33:05] Locks acquired before Read  access:  []      
-[36mINFO[0m[11:33:05] ==================================================================================================== 
-[36mINFO[0m[11:33:05] Data race #7                                 
-[36mINFO[0m[11:33:05] ==================================================================================================== 
-[36mINFO[0m[11:33:05]  Write of [35m&b.Instrs [#3][0m in function [92memit[0m at /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/ssa/func.go:41:4 
-[36mINFO[0m[11:33:05] 	in goroutine  *** Run$1 [ 6 ] ***           
-[36mINFO[0m[11:33:05] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:05] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:05] 	    --> Goroutine:  Run$1 [ 6 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:05] 	     visitAllInstructions /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:319:33 
-[36mINFO[0m[11:33:05] 	      visitAllInstructions /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:396:30 
-[36mINFO[0m[11:33:05] 	       insStore /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:456:19 
-[36mINFO[0m[11:33:05] 	        visitAllInstructions /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/ssaInstructions.go:187:26 
-[36mINFO[0m[11:33:05] 	         insMakeInterface /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:480:23 
-[36mINFO[0m[11:33:05] 	          pointerAnalysis /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/ssaInstructions.go:322:20 
-[36mINFO[0m[11:33:05] 	           Analyze /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/pointerAnalysis.go:34:30 
-[36mINFO[0m[11:33:05] 	            generate /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/pointer_default/analysis.go:294:12 
-[36mINFO[0m[11:33:05] 	             genMethodsOf /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/pointer_default/gen.go:1307:17 
-[36mINFO[0m[11:33:05] 	              MethodValue /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/pointer_default/gen.go:1279:26 
-[36mINFO[0m[11:33:05] 	               addMethod /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/ssa/methods.go:39:23 
-[36mINFO[0m[11:33:05] 	                makeWrapper /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/ssa/methods.go:83:20 
-[36mINFO[0m[11:33:05] 	                 emitLoad /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/ssa/wrappers.go:84:15 
-[36mINFO[0m[11:33:05] 	                  emit /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/ssa/emit.go:35:8 
-[36mINFO[0m[11:33:05] 	                   emit /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/ssa/func.go:447:28 
-[36mINFO[0m[11:33:05]  Read of [35m&t83.Instrs [#3][0m in function [92mmutuallyExcluded[0m at /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/raceCollection.go:181:21 
-[36mINFO[0m[11:33:05] 	in goroutine  *** Run$1 [ 7 ] ***           
-[36mINFO[0m[11:33:05] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:05] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:05] 	    --> Goroutine:  Run$1 [ 7 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:05] 	     checkRacyPairs /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:397:42 
-[36mINFO[0m[11:33:05] 	      mutuallyExcluded /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/raceCollection.go:244:27 
-[36mINFO[0m[11:33:05] Locks acquired before Write access:  [&prog.methodsMu [#5] &prog.methodsMu [#5]] 
-[36mINFO[0m[11:33:05] Locks acquired before Read  access:  []      
-[36mINFO[0m[11:33:05] ==================================================================================================== 
-[36mINFO[0m[11:33:05] Data race #8                                 
-[36mINFO[0m[11:33:05] ==================================================================================================== 
-[36mINFO[0m[11:33:05]  Write of [35m&t73.Value [#0][0m in function [92mmakeWrapper[0m at /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/ssa/wrappers.go:90:11 
-[36mINFO[0m[11:33:05] 	in goroutine  *** Run$1 [ 6 ] ***           
-[36mINFO[0m[11:33:05] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:05] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:05] 	    --> Goroutine:  Run$1 [ 6 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:05] 	     visitAllInstructions /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:319:33 
-[36mINFO[0m[11:33:05] 	      visitAllInstructions /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:396:30 
-[36mINFO[0m[11:33:05] 	       insStore /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:456:19 
-[36mINFO[0m[11:33:05] 	        visitAllInstructions /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/ssaInstructions.go:187:26 
-[36mINFO[0m[11:33:05] 	         insMakeInterface /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:480:23 
-[36mINFO[0m[11:33:05] 	          pointerAnalysis /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/ssaInstructions.go:322:20 
-[36mINFO[0m[11:33:05] 	           Analyze /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/pointerAnalysis.go:34:30 
-[36mINFO[0m[11:33:05] 	            generate /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/pointer_default/analysis.go:294:12 
-[36mINFO[0m[11:33:05] 	             genMethodsOf /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/pointer_default/gen.go:1307:17 
-[36mINFO[0m[11:33:05] 	              MethodValue /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/pointer_default/gen.go:1279:26 
-[36mINFO[0m[11:33:05] 	               addMethod /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/ssa/methods.go:39:23 
-[36mINFO[0m[11:33:05] 	                makeWrapper /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/ssa/methods.go:83:20 
-[36mINFO[0m[11:33:05]  Read of [35m&t44.Value [#0][0m in function [92minsAddress[0m at /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/raceCollection.go:274:75 
-[36mINFO[0m[11:33:05] 	in goroutine  *** Run$1 [ 7 ] ***           
-[36mINFO[0m[11:33:05] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:05] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:05] 	    --> Goroutine:  Run$1 [ 7 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:05] 	     checkRacyPairs /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:397:42 
-[36mINFO[0m[11:33:05] 	      insAddress /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/raceCollection.go:219:34 
-[36mINFO[0m[11:33:05] Locks acquired before Write access:  [&prog.methodsMu [#5] &prog.methodsMu [#5]] 
-[36mINFO[0m[11:33:05] Locks acquired before Read  access:  []      
-[36mINFO[0m[11:33:05] ==================================================================================================== 
-[36mINFO[0m[11:33:05] Data race #9                                 
-[36mINFO[0m[11:33:05] ==================================================================================================== 
-[36mINFO[0m[11:33:05]  Write of [35m&t100.Args [#2][0m in function [92mmakeWrapper[0m at /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/ssa/wrappers.go:96:25 
-[36mINFO[0m[11:33:05] 	in goroutine  *** Run$1 [ 6 ] ***           
-[36mINFO[0m[11:33:05] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:05] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:05] 	    --> Goroutine:  Run$1 [ 6 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:05] 	     visitAllInstructions /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:319:33 
-[36mINFO[0m[11:33:05] 	      visitAllInstructions /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:396:30 
-[36mINFO[0m[11:33:05] 	       insStore /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:456:19 
-[36mINFO[0m[11:33:05] 	        visitAllInstructions /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/ssaInstructions.go:187:26 
-[36mINFO[0m[11:33:05] 	         insMakeInterface /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:480:23 
-[36mINFO[0m[11:33:05] 	          pointerAnalysis /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/ssaInstructions.go:322:20 
-[36mINFO[0m[11:33:05] 	           Analyze /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/pointerAnalysis.go:34:30 
-[36mINFO[0m[11:33:05] 	            generate /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/pointer_default/analysis.go:294:12 
-[36mINFO[0m[11:33:05] 	             genMethodsOf /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/pointer_default/gen.go:1307:17 
-[36mINFO[0m[11:33:05] 	              MethodValue /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/pointer_default/gen.go:1279:26 
-[36mINFO[0m[11:33:05] 	               addMethod /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/ssa/methods.go:39:23 
-[36mINFO[0m[11:33:05] 	                makeWrapper /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/ssa/methods.go:83:20 
-[36mINFO[0m[11:33:05]  Read of [35m&t17.Args [#2][0m in function [92minsAddress[0m at /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/raceCollection.go:273:23 
-[36mINFO[0m[11:33:05] 	in goroutine  *** Run$1 [ 7 ] ***           
-[36mINFO[0m[11:33:05] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:05] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:05] 	    --> Goroutine:  Run$1 [ 7 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:05] 	     checkRacyPairs /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:397:42 
-[36mINFO[0m[11:33:05] 	      insAddress /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/raceCollection.go:219:34 
-[36mINFO[0m[11:33:05] Locks acquired before Write access:  [&prog.methodsMu [#5] &prog.methodsMu [#5]] 
-[36mINFO[0m[11:33:05] Locks acquired before Read  access:  []      
-[36mINFO[0m[11:33:05] ==================================================================================================== 
-[36mINFO[0m[11:33:05] Data race #10                                
-[36mINFO[0m[11:33:05] ==================================================================================================== 
-[36mINFO[0m[11:33:05]  Write of [35m&t130.Value [#0][0m in function [92mmakeWrapper[0m at /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/ssa/wrappers.go:129:10 
-[36mINFO[0m[11:33:05] 	in goroutine  *** Run$1 [ 6 ] ***           
-[36mINFO[0m[11:33:05] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:05] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:05] 	    --> Goroutine:  Run$1 [ 6 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:05] 	     visitAllInstructions /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:319:33 
-[36mINFO[0m[11:33:05] 	      visitAllInstructions /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:396:30 
-[36mINFO[0m[11:33:05] 	       insStore /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:456:19 
-[36mINFO[0m[11:33:05] 	        visitAllInstructions /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/ssaInstructions.go:187:26 
-[36mINFO[0m[11:33:05] 	         insMakeInterface /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:480:23 
-[36mINFO[0m[11:33:05] 	          pointerAnalysis /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/ssaInstructions.go:322:20 
-[36mINFO[0m[11:33:05] 	           Analyze /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/pointerAnalysis.go:34:30 
-[36mINFO[0m[11:33:05] 	            generate /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/pointer_default/analysis.go:294:12 
-[36mINFO[0m[11:33:05] 	             genMethodsOf /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/pointer_default/gen.go:1307:17 
-[36mINFO[0m[11:33:05] 	              MethodValue /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/pointer_default/gen.go:1279:26 
-[36mINFO[0m[11:33:05] 	               addMethod /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/ssa/methods.go:39:23 
-[36mINFO[0m[11:33:05] 	                makeWrapper /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/ssa/methods.go:83:20 
-[36mINFO[0m[11:33:05]  Read of [35m&t44.Value [#0][0m in function [92minsAddress[0m at /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/raceCollection.go:274:75 
-[36mINFO[0m[11:33:05] 	in goroutine  *** Run$1 [ 7 ] ***           
-[36mINFO[0m[11:33:05] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:05] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:05] 	    --> Goroutine:  Run$1 [ 7 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:05] 	     checkRacyPairs /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:397:42 
-[36mINFO[0m[11:33:05] 	      insAddress /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/raceCollection.go:219:34 
-[36mINFO[0m[11:33:05] Locks acquired before Write access:  [&prog.methodsMu [#5] &prog.methodsMu [#5]] 
-[36mINFO[0m[11:33:05] Locks acquired before Read  access:  []      
-[36mINFO[0m[11:33:05] ==================================================================================================== 
-[36mINFO[0m[11:33:05] Data race #11                                
-[36mINFO[0m[11:33:05] ==================================================================================================== 
-[36mINFO[0m[11:33:05]  Write of [35m&t155.Args [#2][0m in function [92mmakeWrapper[0m at /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/ssa/wrappers.go:132:10 
-[36mINFO[0m[11:33:05] 	in goroutine  *** Run$1 [ 6 ] ***           
-[36mINFO[0m[11:33:05] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:05] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:05] 	    --> Goroutine:  Run$1 [ 6 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:05] 	     visitAllInstructions /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:319:33 
-[36mINFO[0m[11:33:05] 	      visitAllInstructions /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:396:30 
-[36mINFO[0m[11:33:05] 	       insStore /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:456:19 
-[36mINFO[0m[11:33:05] 	        visitAllInstructions /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/ssaInstructions.go:187:26 
-[36mINFO[0m[11:33:05] 	         insMakeInterface /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:480:23 
-[36mINFO[0m[11:33:05] 	          pointerAnalysis /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/ssaInstructions.go:322:20 
-[36mINFO[0m[11:33:05] 	           Analyze /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/pointerAnalysis.go:34:30 
-[36mINFO[0m[11:33:05] 	            generate /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/pointer_default/analysis.go:294:12 
-[36mINFO[0m[11:33:05] 	             genMethodsOf /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/pointer_default/gen.go:1307:17 
-[36mINFO[0m[11:33:05] 	              MethodValue /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/pointer_default/gen.go:1279:26 
-[36mINFO[0m[11:33:05] 	               addMethod /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/ssa/methods.go:39:23 
-[36mINFO[0m[11:33:05] 	                makeWrapper /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/ssa/methods.go:83:20 
-[36mINFO[0m[11:33:05]  Read of [35m&t17.Args [#2][0m in function [92minsAddress[0m at /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/raceCollection.go:273:23 
-[36mINFO[0m[11:33:05] 	in goroutine  *** Run$1 [ 7 ] ***           
-[36mINFO[0m[11:33:05] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:05] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:05] 	    --> Goroutine:  Run$1 [ 7 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:05] 	     checkRacyPairs /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:397:42 
-[36mINFO[0m[11:33:05] 	      insAddress /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/raceCollection.go:219:34 
-[36mINFO[0m[11:33:05] Locks acquired before Write access:  [&prog.methodsMu [#5] &prog.methodsMu [#5]] 
-[36mINFO[0m[11:33:05] Locks acquired before Read  access:  []      
-[36mINFO[0m[11:33:05] ==================================================================================================== 
-[36mINFO[0m[11:33:06] Data race #12                                
-[36mINFO[0m[11:33:06] ==================================================================================================== 
-[36mINFO[0m[11:33:06]  Write of [35m&t41[t45][0m in function [92mjumpThreading[0m at /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/ssa/blockopt.go:89:12 
-[36mINFO[0m[11:33:06] 	in goroutine  *** Run$1 [ 6 ] ***           
-[36mINFO[0m[11:33:06] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:06] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:06] 	    --> Goroutine:  Run$1 [ 6 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:06] 	     visitAllInstructions /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:319:33 
-[36mINFO[0m[11:33:06] 	      visitAllInstructions /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:396:30 
-[36mINFO[0m[11:33:06] 	       insStore /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:456:19 
-[36mINFO[0m[11:33:06] 	        visitAllInstructions /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/ssaInstructions.go:187:26 
-[36mINFO[0m[11:33:06] 	         insMakeInterface /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:480:23 
-[36mINFO[0m[11:33:06] 	          pointerAnalysis /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/ssaInstructions.go:322:20 
-[36mINFO[0m[11:33:06] 	           Analyze /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/pointerAnalysis.go:34:30 
-[36mINFO[0m[11:33:06] 	            generate /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/pointer_default/analysis.go:294:12 
-[36mINFO[0m[11:33:06] 	             genMethodsOf /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/pointer_default/gen.go:1307:17 
-[36mINFO[0m[11:33:06] 	              MethodValue /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/pointer_default/gen.go:1279:26 
-[36mINFO[0m[11:33:06] 	               addMethod /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/ssa/methods.go:39:23 
-[36mINFO[0m[11:33:06] 	                makeWrapper /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/ssa/methods.go:83:20 
-[36mINFO[0m[11:33:06] 	                 finishBody /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/ssa/wrappers.go:135:15 
-[36mINFO[0m[11:33:06] 	                  optimizeBlocks /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/ssa/func.go:325:16 
-[36mINFO[0m[11:33:06] 	                   jumpThreading /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/ssa/blockopt.go:180:20 
-[36mINFO[0m[11:33:06]  Read of [35m&t392[t396][0m in function [92mmutuallyExcluded[0m at /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/raceCollection.go:181:27 
-[36mINFO[0m[11:33:06] 	in goroutine  *** Run$1 [ 7 ] ***           
-[36mINFO[0m[11:33:06] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:06] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:06] 	    --> Goroutine:  Run$1 [ 7 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:06] 	     checkRacyPairs /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:397:42 
-[36mINFO[0m[11:33:06] 	      mutuallyExcluded /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/raceCollection.go:244:27 
-[36mINFO[0m[11:33:06] Locks acquired before Write access:  [&prog.methodsMu [#5] &prog.methodsMu [#5]] 
-[36mINFO[0m[11:33:06] Locks acquired before Read  access:  []      
-[36mINFO[0m[11:33:06] ==================================================================================================== 
-[36mINFO[0m[11:33:06] Data race #13                                
-[36mINFO[0m[11:33:06] ==================================================================================================== 
-[36mINFO[0m[11:33:06]  Write of [35m&a.Instrs [#3][0m in function [92mfuseBlocks[0m at /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/ssa/blockopt.go:129:4 
-[36mINFO[0m[11:33:06] 	in goroutine  *** Run$1 [ 6 ] ***           
-[36mINFO[0m[11:33:06] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:06] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:06] 	    --> Goroutine:  Run$1 [ 6 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:06] 	     visitAllInstructions /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:319:33 
-[36mINFO[0m[11:33:06] 	      visitAllInstructions /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:396:30 
-[36mINFO[0m[11:33:06] 	       insStore /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:456:19 
-[36mINFO[0m[11:33:06] 	        visitAllInstructions /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/ssaInstructions.go:187:26 
-[36mINFO[0m[11:33:06] 	         insMakeInterface /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:480:23 
-[36mINFO[0m[11:33:06] 	          pointerAnalysis /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/ssaInstructions.go:322:20 
-[36mINFO[0m[11:33:06] 	           Analyze /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/pointerAnalysis.go:34:30 
-[36mINFO[0m[11:33:06] 	            generate /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/pointer_default/analysis.go:294:12 
-[36mINFO[0m[11:33:06] 	             genMethodsOf /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/pointer_default/gen.go:1307:17 
-[36mINFO[0m[11:33:06] 	              MethodValue /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/pointer_default/gen.go:1279:26 
-[36mINFO[0m[11:33:06] 	               addMethod /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/ssa/methods.go:39:23 
-[36mINFO[0m[11:33:06] 	                makeWrapper /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/ssa/methods.go:83:20 
-[36mINFO[0m[11:33:06] 	                 finishBody /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/ssa/wrappers.go:135:15 
-[36mINFO[0m[11:33:06] 	                  optimizeBlocks /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/ssa/func.go:325:16 
-[36mINFO[0m[11:33:06] 	                   fuseBlocks /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/ssa/blockopt.go:175:17 
-[36mINFO[0m[11:33:06]  Read of [35m&t83.Instrs [#3][0m in function [92mmutuallyExcluded[0m at /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/raceCollection.go:181:21 
-[36mINFO[0m[11:33:06] 	in goroutine  *** Run$1 [ 7 ] ***           
-[36mINFO[0m[11:33:06] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:06] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:06] 	    --> Goroutine:  Run$1 [ 7 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:06] 	     checkRacyPairs /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:397:42 
-[36mINFO[0m[11:33:06] 	      mutuallyExcluded /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/raceCollection.go:244:27 
-[36mINFO[0m[11:33:06] Locks acquired before Write access:  [&prog.methodsMu [#5] &prog.methodsMu [#5]] 
-[36mINFO[0m[11:33:06] Locks acquired before Read  access:  []      
-[36mINFO[0m[11:33:06] ==================================================================================================== 
-[36mINFO[0m[11:33:06] Data race #14                                
-[36mINFO[0m[11:33:06] ==================================================================================================== 
-[36mINFO[0m[11:33:06]  Write of [35m&t109[t113][0m in function [92mlift[0m at /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/ssa/lift.go:238:7 
-[36mINFO[0m[11:33:06] 	in goroutine  *** Run$1 [ 6 ] ***           
-[36mINFO[0m[11:33:06] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:06] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:06] 	    --> Goroutine:  Run$1 [ 6 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:06] 	     visitAllInstructions /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:319:33 
-[36mINFO[0m[11:33:06] 	      visitAllInstructions /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:396:30 
-[36mINFO[0m[11:33:06] 	       insStore /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:456:19 
-[36mINFO[0m[11:33:06] 	        visitAllInstructions /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/ssaInstructions.go:187:26 
-[36mINFO[0m[11:33:06] 	         insMakeInterface /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:480:23 
-[36mINFO[0m[11:33:06] 	          pointerAnalysis /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/ssaInstructions.go:322:20 
-[36mINFO[0m[11:33:06] 	           Analyze /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/pointerAnalysis.go:34:30 
-[36mINFO[0m[11:33:06] 	            generate /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/pointer_default/analysis.go:294:12 
-[36mINFO[0m[11:33:06] 	             genMethodsOf /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/pointer_default/gen.go:1307:17 
-[36mINFO[0m[11:33:06] 	              MethodValue /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/pointer_default/gen.go:1279:26 
-[36mINFO[0m[11:33:06] 	               addMethod /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/ssa/methods.go:39:23 
-[36mINFO[0m[11:33:06] 	                makeWrapper /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/ssa/methods.go:83:20 
-[36mINFO[0m[11:33:06] 	                 finishBody /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/ssa/wrappers.go:135:15 
-[36mINFO[0m[11:33:06] 	                  lift /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/ssa/func.go:335:7 
-[36mINFO[0m[11:33:06]  Read of [35m&t392[t396][0m in function [92mmutuallyExcluded[0m at /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/raceCollection.go:181:27 
-[36mINFO[0m[11:33:06] 	in goroutine  *** Run$1 [ 7 ] ***           
-[36mINFO[0m[11:33:06] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:06] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:06] 	    --> Goroutine:  Run$1 [ 7 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:06] 	     checkRacyPairs /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:397:42 
-[36mINFO[0m[11:33:06] 	      mutuallyExcluded /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/raceCollection.go:244:27 
-[36mINFO[0m[11:33:06] Locks acquired before Write access:  [&prog.methodsMu [#5] &prog.methodsMu [#5]] 
-[36mINFO[0m[11:33:06] Locks acquired before Read  access:  []      
-[36mINFO[0m[11:33:06] ==================================================================================================== 
-[36mINFO[0m[11:33:06] Data race #15                                
-[36mINFO[0m[11:33:06] ==================================================================================================== 
-[36mINFO[0m[11:33:06]  Write of [35m&t109[t124][0m in function [92mlift[0m at /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/ssa/lift.go:249:7 
-[36mINFO[0m[11:33:06] 	in goroutine  *** Run$1 [ 6 ] ***           
-[36mINFO[0m[11:33:06] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:06] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:06] 	    --> Goroutine:  Run$1 [ 6 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:06] 	     visitAllInstructions /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:319:33 
-[36mINFO[0m[11:33:06] 	      visitAllInstructions /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:396:30 
-[36mINFO[0m[11:33:06] 	       insStore /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:456:19 
-[36mINFO[0m[11:33:06] 	        visitAllInstructions /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/ssaInstructions.go:187:26 
-[36mINFO[0m[11:33:06] 	         insMakeInterface /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:480:23 
-[36mINFO[0m[11:33:06] 	          pointerAnalysis /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/ssaInstructions.go:322:20 
-[36mINFO[0m[11:33:06] 	           Analyze /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/pointerAnalysis.go:34:30 
-[36mINFO[0m[11:33:06] 	            generate /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/pointer_default/analysis.go:294:12 
-[36mINFO[0m[11:33:06] 	             genMethodsOf /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/pointer_default/gen.go:1307:17 
-[36mINFO[0m[11:33:06] 	              MethodValue /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/pointer_default/gen.go:1279:26 
-[36mINFO[0m[11:33:06] 	               addMethod /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/ssa/methods.go:39:23 
-[36mINFO[0m[11:33:06] 	                makeWrapper /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/ssa/methods.go:83:20 
-[36mINFO[0m[11:33:06] 	                 finishBody /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/ssa/wrappers.go:135:15 
-[36mINFO[0m[11:33:06] 	                  lift /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/ssa/func.go:335:7 
-[36mINFO[0m[11:33:06]  Read of [35m&t392[t396][0m in function [92mmutuallyExcluded[0m at /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/raceCollection.go:181:27 
-[36mINFO[0m[11:33:06] 	in goroutine  *** Run$1 [ 7 ] ***           
-[36mINFO[0m[11:33:06] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:06] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:06] 	    --> Goroutine:  Run$1 [ 7 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:06] 	     checkRacyPairs /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:397:42 
-[36mINFO[0m[11:33:06] 	      mutuallyExcluded /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/raceCollection.go:244:27 
-[36mINFO[0m[11:33:06] Locks acquired before Write access:  [&prog.methodsMu [#5] &prog.methodsMu [#5]] 
-[36mINFO[0m[11:33:06] Locks acquired before Read  access:  []      
-[36mINFO[0m[11:33:06] ==================================================================================================== 
-[36mINFO[0m[11:33:06] Data race #16                                
-[36mINFO[0m[11:33:06] ==================================================================================================== 
-[36mINFO[0m[11:33:06]  Write of [35m&t87.Instrs [#3][0m in function [92mlift[0m at /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/ssa/lift.go:252:5 
-[36mINFO[0m[11:33:06] 	in goroutine  *** Run$1 [ 6 ] ***           
-[36mINFO[0m[11:33:06] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:06] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:06] 	    --> Goroutine:  Run$1 [ 6 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:06] 	     visitAllInstructions /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:319:33 
-[36mINFO[0m[11:33:06] 	      visitAllInstructions /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:396:30 
-[36mINFO[0m[11:33:06] 	       insStore /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:456:19 
-[36mINFO[0m[11:33:06] 	        visitAllInstructions /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/ssaInstructions.go:187:26 
-[36mINFO[0m[11:33:06] 	         insMakeInterface /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:480:23 
-[36mINFO[0m[11:33:06] 	          pointerAnalysis /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/ssaInstructions.go:322:20 
-[36mINFO[0m[11:33:06] 	           Analyze /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/pointerAnalysis.go:34:30 
-[36mINFO[0m[11:33:06] 	            generate /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/pointer_default/analysis.go:294:12 
-[36mINFO[0m[11:33:06] 	             genMethodsOf /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/pointer_default/gen.go:1307:17 
-[36mINFO[0m[11:33:06] 	              MethodValue /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/pointer_default/gen.go:1279:26 
-[36mINFO[0m[11:33:06] 	               addMethod /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/ssa/methods.go:39:23 
-[36mINFO[0m[11:33:06] 	                makeWrapper /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/ssa/methods.go:83:20 
-[36mINFO[0m[11:33:06] 	                 finishBody /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/ssa/wrappers.go:135:15 
-[36mINFO[0m[11:33:06] 	                  lift /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/ssa/func.go:335:7 
-[36mINFO[0m[11:33:06]  Read of [35m&t83.Instrs [#3][0m in function [92mmutuallyExcluded[0m at /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/raceCollection.go:181:21 
-[36mINFO[0m[11:33:06] 	in goroutine  *** Run$1 [ 7 ] ***           
-[36mINFO[0m[11:33:06] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:06] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:06] 	    --> Goroutine:  Run$1 [ 7 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:06] 	     checkRacyPairs /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:397:42 
-[36mINFO[0m[11:33:06] 	      mutuallyExcluded /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/raceCollection.go:244:27 
-[36mINFO[0m[11:33:06] Locks acquired before Write access:  [&prog.methodsMu [#5] &prog.methodsMu [#5]] 
-[36mINFO[0m[11:33:06] Locks acquired before Read  access:  []      
-[36mINFO[0m[11:33:06] ==================================================================================================== 
-[36mINFO[0m[11:33:06] Data race #17                                
-[36mINFO[0m[11:33:06] ==================================================================================================== 
-[36mINFO[0m[11:33:06]  Write of [35m&t137.Value [#0][0m in function [92mmakeWrapper[0m at /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/ssa/wrappers.go:125:10 
-[36mINFO[0m[11:33:06] 	in goroutine  *** Run$1 [ 6 ] ***           
-[36mINFO[0m[11:33:06] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:06] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:06] 	    --> Goroutine:  Run$1 [ 6 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:06] 	     visitAllInstructions /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:319:33 
-[36mINFO[0m[11:33:06] 	      visitAllInstructions /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:396:30 
-[36mINFO[0m[11:33:06] 	       insStore /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:456:19 
-[36mINFO[0m[11:33:06] 	        visitAllInstructions /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/ssaInstructions.go:187:26 
-[36mINFO[0m[11:33:06] 	         insMakeInterface /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:480:23 
-[36mINFO[0m[11:33:06] 	          pointerAnalysis /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/ssaInstructions.go:322:20 
-[36mINFO[0m[11:33:06] 	           Analyze /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/pointerAnalysis.go:34:30 
-[36mINFO[0m[11:33:06] 	            generate /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/pointer_default/analysis.go:294:12 
-[36mINFO[0m[11:33:06] 	             genMethodsOf /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/pointer_default/gen.go:1307:17 
-[36mINFO[0m[11:33:06] 	              MethodValue /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/pointer_default/gen.go:1279:26 
-[36mINFO[0m[11:33:06] 	               addMethod /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/ssa/methods.go:39:23 
-[36mINFO[0m[11:33:06] 	                makeWrapper /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/ssa/methods.go:83:20 
-[36mINFO[0m[11:33:06]  Read of [35m&t44.Value [#0][0m in function [92minsAddress[0m at /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/raceCollection.go:274:75 
-[36mINFO[0m[11:33:06] 	in goroutine  *** Run$1 [ 7 ] ***           
-[36mINFO[0m[11:33:06] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:06] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:06] 	    --> Goroutine:  Run$1 [ 7 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:06] 	     checkRacyPairs /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:397:42 
-[36mINFO[0m[11:33:06] 	      insAddress /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/raceCollection.go:219:34 
-[36mINFO[0m[11:33:06] Locks acquired before Write access:  [&prog.methodsMu [#5] &prog.methodsMu [#5]] 
-[36mINFO[0m[11:33:06] Locks acquired before Read  access:  []      
-[36mINFO[0m[11:33:06] ==================================================================================================== 
-[36mINFO[0m[11:33:06] Data race #18                                
-[36mINFO[0m[11:33:06] ==================================================================================================== 
-[36mINFO[0m[11:33:06]  Write of [35m&t141.Args [#2][0m in function [92mmakeWrapper[0m at /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/ssa/wrappers.go:126:10 
-[36mINFO[0m[11:33:06] 	in goroutine  *** Run$1 [ 6 ] ***           
-[36mINFO[0m[11:33:06] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:06] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:06] 	    --> Goroutine:  Run$1 [ 6 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:06] 	     visitAllInstructions /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:319:33 
-[36mINFO[0m[11:33:06] 	      visitAllInstructions /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:396:30 
-[36mINFO[0m[11:33:06] 	       insStore /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:456:19 
-[36mINFO[0m[11:33:06] 	        visitAllInstructions /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/ssaInstructions.go:187:26 
-[36mINFO[0m[11:33:06] 	         insMakeInterface /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:480:23 
-[36mINFO[0m[11:33:06] 	          pointerAnalysis /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/ssaInstructions.go:322:20 
-[36mINFO[0m[11:33:06] 	           Analyze /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/pointerAnalysis.go:34:30 
-[36mINFO[0m[11:33:06] 	            generate /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/pointer_default/analysis.go:294:12 
-[36mINFO[0m[11:33:06] 	             genMethodsOf /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/pointer_default/gen.go:1307:17 
-[36mINFO[0m[11:33:06] 	              MethodValue /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/pointer_default/gen.go:1279:26 
-[36mINFO[0m[11:33:06] 	               addMethod /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/ssa/methods.go:39:23 
-[36mINFO[0m[11:33:06] 	                makeWrapper /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/ssa/methods.go:83:20 
-[36mINFO[0m[11:33:06]  Read of [35m&t17.Args [#2][0m in function [92minsAddress[0m at /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/raceCollection.go:273:23 
-[36mINFO[0m[11:33:06] 	in goroutine  *** Run$1 [ 7 ] ***           
-[36mINFO[0m[11:33:06] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:06] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:06] 	    --> Goroutine:  Run$1 [ 7 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:06] 	     checkRacyPairs /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:397:42 
-[36mINFO[0m[11:33:06] 	      insAddress /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/raceCollection.go:219:34 
-[36mINFO[0m[11:33:06] Locks acquired before Write access:  [&prog.methodsMu [#5] &prog.methodsMu [#5]] 
-[36mINFO[0m[11:33:06] Locks acquired before Read  access:  []      
-[36mINFO[0m[11:33:06] ==================================================================================================== 
-[36mINFO[0m[11:33:06] Data race #19                                
-[36mINFO[0m[11:33:06] ==================================================================================================== 
-[36mINFO[0m[11:33:06]  Write of [35mnew github.com/april1989/origin-go-tools/go/ssa.Function (fn2)[0m in function [92mgenFunc[0m at /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/pointer_default/gen.go:1186:4 
-[36mINFO[0m[11:33:06] 	in goroutine  *** Run$1 [ 6 ] ***           
-[36mINFO[0m[11:33:06] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:06] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:06] 	    --> Goroutine:  Run$1 [ 6 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:06] 	     visitAllInstructions /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:319:33 
-[36mINFO[0m[11:33:06] 	      visitAllInstructions /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:396:30 
-[36mINFO[0m[11:33:06] 	       insStore /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:456:19 
-[36mINFO[0m[11:33:06] 	        visitAllInstructions /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/ssaInstructions.go:187:26 
-[36mINFO[0m[11:33:06] 	         insMakeInterface /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:480:23 
-[36mINFO[0m[11:33:06] 	          pointerAnalysis /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/ssaInstructions.go:322:20 
-[36mINFO[0m[11:33:06] 	           Analyze /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/pointerAnalysis.go:34:30 
-[36mINFO[0m[11:33:06] 	            generate /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/pointer_default/analysis.go:294:12 
-[36mINFO[0m[11:33:06] 	             genFunc /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/pointer_default/gen.go:1328:12 
-[36mINFO[0m[11:33:06]  Read of [35mparameter v : *Function[0m in function [92mName[0m at /Users/bozhen/go/pkg/mod/github.com/april1989/origin-go-tools@v0.0.14/go/ssa/ssa.go:1442:53 
-[36mINFO[0m[11:33:06] 	in goroutine  *** Run$1 [ 7 ] ***           
-[36mINFO[0m[11:33:06] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:06] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:06] 	    --> Goroutine:  Run$1 [ 7 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:06] 	     checkRacyPairs /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:397:42 
-[36mINFO[0m[11:33:06] 	      printRace /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/raceCollection.go:253:20 
-[36mINFO[0m[11:33:06] 	       isWriteIns /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/raceCollection.go:464:16 
-[36mINFO[0m[11:33:06] 	        Name /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/ssaInstructions.go:82:29 
-[36mINFO[0m[11:33:06] Locks acquired before Write access:  []      
-[36mINFO[0m[11:33:06] Locks acquired before Read  access:  [&prog.methodsMu [#5] &prog.methodsMu [#5]] 
-[36mINFO[0m[11:33:06] ==================================================================================================== 
-[36mINFO[0m[11:33:07] Data race #20                                
-[36mINFO[0m[11:33:07] ==================================================================================================== 
-[36mINFO[0m[11:33:07]  Read of [35m&g.nodes [#0][0m in function [92mNeighbors[0m at /Users/bozhen/go/pkg/mod/github.com/twmb/algoimpl@v0.0.0-20170717182524-076353e90b94/go/graph/graph.go:212:7 
-[36mINFO[0m[11:33:07] 	in goroutine  *** Run$1 [ 6 ] ***           
-[36mINFO[0m[11:33:07] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:07] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:07] 	    --> Goroutine:  Run$1 [ 6 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:07] 	     checkRacyPairs /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:397:42 
-[36mINFO[0m[11:33:07] 	      reachable /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/raceCollection.go:239:20 
-[36mINFO[0m[11:33:07] 	       Neighbors /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/raceCollection.go:373:48 
-[36mINFO[0m[11:33:07]  Write of [35m&g.nodes [#0][0m in function [92mMakeNode[0m at /Users/bozhen/go/pkg/mod/github.com/twmb/algoimpl@v0.0.0-20170717182524-076353e90b94/go/graph/graph.go:79:4 
-[36mINFO[0m[11:33:07] 	in goroutine  *** Run$1 [ 7 ] ***           
-[36mINFO[0m[11:33:07] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:07] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:07] 	    --> Goroutine:  Run$1 [ 7 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:07] 	     buildHB /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:389:20 
-[36mINFO[0m[11:33:07] 	      MakeNode /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:32:32 
-[36mINFO[0m[11:33:07] Locks acquired before Write access:  []      
-[36mINFO[0m[11:33:07] Locks acquired before Read  access:  []      
-[36mINFO[0m[11:33:07] ==================================================================================================== 
-[36mINFO[0m[11:33:07] Data race #21                                
-[36mINFO[0m[11:33:07] ==================================================================================================== 
-[36mINFO[0m[11:33:07]  Read of [35m&g.nodes [#0][0m in function [92mMakeNode[0m at /Users/bozhen/go/pkg/mod/github.com/twmb/algoimpl@v0.0.0-20170717182524-076353e90b94/go/graph/graph.go:77:32 
-[36mINFO[0m[11:33:07] 	in goroutine  *** Run$1 [ 6 ] ***           
-[36mINFO[0m[11:33:07] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:07] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:07] 	    --> Goroutine:  Run$1 [ 6 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:07] 	     buildHB /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:389:20 
-[36mINFO[0m[11:33:07] 	      MakeNode /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:32:32 
-[36mINFO[0m[11:33:07]  Write of [35m&g.nodes [#0][0m in function [92mMakeNode[0m at /Users/bozhen/go/pkg/mod/github.com/twmb/algoimpl@v0.0.0-20170717182524-076353e90b94/go/graph/graph.go:79:4 
-[36mINFO[0m[11:33:07] 	in goroutine  *** Run$1 [ 7 ] ***           
-[36mINFO[0m[11:33:07] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:07] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:07] 	    --> Goroutine:  Run$1 [ 7 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:07] 	     buildHB /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:389:20 
-[36mINFO[0m[11:33:07] 	      MakeNode /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:32:32 
-[36mINFO[0m[11:33:07] Locks acquired before Write access:  []      
-[36mINFO[0m[11:33:07] Locks acquired before Read  access:  []      
-[36mINFO[0m[11:33:07] ==================================================================================================== 
-[36mINFO[0m[11:33:07] Data race #22                                
-[36mINFO[0m[11:33:07] ==================================================================================================== 
-[36mINFO[0m[11:33:07]  Read of [35m&g.nodes [#0][0m in function [92mMakeNode[0m at /Users/bozhen/go/pkg/mod/github.com/twmb/algoimpl@v0.0.0-20170717182524-076353e90b94/go/graph/graph.go:79:21 
-[36mINFO[0m[11:33:07] 	in goroutine  *** Run$1 [ 6 ] ***           
-[36mINFO[0m[11:33:07] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:07] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:07] 	    --> Goroutine:  Run$1 [ 6 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:07] 	     buildHB /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:389:20 
-[36mINFO[0m[11:33:07] 	      MakeNode /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:32:32 
-[36mINFO[0m[11:33:07]  Write of [35m&g.nodes [#0][0m in function [92mMakeNode[0m at /Users/bozhen/go/pkg/mod/github.com/twmb/algoimpl@v0.0.0-20170717182524-076353e90b94/go/graph/graph.go:79:4 
-[36mINFO[0m[11:33:07] 	in goroutine  *** Run$1 [ 7 ] ***           
-[36mINFO[0m[11:33:07] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:07] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:07] 	    --> Goroutine:  Run$1 [ 7 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:07] 	     buildHB /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:389:20 
-[36mINFO[0m[11:33:07] 	      MakeNode /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:32:32 
-[36mINFO[0m[11:33:07] Locks acquired before Write access:  []      
-[36mINFO[0m[11:33:07] Locks acquired before Read  access:  []      
-[36mINFO[0m[11:33:07] ==================================================================================================== 
-[36mINFO[0m[11:33:07] Data race #23                                
-[36mINFO[0m[11:33:07] ==================================================================================================== 
-[36mINFO[0m[11:33:07]  Write of [35m&g.nodes [#0][0m in function [92mMakeNode[0m at /Users/bozhen/go/pkg/mod/github.com/twmb/algoimpl@v0.0.0-20170717182524-076353e90b94/go/graph/graph.go:79:4 
-[36mINFO[0m[11:33:07] 	in goroutine  *** Run$1 [ 6 ] ***           
-[36mINFO[0m[11:33:07] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:07] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:07] 	    --> Goroutine:  Run$1 [ 6 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:07] 	     buildHB /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:389:20 
-[36mINFO[0m[11:33:07] 	      MakeNode /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:32:32 
-[36mINFO[0m[11:33:07]  Read of [35m&g.nodes [#0][0m in function [92mMakeNode[0m at /Users/bozhen/go/pkg/mod/github.com/twmb/algoimpl@v0.0.0-20170717182524-076353e90b94/go/graph/graph.go:77:32 
-[36mINFO[0m[11:33:07] 	in goroutine  *** Run$1 [ 7 ] ***           
-[36mINFO[0m[11:33:07] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:07] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:07] 	    --> Goroutine:  Run$1 [ 7 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:07] 	     buildHB /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:389:20 
-[36mINFO[0m[11:33:07] 	      MakeNode /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:32:32 
-[36mINFO[0m[11:33:07] Locks acquired before Write access:  []      
-[36mINFO[0m[11:33:07] Locks acquired before Read  access:  []      
-[36mINFO[0m[11:33:07] ==================================================================================================== 
-[36mINFO[0m[11:33:07] Data race #24                                
-[36mINFO[0m[11:33:07] ==================================================================================================== 
-[36mINFO[0m[11:33:07]  Write of [35m*t36[0m in function [92mbuildHB[0m at /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:27:5 
-[36mINFO[0m[11:33:07] 	in goroutine  *** Run$1 [ 6 ] ***           
-[36mINFO[0m[11:33:07] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:07] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:07] 	    --> Goroutine:  Run$1 [ 6 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:07] 	     buildHB /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:389:20 
-[36mINFO[0m[11:33:07]  Write of [35m*t36[0m in function [92mbuildHB[0m at /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:27:5 
-[36mINFO[0m[11:33:07] 	in goroutine  *** Run$1 [ 7 ] ***           
-[36mINFO[0m[11:33:07] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:07] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:07] 	    --> Goroutine:  Run$1 [ 7 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:07] 	     buildHB /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:389:20 
-[36mINFO[0m[11:33:07] Locks acquired before Write access:  []      
-[36mINFO[0m[11:33:07] Locks acquired before Read  access:  []      
-[36mINFO[0m[11:33:07] ==================================================================================================== 
-[36mINFO[0m[11:33:07] Data race #25                                
-[36mINFO[0m[11:33:07] ==================================================================================================== 
-[36mINFO[0m[11:33:07]  Read of [35m*t571[0m in function [92mbuildHB[0m at /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:196:8 
-[36mINFO[0m[11:33:07] 	in goroutine  *** Run$1 [ 6 ] ***           
-[36mINFO[0m[11:33:07] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:07] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:07] 	    --> Goroutine:  Run$1 [ 6 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:07] 	     buildHB /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:389:20 
-[36mINFO[0m[11:33:07]  Write of [35m*t36[0m in function [92mbuildHB[0m at /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:27:5 
-[36mINFO[0m[11:33:07] 	in goroutine  *** Run$1 [ 7 ] ***           
-[36mINFO[0m[11:33:07] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:07] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:07] 	    --> Goroutine:  Run$1 [ 7 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:07] 	     buildHB /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:389:20 
-[36mINFO[0m[11:33:07] Locks acquired before Write access:  []      
-[36mINFO[0m[11:33:07] Locks acquired before Read  access:  []      
-[36mINFO[0m[11:33:07] ==================================================================================================== 
-[36mINFO[0m[11:33:07] Data race #26                                
-[36mINFO[0m[11:33:07] ==================================================================================================== 
-[36mINFO[0m[11:33:07]  Read of [35m*t576[0m in function [92mbuildHB[0m at /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:196:41 
-[36mINFO[0m[11:33:07] 	in goroutine  *** Run$1 [ 6 ] ***           
-[36mINFO[0m[11:33:07] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:07] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:07] 	    --> Goroutine:  Run$1 [ 6 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:07] 	     buildHB /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:389:20 
-[36mINFO[0m[11:33:07]  Write of [35m*t36[0m in function [92mbuildHB[0m at /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:27:5 
-[36mINFO[0m[11:33:07] 	in goroutine  *** Run$1 [ 7 ] ***           
-[36mINFO[0m[11:33:07] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:07] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:07] 	    --> Goroutine:  Run$1 [ 7 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:07] 	     buildHB /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:389:20 
-[36mINFO[0m[11:33:07] Locks acquired before Write access:  []      
-[36mINFO[0m[11:33:07] Locks acquired before Read  access:  []      
-[36mINFO[0m[11:33:07] ==================================================================================================== 
-[36mINFO[0m[11:33:07] Data race #27                                
-[36mINFO[0m[11:33:07] ==================================================================================================== 
-[36mINFO[0m[11:33:07]  Read of [35m&g.Kind [#1][0m in function [92mMakeEdgeWeight[0m at /Users/bozhen/go/pkg/mod/github.com/twmb/algoimpl@v0.0.0-20170717182524-076353e90b94/go/graph/graph.go:156:9 
-[36mINFO[0m[11:33:07] 	in goroutine  *** Run$1 [ 6 ] ***           
-[36mINFO[0m[11:33:07] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:07] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:07] 	    --> Goroutine:  Run$1 [ 6 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:07] 	     buildHB /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:389:20 
-[36mINFO[0m[11:33:07] 	      MakeEdge /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:197:32 
-[36mINFO[0m[11:33:07] 	       MakeEdgeWeight /Users/bozhen/go/pkg/mod/github.com/twmb/algoimpl@v0.0.0-20170717182524-076353e90b94/go/graph/graph.go:135:25 
-[36mINFO[0m[11:33:07]  Write of [35m&t0.Kind [#1][0m in function [92mNew[0m at /Users/bozhen/go/pkg/mod/github.com/twmb/algoimpl@v0.0.0-20170717182524-076353e90b94/go/graph/graph.go:70:5 
-[36mINFO[0m[11:33:07] 	in goroutine  *** Run$1 [ 7 ] ***           
-[36mINFO[0m[11:33:07] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:07] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:07] 	    --> Goroutine:  Run$1 [ 7 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:07] 	     New /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:388:32 
-[36mINFO[0m[11:33:07] Locks acquired before Write access:  []      
-[36mINFO[0m[11:33:07] Locks acquired before Read  access:  []      
-[36mINFO[0m[11:33:07] ==================================================================================================== 
-[36mINFO[0m[11:33:07] Data race #28                                
-[36mINFO[0m[11:33:07] ==================================================================================================== 
-[36mINFO[0m[11:33:07]  Read of [35m&g.Kind [#1][0m in function [92mMakeEdgeWeight[0m at /Users/bozhen/go/pkg/mod/github.com/twmb/algoimpl@v0.0.0-20170717182524-076353e90b94/go/graph/graph.go:169:7 
-[36mINFO[0m[11:33:07] 	in goroutine  *** Run$1 [ 6 ] ***           
-[36mINFO[0m[11:33:07] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:07] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:07] 	    --> Goroutine:  Run$1 [ 6 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:07] 	     buildHB /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:389:20 
-[36mINFO[0m[11:33:07] 	      MakeEdge /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:197:32 
-[36mINFO[0m[11:33:07] 	       MakeEdgeWeight /Users/bozhen/go/pkg/mod/github.com/twmb/algoimpl@v0.0.0-20170717182524-076353e90b94/go/graph/graph.go:135:25 
-[36mINFO[0m[11:33:07]  Write of [35m&t0.Kind [#1][0m in function [92mNew[0m at /Users/bozhen/go/pkg/mod/github.com/twmb/algoimpl@v0.0.0-20170717182524-076353e90b94/go/graph/graph.go:70:5 
-[36mINFO[0m[11:33:07] 	in goroutine  *** Run$1 [ 7 ] ***           
-[36mINFO[0m[11:33:07] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:07] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:07] 	    --> Goroutine:  Run$1 [ 7 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:07] 	     New /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:388:32 
-[36mINFO[0m[11:33:07] Locks acquired before Write access:  []      
-[36mINFO[0m[11:33:07] Locks acquired before Read  access:  []      
-[36mINFO[0m[11:33:07] ==================================================================================================== 
-[36mINFO[0m[11:33:07] Data race #29                                
-[36mINFO[0m[11:33:07] ==================================================================================================== 
-[36mINFO[0m[11:33:07]  Read of [35m&g.Kind [#1][0m in function [92mMakeEdgeWeight[0m at /Users/bozhen/go/pkg/mod/github.com/twmb/algoimpl@v0.0.0-20170717182524-076353e90b94/go/graph/graph.go:172:7 
-[36mINFO[0m[11:33:07] 	in goroutine  *** Run$1 [ 6 ] ***           
-[36mINFO[0m[11:33:07] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:07] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:07] 	    --> Goroutine:  Run$1 [ 6 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:07] 	     buildHB /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:389:20 
-[36mINFO[0m[11:33:07] 	      MakeEdge /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:197:32 
-[36mINFO[0m[11:33:07] 	       MakeEdgeWeight /Users/bozhen/go/pkg/mod/github.com/twmb/algoimpl@v0.0.0-20170717182524-076353e90b94/go/graph/graph.go:135:25 
-[36mINFO[0m[11:33:07]  Write of [35m&t0.Kind [#1][0m in function [92mNew[0m at /Users/bozhen/go/pkg/mod/github.com/twmb/algoimpl@v0.0.0-20170717182524-076353e90b94/go/graph/graph.go:70:5 
-[36mINFO[0m[11:33:07] 	in goroutine  *** Run$1 [ 7 ] ***           
-[36mINFO[0m[11:33:07] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:07] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:07] 	    --> Goroutine:  Run$1 [ 7 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:07] 	     New /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:388:32 
-[36mINFO[0m[11:33:07] Locks acquired before Write access:  []      
-[36mINFO[0m[11:33:07] Locks acquired before Read  access:  []      
-[36mINFO[0m[11:33:07] ==================================================================================================== 
-[36mINFO[0m[11:33:07] Data race #30                                
-[36mINFO[0m[11:33:07] ==================================================================================================== 
-[36mINFO[0m[11:33:07]  Read of [35m*t613[0m in function [92mbuildHB[0m at /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:210:110 
-[36mINFO[0m[11:33:07] 	in goroutine  *** Run$1 [ 6 ] ***           
-[36mINFO[0m[11:33:07] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:07] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:07] 	    --> Goroutine:  Run$1 [ 6 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:07] 	     buildHB /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:389:20 
-[36mINFO[0m[11:33:07]  Write of [35m*t36[0m in function [92mbuildHB[0m at /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:27:5 
-[36mINFO[0m[11:33:07] 	in goroutine  *** Run$1 [ 7 ] ***           
-[36mINFO[0m[11:33:07] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:07] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:07] 	    --> Goroutine:  Run$1 [ 7 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:07] 	     buildHB /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:389:20 
-[36mINFO[0m[11:33:07] Locks acquired before Write access:  []      
-[36mINFO[0m[11:33:07] Locks acquired before Read  access:  []      
-[36mINFO[0m[11:33:07] ==================================================================================================== 
-[36mINFO[0m[11:33:07] Data race #31                                
-[36mINFO[0m[11:33:07] ==================================================================================================== 
-[36mINFO[0m[11:33:07]  Read of [35m*t602[0m in function [92mbuildHB[0m at /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:207:36 
-[36mINFO[0m[11:33:07] 	in goroutine  *** Run$1 [ 6 ] ***           
-[36mINFO[0m[11:33:07] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:07] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:07] 	    --> Goroutine:  Run$1 [ 6 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:07] 	     buildHB /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:389:20 
-[36mINFO[0m[11:33:07]  Write of [35m*t36[0m in function [92mbuildHB[0m at /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:27:5 
-[36mINFO[0m[11:33:07] 	in goroutine  *** Run$1 [ 7 ] ***           
-[36mINFO[0m[11:33:07] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:07] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:07] 	    --> Goroutine:  Run$1 [ 7 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:07] 	     buildHB /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:389:20 
-[36mINFO[0m[11:33:07] Locks acquired before Write access:  []      
-[36mINFO[0m[11:33:07] Locks acquired before Read  access:  []      
-[36mINFO[0m[11:33:07] ==================================================================================================== 
-[36mINFO[0m[11:33:07] Data race #32                                
-[36mINFO[0m[11:33:07] ==================================================================================================== 
-[36mINFO[0m[11:33:07]  Read of [35m*t584[0m in function [92mbuildHB[0m at /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:204:11 
-[36mINFO[0m[11:33:07] 	in goroutine  *** Run$1 [ 6 ] ***           
-[36mINFO[0m[11:33:07] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:07] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:07] 	    --> Goroutine:  Run$1 [ 6 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:07] 	     buildHB /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:389:20 
-[36mINFO[0m[11:33:07]  Write of [35m*t36[0m in function [92mbuildHB[0m at /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:27:5 
-[36mINFO[0m[11:33:07] 	in goroutine  *** Run$1 [ 7 ] ***           
-[36mINFO[0m[11:33:07] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:07] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:07] 	    --> Goroutine:  Run$1 [ 7 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:07] 	     buildHB /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:389:20 
-[36mINFO[0m[11:33:07] Locks acquired before Write access:  []      
-[36mINFO[0m[11:33:07] Locks acquired before Read  access:  []      
-[36mINFO[0m[11:33:07] ==================================================================================================== 
-[36mINFO[0m[11:33:07] Data race #33                                
-[36mINFO[0m[11:33:07] ==================================================================================================== 
-[36mINFO[0m[11:33:07]  Read of [35m*t674[0m in function [92mbuildHB[0m at /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:224:8 
-[36mINFO[0m[11:33:07] 	in goroutine  *** Run$1 [ 6 ] ***           
-[36mINFO[0m[11:33:07] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:07] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:07] 	    --> Goroutine:  Run$1 [ 6 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:07] 	     buildHB /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:389:20 
-[36mINFO[0m[11:33:07]  Write of [35m*t36[0m in function [92mbuildHB[0m at /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:27:5 
-[36mINFO[0m[11:33:07] 	in goroutine  *** Run$1 [ 7 ] ***           
-[36mINFO[0m[11:33:07] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:07] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:07] 	    --> Goroutine:  Run$1 [ 7 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:07] 	     buildHB /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:389:20 
-[36mINFO[0m[11:33:07] Locks acquired before Write access:  []      
-[36mINFO[0m[11:33:07] Locks acquired before Read  access:  []      
-[36mINFO[0m[11:33:07] ==================================================================================================== 
-[36mINFO[0m[11:33:07] Data race #34                                
-[36mINFO[0m[11:33:07] ==================================================================================================== 
-[36mINFO[0m[11:33:07]  Read of [35m*t679[0m in function [92mbuildHB[0m at /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:224:40 
-[36mINFO[0m[11:33:07] 	in goroutine  *** Run$1 [ 6 ] ***           
-[36mINFO[0m[11:33:07] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:07] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:07] 	    --> Goroutine:  Run$1 [ 6 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:07] 	     buildHB /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:389:20 
-[36mINFO[0m[11:33:07]  Write of [35m*t36[0m in function [92mbuildHB[0m at /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:27:5 
-[36mINFO[0m[11:33:07] 	in goroutine  *** Run$1 [ 7 ] ***           
-[36mINFO[0m[11:33:07] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:07] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:07] 	    --> Goroutine:  Run$1 [ 7 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:07] 	     buildHB /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:389:20 
-[36mINFO[0m[11:33:07] Locks acquired before Write access:  []      
-[36mINFO[0m[11:33:07] Locks acquired before Read  access:  []      
-[36mINFO[0m[11:33:07] ==================================================================================================== 
-[36mINFO[0m[11:33:07] Data race #35                                
-[36mINFO[0m[11:33:07] ==================================================================================================== 
-[36mINFO[0m[11:33:07]  Read of [35m*t668[0m in function [92mbuildHB[0m at /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:227:11 
-[36mINFO[0m[11:33:07] 	in goroutine  *** Run$1 [ 6 ] ***           
-[36mINFO[0m[11:33:07] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:07] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:07] 	    --> Goroutine:  Run$1 [ 6 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:07] 	     buildHB /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:389:20 
-[36mINFO[0m[11:33:07]  Write of [35m*t36[0m in function [92mbuildHB[0m at /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:27:5 
-[36mINFO[0m[11:33:07] 	in goroutine  *** Run$1 [ 7 ] ***           
-[36mINFO[0m[11:33:07] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:07] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:07] 	    --> Goroutine:  Run$1 [ 7 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:07] 	     buildHB /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:389:20 
-[36mINFO[0m[11:33:07] Locks acquired before Write access:  []      
-[36mINFO[0m[11:33:07] Locks acquired before Read  access:  []      
-[36mINFO[0m[11:33:07] ==================================================================================================== 
-[36mINFO[0m[11:33:07] Data race #36                                
-[36mINFO[0m[11:33:07] ==================================================================================================== 
-[36mINFO[0m[11:33:07]  Read of [35m*t710[0m in function [92mbuildHB[0m at /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:238:72 
-[36mINFO[0m[11:33:07] 	in goroutine  *** Run$1 [ 6 ] ***           
-[36mINFO[0m[11:33:07] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:07] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:07] 	    --> Goroutine:  Run$1 [ 6 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:07] 	     buildHB /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:389:20 
-[36mINFO[0m[11:33:07]  Write of [35m*t36[0m in function [92mbuildHB[0m at /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:27:5 
-[36mINFO[0m[11:33:07] 	in goroutine  *** Run$1 [ 7 ] ***           
-[36mINFO[0m[11:33:07] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:07] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:07] 	    --> Goroutine:  Run$1 [ 7 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:07] 	     buildHB /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:389:20 
-[36mINFO[0m[11:33:07] Locks acquired before Write access:  []      
-[36mINFO[0m[11:33:07] Locks acquired before Read  access:  []      
-[36mINFO[0m[11:33:07] ==================================================================================================== 
-[36mINFO[0m[11:33:07] Data race #37                                
-[36mINFO[0m[11:33:07] ==================================================================================================== 
-[36mINFO[0m[11:33:07]  Read of [35m*t689[0m in function [92mbuildHB[0m at /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:230:38 
-[36mINFO[0m[11:33:07] 	in goroutine  *** Run$1 [ 6 ] ***           
-[36mINFO[0m[11:33:07] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:07] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:07] 	    --> Goroutine:  Run$1 [ 6 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:07] 	     buildHB /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:389:20 
-[36mINFO[0m[11:33:07]  Write of [35m*t36[0m in function [92mbuildHB[0m at /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:27:5 
-[36mINFO[0m[11:33:07] 	in goroutine  *** Run$1 [ 7 ] ***           
-[36mINFO[0m[11:33:07] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:07] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:07] 	    --> Goroutine:  Run$1 [ 7 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:07] 	     buildHB /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:389:20 
-[36mINFO[0m[11:33:07] Locks acquired before Write access:  []      
-[36mINFO[0m[11:33:07] Locks acquired before Read  access:  []      
-[36mINFO[0m[11:33:07] ==================================================================================================== 
-[36mINFO[0m[11:33:07] Data race #38                                
-[36mINFO[0m[11:33:07] ==================================================================================================== 
-[36mINFO[0m[11:33:07]  Read of [35m*t367[0m in function [92mbuildHB[0m at /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:142:9 
-[36mINFO[0m[11:33:07] 	in goroutine  *** Run$1 [ 6 ] ***           
-[36mINFO[0m[11:33:07] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:07] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:07] 	    --> Goroutine:  Run$1 [ 6 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:07] 	     buildHB /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:389:20 
-[36mINFO[0m[11:33:07]  Write of [35m*t36[0m in function [92mbuildHB[0m at /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:27:5 
-[36mINFO[0m[11:33:07] 	in goroutine  *** Run$1 [ 7 ] ***           
-[36mINFO[0m[11:33:07] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:07] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:07] 	    --> Goroutine:  Run$1 [ 7 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:07] 	     buildHB /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:389:20 
-[36mINFO[0m[11:33:07] Locks acquired before Write access:  []      
-[36mINFO[0m[11:33:07] Locks acquired before Read  access:  []      
-[36mINFO[0m[11:33:07] ==================================================================================================== 
-[36mINFO[0m[11:33:07] Data race #39                                
-[36mINFO[0m[11:33:07] ==================================================================================================== 
-[36mINFO[0m[11:33:07]  Read of [35m*t372[0m in function [92mbuildHB[0m at /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:142:42 
-[36mINFO[0m[11:33:07] 	in goroutine  *** Run$1 [ 6 ] ***           
-[36mINFO[0m[11:33:07] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:07] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:07] 	    --> Goroutine:  Run$1 [ 6 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:07] 	     buildHB /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:389:20 
-[36mINFO[0m[11:33:07]  Write of [35m*t36[0m in function [92mbuildHB[0m at /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:27:5 
-[36mINFO[0m[11:33:07] 	in goroutine  *** Run$1 [ 7 ] ***           
-[36mINFO[0m[11:33:07] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:07] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:07] 	    --> Goroutine:  Run$1 [ 7 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:07] 	     buildHB /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:389:20 
-[36mINFO[0m[11:33:07] Locks acquired before Write access:  []      
-[36mINFO[0m[11:33:07] Locks acquired before Read  access:  []      
-[36mINFO[0m[11:33:07] ==================================================================================================== 
-[36mINFO[0m[11:33:07] Data race #40                                
-[36mINFO[0m[11:33:07] ==================================================================================================== 
-[36mINFO[0m[11:33:07]  Read of [35m*t408[0m in function [92mbuildHB[0m at /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:157:108 
-[36mINFO[0m[11:33:07] 	in goroutine  *** Run$1 [ 6 ] ***           
-[36mINFO[0m[11:33:07] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:07] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:07] 	    --> Goroutine:  Run$1 [ 6 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:07] 	     buildHB /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:389:20 
-[36mINFO[0m[11:33:07]  Write of [35m*t36[0m in function [92mbuildHB[0m at /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:27:5 
-[36mINFO[0m[11:33:07] 	in goroutine  *** Run$1 [ 7 ] ***           
-[36mINFO[0m[11:33:07] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:07] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:07] 	    --> Goroutine:  Run$1 [ 7 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:07] 	     buildHB /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:389:20 
-[36mINFO[0m[11:33:07] Locks acquired before Write access:  []      
-[36mINFO[0m[11:33:07] Locks acquired before Read  access:  []      
-[36mINFO[0m[11:33:07] ==================================================================================================== 
-[36mINFO[0m[11:33:07] Data race #41                                
-[36mINFO[0m[11:33:07] ==================================================================================================== 
-[36mINFO[0m[11:33:07]  Read of [35m*t397[0m in function [92mbuildHB[0m at /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:154:37 
-[36mINFO[0m[11:33:07] 	in goroutine  *** Run$1 [ 6 ] ***           
-[36mINFO[0m[11:33:07] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:07] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:07] 	    --> Goroutine:  Run$1 [ 6 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:07] 	     buildHB /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:389:20 
-[36mINFO[0m[11:33:07]  Write of [35m*t36[0m in function [92mbuildHB[0m at /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:27:5 
-[36mINFO[0m[11:33:07] 	in goroutine  *** Run$1 [ 7 ] ***           
-[36mINFO[0m[11:33:07] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:07] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:07] 	    --> Goroutine:  Run$1 [ 7 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:07] 	     buildHB /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:389:20 
-[36mINFO[0m[11:33:07] Locks acquired before Write access:  []      
-[36mINFO[0m[11:33:07] Locks acquired before Read  access:  []      
-[36mINFO[0m[11:33:07] ==================================================================================================== 
-[36mINFO[0m[11:33:07] Data race #42                                
-[36mINFO[0m[11:33:07] ==================================================================================================== 
-[36mINFO[0m[11:33:07]  Read of [35m*t379[0m in function [92mbuildHB[0m at /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:151:12 
-[36mINFO[0m[11:33:07] 	in goroutine  *** Run$1 [ 6 ] ***           
-[36mINFO[0m[11:33:07] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:07] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:07] 	    --> Goroutine:  Run$1 [ 6 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:07] 	     buildHB /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:389:20 
-[36mINFO[0m[11:33:07]  Write of [35m*t36[0m in function [92mbuildHB[0m at /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:27:5 
-[36mINFO[0m[11:33:07] 	in goroutine  *** Run$1 [ 7 ] ***           
-[36mINFO[0m[11:33:07] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:07] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:07] 	    --> Goroutine:  Run$1 [ 7 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:07] 	     buildHB /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:389:20 
-[36mINFO[0m[11:33:07] Locks acquired before Write access:  []      
-[36mINFO[0m[11:33:07] Locks acquired before Read  access:  []      
-[36mINFO[0m[11:33:07] ==================================================================================================== 
-[36mINFO[0m[11:33:07] Data race #43                                
-[36mINFO[0m[11:33:07] ==================================================================================================== 
-[36mINFO[0m[11:33:07]  Read of [35m*t474[0m in function [92mbuildHB[0m at /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:169:9 
-[36mINFO[0m[11:33:07] 	in goroutine  *** Run$1 [ 6 ] ***           
-[36mINFO[0m[11:33:07] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:07] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:07] 	    --> Goroutine:  Run$1 [ 6 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:07] 	     buildHB /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:389:20 
-[36mINFO[0m[11:33:07]  Write of [35m*t36[0m in function [92mbuildHB[0m at /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:27:5 
-[36mINFO[0m[11:33:07] 	in goroutine  *** Run$1 [ 7 ] ***           
-[36mINFO[0m[11:33:07] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:07] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:07] 	    --> Goroutine:  Run$1 [ 7 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:07] 	     buildHB /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:389:20 
-[36mINFO[0m[11:33:07] Locks acquired before Write access:  []      
-[36mINFO[0m[11:33:07] Locks acquired before Read  access:  []      
-[36mINFO[0m[11:33:07] ==================================================================================================== 
-[36mINFO[0m[11:33:07] Data race #44                                
-[36mINFO[0m[11:33:07] ==================================================================================================== 
-[36mINFO[0m[11:33:07]  Read of [35m*t479[0m in function [92mbuildHB[0m at /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:169:42 
-[36mINFO[0m[11:33:07] 	in goroutine  *** Run$1 [ 6 ] ***           
-[36mINFO[0m[11:33:07] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:07] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:07] 	    --> Goroutine:  Run$1 [ 6 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:07] 	     buildHB /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:389:20 
-[36mINFO[0m[11:33:07]  Write of [35m*t36[0m in function [92mbuildHB[0m at /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:27:5 
-[36mINFO[0m[11:33:07] 	in goroutine  *** Run$1 [ 7 ] ***           
-[36mINFO[0m[11:33:07] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:07] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:07] 	    --> Goroutine:  Run$1 [ 7 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:07] 	     buildHB /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:389:20 
-[36mINFO[0m[11:33:07] Locks acquired before Write access:  []      
-[36mINFO[0m[11:33:07] Locks acquired before Read  access:  []      
-[36mINFO[0m[11:33:07] ==================================================================================================== 
-[36mINFO[0m[11:33:07] Data race #45                                
-[36mINFO[0m[11:33:07] ==================================================================================================== 
-[36mINFO[0m[11:33:07]  Read of [35m*t515[0m in function [92mbuildHB[0m at /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:184:108 
-[36mINFO[0m[11:33:07] 	in goroutine  *** Run$1 [ 6 ] ***           
-[36mINFO[0m[11:33:07] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:07] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:07] 	    --> Goroutine:  Run$1 [ 6 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:07] 	     buildHB /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:389:20 
-[36mINFO[0m[11:33:07]  Write of [35m*t36[0m in function [92mbuildHB[0m at /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:27:5 
-[36mINFO[0m[11:33:07] 	in goroutine  *** Run$1 [ 7 ] ***           
-[36mINFO[0m[11:33:07] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:07] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:07] 	    --> Goroutine:  Run$1 [ 7 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:07] 	     buildHB /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:389:20 
-[36mINFO[0m[11:33:07] Locks acquired before Write access:  []      
-[36mINFO[0m[11:33:07] Locks acquired before Read  access:  []      
-[36mINFO[0m[11:33:07] ==================================================================================================== 
-[36mINFO[0m[11:33:07] Data race #46                                
-[36mINFO[0m[11:33:07] ==================================================================================================== 
-[36mINFO[0m[11:33:07]  Read of [35m*t504[0m in function [92mbuildHB[0m at /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:181:37 
-[36mINFO[0m[11:33:07] 	in goroutine  *** Run$1 [ 6 ] ***           
-[36mINFO[0m[11:33:07] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:07] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:07] 	    --> Goroutine:  Run$1 [ 6 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:07] 	     buildHB /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:389:20 
-[36mINFO[0m[11:33:07]  Write of [35m*t36[0m in function [92mbuildHB[0m at /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:27:5 
-[36mINFO[0m[11:33:07] 	in goroutine  *** Run$1 [ 7 ] ***           
-[36mINFO[0m[11:33:07] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:07] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:07] 	    --> Goroutine:  Run$1 [ 7 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:07] 	     buildHB /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:389:20 
-[36mINFO[0m[11:33:07] Locks acquired before Write access:  []      
-[36mINFO[0m[11:33:07] Locks acquired before Read  access:  []      
-[36mINFO[0m[11:33:07] ==================================================================================================== 
-[36mINFO[0m[11:33:07] Data race #47                                
-[36mINFO[0m[11:33:07] ==================================================================================================== 
-[36mINFO[0m[11:33:07]  Write of [35m*t53[0m in function [92mbuildHB[0m at /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:33:5 
-[36mINFO[0m[11:33:07] 	in goroutine  *** Run$1 [ 6 ] ***           
-[36mINFO[0m[11:33:07] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:07] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:07] 	    --> Goroutine:  Run$1 [ 6 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:07] 	     buildHB /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:389:20 
-[36mINFO[0m[11:33:07]  Write of [35m*t36[0m in function [92mbuildHB[0m at /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:27:5 
-[36mINFO[0m[11:33:07] 	in goroutine  *** Run$1 [ 7 ] ***           
-[36mINFO[0m[11:33:07] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:07] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:07] 	    --> Goroutine:  Run$1 [ 7 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:07] 	     buildHB /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:389:20 
-[36mINFO[0m[11:33:07] Locks acquired before Write access:  []      
-[36mINFO[0m[11:33:07] Locks acquired before Read  access:  []      
-[36mINFO[0m[11:33:07] ==================================================================================================== 
-[36mINFO[0m[11:33:07] Data race #48                                
-[36mINFO[0m[11:33:07] ==================================================================================================== 
-[36mINFO[0m[11:33:07]  Read of [35m*t486[0m in function [92mbuildHB[0m at /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:178:12 
-[36mINFO[0m[11:33:07] 	in goroutine  *** Run$1 [ 6 ] ***           
-[36mINFO[0m[11:33:07] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:07] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:07] 	    --> Goroutine:  Run$1 [ 6 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:07] 	     buildHB /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:389:20 
-[36mINFO[0m[11:33:07]  Write of [35m*t36[0m in function [92mbuildHB[0m at /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/analysisTools.go:27:5 
-[36mINFO[0m[11:33:07] 	in goroutine  *** Run$1 [ 7 ] ***           
-[36mINFO[0m[11:33:07] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:186:6 
-[36mINFO[0m[11:33:07] 	       Run   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/main.go:283:20 
-[36mINFO[0m[11:33:07] 	    --> Goroutine:  Run$1 [ 7 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:262:3 
-[36mINFO[0m[11:33:07] 	     buildHB /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/staticAnalysis.go:389:20 
-[36mINFO[0m[11:33:07] Locks acquired before Write access:  []      
-[36mINFO[0m[11:33:07] Locks acquired before Read  access:  []      
-[36mINFO[0m[11:33:07] ==================================================================================================== 
-[36mINFO[0m[11:33:07] 48 races found for entry point github.com/o2lab/race-checker... 
-[36mINFO[0m[11:33:07] Total of 48 races found for all entry points.  
-[36mINFO[0m[11:33:07] 47.383462062s elapsed.                       
+[36mINFO[0m[13:19:32] Compiling stack trace for every Goroutine...  
+[36mINFO[0m[13:19:32] Done  -- 4 goroutines analyzed! 179 instructions of interest detected!  
+[36mINFO[0m[13:19:32] Building Happens-Before graph...             
+[36mINFO[0m[13:19:32] Done  -- Happens-Before graph built          
+[36mINFO[0m[13:19:32] Checking for data races...                   
+&t0.filterPlugins [#0]  Go:  go t2()  loopid:  0 ;   &fp.numFilterCalled [#0]  Go:  go t14()  loopid:  1
+&t0.filterPlugins [#0]  Go:  go t2()  loopid:  0 ;   freevar toProcess : *chan int  Go:  go t14()  loopid:  1
+&t0.filterPlugins [#0]  Go:  go t2()  loopid:  0 ;   *toProcess  Go:  go t14()  loopid:  1
+&t0.filterPlugins [#0]  Go:  go t2()  loopid:  0 ;   freevar stop : *<-chan struct{}  Go:  go t14()  loopid:  1
+&t0.filterPlugins [#0]  Go:  go t2()  loopid:  0 ;   freevar doWorkPiece : *DoWorkPieceFunc  Go:  go t14()  loopid:  1
+&t0.filterPlugins [#0]  Go:  go t2()  loopid:  0 ;   freevar g : **genericScheduler  Go:  go t14()  loopid:  1
+&t0.filterPlugins [#0]  Go:  go t2()  loopid:  0 ;   *g  Go:  go t14()  loopid:  1
+&t0.filterPlugins [#0]  Go:  go t2()  loopid:  0 ;   &t0.framework [#0]  Go:  go t14()  loopid:  1
+&t0.filterPlugins [#0]  Go:  go t2()  loopid:  0 ;   parameter f : *framework  Go:  go t14()  loopid:  1
+&t0.filterPlugins [#0]  Go:  go t2()  loopid:  0 ;   &f.filterPlugins [#0]  Go:  go t14()  loopid:  1
+&t0.filterPlugins [#0]  Go:  go t2()  loopid:  0 ;   &t1[t4]  Go:  go t14()  loopid:  1
+&t0.filterPlugins [#0]  Go:  go t2()  loopid:  0 ;   parameter fp : *FakeFilterPlugin  Go:  go t14()  loopid:  1
+&t0.filterPlugins [#0]  Go:  go t2()  loopid:  0 ;   &fp.numFilterCalled [#0]  Go:  go t14()  loopid:  1
+&t0.filterPlugins [#0]  Go:  go t2()  loopid:  0 ;   &fp.numFilterCalled [#0]  Go:  go t14()  loopid:  1
+freevar g : **genericScheduler  Go:  go t2()  loopid:  0 ;   &fp.numFilterCalled [#0]  Go:  go t14()  loopid:  1
+*g  Go:  go t2()  loopid:  0 ;   &fp.numFilterCalled [#0]  Go:  go t14()  loopid:  1
+&t0.framework [#0]  Go:  go t2()  loopid:  0 ;   &fp.numFilterCalled [#0]  Go:  go t14()  loopid:  1
+parameter f : *framework  Go:  go t2()  loopid:  0 ;   &fp.numFilterCalled [#0]  Go:  go t14()  loopid:  1
+&f.filterPlugins [#0]  Go:  go t2()  loopid:  0 ;   &fp.numFilterCalled [#0]  Go:  go t14()  loopid:  1
+&t1[t4]  Go:  go t2()  loopid:  0 ;   &fp.numFilterCalled [#0]  Go:  go t14()  loopid:  1
+parameter fp : *FakeFilterPlugin  Go:  go t2()  loopid:  0 ;   &fp.numFilterCalled [#0]  Go:  go t14()  loopid:  1
+&fp.numFilterCalled [#0]  Go:  go t2()  loopid:  0 ;   &fp.numFilterCalled [#0]  Go:  go t14()  loopid:  1
+
+&fp.numFilterCalled [#0]  Go:  go t2()  loopid:  0 ;   freevar toProcess : *chan int  Go:  go t14()  loopid:  1
+&fp.numFilterCalled [#0]  Go:  go t2()  loopid:  0 ;   *toProcess  Go:  go t14()  loopid:  1
+&fp.numFilterCalled [#0]  Go:  go t2()  loopid:  0 ;   freevar stop : *<-chan struct{}  Go:  go t14()  loopid:  1
+&fp.numFilterCalled [#0]  Go:  go t2()  loopid:  0 ;   freevar doWorkPiece : *DoWorkPieceFunc  Go:  go t14()  loopid:  1
+&fp.numFilterCalled [#0]  Go:  go t2()  loopid:  0 ;   freevar g : **genericScheduler  Go:  go t14()  loopid:  1
+&fp.numFilterCalled [#0]  Go:  go t2()  loopid:  0 ;   *g  Go:  go t14()  loopid:  1
+&fp.numFilterCalled [#0]  Go:  go t2()  loopid:  0 ;   &t0.framework [#0]  Go:  go t14()  loopid:  1
+&fp.numFilterCalled [#0]  Go:  go t2()  loopid:  0 ;   parameter f : *framework  Go:  go t14()  loopid:  1
+&fp.numFilterCalled [#0]  Go:  go t2()  loopid:  0 ;   &f.filterPlugins [#0]  Go:  go t14()  loopid:  1
+&fp.numFilterCalled [#0]  Go:  go t2()  loopid:  0 ;   &t1[t4]  Go:  go t14()  loopid:  1
+&fp.numFilterCalled [#0]  Go:  go t2()  loopid:  0 ;   parameter fp : *FakeFilterPlugin  Go:  go t14()  loopid:  1
+&fp.numFilterCalled [#0]  Go:  go t2()  loopid:  0 ;   &fp.numFilterCalled [#0]  Go:  go t14()  loopid:  1
+
+&fp.numFilterCalled [#0]  Go:  go t2()  loopid:  0 ;   &fp.numFilterCalled [#0]  Go:  go t14()  loopid:  1
+
+&t0.filterPlugins [#0]  Go:  go t2()  loopid:  0 ;   &fp.numFilterCalled [#0]  Go:  go t14()  loopid:  2
+&t0.filterPlugins [#0]  Go:  go t2()  loopid:  0 ;   freevar toProcess : *chan int  Go:  go t14()  loopid:  2
+&t0.filterPlugins [#0]  Go:  go t2()  loopid:  0 ;   *toProcess  Go:  go t14()  loopid:  2
+&t0.filterPlugins [#0]  Go:  go t2()  loopid:  0 ;   freevar stop : *<-chan struct{}  Go:  go t14()  loopid:  2
+&t0.filterPlugins [#0]  Go:  go t2()  loopid:  0 ;   freevar doWorkPiece : *DoWorkPieceFunc  Go:  go t14()  loopid:  2
+&t0.filterPlugins [#0]  Go:  go t2()  loopid:  0 ;   freevar g : **genericScheduler  Go:  go t14()  loopid:  2
+&t0.filterPlugins [#0]  Go:  go t2()  loopid:  0 ;   *g  Go:  go t14()  loopid:  2
+&t0.filterPlugins [#0]  Go:  go t2()  loopid:  0 ;   &t0.framework [#0]  Go:  go t14()  loopid:  2
+&t0.filterPlugins [#0]  Go:  go t2()  loopid:  0 ;   parameter f : *framework  Go:  go t14()  loopid:  2
+&t0.filterPlugins [#0]  Go:  go t2()  loopid:  0 ;   &f.filterPlugins [#0]  Go:  go t14()  loopid:  2
+&t0.filterPlugins [#0]  Go:  go t2()  loopid:  0 ;   &t1[t4]  Go:  go t14()  loopid:  2
+&t0.filterPlugins [#0]  Go:  go t2()  loopid:  0 ;   parameter fp : *FakeFilterPlugin  Go:  go t14()  loopid:  2
+&t0.filterPlugins [#0]  Go:  go t2()  loopid:  0 ;   &fp.numFilterCalled [#0]  Go:  go t14()  loopid:  2
+&t0.filterPlugins [#0]  Go:  go t2()  loopid:  0 ;   &fp.numFilterCalled [#0]  Go:  go t14()  loopid:  2
+freevar g : **genericScheduler  Go:  go t2()  loopid:  0 ;   &fp.numFilterCalled [#0]  Go:  go t14()  loopid:  2
+*g  Go:  go t2()  loopid:  0 ;   &fp.numFilterCalled [#0]  Go:  go t14()  loopid:  2
+&t0.framework [#0]  Go:  go t2()  loopid:  0 ;   &fp.numFilterCalled [#0]  Go:  go t14()  loopid:  2
+parameter f : *framework  Go:  go t2()  loopid:  0 ;   &fp.numFilterCalled [#0]  Go:  go t14()  loopid:  2
+&f.filterPlugins [#0]  Go:  go t2()  loopid:  0 ;   &fp.numFilterCalled [#0]  Go:  go t14()  loopid:  2
+&t1[t4]  Go:  go t2()  loopid:  0 ;   &fp.numFilterCalled [#0]  Go:  go t14()  loopid:  2
+parameter fp : *FakeFilterPlugin  Go:  go t2()  loopid:  0 ;   &fp.numFilterCalled [#0]  Go:  go t14()  loopid:  2
+&fp.numFilterCalled [#0]  Go:  go t2()  loopid:  0 ;   &fp.numFilterCalled [#0]  Go:  go t14()  loopid:  2
+
+&fp.numFilterCalled [#0]  Go:  go t2()  loopid:  0 ;   freevar toProcess : *chan int  Go:  go t14()  loopid:  2
+&fp.numFilterCalled [#0]  Go:  go t2()  loopid:  0 ;   *toProcess  Go:  go t14()  loopid:  2
+&fp.numFilterCalled [#0]  Go:  go t2()  loopid:  0 ;   freevar stop : *<-chan struct{}  Go:  go t14()  loopid:  2
+&fp.numFilterCalled [#0]  Go:  go t2()  loopid:  0 ;   freevar doWorkPiece : *DoWorkPieceFunc  Go:  go t14()  loopid:  2
+&fp.numFilterCalled [#0]  Go:  go t2()  loopid:  0 ;   freevar g : **genericScheduler  Go:  go t14()  loopid:  2
+&fp.numFilterCalled [#0]  Go:  go t2()  loopid:  0 ;   *g  Go:  go t14()  loopid:  2
+&fp.numFilterCalled [#0]  Go:  go t2()  loopid:  0 ;   &t0.framework [#0]  Go:  go t14()  loopid:  2
+&fp.numFilterCalled [#0]  Go:  go t2()  loopid:  0 ;   parameter f : *framework  Go:  go t14()  loopid:  2
+&fp.numFilterCalled [#0]  Go:  go t2()  loopid:  0 ;   &f.filterPlugins [#0]  Go:  go t14()  loopid:  2
+&fp.numFilterCalled [#0]  Go:  go t2()  loopid:  0 ;   &t1[t4]  Go:  go t14()  loopid:  2
+&fp.numFilterCalled [#0]  Go:  go t2()  loopid:  0 ;   parameter fp : *FakeFilterPlugin  Go:  go t14()  loopid:  2
+&fp.numFilterCalled [#0]  Go:  go t2()  loopid:  0 ;   &fp.numFilterCalled [#0]  Go:  go t14()  loopid:  2
+
+&fp.numFilterCalled [#0]  Go:  go t2()  loopid:  0 ;   &fp.numFilterCalled [#0]  Go:  go t14()  loopid:  2
+
+freevar toProcess : *chan int  Go:  go t14()  loopid:  1 ;   &fp.numFilterCalled [#0]  Go:  go t14()  loopid:  2
+*toProcess  Go:  go t14()  loopid:  1 ;   &fp.numFilterCalled [#0]  Go:  go t14()  loopid:  2
+freevar stop : *<-chan struct{}  Go:  go t14()  loopid:  1 ;   &fp.numFilterCalled [#0]  Go:  go t14()  loopid:  2
+freevar doWorkPiece : *DoWorkPieceFunc  Go:  go t14()  loopid:  1 ;   &fp.numFilterCalled [#0]  Go:  go t14()  loopid:  2
+freevar g : **genericScheduler  Go:  go t14()  loopid:  1 ;   &fp.numFilterCalled [#0]  Go:  go t14()  loopid:  2
+*g  Go:  go t14()  loopid:  1 ;   &fp.numFilterCalled [#0]  Go:  go t14()  loopid:  2
+&t0.framework [#0]  Go:  go t14()  loopid:  1 ;   &fp.numFilterCalled [#0]  Go:  go t14()  loopid:  2
+parameter f : *framework  Go:  go t14()  loopid:  1 ;   &fp.numFilterCalled [#0]  Go:  go t14()  loopid:  2
+&f.filterPlugins [#0]  Go:  go t14()  loopid:  1 ;   &fp.numFilterCalled [#0]  Go:  go t14()  loopid:  2
+&t1[t4]  Go:  go t14()  loopid:  1 ;   &fp.numFilterCalled [#0]  Go:  go t14()  loopid:  2
+parameter fp : *FakeFilterPlugin  Go:  go t14()  loopid:  1 ;   &fp.numFilterCalled [#0]  Go:  go t14()  loopid:  2
+&fp.numFilterCalled [#0]  Go:  go t14()  loopid:  1 ;   &fp.numFilterCalled [#0]  Go:  go t14()  loopid:  2
+
+[36mINFO[0m[13:19:32] Data race #1                                 
+[36mINFO[0m[13:19:32] ==================================================================================================== 
+[36mINFO[0m[13:19:32]  Read of [35m&fp.numFilterCalled [#0][0m in function [92mFilter[0m at /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/tests/GoBench/Kubernetes/81091/main.go:15:5 
+[36mINFO[0m[13:19:32] 	in goroutine  *** ParallelizeUntil$1 [ 2 ] ***  
+[36mINFO[0m[13:19:32] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/tests/GoBench/Kubernetes/81091/main.go:108:6 
+[36mINFO[0m[13:19:32] 	       TestKubernetes81091   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/tests/GoBench/Kubernetes/81091/main.go:110:21 
+[36mINFO[0m[13:19:32] 	    --> Goroutine:  TestKubernetes81091$1 [ 1 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/tests/GoBench/Kubernetes/81091/main.go:100:2 
+[36mINFO[0m[13:19:32] 	        Schedule   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/tests/GoBench/Kubernetes/81091/main.go:104:21 
+[36mINFO[0m[13:19:32] 	         findNodesThatFit   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/tests/GoBench/Kubernetes/81091/main.go:60:20 
+[36mINFO[0m[13:19:32] 	          ParallelizeUntil   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/tests/GoBench/Kubernetes/81091/main.go:56:18 
+[36mINFO[0m[13:19:32] 	     --> Goroutine:  ParallelizeUntil$1 [ 2 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/tests/GoBench/Kubernetes/81091/main.go:81:3 
+[36mINFO[0m[13:19:32] 	      findNodesThatFit$1 /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/tests/GoBench/Kubernetes/81091/main.go:89:17 
+[36mINFO[0m[13:19:32] 	       RunFilterPlugins /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/tests/GoBench/Kubernetes/81091/main.go:54:31 
+[36mINFO[0m[13:19:32] 	        Filter /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/tests/GoBench/Kubernetes/81091/main.go:28:12 
+[36mINFO[0m[13:19:32]  Write of [35m&fp.numFilterCalled [#0][0m in function [92mFilter[0m at /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/tests/GoBench/Kubernetes/81091/main.go:15:5 
+[36mINFO[0m[13:19:32] 	in goroutine  *** ParallelizeUntil$1 [ 3 ] ***  
+[36mINFO[0m[13:19:32] 	   --> Goroutine:  main [ 0 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/tests/GoBench/Kubernetes/81091/main.go:108:6 
+[36mINFO[0m[13:19:32] 	       TestKubernetes81091   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/tests/GoBench/Kubernetes/81091/main.go:110:21 
+[36mINFO[0m[13:19:32] 	    --> Goroutine:  TestKubernetes81091$1 [ 1 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/tests/GoBench/Kubernetes/81091/main.go:100:2 
+[36mINFO[0m[13:19:32] 	        Schedule   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/tests/GoBench/Kubernetes/81091/main.go:104:21 
+[36mINFO[0m[13:19:32] 	         findNodesThatFit   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/tests/GoBench/Kubernetes/81091/main.go:60:20 
+[36mINFO[0m[13:19:32] 	          ParallelizeUntil   /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/tests/GoBench/Kubernetes/81091/main.go:56:18 
+[36mINFO[0m[13:19:32] 	     --> Goroutine:  ParallelizeUntil$1 [ 3 ]  /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/tests/GoBench/Kubernetes/81091/main.go:81:3 
+[36mINFO[0m[13:19:32] 	      findNodesThatFit$1 /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/tests/GoBench/Kubernetes/81091/main.go:89:17 
+[36mINFO[0m[13:19:32] 	       RunFilterPlugins /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/tests/GoBench/Kubernetes/81091/main.go:54:31 
+[36mINFO[0m[13:19:32] 	        Filter /Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/tests/GoBench/Kubernetes/81091/main.go:28:12 
+[36mINFO[0m[13:19:32] Locks acquired before Write access:  []      
+[36mINFO[0m[13:19:32] Locks acquired before Read  access:  []      
+[36mINFO[0m[13:19:32] ==================================================================================================== 
+&fp.numFilterCalled [#0]  Go:  go t14()  loopid:  1 ;   freevar toProcess : *chan int  Go:  go t14()  loopid:  2
+&fp.numFilterCalled [#0]  Go:  go t14()  loopid:  1 ;   *toProcess  Go:  go t14()  loopid:  2
+&fp.numFilterCalled [#0]  Go:  go t14()  loopid:  1 ;   freevar stop : *<-chan struct{}  Go:  go t14()  loopid:  2
+&fp.numFilterCalled [#0]  Go:  go t14()  loopid:  1 ;   freevar doWorkPiece : *DoWorkPieceFunc  Go:  go t14()  loopid:  2
+&fp.numFilterCalled [#0]  Go:  go t14()  loopid:  1 ;   freevar g : **genericScheduler  Go:  go t14()  loopid:  2
+&fp.numFilterCalled [#0]  Go:  go t14()  loopid:  1 ;   *g  Go:  go t14()  loopid:  2
+&fp.numFilterCalled [#0]  Go:  go t14()  loopid:  1 ;   &t0.framework [#0]  Go:  go t14()  loopid:  2
+&fp.numFilterCalled [#0]  Go:  go t14()  loopid:  1 ;   parameter f : *framework  Go:  go t14()  loopid:  2
+&fp.numFilterCalled [#0]  Go:  go t14()  loopid:  1 ;   &f.filterPlugins [#0]  Go:  go t14()  loopid:  2
+&fp.numFilterCalled [#0]  Go:  go t14()  loopid:  1 ;   &t1[t4]  Go:  go t14()  loopid:  2
+&fp.numFilterCalled [#0]  Go:  go t14()  loopid:  1 ;   parameter fp : *FakeFilterPlugin  Go:  go t14()  loopid:  2
+&fp.numFilterCalled [#0]  Go:  go t14()  loopid:  1 ;   &fp.numFilterCalled [#0]  Go:  go t14()  loopid:  2
+
+&fp.numFilterCalled [#0]  Go:  go t14()  loopid:  1 ;   &fp.numFilterCalled [#0]  Go:  go t14()  loopid:  2
+
+[36mINFO[0m[13:19:32] 1 races found for entry point command-line-arguments... 
+[36mINFO[0m[13:19:32] Total of 1 races found for all entry points.  
+[36mINFO[0m[13:19:32] 124.492609ms elapsed.                        
