@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/april1989/origin-go-tools/go/packages"
 	"github.com/april1989/origin-go-tools/go/pointer"
+	"github.com/april1989/origin-go-tools/go/myutil/flags"
 	pta0 "github.com/april1989/origin-go-tools/go/pointer_default"
 	"github.com/april1989/origin-go-tools/go/ssa"
 	"github.com/april1989/origin-go-tools/go/ssa/ssautil"
@@ -178,14 +179,16 @@ func (runner *AnalysisRunner) Run(args []string) error {
 	// Configure pointer analysis...
 	if useNewPTA {
 		var scope = make([]string, 1)
-		if pkgs[0] != nil { // Note: only if main dir contains main.go.
-			scope[0] = pkgs[0].Pkg.Path() //bz: the 1st pkg has the scope info == the root pkg or default .go input
-		} else if pkgs[0] == nil && len(pkgs) == 1 {
-			log.Fatal("Error: No packages detected. Please verify directory provided contains Go Files. ")
-			return fmt.Errorf("Error: No packages detected. Please verify directory provided contains Go Files. ")
-		} else {
-			scope[0] = strings.Split(pkgs[1].Pkg.Path(), "/")[0] + "/" + strings.Split(pkgs[1].Pkg.Path(), "/")[1]
-		}
+		//if pkgs[0] != nil { // Note: only if main dir contains main.go.
+		//	scope[0] = pkgs[0].Pkg.Path() //bz: the 1st pkg has the scope info == the root pkg or default .go input
+		//} else if pkgs[0] == nil && len(pkgs) == 1 {
+		//	log.Fatal("Error: No packages detected. Please verify directory provided contains Go Files. ")
+		//	return fmt.Errorf("Error: No packages detected. Please verify directory provided contains Go Files. ")
+		//} else {
+		//	scope[0] = strings.Split(pkgs[1].Pkg.Path(), "/")[0] + "/" + strings.Split(pkgs[1].Pkg.Path(), "/")[1]
+		//}
+		scope[0] = "google.golang.org/grpc" //bz: the scope obtained by the above code is "google.golang.org/grpc/health", which is not what we want; hard code here
+
 		//bz: update a bit to avoid duplicate scope addition, e.g., grpc
 		// return with error if error exist, skip panic
 		if len(scope) == 0 && len(pkgs) >= 1 && !goTest {           // ** assuming more than one package detected in real programs
@@ -217,6 +220,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 			scope = append(scope, parts[1])
 		}
 
+		flags.DoTests = true //bz: set to true if your folder has tests and you want to analyze them
 		runner.ptaConfig = &pointer.Config{
 			Mains:          mains, //bz: all mains/tests in a project
 			Reflection:     false,
@@ -247,9 +251,26 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		//	fmt.Println("Receive ptaRes (#Queries: ", len(ptaRes.Queries), ", #IndirectQueries: ", len(ptaRes.IndirectQueries), ") for main: ", mainEntry.String())
 		//	ptaRes.DumpAll()
 		//}
+
+		//bz: how to use new api to extract test functions, and use them as main entry
+		//   i cannot provide *ssa.Package here, since all the test functions shares the same *ssa.Package
+		//   actually you can call visitAllInstructions() on these test functions
+		for mainEntry, ptaRes := range runner.ptaResult {
+			tests := ptaRes.GetTests()
+			if tests == nil {
+				continue //this is a main entry
+			}
+
+			//for a test entry, print out all tests
+			fmt.Println("\n\nTest Functions of: ", mainEntry)
+			for fn, cgn := range tests {
+				fmt.Println(fn, "\t-> ", cgn.String())
+			}
+		}
+
 	} else {
 		runner.ptaConfig0 = &pta0.Config{
-			Mains:          mains,
+			Mains: mains,
 			BuildCallGraph: false,
 		}
 		runner.ptaResult0, _ = pta0.Analyze(runner.ptaConfig0)
