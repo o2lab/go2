@@ -187,7 +187,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		//} else {
 		//	scope[0] = strings.Split(pkgs[1].Pkg.Path(), "/")[0] + "/" + strings.Split(pkgs[1].Pkg.Path(), "/")[1]
 		//}
-		scope[0] = "google.golang.org/grpc" //bz: the scope obtained by the above code is "google.golang.org/grpc/health", which is not what we want; hard code here
+		scope[0] = "google.golang.org/grpc" //bz: the scope obtained by the above code is "google.golang.org/grpc/health" if you run this under the /health directory, which is not what we want; hard code here
 
 		//bz: update a bit to avoid duplicate scope addition, e.g., grpc
 		// return with error if error exist, skip panic
