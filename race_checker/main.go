@@ -168,7 +168,7 @@ var useNewPTA = true
 var trieLimit = 2      // set as user config option later, an integer that dictates how many times a function can be called under identical context
 var efficiency = true  // configuration setting to avoid recursion in tested program
 var channelComm = true // analyze channel communication
-var entryFn = "TestMetadataStreamingRPC"
+var entryFn = "main"
 var testEntry *ssa.Function
 var allEntries = false
 var useDefaultPTA = false

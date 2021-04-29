@@ -112,6 +112,7 @@ func pkgSelection(initial []*packages.Package) ([]*ssa.Package, *ssa.Program, []
 			fmt.Print("Enter option number of choice: \n")
 			fmt.Print("*** use space delimiter for multiple selections *** \n")
 			fmt.Print("*** use \"-\" for a range of selections *** \n")
+			fmt.Print("*** if selecting a test folder (ie. ending in .test), please select ONE at a time *** \n")
 			fmt.Scan(&mainInd)
 			if mainInd == "-" {
 				fmt.Print("Enter function name to begin analysis from: ")
@@ -257,28 +258,6 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		//	ptaRes.DumpAll()
 		//}
 
-		//bz: how to use new api to extract test functions, and use them as main entry
-		//   i cannot provide *ssa.Package here, since all the test functions shares the same *ssa.Package
-		//   actually you can call visitAllInstructions() on these test functions
-		if entryFn != "main" {
-			fmt.Println("Extracting test functions from CG...")
-			for _, ptaRes := range runner.ptaResult {
-				tests := ptaRes.GetTests()
-				if tests == nil {
-					continue //this is a main entry
-				}
-
-				//for a test entry, print out all tests
-				//fmt.Println("\n\nTest Functions of: ", mainEntry)
-				for fn := range tests {
-					if fn.Name() == entryFn {
-						testEntry = fn
-					}
-					//fmt.Println(fn, "\t-> ", cgn.String())
-				}
-			}
-			fmt.Println("Done - CG node of test function extracted...")
-		}
 	} else {
 		runner.ptaConfig0 = &pta0.Config{
 			Mains: mains,
@@ -290,6 +269,56 @@ func (runner *AnalysisRunner) Run(args []string) error {
 	if len(mains) > 1 {
 		allEntries = true
 	}
+	if strings.Contains(mains[0].String(), ".test") {
+		fmt.Println("Extracting test functions from PTA/CG...")
+		for mainEntry, ptaRes := range runner.ptaResult {
+			tests := ptaRes.GetTests()
+			if tests == nil {
+				continue //this is a main entry
+			}
+			fmt.Println("The following are functions found within: ", mainEntry)
+			var testSelect string
+			var testFns []*ssa.Function
+			var selectedFns []*ssa.Function
+			counter := 1
+			for fn := range tests {
+				fmt.Println("Option", counter, ": ", fn.Name())
+				testFns = append(testFns, fn)
+				counter++
+			}
+			fmt.Print("Enter option number of choice or test name: \n")
+			fmt.Scan(&testSelect)
+			if strings.Contains(testSelect, ",") && testFns != nil { // multiple selections
+				selection := strings.Split(testSelect, ",")
+				for _, s := range selection {
+					i, _ := strconv.Atoi(s) // convert to integer
+					selectedFns = append(selectedFns, testFns[i-1]) // TODO: analyze multiple tests concurrently
+				}
+			} else if strings.Contains(testSelect, "-") && testFns != nil { // selected range
+				selection := strings.Split(testSelect, "-")
+				begin, _ := strconv.Atoi(selection[0])
+				end, _ := strconv.Atoi(selection[1])
+				for i := begin; i <= end; i++ {
+					selectedFns = append(selectedFns, testFns[i-1]) // TODO: analyze multiple tests concurrently
+				}
+			} else if i, err0 := strconv.Atoi(testSelect); err0 == nil && testFns != nil {
+				selectedFns = append(selectedFns, testFns[i-1]) // TODO: analyze multiple tests concurrently
+				testEntry = testFns[i-1]
+				entryFn = testEntry.Name()
+			} else if strings.Contains(testSelect, "Test") {
+				for _, fn := range testFns {
+					if fn.Name() == testSelect {
+						testEntry = fn
+						entryFn = testEntry.Name()
+					}
+				}
+			} else {
+				log.Error("Unrecognized input, try again.")
+			}
+		}
+		fmt.Println("Done  -- CG node of test function extracted...")
+	}
+	fmt.Println(entryFn)
 	// Iterate each entry point...
 	var wg sync.WaitGroup
 	for _, m := range mains {

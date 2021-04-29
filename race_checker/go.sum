@@ -8,6 +8,8 @@ github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578 h1:d+Bc7a5rLufV
 github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578/go.mod h1:uGdkoq3SwY9Y+13GIhn11/XLaGBb4BfwItxLd5jeuXE=
 github.com/april1989/origin-go-tools v0.0.20 h1:SxV+8nQkmWYWTSiQxZ4toxyyPBOcOfT3QpQsrlDUgU0=
 github.com/april1989/origin-go-tools v0.0.20/go.mod h1:Le7RWmV21OpZgCB3D/TiWmRAZsEUqyCrBpJ0+CnoLzY=
+github.com/april1989/origin-go-tools v0.0.21 h1:5D5c+hZrdvYBhDaAB/q9OatnDgOMwSdmrZE8FienFAI=
+github.com/april1989/origin-go-tools v0.0.21/go.mod h1:Le7RWmV21OpZgCB3D/TiWmRAZsEUqyCrBpJ0+CnoLzY=
 github.com/asaskevich/govalidator v0.0.0-20190424111038-f61b66f89f4a/go.mod h1:lB+ZfQJz7igIIfQNfa7Ml4HSf2uFQQRzpGGRXenZAgY=
 github.com/census-instrumentation/opencensus-proto v0.2.1/go.mod h1:f6KPmirojxKA12rnyqOA5BBL4O983OfeGPqjHWSTneU=
 github.com/client9/misspell v0.3.4/go.mod h1:qj6jICC3Q7zFZvVWo7KLAzC3yx5G7kyvSDkc90ppPyw=
