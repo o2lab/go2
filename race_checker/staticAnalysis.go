@@ -3,9 +3,9 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"github.com/april1989/origin-go-tools/go/myutil/flags"
 	"github.com/april1989/origin-go-tools/go/packages"
 	"github.com/april1989/origin-go-tools/go/pointer"
-	"github.com/april1989/origin-go-tools/go/myutil/flags"
 	pta0 "github.com/april1989/origin-go-tools/go/pointer_default"
 	"github.com/april1989/origin-go-tools/go/ssa"
 	"github.com/april1989/origin-go-tools/go/ssa/ssautil"
@@ -181,13 +181,18 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		var scope = make([]string, 1)
 		//if pkgs[0] != nil { // Note: only if main dir contains main.go.
 		//	scope[0] = pkgs[0].Pkg.Path() //bz: the 1st pkg has the scope info == the root pkg or default .go input
-		//} else if pkgs[0] == nil && len(pkgs) == 1 {
-		//	log.Fatal("Error: No packages detected. Please verify directory provided contains Go Files. ")
-		//	return fmt.Errorf("Error: No packages detected. Please verify directory provided contains Go Files. ")
-		//} else {
-		//	scope[0] = strings.Split(pkgs[1].Pkg.Path(), "/")[0] + "/" + strings.Split(pkgs[1].Pkg.Path(), "/")[1]
-		//}
-		scope[0] = "google.golang.org/grpc" //bz: the scope obtained by the above code is "google.golang.org/grpc/health" if you run this under the /health directory, which is not what we want; hard code here
+		//} else
+		if pkgs[0] == nil && len(pkgs) == 1 {
+			log.Fatal("Error: No packages detected. Please verify directory provided contains Go Files. ")
+		} else if !strings.Contains(pkgs[0].Pkg.Path(), "/") {
+			scope[0] = pkgs[0].Pkg.Path()
+		} else {
+			scope[0] = strings.Split(pkgs[0].Pkg.Path(), "/")[0] + "/" + strings.Split(pkgs[0].Pkg.Path(), "/")[1]
+			if strings.Contains(pkgs[0].Pkg.Path(), "checker") {
+				scope[0] += "/race-checker"
+			}
+		}
+		//scope[0] = "google.golang.org/grpc" //bz: the scope obtained by the above code is "google.golang.org/grpc/health" if you run this under the /health directory, which is not what we want; hard code here
 
 		//bz: update a bit to avoid duplicate scope addition, e.g., grpc
 		// return with error if error exist, skip panic
@@ -255,19 +260,25 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		//bz: how to use new api to extract test functions, and use them as main entry
 		//   i cannot provide *ssa.Package here, since all the test functions shares the same *ssa.Package
 		//   actually you can call visitAllInstructions() on these test functions
-		for mainEntry, ptaRes := range runner.ptaResult {
-			tests := ptaRes.GetTests()
-			if tests == nil {
-				continue //this is a main entry
-			}
+		if entryFn != "main" {
+			fmt.Println("Extracting test functions from CG...")
+			for _, ptaRes := range runner.ptaResult {
+				tests := ptaRes.GetTests()
+				if tests == nil {
+					continue //this is a main entry
+				}
 
-			//for a test entry, print out all tests
-			fmt.Println("\n\nTest Functions of: ", mainEntry)
-			for fn, cgn := range tests {
-				fmt.Println(fn, "\t-> ", cgn.String())
+				//for a test entry, print out all tests
+				//fmt.Println("\n\nTest Functions of: ", mainEntry)
+				for fn := range tests {
+					if fn.Name() == entryFn {
+						testEntry = fn
+					}
+					//fmt.Println(fn, "\t-> ", cgn.String())
+				}
 			}
+			fmt.Println("Done - CG node of test function extracted...")
 		}
-
 	} else {
 		runner.ptaConfig0 = &pta0.Config{
 			Mains: mains,
@@ -340,7 +351,12 @@ func (runner *AnalysisRunner) Run(args []string) error {
 				log.Info("Compiling stack trace for every Goroutine... ")
 				log.Debug(strings.Repeat("-", 35), "Stack trace begins", strings.Repeat("-", 35))
 			}
-			Analysis.visitAllInstructions(main.Func(entryFn), 0)
+			if testEntry != nil {
+				Analysis.visitAllInstructions(testEntry, 0)
+			} else {
+				Analysis.visitAllInstructions(main.Func(entryFn), 0)
+			}
+
 			if !allEntries {
 				log.Debug(strings.Repeat("-", 35), "Stack trace ends", strings.Repeat("-", 35))
 			}

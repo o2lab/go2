@@ -144,12 +144,12 @@ func (a *analysis) buildHB() {
 							var fromName string
 							var toName string
 							if nGo == 0 {
-								fromName = "main"
+								fromName = entryFn
 							} else {
 								fromName = a.goNames(a.RWIns[nGo][0].(*ssa.Go))
 							}
 							if (*wNode.Value).(goIns).goID == 0 {
-								toName = "main"
+								toName = entryFn
 							} else {
 								toName = a.goNames(a.RWIns[(*wNode.Value).(goIns).goID][0].(*ssa.Go))
 							}
@@ -171,12 +171,12 @@ func (a *analysis) buildHB() {
 							var fromName string
 							var toName string
 							if nGo == 0 {
-								fromName = "main"
+								fromName = entryFn
 							} else {
 								fromName = a.goNames(a.RWIns[nGo][0].(*ssa.Go))
 							}
 							if (*wNode.Value).(goIns).goID == 0 {
-								toName = "main"
+								toName = entryFn
 							} else {
 								toName = a.goNames(a.RWIns[(*wNode.Value).(goIns).goID][0].(*ssa.Go))
 							}
@@ -197,12 +197,12 @@ func (a *analysis) buildHB() {
 						err := a.HBgraph.MakeEdge(prevN, rcvN) // create edge from Send node to Receive node
 						var fromName, toName string
 						if nGo == 0 {
-							fromName = "main"
+							fromName = entryFn
 						} else {
 							fromName = a.goNames(a.RWIns[nGo][0].(*ssa.Go))
 						}
 						if (*rcvN.Value).(goIns).goID == 0 {
-							toName = "main"
+							toName = entryFn
 						} else {
 							toName = a.goNames(a.RWIns[(*rcvN.Value).(goIns).goID][0].(*ssa.Go))
 						}
@@ -225,12 +225,12 @@ func (a *analysis) buildHB() {
 						err := a.HBgraph.MakeEdge(sndN, prevN) // create edge from Send node to Receive node
 						var fromName, toName string
 						if (*sndN.Value).(goIns).goID == 0 {
-							fromName = "main"
+							fromName = entryFn
 						} else {
 							fromName = a.goNames(a.RWIns[(*sndN.Value).(goIns).goID][0].(*ssa.Go))
 						}
 						if nGo == 0 {
-							toName = "main"
+							toName = entryFn
 						} else {
 							toName = a.goNames(a.RWIns[nGo][0].(*ssa.Go))
 						}
