@@ -106,10 +106,6 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 		//	for _, c := range ctx {
 				//loopID := c.GetLoopID() //this is the loop id you want
 				//str := c.String()
-				//_ = fn
-				//_ = loopID
-				//_ = str
-				//fmt.Println(fn, " ", loopID, " ", str) // fmt package does not work
 		//	}
 		//}
 		//bz: end
@@ -117,6 +113,9 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 		var fnName string
 		switch theFunc := labels[0].Value().(type) {
 		case *ssa.Function:
+			if theFunc == testEntry {
+				return
+			}
 			if a.getParam {
 				a.paramFunc = theFunc
 				a.getParam = !a.getParam

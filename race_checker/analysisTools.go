@@ -281,10 +281,15 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 			return
 		}
 		if fn.Name() == entryFn {
-			a.levels[goID] = 0 // initialize level count at main entry
-			a.loopIDs[goID] = 0
-			a.updateRecords(fn.Name(), goID, "PUSH ", fn, nil)
-			a.goStack = append(a.goStack, []fnCallInfo{}) // initialize first interior slice for main goroutine
+			if goID == 0 && len(a.storeFns) == 0 {
+				a.levels[goID] = 0 // initialize level count at main entry
+				a.loopIDs[goID] = 0
+				a.updateRecords(fn.Name(), goID, "PUSH ", fn, nil)
+				a.goStack = append(a.goStack, []fnCallInfo{}) // initialize first interior slice for main goroutine
+			} else { //revisiting entry-point
+				return
+			}
+
 		}
 	}
 	if _, ok := a.levels[goID]; !ok && goID > 0 { // initialize level counter for new goroutine
@@ -401,8 +406,8 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 							a.mu.Unlock()
 						}
 					}
-					toDefer = []ssa.Instruction{}
 				}
+				toDefer = []ssa.Instruction{}
 			}
 			for _, ex := range excludedPkgs { // TODO: need revision
 				if !isSynthetic(fn) && ex == theIns.Parent().Pkg.Pkg.Name() {

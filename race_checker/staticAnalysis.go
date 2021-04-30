@@ -31,7 +31,7 @@ func (a *analysis) fromPkgsOfInterest(fn *ssa.Function) bool {
 		}
 		return false
 	}
-	if fn.Pkg.Pkg.Name() == "main" || fn.Pkg.Pkg.Name() == "cli" {
+	if fn.Pkg.Pkg.Name() == "main" || fn.Pkg.Pkg.Name() == "cli" || fn.Pkg.Pkg.Name() == "testing" {
 		return true
 	}
 	for _, excluded := range excludedPkgs {
