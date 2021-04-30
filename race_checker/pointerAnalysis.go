@@ -150,7 +150,19 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 		case *ssa.MakeChan:
 			a.chanName = theFunc.Name()
 		case *ssa.Alloc:
-			a.pbr = theFunc
+			if call, ok := theIns.(*ssa.Call); ok {
+				goInstr := a.RWIns[goID][0].(*ssa.Go)
+				if goID == 0 {
+					goInstr = nil
+				}
+				invokeFunc := a.ptaRes[a.main].GetFreeVarFunc(theFunc, call, goInstr)
+				fnName = invokeFunc.Name()
+				if !a.exploredFunction(invokeFunc, goID, theIns) {
+					a.updateRecords(fnName, goID, "PUSH ", invokeFunc, theIns)
+					a.RWIns[goID] = append(a.RWIns[goID], theIns)
+					a.visitAllInstructions(invokeFunc, goID)
+				}
+			}
 		default:
 			break
 		}
