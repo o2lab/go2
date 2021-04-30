@@ -316,9 +316,9 @@ func (runner *AnalysisRunner) Run(args []string) error {
 				log.Error("Unrecognized input, try again.")
 			}
 		}
-		fmt.Println("Done  -- CG node of test function extracted...")
+		fmt.Println("Done  -- CG node of test function ", entryFn, " extracted...")
 	}
-	fmt.Println(entryFn)
+
 	// Iterate each entry point...
 	var wg sync.WaitGroup
 	for _, m := range mains {

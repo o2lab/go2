@@ -179,7 +179,6 @@ func (a *analysis) mutuallyExcluded(goI ssa.Instruction, I int, goJ ssa.Instruct
 			break
 		} // otherwise it's common fn call mid-stack
 	}
-
 	if b1 != nil && b2 != nil && b1.Parent() == divFn.fnIns && b2.Parent() == divFn.fnIns {
 		if !b1.Dominates(b2) && !b2.Dominates(b1) {
 			return true
@@ -209,7 +208,13 @@ func (a *analysis) checkRacyPairs() []*raceInfo {
 	var races []*raceInfo
 	var ri *raceInfo
 	for i := 0; i < len(a.RWIns); i++ {
+		//if i != 0 { // for debugging
+		//	continue
+		//}
 		for j := i + 1; j < len(a.RWIns); j++ { // must be in different goroutines, j always greater than i
+			//if a.goNames(a.RWIns[j][0].(*ssa.Go)) != "testMetadataStreamingRPC$1" { // for debugging
+			//	continue
+			//}
 			if !a.canRunInParallel(i, j) {
 				continue
 			}
@@ -231,6 +236,7 @@ func (a *analysis) checkRacyPairs() []*raceInfo {
 							continue
 						}
 						////!!!! bz: for my debug, please comment off, do not delete
+						//if goI.Parent().Name() == "commitAttemptLocked" && goJ.Parent().Name() == "SendMsg" {
 						//	var goIinstr string
 						//	var goJinstr string
 						//	if i == 0 {
@@ -243,11 +249,12 @@ func (a *analysis) checkRacyPairs() []*raceInfo {
 						//	}else{
 						//		goJinstr = a.RWIns[j][0].String()
 						//	}
-						//	fmt.Println(addressPair[0], " Go: ", goIinstr, " loopid: ", a.loopIDs[i], ";  ", addressPair[1], " Go: ", goJinstr, " loopid: ", a.loopIDs[j])
-						//if strings.Contains(addressPair[0].String(), "&fp.numFilterCalled [#0]") &&
-						//	strings.Contains(addressPair[1].String(), "&fp.numFilterCalled [#0]") {
-						//	fmt.Println()
+						//	if strings.Contains(addressPair[0].String(), "returnBuffers") && strings.Contains(addressPair[1].String(), "returnBuffers") {
+						//		fmt.Println(addressPair[0], " Go: ", goIinstr, " loopid: ", a.loopIDs[i], ";  ", addressPair[1], " Go: ", goJinstr, " loopid: ", a.loopIDs[j])
+						//		fmt.Println("sameAddress", a.sameAddress(addressPair[0], addressPair[1], i, j))
+						//	}
 						//}
+
 						if a.sameAddress(addressPair[0], addressPair[1], i, j) &&
 							!sliceContains(a.reportedAddr, addressPair[0]) &&
 							!a.reachable(goI, i, goJ, j) &&
@@ -540,11 +547,9 @@ func (a *analysis) printRace(counter int, insPair []ssa.Instruction, addrPair [2
 					} else {
 						log.Println("\t ", strings.Repeat(" ", p+len(pathGo)), everyFn.fnIns.Name(), a.prog.Fset.Position(everyFn.ssaIns.Pos()))
 					}
-
 				}
 			}
 		}
-
 	}
 	log.Println("Locks acquired before Write access: ", writeLocks)
 	log.Println("Locks acquired before Read  access: ", readLocks)

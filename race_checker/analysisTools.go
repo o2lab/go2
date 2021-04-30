@@ -273,6 +273,11 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 	if !isSynthetic(fn) { // if function is NOT synthetic
 		if !a.fromPkgsOfInterest(fn) {
 			a.updateRecords(fn.Name(), goID, "POP  ", fn, nil)
+			if len(a.storeFns) == 0 && len(a.workList) != 0 { // finished reporting current goroutine and workList isn't empty
+				nextGoInfo := a.workList[0] // get the goroutine info at head of workList
+				a.workList = a.workList[1:] // pop goroutine info from head of workList
+				a.newGoroutine(nextGoInfo)
+			}
 			return
 		}
 		if fn.Name() == entryFn {
@@ -623,7 +628,6 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 		nextGoInfo := a.workList[0] // get the goroutine info at head of workList
 		a.workList = a.workList[1:] // pop goroutine info from head of workList
 		a.newGoroutine(nextGoInfo)
-		//go a.newGoroutine(nextGoInfo)
 	}
 }
 
@@ -667,9 +671,9 @@ func (a *analysis) newGoroutine(info goroutineInfo) {
 			log.Debug(strings.Repeat("-", 35), "Goroutine ", info.entryMethod.Name(), strings.Repeat("-", 35), "[", info.goID, "]")
 		}
 	}
-	if len(a.lockSet[a.goCaller[info.goID]]) > 0 {
-		a.lockSet[info.goID] = a.lockSet[a.goCaller[info.goID]]
-	}
+	//if len(a.lockSet[a.goCaller[info.goID]]) > 0 {
+	//	a.lockSet[info.goID] = a.lockSet[a.goCaller[info.goID]]
+	//}
 	if !allEntries {
 		log.Debug(strings.Repeat(" ", a.levels[info.goID]), "PUSH ", info.entryMethod.Name(), " at lvl ", a.levels[info.goID])
 		fnCall := fnCallIns{fnIns: info.entryMethod, goID: info.goID}
