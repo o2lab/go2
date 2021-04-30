@@ -151,11 +151,16 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 			a.chanName = theFunc.Name()
 		case *ssa.Alloc:
 			if call, ok := theIns.(*ssa.Call); ok {
-				goInstr := a.RWIns[goID][0].(*ssa.Go)
+				var goInstr *ssa.Go
 				if goID == 0 {
 					goInstr = nil
+				}else{
+					goInstr = a.RWIns[goID][0].(*ssa.Go)
 				}
-				invokeFunc := a.ptaRes[a.main].GetFreeVarFunc(theFunc, call, goInstr)
+				invokeFunc := a.ptaRes[a.main].GetFreeVarFunc(theIns.Parent(), call, goInstr)
+				if invokeFunc == nil {
+					break //bz: pta cannot find the target. how?
+				}
 				fnName = invokeFunc.Name()
 				if !a.exploredFunction(invokeFunc, goID, theIns) {
 					a.updateRecords(fnName, goID, "PUSH ", invokeFunc, theIns)

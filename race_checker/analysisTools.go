@@ -298,7 +298,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 	if goID >= len(a.RWIns) { // initialize interior slice for new goroutine
 		a.RWIns = append(a.RWIns, []ssa.Instruction{})
 	}
-
+	//fmt.Println(" ... ", fn.String(), " goID:", goID) //bz: debug, please comment off
 	bVisit0 := fn.DomPreorder()
 	var bVisit []*ssa.BasicBlock
 	var pushBack []*ssa.BasicBlock // stack of .done blocks

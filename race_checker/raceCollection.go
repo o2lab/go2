@@ -31,11 +31,11 @@ func isLocal(ins ssa.Instruction) bool {
 }
 
 func (a *analysis) canRunInParallel(goID1 int, goID2 int) bool {
-	paths := [2][]int{} // thread traversal
+	paths := [2][]int{}         // thread traversal
 	stacks := [2][]fnCallInfo{} // fn traversal
 	goIDs := []int{goID1, goID2}
 	divFn := fnCallInfo{nil, nil} // fn where divergence happens
-	for i, ID := range goIDs { // for each thread
+	for i, ID := range goIDs {    // for each thread
 		for ID > 0 { // traverse up the call chain
 			paths[i] = append([]int{ID}, paths[i]...) // prepend
 			temp := a.goCaller[ID]
@@ -75,12 +75,12 @@ func (a *analysis) canRunInParallel(goID1 int, goID2 int) bool {
 }
 
 func (a *analysis) mutuallyExcluded(goI ssa.Instruction, I int, goJ ssa.Instruction, J int) bool {
-	paths := [2][]int{} // thread traversal
+	paths := [2][]int{}         // thread traversal
 	stacks := [2][]fnCallInfo{} // fn traversal
 	goIDs := []int{I, J}
 	insPair := []ssa.Instruction{goI, goJ}
 	divFn := fnCallInfo{nil, nil} // fn where divergence happens
-	for i, ID := range goIDs { // for each thread
+	for i, ID := range goIDs {    // for each thread
 		for ID > 0 { // traverse up the call chain
 			paths[i] = append([]int{ID}, paths[i]...) // prepend
 			temp := a.goCaller[ID]
@@ -131,7 +131,7 @@ func (a *analysis) mutuallyExcluded(goI ssa.Instruction, I int, goJ ssa.Instruct
 				}
 			} else { // divergence happened
 				divFn = stacks[0][j-1] // examine caller function
-				divFnAt = j-1
+				divFnAt = j - 1
 				b1 = stacks[0][j].ssaIns.Block()
 				if deferIns, isDefer := stacks[0][j].ssaIns.(*ssa.Defer); isDefer && a.deferToRet[deferIns] != nil {
 					b1 = a.deferToRet[deferIns].Block()
@@ -154,7 +154,7 @@ func (a *analysis) mutuallyExcluded(goI ssa.Instruction, I int, goJ ssa.Instruct
 				break
 			} else { // divergence happened
 				divFn = stacks[0][j-1] // examine caller function
-				divFnAt = j-1
+				divFnAt = j - 1
 				b1 = stacks[0][j].ssaIns.Block()
 				if deferIns, isDefer := stacks[0][j].ssaIns.(*ssa.Defer); isDefer && a.deferToRet[deferIns] != nil {
 					b1 = a.deferToRet[deferIns].Block()
@@ -167,7 +167,7 @@ func (a *analysis) mutuallyExcluded(goI ssa.Instruction, I int, goJ ssa.Instruct
 			}
 		} else if fn != stacks[1][j] { // mid-stack divergence for both threads
 			divFn = stacks[0][j-1] // examine caller function
-			divFnAt = j-1
+			divFnAt = j - 1
 			b1 = stacks[0][j].ssaIns.Block()
 			if deferIns, isDefer := stacks[0][j].ssaIns.(*ssa.Defer); isDefer {
 				b1 = a.deferToRet[deferIns].Block()
@@ -236,23 +236,22 @@ func (a *analysis) checkRacyPairs() []*raceInfo {
 							continue
 						}
 						////!!!! bz: for my debug, please comment off, do not delete
-						//if goI.Parent().Name() == "Drain" && goJ.Parent().Name() == "Drain$1" {
-						//	var goIinstr string
-						//	var goJinstr string
-						//	if i == 0 {
-						//		goIinstr = "main"
-						//	}else{
-						//		goIinstr = a.RWIns[i][0].String()
-						//	}
-						//	if j == 0 {
-						//		goJinstr = "main"
-						//	}else{
-						//		goJinstr = a.RWIns[j][0].String()
-						//	}
-							//if strings.Contains(addressPair[0].String(), "returnBuffers") && strings.Contains(addressPair[1].String(), "returnBuffers") {
-							//	fmt.Println(addressPair[0], " Go: ", goIinstr, " loopid: ", a.loopIDs[i], ";  ", addressPair[1], " Go: ", goJinstr, " loopid: ", a.loopIDs[j])
-							//	fmt.Println("sameAddress", a.sameAddress(addressPair[0], addressPair[1], i, j))
-							//}
+						//var goIinstr string
+						//var goJinstr string
+						//if i == 0 {
+						//	goIinstr = "main"
+						//} else {
+						//	goIinstr = a.RWIns[i][0].String()
+						//}
+						//if j == 0 {
+						//	goJinstr = "main"
+						//} else {
+						//	goJinstr = a.RWIns[j][0].String()
+						//}
+						////fmt.Println(addressPair[0], " Go: ", goIinstr, " loopid: ", a.loopIDs[i], ";  ", addressPair[1], " Go: ", goJinstr, " loopid: ", a.loopIDs[j])
+						//if strings.Contains(addressPair[0].String(), "returnBuffers") && strings.Contains(addressPair[1].String(), "returnBuffers") {
+						//	fmt.Println(addressPair[0], " Go: ", goIinstr, " loopid: ", a.loopIDs[i], ";  ", addressPair[1], " Go: ", goJinstr, " loopid: ", a.loopIDs[j])
+						//	fmt.Println("sameAddress", a.sameAddress(addressPair[0], addressPair[1], i, j))
 						//}
 
 						if a.sameAddress(addressPair[0], addressPair[1], i, j) &&
