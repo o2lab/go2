@@ -397,6 +397,8 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 						a.mu.Unlock()
 					}
 				}
+			case *ssa.Function:
+				a.visitAllInstructions(access, goID)
 			default:
 				continue
 			}

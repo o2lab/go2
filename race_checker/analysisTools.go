@@ -676,9 +676,9 @@ func (a *analysis) newGoroutine(info goroutineInfo) {
 			log.Debug(strings.Repeat("-", 35), "Goroutine ", info.entryMethod.Name(), strings.Repeat("-", 35), "[", info.goID, "]")
 		}
 	}
-	//if len(a.lockSet[a.goCaller[info.goID]]) > 0 {
-	//	a.lockSet[info.goID] = a.lockSet[a.goCaller[info.goID]]
-	//}
+	if len(a.lockSet[a.goCaller[info.goID]]) > 0 {
+		a.lockSet[info.goID] = a.lockSet[a.goCaller[info.goID]]
+	}
 	if !allEntries {
 		log.Debug(strings.Repeat(" ", a.levels[info.goID]), "PUSH ", info.entryMethod.Name(), " at lvl ", a.levels[info.goID])
 		fnCall := fnCallIns{fnIns: info.entryMethod, goID: info.goID}
@@ -699,6 +699,9 @@ func (a *analysis) newGoroutine(info goroutineInfo) {
 
 // exploredFunction determines if we already visited this function
 func (a *analysis) exploredFunction(fn *ssa.Function, goID int, theIns ssa.Instruction) bool {
+	if fn.Name() == "RecvMsg" || fn.Name() == "withRetry" || fn.Name() == "newClientStream$3" || fn.Name() == "newClientStream$4" {
+		return false
+	} // for debugging for now, fix trieLimit later
 	if a.efficiency && !a.fromPkgsOfInterest(fn) { // for temporary debugging purposes only
 		return true
 	}

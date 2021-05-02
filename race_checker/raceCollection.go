@@ -212,7 +212,7 @@ func (a *analysis) checkRacyPairs() []*raceInfo {
 		//	continue
 		//}
 		for j := i + 1; j < len(a.RWIns); j++ { // must be in different goroutines, j always greater than i
-			//if a.goNames(a.RWIns[j][0].(*ssa.Go)) != "Drain$1" { // for debugging
+			//if a.goNames(a.RWIns[j][0].(*ssa.Go)) != "testMetadataStreamingRPC$1" { // for debugging
 			//	continue
 			//}
 			if !a.canRunInParallel(i, j) {
@@ -248,10 +248,10 @@ func (a *analysis) checkRacyPairs() []*raceInfo {
 						//} else {
 						//	goJinstr = a.RWIns[j][0].String()
 						//}
-						////fmt.Println(addressPair[0], " Go: ", goIinstr, " loopid: ", a.loopIDs[i], ";  ", addressPair[1], " Go: ", goJinstr, " loopid: ", a.loopIDs[j])
-						//if strings.Contains(addressPair[0].String(), "returnBuffers") && strings.Contains(addressPair[1].String(), "returnBuffers") {
+						//fmt.Println(addressPair[0], " Go: ", goIinstr, " loopid: ", a.loopIDs[i], ";  ", addressPair[1], " Go: ", goJinstr, " loopid: ", a.loopIDs[j])
+						//if strings.Contains(addressPair[0].String(), "returnBuffers") && strings.Contains(addressPair[1].String(), "returnBuffers") &&
+						//	goI.Parent().Name() == "commitAttemptLocked" && goJ.Parent().Name() == "SendMsg" {
 						//	fmt.Println(addressPair[0], " Go: ", goIinstr, " loopid: ", a.loopIDs[i], ";  ", addressPair[1], " Go: ", goJinstr, " loopid: ", a.loopIDs[j])
-						//	fmt.Println("sameAddress", a.sameAddress(addressPair[0], addressPair[1], i, j))
 						//}
 
 						if a.sameAddress(addressPair[0], addressPair[1], i, j) &&
