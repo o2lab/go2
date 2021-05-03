@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"github.com/april1989/origin-go-tools/go/ssa"
 	log "github.com/sirupsen/logrus"
 	"github.com/twmb/algoimpl/go/graph"
@@ -414,9 +413,6 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				if !isSynthetic(fn) && ex == theIns.Parent().Pkg.Pkg.Name() {
 					return
 				}
-			}
-			if strings.Contains(theIns.String(), "onSuccess()") && strings.Contains(fn.String(), "withRetry") {
-				fmt.Print() //bz: debug for yiqing
 			}
 
 			switch examIns := theIns.(type) {
