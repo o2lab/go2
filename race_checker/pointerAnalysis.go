@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"github.com/april1989/origin-go-tools/go/pointer"
 	pta0 "github.com/april1989/origin-go-tools/go/pointer_default"
 	"github.com/april1989/origin-go-tools/go/ssa"
@@ -116,9 +115,6 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 		case *ssa.Function:
 			if theFunc == testEntry {
 				return
-			}
-			if theIns.Parent().Name() == "withRetry" {
-				fmt.Println(theFunc.Name(), a.prog.Fset.Position(theIns.Pos())) // these are from when caller of withRety is newClientStream
 			}
 			if a.getParam {
 				a.paramFunc = theFunc

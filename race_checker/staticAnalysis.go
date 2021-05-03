@@ -185,12 +185,15 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		//} else
 		if pkgs[0] == nil && len(pkgs) == 1 {
 			log.Fatal("Error: No packages detected. Please verify directory provided contains Go Files. ")
-		} else if !strings.Contains(pkgs[0].Pkg.Path(), "/") {
-			scope[0] = pkgs[0].Pkg.Path()
-		} else {
-			scope[0] = strings.Split(pkgs[0].Pkg.Path(), "/")[0] + "/" + strings.Split(pkgs[0].Pkg.Path(), "/")[1]
-			if strings.Contains(pkgs[0].Pkg.Path(), "checker") {
+		} else if len(pkgs) > 1 && pkgs[1] != nil && !strings.Contains(pkgs[1].Pkg.Path(), "/") {
+			scope[0] = pkgs[1].Pkg.Path()
+		} else if len(pkgs) > 1 {
+			scope[0] = strings.Split(pkgs[1].Pkg.Path(), "/")[1] + "/" + strings.Split(pkgs[1].Pkg.Path(), "/")[1]
+			if strings.Contains(pkgs[1].Pkg.Path(), "checker") {
 				scope[0] += "/race-checker"
+			}
+			if strings.Contains(pkgs[1].Pkg.Path(), "ethereum") {
+				scope[0] += "/go-ethereum"
 			}
 		}
 		//scope[0] = "google.golang.org/grpc" //bz: the scope obtained by the above code is "google.golang.org/grpc/health" if you run this under the /health directory, which is not what we want; hard code here
