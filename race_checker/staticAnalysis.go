@@ -188,7 +188,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		} else if len(pkgs) > 1 && pkgs[1] != nil && !strings.Contains(pkgs[1].Pkg.Path(), "/") {
 			scope[0] = pkgs[1].Pkg.Path()
 		} else if len(pkgs) > 1 {
-			scope[0] = strings.Split(pkgs[1].Pkg.Path(), "/")[1] + "/" + strings.Split(pkgs[1].Pkg.Path(), "/")[1]
+			scope[0] = strings.Split(pkgs[1].Pkg.Path(), "/")[0] + "/" + strings.Split(pkgs[1].Pkg.Path(), "/")[1]
 			if strings.Contains(pkgs[1].Pkg.Path(), "checker") {
 				scope[0] += "/race-checker"
 			}
