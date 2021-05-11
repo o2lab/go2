@@ -458,13 +458,13 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 			}
 			lockOp := a.lockSetContainsAt(a.lockSet, lockLoc, goID) // index of locking operation
 			if lockOp != -1 {
-				//if a.lockSet[goID][lockOp].parentFn == theIns.Parent() && a.lockSet[goID][lockOp].locBlocInd == theIns.Block().Index { // common block
+				if a.lockSet[goID][lockOp].parentFn == theIns.Parent() && a.lockSet[goID][lockOp].locBlocInd == theIns.Block().Index { // common block
 					log.Trace("Unlocking   ", lockLoc.String(), "  (", a.lockSet[goID][lockOp].locAddr.Pos(), ") removing index ", lockOp, " from: ", lockSetVal(a.lockSet, goID))
 					a.lockSet[goID] = append(a.lockSet[goID][:lockOp], a.lockSet[goID][lockOp+1:]...) // remove from lockset
-				//} else {
-				//	unlockOps = append(unlockOps, lockLoc)
-				//	a.lockSet[goID][lockOp].locFreeze = true
-				//}
+				} else {
+					unlockOps = append(unlockOps, lockLoc)
+					a.lockSet[goID][lockOp].locFreeze = true
+				}
 			}
 		case "RLock":
 			RlockLoc := examIns.Call.Args[0] // identifier for address of lock
