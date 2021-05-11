@@ -98,7 +98,7 @@ func (a *analysis) updateRecords(fnName string, goID int, pushPop string, theFn 
 		a.levels[goID]--
 	}
 	if !allEntries {
-		log.Debug(strings.Repeat(" ", a.levels[goID]), pushPop, fnName, " at lvl ", a.levels[goID])
+		log.Debug(strings.Repeat(" ", a.levels[goID]), pushPop, theFn.String(), " at lvl ", a.levels[goID])
 	}
 	if pushPop == "PUSH " {
 		fnCall := fnCallIns{fnIns: theFn, goID: goID}
@@ -207,14 +207,15 @@ func (a *analysis) insUnOp(examIns *ssa.UnOp, goID int, theIns ssa.Instruction) 
 						//log.Debug(strct.Field(i))
 					}
 				}
-				for fnKey, member := range v.Pkg.Members {
-					if memberFn, isFn := member.(*ssa.Function); isFn && fnKey != "main" && fnKey != "init" {
-						if !a.exploredFunction(memberFn, goID, theIns) {
-							a.updateRecords(memberFn.Name(), goID, "PUSH ", memberFn, theIns)
-							a.visitAllInstructions(memberFn, goID)
-						}
-					}
-				}
+				a.pointerAnalysis(examIns.X, goID, theIns) //TODO: bz: WIP
+				//for fnKey, member := range v.Pkg.Members {//bz: why .... are you creating calls to all the functions in v.pkg.members????
+				//	if memberFn, isFn := member.(*ssa.Function); isFn && fnKey != "main" && fnKey != "init" {
+				//		if !a.exploredFunction(memberFn, goID, theIns) {
+				//			a.updateRecords(memberFn.Name(), goID, "PUSH ", memberFn, theIns)
+				//			a.visitAllInstructions(memberFn, goID)
+				//		}
+				//	}
+				//}
 			}
 		}
 		a.RWIns[goID] = append(a.RWIns[goID], theIns)

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"github.com/april1989/origin-go-tools/go/ssa"
 	log "github.com/sirupsen/logrus"
 	"github.com/twmb/algoimpl/go/graph"
@@ -300,6 +301,13 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 		a.RWIns = append(a.RWIns, []ssa.Instruction{})
 	}
 	//fmt.Println(" ... ", fn.String(), " goID:", goID) //bz: debug, please comment off
+	if strings.Contains(fn.String(), "google.golang.org/grpc.NewServer") {
+		fmt.Println()
+	}
+	if strings.Contains(fn.String(), "google.golang.org/grpc.getChainUnaryInvoker$1") {
+		fmt.Println()
+	}
+
 	bVisit0 := fn.DomPreorder()
 	var bVisit []*ssa.BasicBlock
 	var pushBack []*ssa.BasicBlock // stack of .done blocks
@@ -714,6 +722,9 @@ func (a *analysis) newGoroutine(info goroutineInfo) {
 
 // exploredFunction determines if we already visited this function
 func (a *analysis) exploredFunction(fn *ssa.Function, goID int, theIns ssa.Instruction) bool {
+	if a.fromExcludedFns(fn) {
+		return true
+	}
 	if a.efficiency && !a.fromPkgsOfInterest(fn) { // for temporary debugging purposes only
 		return true
 	}

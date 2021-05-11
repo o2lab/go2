@@ -35,7 +35,7 @@ func (a *analysis) fromPkgsOfInterest(fn *ssa.Function) bool {
 		return true
 	}
 	for _, excluded := range excludedPkgs {
-		if fn.Pkg.Pkg.Name() == excluded || fn.Pkg.Pkg.Path() == excluded {//bz: some lib's Pkg.Name() == "Package", not the used import xxx; if so, check Pkg.Path()
+		if fn.Pkg.Pkg.Name() == excluded || fn.Pkg.Pkg.Path() == excluded { //bz: some lib's Pkg.Name() == "Package", not the used import xxx; if so, check Pkg.Path()
 			return false
 		}
 	}
@@ -43,6 +43,16 @@ func (a *analysis) fromPkgsOfInterest(fn *ssa.Function) bool {
 		return false
 	}
 	return true
+}
+
+func (a *analysis) fromExcludedFns(fn *ssa.Function) bool {
+	strFn := fn.String()
+	for _, ex := range excludedFns {
+		if strings.HasPrefix(strFn, ex) {
+			return true
+		}
+	}
+	return false
 }
 
 // isLocalAddr returns whether location is a local address or not
@@ -158,8 +168,8 @@ func (runner *AnalysisRunner) Run(args []string) error {
 	efficiency = runner.efficiency
 	// Load packages...
 	cfg := &packages.Config{
-		Mode:  packages.LoadAllSyntax, // the level of information returned for each package
-		Dir:   "",                     // directory in which to run the build system's query tool
+		Mode: packages.LoadAllSyntax, // the level of information returned for each package
+		Dir:  "",                     // directory in which to run the build system's query tool
 		//TODO: bz: change this to true if you want to analyze test
 		Tests: true,
 		//Tests: false,                  // setting Tests will include related test packages
@@ -198,11 +208,11 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		} else if len(pkgs) == 1 {
 			scope[0] = pkgs[0].Pkg.Path()
 		}
-		//scope[0] = "google.golang.org/grpc" //bz: the scope obtained by the above code is "google.golang.org/grpc/health" if you run this under the /health directory, which is not what we want; hard code here
+		//scope[0] = "google.golang.org/grpc"
 
 		//bz: update a bit to avoid duplicate scope addition, e.g., grpc
 		// return with error if error exist, skip panic
-		if len(scope) == 0 && len(pkgs) >= 1 && !goTest {           // ** assuming more than one package detected in real programs
+		if len(scope) == 0 && len(pkgs) >= 1 && !goTest { // ** assuming more than one package detected in real programs
 			path, err := os.Getwd() //current working directory == project path
 			if err != nil {
 				panic("Error while os.Getwd: " + err.Error())
@@ -232,6 +242,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		}
 
 		flags.DoTests = true //bz: set to true if your folder has tests and you want to analyze them
+		flags.PTSLimit = 10  //bz: limit the size of pts to 10
 		runner.ptaConfig = &pointer.Config{
 			Mains:          mains, //bz: all mains/tests in a project
 			Reflection:     false,
@@ -246,7 +257,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 			TrackMore:  true,         //bz: track pointers with all types
 			Level:      0,            //bz: see pointer.Config
 		}
-		start := time.Now()                                               //performance
+		start := time.Now() //performance
 		var err error
 		runner.ptaResult, err = pointer.AnalyzeMultiMains(runner.ptaConfig) // conduct pointer analysis for multiple mains
 		if err != nil {
@@ -265,7 +276,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 
 	} else {
 		runner.ptaConfig0 = &pta0.Config{
-			Mains: mains,
+			Mains:          mains,
 			BuildCallGraph: false,
 		}
 		runner.ptaResult0, _ = pta0.Analyze(runner.ptaConfig0)
@@ -296,7 +307,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 			if strings.Contains(testSelect, ",") && testFns != nil { // multiple selections
 				selection := strings.Split(testSelect, ",")
 				for _, s := range selection {
-					i, _ := strconv.Atoi(s) // convert to integer
+					i, _ := strconv.Atoi(s)                         // convert to integer
 					selectedFns = append(selectedFns, testFns[i-1]) // TODO: analyze multiple tests concurrently
 				}
 			} else if strings.Contains(testSelect, "-") && testFns != nil { // selected range
@@ -336,15 +347,15 @@ func (runner *AnalysisRunner) Run(args []string) error {
 				ptaCfg:          runner.ptaConfig,
 				ptaCfg0:         runner.ptaConfig0,
 				efficiency:      efficiency,
-				trieLimit:   	 trieLimit,
-				getGo:   		 getGo,
+				trieLimit:       trieLimit,
+				getGo:           getGo,
 				prog:            runner.prog,
 				pkgs:            runner.pkgs,
 				mains:           mains,
 				main:            main,
 				RWinsMap:        make(map[goIns]graph.Node),
 				trieMap:         make(map[fnInfo]*trie),
-				stackMap:  		 make(map[fnCallIns]stackInfo),
+				stackMap:        make(map[fnCallIns]stackInfo),
 				insDRA:          -1,
 				levels:          make(map[int]int),
 				lockMap:         make(map[ssa.Instruction][]ssa.Value),
@@ -372,8 +383,8 @@ func (runner *AnalysisRunner) Run(args []string) error {
 				loopIDs:         make(map[int]int),
 				allocLoop:       make(map[*ssa.Function][]string),
 				bindingFV:       make(map[*ssa.Go][]*ssa.FreeVar),
-				commIDs:  		 make(map[int][]int),
-				deferToRet: 	 make(map[*ssa.Defer]ssa.Instruction),
+				commIDs:         make(map[int][]int),
+				deferToRet:      make(map[*ssa.Defer]ssa.Instruction),
 			}
 			if strings.Contains(main.Pkg.Path(), "GoBench") { // for testing purposes
 				Analysis.efficiency = false

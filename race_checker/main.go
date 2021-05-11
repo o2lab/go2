@@ -24,9 +24,9 @@ type analysis struct {
 	ptaCfg  *pointer.Config
 	ptaCfg0 *pta0.Config
 
-	efficiency 		bool
-	trieLimit 		int
-	getGo  			bool // flag
+	efficiency      bool
+	trieLimit       int
+	getGo           bool // flag
 	prog            *ssa.Program
 	pkgs            []*ssa.Package
 	mains           []*ssa.Package
@@ -38,7 +38,7 @@ type analysis struct {
 	RWIns           [][]ssa.Instruction // instructions grouped by goroutine
 	insDRA          int                 // index of instruction (in main goroutine) at which to begin data race analysis
 	storeFns        []fnCallInfo
-	stackMap		map[fnCallIns]stackInfo
+	stackMap        map[fnCallIns]stackInfo
 	workList        []goroutineInfo
 	reportedAddr    []ssa.Value // stores already reported addresses
 	levels          map[int]int
@@ -75,8 +75,8 @@ type analysis struct {
 	allocLoop       map[*ssa.Function][]string
 	bindingFV       map[*ssa.Go][]*ssa.FreeVar
 	pbr             *ssa.Alloc
-	commIDs 		map[int][]int
-	deferToRet 		map[*ssa.Defer]ssa.Instruction
+	commIDs         map[int][]int
+	deferToRet      map[*ssa.Defer]ssa.Instruction
 }
 
 type lockInfo struct {
@@ -94,8 +94,8 @@ type raceInfo struct {
 }
 
 type raceReport struct {
-	entryInfo    string
-	racePairs    []*raceInfo
+	entryInfo string
+	racePairs []*raceInfo
 }
 
 type AnalysisRunner struct {
@@ -118,12 +118,12 @@ type fnInfo struct { // all fields must be comparable for fnInfo to be used as k
 }
 
 type stackInfo struct {
-	fnCalls 	[]fnCallInfo
+	fnCalls []fnCallInfo
 }
 
 type fnCallInfo struct {
-	fnIns 	*ssa.Function
-	ssaIns 	ssa.Instruction
+	fnIns  *ssa.Function
+	ssaIns ssa.Instruction
 }
 
 type goCallInfo struct {
@@ -132,8 +132,8 @@ type goCallInfo struct {
 }
 
 type fnCallIns struct {
-	fnIns 	*ssa.Function
-	goID  	int
+	fnIns *ssa.Function
+	goID  int
 }
 
 type goIns struct { // an ssa.Instruction with goroutine info
@@ -142,7 +142,7 @@ type goIns struct { // an ssa.Instruction with goroutine info
 }
 
 type goroutineInfo struct {
-	ssaIns 		ssa.Instruction
+	ssaIns      ssa.Instruction
 	goIns       *ssa.Go
 	entryMethod *ssa.Function
 	goID        int
@@ -161,6 +161,7 @@ type trie struct {
 
 var (
 	excludedPkgs []string
+	excludedFns  []string
 	testMode     = false // Used by race_test.go for collecting output.
 )
 
@@ -180,6 +181,14 @@ func init() {
 	excludedPkgs = []string{
 		"fmt",
 		"logrus",
+	}
+	//bz: skip traversing some functions that are not important in detection (or too verbose, do not want to analyze)
+	excludedFns = []string{ //bz: grpc specific, hasprefix
+		"google.golang.org/grpc/grpclog",
+		"(*testing.common).Log",
+		"(*testing.common).Error",
+		"(*testing.common).Fatal",
+		"(*testing.common).Skip",
 	}
 }
 

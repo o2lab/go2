@@ -114,6 +114,13 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 
 		var label *pointer.Label
 		label = labels[0] // use first target by default
+		//TODO: bz: need some heuristics to remove impossible targets, e.g.,
+		// when t4(ctx, method, req, reply, cc, t9, opts...) in google.golang.org/grpc.chainUnaryClientInterceptors$1
+		// returns 3 targets: TestInterceptorCanAccessCallOptions$2, failOkayRPC and chainUnaryClientInterceptors$1
+		// since chainUnaryClientInterceptors is already pushed (or popped) before,
+		// the correct target should be nil, since TestInterceptorCanAccessCallOptions$2 is from another test and
+		// chainUnaryClientInterceptors$1 already pushed and failOkayRPC is used by TestUnaryClientInterceptor
+
 		if len(labels) > 1 { // pta returns multiple targets
 			var stack []fnCallInfo
 			var path []int
