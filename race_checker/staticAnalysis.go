@@ -195,6 +195,8 @@ func (runner *AnalysisRunner) Run(args []string) error {
 			if strings.Contains(pkgs[1].Pkg.Path(), "ethereum") {
 				scope[0] += "/go-ethereum"
 			}
+		} else if len(pkgs) == 1 {
+			scope[0] = pkgs[0].Pkg.Path()
 		}
 		//scope[0] = "google.golang.org/grpc" //bz: the scope obtained by the above code is "google.golang.org/grpc/health" if you run this under the /health directory, which is not what we want; hard code here
 

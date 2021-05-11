@@ -339,7 +339,7 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 		if _, ok := examIns.Call.Value.(*ssa.Builtin); !ok {
 			a.pointerAnalysis(examIns.Call.Value, goID, theIns)
 		} else if examIns.Call.Value.Name() == "delete" { // built-in delete op
-			if theVal, ok := examIns.Call.Args[0].(*ssa.UnOp); ok {
+			if theVal, ok0 := examIns.Call.Args[0].(*ssa.UnOp); ok0 {
 				if theVal.Op == token.MUL && !isLocalAddr(theVal.X) {
 					a.RWIns[goID] = append(a.RWIns[goID], theIns)
 					a.updateLockMap(goID, theIns)
@@ -398,7 +398,23 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 					}
 				}
 			case *ssa.Function:
+				a.updateRecords(access.Name(), goID, "PUSH ", access, theIns)
+				a.RWIns[goID] = append(a.RWIns[goID], theIns)
 				a.visitAllInstructions(access, goID)
+			case *ssa.UnOp:
+				if !isLocalAddr(access.X) {
+					a.RWIns[goID] = append(a.RWIns[goID], theIns)
+					a.updateLockMap(goID, theIns)
+					a.updateRLockMap(goID, theIns)
+				}
+			//case *ssa.Const:
+			//	a.RWIns[goID] = append(a.RWIns[goID], theIns)
+			//	a.updateLockMap(goID, theIns)
+			//	a.updateRLockMap(goID, theIns)
+			case *ssa.MakeClosure:
+				a.updateRecords(access.Fn.(*ssa.Function).Name(), goID, "PUSH ", access.Fn.(*ssa.Function), theIns)
+				a.RWIns[goID] = append(a.RWIns[goID], theIns)
+				a.visitAllInstructions(access.Fn.(*ssa.Function), goID)
 			default:
 				continue
 			}
@@ -442,12 +458,13 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 			}
 			lockOp := a.lockSetContainsAt(a.lockSet, lockLoc, goID) // index of locking operation
 			if lockOp != -1 {
-				if a.lockSet[goID][lockOp].parentFn == theIns.Parent() && a.lockSet[goID][lockOp].locBlocInd == theIns.Block().Index { // common block
+				//if a.lockSet[goID][lockOp].parentFn == theIns.Parent() && a.lockSet[goID][lockOp].locBlocInd == theIns.Block().Index { // common block
+					log.Trace("Unlocking   ", lockLoc.String(), "  (", a.lockSet[goID][lockOp].locAddr.Pos(), ") removing index ", lockOp, " from: ", lockSetVal(a.lockSet, goID))
 					a.lockSet[goID] = append(a.lockSet[goID][:lockOp], a.lockSet[goID][lockOp+1:]...) // remove from lockset
-				} else {
-					unlockOps = append(unlockOps, lockLoc)
-					a.lockSet[goID][lockOp].locFreeze = true
-				}
+				//} else {
+				//	unlockOps = append(unlockOps, lockLoc)
+				//	a.lockSet[goID][lockOp].locFreeze = true
+				//}
 			}
 		case "RLock":
 			RlockLoc := examIns.Call.Args[0] // identifier for address of lock

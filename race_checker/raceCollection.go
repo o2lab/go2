@@ -248,7 +248,6 @@ func (a *analysis) checkRacyPairs() []*raceInfo {
 						//} else {
 						//	goJinstr = a.RWIns[j][0].String()
 						//}
-						//fmt.Println(addressPair[0], " Go: ", goIinstr, " loopid: ", a.loopIDs[i], ";  ", addressPair[1], " Go: ", goJinstr, " loopid: ", a.loopIDs[j])
 						//if strings.Contains(addressPair[0].String(), "returnBuffers") && strings.Contains(addressPair[1].String(), "returnBuffers") &&
 						//	goI.Parent().Name() == "commitAttemptLocked" && goJ.Parent().Name() == "SendMsg" {
 						//	fmt.Println(addressPair[0], " Go: ", goIinstr, " loopid: ", a.loopIDs[i], ";  ", addressPair[1], " Go: ", goJinstr, " loopid: ", a.loopIDs[j])

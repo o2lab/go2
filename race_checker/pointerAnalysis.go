@@ -1,9 +1,11 @@
 package main
 
 import (
+	"fmt"
 	"github.com/april1989/origin-go-tools/go/pointer"
 	pta0 "github.com/april1989/origin-go-tools/go/pointer_default"
 	"github.com/april1989/origin-go-tools/go/ssa"
+	log "github.com/sirupsen/logrus"
 	"go/types"
 )
 
@@ -110,8 +112,92 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 		//}
 		//bz: end
 
+		var label *pointer.Label
+		label = labels[0] // use first target by default
+		if len(labels) > 1 { // pta returns multiple targets
+			var stack []fnCallInfo
+			var path []int
+			ID := goID
+			for ID > 0 { // traverse up the call chain
+				path = append([]int{ID}, path...) // prepend
+				temp := a.goCaller[ID]
+				ID = temp
+			}
+			for _, eachGo := range path { // concatenate call chain from each thread
+				stack = append(stack, a.goStack[eachGo][:len(a.goStack[eachGo])-1]...)
+			}
+			fnCall := fnCallIns{theIns.Parent(), goID}
+			stack = append(stack, a.stackMap[fnCall].fnCalls...)
+
+			targetNames := make([]string, len(labels)) // get names of all targets
+			for i, eachLabel := range labels {
+				switch theFunc := eachLabel.Value().(type) {
+				case *ssa.Function:
+					if theFunc == testEntry {
+						return
+					}
+					targetNames[i] = theFunc.Name()
+				case *ssa.MakeInterface:
+					switch theIns.(type) {
+					case *ssa.Call:
+						methodName := theIns.(*ssa.Call).Call.Method.Name()
+						if a.prog.MethodSets.MethodSet(ptr.PointsTo().DynamicTypes().Keys()[0]).Lookup(a.mains[0].Pkg, methodName) == nil { // ignore abstract methods
+							break
+						}
+						check := a.prog.LookupMethod(ptr.PointsTo().DynamicTypes().Keys()[0], a.mains[0].Pkg, methodName)
+						targetNames[i] = check.Name()
+					case *ssa.Go:
+						switch theFunc.X.(type) {
+						case *ssa.Parameter:
+							targetNames[i] = theFunc.X.Name()
+						}
+					}
+				case *ssa.Alloc:
+					if call, ok := theIns.(*ssa.Call); ok {
+						var goInstr *ssa.Go
+						if goID == 0 {
+							goInstr = nil
+						} else {
+							goInstr = a.RWIns[goID][0].(*ssa.Go)
+						}
+						invokeFunc := a.ptaRes[a.main].GetFreeVarFunc(theIns.Parent(), call, goInstr)
+						if invokeFunc == nil {
+							fmt.Println("no pta target")
+							break //bz: pta cannot find the target. how?
+						}
+						targetNames[i] = invokeFunc.Name()
+					}
+				case *ssa.MakeSlice:
+					targetNames[i] = theFunc.Name()
+				default:
+					break
+				}
+			}
+			//log.Debug("PTA identified multiple targets: ", targetNames)
+
+			//out:
+			//for i := len(stack)-1; i >= 0; i-- {
+			//	for j, tName := range targetNames {
+			//		if stack[i].fnIns.Name() == tName {
+			//			label = labels[j]
+			//			log.Debug("referencing callstack, select target: ", tName)
+			//			break out
+			//		}
+			//	}
+			//}
+			if theIns.Parent() != nil && theIns.Parent().Name() == "withRetry" {
+				for j, tName := range targetNames {
+					if tName == "commitAttemptLocked$bound" || tName == "RecvMsg$1" {
+						label = labels[j]
+						log.Debug("manually selecting pta target: ", tName)
+					}
+				}
+			}
+
+		}
+
 		var fnName string
-		switch theFunc := labels[0].Value().(type) {
+		switch theFunc := label.Value().(type) {
 		case *ssa.Function:
 			if theFunc == testEntry {
 				return
@@ -154,11 +240,12 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 				var goInstr *ssa.Go
 				if goID == 0 {
 					goInstr = nil
-				}else{
+				} else {
 					goInstr = a.RWIns[goID][0].(*ssa.Go)
 				}
 				invokeFunc := a.ptaRes[a.main].GetFreeVarFunc(theIns.Parent(), call, goInstr)
 				if invokeFunc == nil {
+					fmt.Println("no pta target")
 					break //bz: pta cannot find the target. how?
 				}
 				fnName = invokeFunc.Name()

@@ -266,6 +266,7 @@ func (a *analysis) buildHB() {
 
 // visitAllInstructions visits each line and calls the corresponding helper function to drive the tool
 func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
+	lockSetSize := len(a.lockSet[goID])
 	a.analysisStat.nGoroutine = goID + 1 // keep count of goroutine quantity
 	if fn == nil {
 		return
@@ -560,28 +561,6 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 			}
 		}
 	}
-	if len(toUnlock) > 0 {// ----> !!! SEE HERE: bz: the same as above, from line 488 to 501 can be separated out
-		for _, loc := range toUnlock {
-			if z := a.lockSetContainsAt(a.lockSet, loc, goID); z >= 0 {
-				log.Trace("Unlocking ", loc.String(), "  (", a.lockSet[goID][z].locAddr.Pos(), ") removing index ", z, " from: ", lockSetVal(a.lockSet, goID))
-				a.lockSet[goID] = append(a.lockSet[goID][:z], a.lockSet[goID][z+1:]...)
-			} else {
-				z = a.lockSetContainsAt(a.lockSet, loc, a.goCaller[goID])
-				if z == -1 {
-					continue
-				}
-				a.lockSet[a.goCaller[goID]] = append(a.lockSet[a.goCaller[goID]][:z], a.lockSet[a.goCaller[goID]][z+1:]...)
-			}
-		}
-	}
-	if len(toRUnlock) > 0 {// ----> !!! SEE HERE: bz: the same as above, from line 502 to 509 can be separated out
-		for _, rloc := range toRUnlock {
-			if z := a.lockSetContainsAt(a.RlockSet, rloc, goID); z >= 0 {
-				log.Trace("RUnlocking ", rloc.String(), "  (", a.RlockSet[goID][z].locAddr.Pos(), ") removing index ", z, " from: ", lockSetVal(a.RlockSet, goID))
-				a.RlockSet[goID] = append(a.RlockSet[goID][:z], a.RlockSet[goID][z+1:]...)
-			} //TODO : modify for unlock in diff thread
-		}
-	}
 	if len(toDefer) > 0 {
 		for _, dIns := range toDefer {  // ----> !!! SEE HERE: bz: the same as above, from line 307 to 347 can be separated out
 			deferIns := dIns.(*ssa.Defer)
@@ -606,6 +585,12 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 					a.mu.Unlock()
 				}
 				toUnlock = append(toUnlock, lockLoc)
+				lockOp := a.lockSetContainsAt(a.lockSet, lockLoc, goID) // index of locking operation
+				if lockOp != -1 {
+					//if a.lockSet[goID][lockOp].parentFn == theIns.Parent() && a.lockSet[goID][lockOp].locBlocInd == theIns.Block().Index { // common block
+					log.Trace("Unlocking   ", lockLoc.String(), "  (", a.lockSet[goID][lockOp].locAddr.Pos(), ") removing index ", lockOp, " from: ", lockSetVal(a.lockSet, goID))
+					a.lockSet[goID] = append(a.lockSet[goID][:lockOp], a.lockSet[goID][lockOp+1:]...) // remove from lockset
+				}
 			} else if deferIns.Call.StaticCallee().Name() == "RUnlock" {
 				RlockLoc := deferIns.Call.Args[0]
 				if !useNewPTA {
@@ -623,6 +608,35 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				}
 			}
 			toDefer = []ssa.Instruction{}
+		}
+	}
+	if len(toUnlock) > 0 {// ----> !!! SEE HERE: bz: the same as above, from line 488 to 501 can be separated out
+		for _, loc := range toUnlock {
+			if z := a.lockSetContainsAt(a.lockSet, loc, goID); z >= 0 {
+				log.Trace("Unlocking ", loc.String(), "  (", a.lockSet[goID][z].locAddr.Pos(), ") removing index ", z, " from: ", lockSetVal(a.lockSet, goID))
+				a.lockSet[goID] = append(a.lockSet[goID][:z], a.lockSet[goID][z+1:]...)
+			} else {
+				z = a.lockSetContainsAt(a.lockSet, loc, a.goCaller[goID])
+				if z == -1 {
+					continue
+				}
+				log.Trace("Unlocking ", loc.String(), "  (", a.lockSet[goID][z].locAddr.Pos(), ") removing index ", z, " from: ", lockSetVal(a.lockSet, goID))
+				a.lockSet[a.goCaller[goID]] = append(a.lockSet[a.goCaller[goID]][:z], a.lockSet[a.goCaller[goID]][z+1:]...)
+			}
+		}
+	}
+	if len(toRUnlock) > 0 {// ----> !!! SEE HERE: bz: the same as above, from line 502 to 509 can be separated out
+		for _, rloc := range toRUnlock {
+			if z := a.lockSetContainsAt(a.RlockSet, rloc, goID); z >= 0 {
+				log.Trace("RUnlocking ", rloc.String(), "  (", a.RlockSet[goID][z].locAddr.Pos(), ") removing index ", z, " from: ", lockSetVal(a.RlockSet, goID))
+				a.RlockSet[goID] = append(a.RlockSet[goID][:z], a.RlockSet[goID][z+1:]...)
+			} //TODO : modify for unlock in diff thread
+		}
+	}
+	if len(a.lockSet[goID]) > lockSetSize {
+		for i := lockSetSize; i < len(a.lockSet[goID]); i++ {
+			log.Trace("Unlocking ", a.lockSet[goID][i].locAddr.String(), "  (", a.lockSet[goID][i].locAddr.Pos(), ") removing index ", i, " from: ", lockSetVal(a.lockSet, goID))
+			a.lockSet[goID] = append(a.lockSet[a.goCaller[goID]][:i], a.lockSet[goID][i+1:]...)
 		}
 	}
 	// done with all instructions in function body, now pop the function
@@ -700,15 +714,12 @@ func (a *analysis) newGoroutine(info goroutineInfo) {
 
 // exploredFunction determines if we already visited this function
 func (a *analysis) exploredFunction(fn *ssa.Function, goID int, theIns ssa.Instruction) bool {
-	if fn.Name() == "RecvMsg" || fn.Name() == "withRetry" || fn.Name() == "newClientStream$3" || fn.Name() == "newClientStream$4" {
-		return false
-	} // for debugging for now, fix trieLimit later
 	if a.efficiency && !a.fromPkgsOfInterest(fn) { // for temporary debugging purposes only
 		return true
 	}
-	if sliceContainsInsAt(a.RWIns[goID], theIns) >= 0 {
-		return true
-	}
+	//if sliceContainsInsAt(a.RWIns[goID], theIns) >= 0 {
+	//	return true
+	//}
 	theFn := fnCallInfo{fn, theIns}
 	if a.efficiency && sliceContainsFnCall(a.storeFns, theFn) { // for temporary debugging purposes only
 		return true
