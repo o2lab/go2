@@ -241,8 +241,9 @@ func (runner *AnalysisRunner) Run(args []string) error {
 			scope = append(scope, parts[1])
 		}
 
+		//logfile, _ := os.Create("/Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/pta_log_0") //bz: debug
 		flags.DoTests = true //bz: set to true if your folder has tests and you want to analyze them
-		flags.PTSLimit = 10  //bz: limit the size of pts to 10
+		//flags.PTSLimit = 10  //bz: limit the size of pts to 10
 		runner.ptaConfig = &pointer.Config{
 			Mains:          mains, //bz: all mains/tests in a project
 			Reflection:     false,

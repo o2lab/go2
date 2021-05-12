@@ -2,10 +2,10 @@ module github.com/o2lab/race-checker
 
 go 1.13
 
-//replace github.tamu.edu/April1989/go_tools v0.0.0 => ../go_tools
+//replace github.com/april1989/origin-go-tools  => ../../../origin-go-tools //bz: debug use
 
 require (
-	github.com/april1989/origin-go-tools v0.0.29
+	github.com/april1989/origin-go-tools v0.0.31
 	github.com/cpuguy83/go-md2man/v2 v2.0.0 // indirect
 	github.com/google/go-cmp v0.5.4 // indirect
 	github.com/kr/text v0.2.0 // indirect

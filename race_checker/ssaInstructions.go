@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"github.com/april1989/origin-go-tools/go/ssa"
 	log "github.com/sirupsen/logrus"
 	"go/constant"
@@ -93,6 +94,9 @@ func isWriteIns(ins ssa.Instruction) bool {
 
 // updateRecords will print out the stack trace
 func (a *analysis) updateRecords(fnName string, goID int, pushPop string, theFn *ssa.Function, theIns ssa.Instruction) {
+	if strings.EqualFold(fnName, "InitialConnWindowSize") || strings.EqualFold(fnName, "listenWithConnControl"){
+		fmt.Println(pushPop)
+	}
 	if pushPop == "POP  " {
 		a.storeFns = a.storeFns[:len(a.storeFns)-1]
 		a.levels[goID]--
@@ -199,15 +203,16 @@ func (a *analysis) insUnOp(examIns *ssa.UnOp, goID int, theIns ssa.Instruction) 
 			a.ptaCfg0.AddQuery(examIns.X)
 			a.mu.Unlock()
 		}
-		if v, globVar := examIns.X.(*ssa.Global); globVar {
+		if v, isGlobalVar := examIns.X.(*ssa.Global); isGlobalVar {
 			if strct, isStruct := v.Type().(*types.Pointer).Elem().Underlying().(*types.Struct); isStruct {
 				for i := 0; i < strct.NumFields(); i++ {
-					switch strct.Field(i).Type().String() { // requires further testing for when this can be involved in race
-					default:
-						//log.Debug(strct.Field(i))
+					f := strct.Field(i)
+					switch f.Type().(type) {
+					case *types.Interface: //bz: fit checkpointCommand field Action in /tests/runc_simple.go, is there other types that leads to func?
+						a.pointerNewAnalysisOffset(v, i, goID, theIns) //bz: i here is the offset
 					}
 				}
-				a.pointerAnalysis(examIns.X, goID, theIns) //TODO: bz: WIP
+
 				//for fnKey, member := range v.Pkg.Members {//bz: why .... are you creating calls to all the functions in v.pkg.members????
 				//	if memberFn, isFn := member.(*ssa.Function); isFn && fnKey != "main" && fnKey != "init" {
 				//		if !a.exploredFunction(memberFn, goID, theIns) {
