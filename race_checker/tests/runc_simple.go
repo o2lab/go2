@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"github.com/urfave/cli"
 )
 
@@ -17,21 +18,13 @@ checkpointed.`,
 	Flags: []cli.Flag{
 		cli.StringFlag{Name: "image-path", Value: "", Usage: "path for saving criu image files"},
 	},
-	Action: func(context *cli.Context) error {
-
-		//container, err := getContainer(context)
-		//if err != nil {
-		//	return err
-		//}
-		//
-		//return container.Checkpoint(options)
-		return someFn()
-	},
+	Action: someFn(),
 }
 
-func someFn() error {
+func someFn() int {
 	x /* RACE Write */ = 3
-	return nil
+	fmt.Println(x)
+	return x
 }
 
 func main() {
@@ -47,9 +40,11 @@ func main() {
 			Usage: "set the log file path where internal debug information is written",
 		},
 	}
-	go func() { x /* RACE Write */  = 2 }()
+	go func() {
+		x /* RACE Write */  = 2
+	}()
 	app.Commands = []cli.Command{
 		checkpointCommand,
 	}
-
+	fmt.Println(app.Commands[0].Action)
 }
