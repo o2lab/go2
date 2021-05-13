@@ -132,7 +132,7 @@ func pkgSelection(initial []*packages.Package) ([]*ssa.Package, *ssa.Program, []
 						if fnMem, okf := p.Members[enterAt]; okf { // package contains function to enter at
 							userEP = true
 							mains = append(mainPkgs, p)
-							entryFn = enterAt // start analysis at user specified function
+							//entryFn = enterAt // start analysis at user specified function TODO: bz: what is the use of entryFn here?
 							_ = fnMem
 						}
 					}
@@ -243,7 +243,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 
 		//logfile, _ := os.Create("/Users/bozhen/Documents/GO2/pta_replaced/go2/race_checker/pta_log_0") //bz: debug
 		flags.DoTests = true //bz: set to true if your folder has tests and you want to analyze them
-		//flags.PTSLimit = 10  //bz: limit the size of pts to 10
+		flags.PTSLimit = 10  //bz: limit the size of pts to 10
 		runner.ptaConfig = &pointer.Config{
 			Mains:          mains, //bz: all mains/tests in a project
 			Reflection:     false,
@@ -286,6 +286,10 @@ func (runner *AnalysisRunner) Run(args []string) error {
 	if len(mains) > 1 {
 		allEntries = true
 	}
+
+	//bz: for analyzing tests
+	entry := "main" //bz: default value, will update later
+	var selectTest *ssa.Function
 	if strings.Contains(mains[0].String(), ".test") {
 		fmt.Println("Extracting test functions from PTA/CG...")
 		for mainEntry, ptaRes := range runner.ptaResult {
@@ -320,20 +324,20 @@ func (runner *AnalysisRunner) Run(args []string) error {
 				}
 			} else if i, err0 := strconv.Atoi(testSelect); err0 == nil && testFns != nil {
 				selectedFns = append(selectedFns, testFns[i-1]) // TODO: analyze multiple tests concurrently
-				testEntry = testFns[i-1]
-				entryFn = testEntry.Name()
+				selectTest = testFns[i-1]
+				entry = selectTest.Name()
 			} else if strings.Contains(testSelect, "Test") {
 				for _, fn := range testFns {
 					if fn.Name() == testSelect {
-						testEntry = fn
-						entryFn = testEntry.Name()
+						selectTest = fn
+						entry = selectTest.Name()
 					}
 				}
 			} else {
 				log.Error("Unrecognized input, try again.")
 			}
 		}
-		fmt.Println("Done  -- CG node of test function ", entryFn, " extracted...")
+		fmt.Println("Done  -- CG node of test function ", entry, " extracted...")
 	}
 
 	// Iterate each entry point...
@@ -343,7 +347,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		go func(main *ssa.Package) {
 			// Configure static analysis...
 			Analysis := analysis{
-				ptaRes:          runner.ptaResult,
+				ptaRes:          runner.ptaResult[m],
 				ptaRes0:         runner.ptaResult0,
 				ptaCfg:          runner.ptaConfig,
 				ptaCfg0:         runner.ptaConfig0,
@@ -351,8 +355,6 @@ func (runner *AnalysisRunner) Run(args []string) error {
 				trieLimit:       trieLimit,
 				getGo:           getGo,
 				prog:            runner.prog,
-				pkgs:            runner.pkgs,
-				mains:           mains,
 				main:            main,
 				RWinsMap:        make(map[goIns]graph.Node),
 				trieMap:         make(map[fnInfo]*trie),
@@ -386,6 +388,8 @@ func (runner *AnalysisRunner) Run(args []string) error {
 				bindingFV:       make(map[*ssa.Go][]*ssa.FreeVar),
 				commIDs:         make(map[int][]int),
 				deferToRet:      make(map[*ssa.Defer]ssa.Instruction),
+				testEntry:       selectTest,
+				entryFn:         entry,
 			}
 			if strings.Contains(main.Pkg.Path(), "GoBench") { // for testing purposes
 				Analysis.efficiency = false
@@ -397,10 +401,12 @@ func (runner *AnalysisRunner) Run(args []string) error {
 				log.Info("Compiling stack trace for every Goroutine... ")
 				log.Debug(strings.Repeat("-", 35), "Stack trace begins", strings.Repeat("-", 35))
 			}
-			if testEntry != nil {
-				Analysis.visitAllInstructions(testEntry, 0)
+			if Analysis.testEntry != nil {
+				//bz: a test now uses itself as main context, tell pta which test will be analyzed for this analysis
+				Analysis.ptaRes.AnalyzeTest(Analysis.testEntry)
+				Analysis.visitAllInstructions(Analysis.testEntry, 0)
 			} else {
-				Analysis.visitAllInstructions(main.Func(entryFn), 0)
+				Analysis.visitAllInstructions(main.Func(Analysis.entryFn), 0)
 			}
 
 			if !allEntries {

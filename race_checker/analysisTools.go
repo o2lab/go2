@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"github.com/april1989/origin-go-tools/go/ssa"
 	log "github.com/sirupsen/logrus"
 	"github.com/twmb/algoimpl/go/graph"
@@ -145,12 +144,12 @@ func (a *analysis) buildHB() {
 							var fromName string
 							var toName string
 							if nGo == 0 {
-								fromName = entryFn
+								fromName = a.entryFn
 							} else {
 								fromName = a.goNames(a.RWIns[nGo][0].(*ssa.Go))
 							}
 							if (*wNode.Value).(goIns).goID == 0 {
-								toName = entryFn
+								toName = a.entryFn
 							} else {
 								toName = a.goNames(a.RWIns[(*wNode.Value).(goIns).goID][0].(*ssa.Go))
 							}
@@ -172,12 +171,12 @@ func (a *analysis) buildHB() {
 							var fromName string
 							var toName string
 							if nGo == 0 {
-								fromName = entryFn
+								fromName = a.entryFn
 							} else {
 								fromName = a.goNames(a.RWIns[nGo][0].(*ssa.Go))
 							}
 							if (*wNode.Value).(goIns).goID == 0 {
-								toName = entryFn
+								toName = a.entryFn
 							} else {
 								toName = a.goNames(a.RWIns[(*wNode.Value).(goIns).goID][0].(*ssa.Go))
 							}
@@ -198,12 +197,12 @@ func (a *analysis) buildHB() {
 						err := a.HBgraph.MakeEdge(prevN, rcvN) // create edge from Send node to Receive node
 						var fromName, toName string
 						if nGo == 0 {
-							fromName = entryFn
+							fromName = a.entryFn
 						} else {
 							fromName = a.goNames(a.RWIns[nGo][0].(*ssa.Go))
 						}
 						if (*rcvN.Value).(goIns).goID == 0 {
-							toName = entryFn
+							toName = a.entryFn
 						} else {
 							toName = a.goNames(a.RWIns[(*rcvN.Value).(goIns).goID][0].(*ssa.Go))
 						}
@@ -226,12 +225,12 @@ func (a *analysis) buildHB() {
 						err := a.HBgraph.MakeEdge(sndN, prevN) // create edge from Send node to Receive node
 						var fromName, toName string
 						if (*sndN.Value).(goIns).goID == 0 {
-							fromName = entryFn
+							fromName = a.entryFn
 						} else {
 							fromName = a.goNames(a.RWIns[(*sndN.Value).(goIns).goID][0].(*ssa.Go))
 						}
 						if nGo == 0 {
-							toName = entryFn
+							toName = a.entryFn
 						} else {
 							toName = a.goNames(a.RWIns[nGo][0].(*ssa.Go))
 						}
@@ -282,7 +281,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 			}
 			return
 		}
-		if fn.Name() == entryFn {
+		if fn.Name() == a.entryFn {
 			if goID == 0 && len(a.storeFns) == 0 {
 				a.levels[goID] = 0 // initialize level count at main entry
 				a.loopIDs[goID] = 0
@@ -301,12 +300,14 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 		a.RWIns = append(a.RWIns, []ssa.Instruction{})
 	}
 	//fmt.Println(" ... ", fn.String(), " goID:", goID) //bz: debug, please comment off
-	if strings.Contains(fn.String(), "google.golang.org/grpc.NewServer") {
-		fmt.Println()
-	}
-	if strings.Contains(fn.String(), "google.golang.org/grpc.getChainUnaryInvoker$1") {
-		fmt.Println()
-	}
+	//if strings.Contains(fn.String(), "google.golang.org/grpc.newProxyDialer") {
+	//	fmt.Println()
+		//for _, bb := range fn.Blocks {
+		//	for _, instr := range bb.Instrs {
+		//		fmt.Println(instr.String())
+		//	}
+		//}
+	//}
 
 	bVisit0 := fn.DomPreorder()
 	var bVisit []*ssa.BasicBlock
@@ -423,7 +424,6 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 					return
 				}
 			}
-
 			switch examIns := theIns.(type) {
 			case *ssa.MakeChan: // channel creation op
 				a.insMakeChan(examIns, ii)
@@ -460,7 +460,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 							a.insStore(examIns, goID, theIns)
 						}
 					}
-				} else {
+				}else {
 					a.insStore(examIns, goID, theIns)
 				}
 			case *ssa.UnOp:

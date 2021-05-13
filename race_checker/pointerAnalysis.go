@@ -5,7 +5,6 @@ import (
 	"github.com/april1989/origin-go-tools/go/pointer"
 	pta0 "github.com/april1989/origin-go-tools/go/pointer_default"
 	"github.com/april1989/origin-go-tools/go/ssa"
-	log "github.com/sirupsen/logrus"
 	"go/types"
 )
 
@@ -68,10 +67,10 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 			}
 		case *ssa.MakeInterface:
 			methodName := theIns.(*ssa.Call).Call.Method.Name()
-			if a.prog.MethodSets.MethodSet(pta0Set[location].PointsTo().DynamicTypes().Keys()[0]).Lookup(a.mains[0].Pkg, methodName) == nil { // ignore abstract methods
+			if a.prog.MethodSets.MethodSet(pta0Set[location].PointsTo().DynamicTypes().Keys()[0]).Lookup(a.main.Pkg, methodName) == nil { // ignore abstract methods
 				break
 			}
-			check := a.prog.LookupMethod(pta0Set[location].PointsTo().DynamicTypes().Keys()[0], a.mains[0].Pkg, methodName)
+			check := a.prog.LookupMethod(pta0Set[location].PointsTo().DynamicTypes().Keys()[0], a.main.Pkg, methodName)
 			fnName = check.Name()
 			if !a.exploredFunction(check, goID, theIns) {
 				a.updateRecords(fnName, goID, "PUSH ", check, theIns)
@@ -96,7 +95,7 @@ func (a *analysis) pointerNewAnalysisOffset(location ssa.Value, f int, goID int,
 	} else {
 		goInstr = a.RWIns[goID][0].(*ssa.Go)
 	}
-	ptr := a.ptaRes[a.main].PointsToByGoWithLoopIDOffset(location, f, goInstr, a.loopIDs[goID])
+	ptr := a.ptaRes.PointsToByGoWithLoopIDOffset(location, f, goInstr, a.loopIDs[goID])
 	labels := ptr.PointsTo().Labels()
 	if labels == nil {
 		//bz: if nil, probably from reflection, which we excluded from analysis;
@@ -106,7 +105,7 @@ func (a *analysis) pointerNewAnalysisOffset(location ssa.Value, f int, goID int,
 		return
 	}
 
-	a.pointerNewAnalysisHandleFunc(ptr, labels, location, goID, theIns)
+	a.pointerNewAnalysisHandleFunc(ptr, labels, location, goID, goInstr, theIns)
 }
 
 //bz: use my pta
@@ -117,7 +116,19 @@ func (a *analysis) pointerNewAnalysis(location ssa.Value, goID int, theIns ssa.I
 	} else {
 		goInstr = a.RWIns[goID][0].(*ssa.Go)
 	}
-	ptr := a.ptaRes[a.main].PointsToByGoWithLoopID(location, goInstr, a.loopIDs[goID])
+	//if strings.Contains(theIns.String(), "onSuccess()") || strings.Contains(theIns.String(), "withRetry") {
+	//	fmt.Println("###", theIns) //bz:debug
+	//	parent := theIns.Parent()
+	//	for k, v := range a.stackMap {
+	//		if k.fnIns == parent && k.goID == goID {
+	//			for i, s := range v.fnCalls {
+	//				fmt.Println("-", i, s.fnIns)
+	//			}
+	//		}
+	//	}
+	//}
+
+	ptr := a.ptaRes.PointsToByGoWithLoopID(location, goInstr, a.loopIDs[goID])
 	labels := ptr.PointsTo().Labels()
 	if labels == nil {
 		//bz: if nil, probably from reflection, which we excluded from analysis;
@@ -127,20 +138,22 @@ func (a *analysis) pointerNewAnalysis(location ssa.Value, goID int, theIns ssa.I
 		return
 	}
 
-	a.pointerNewAnalysisHandleFunc(ptr, labels, location, goID, theIns)
+	a.pointerNewAnalysisHandleFunc(ptr, labels, location, goID, goInstr, theIns)
 }
 
 //bz: use my pta: comment job for both pointerNewAnalysis and pointerNewAnalysisOffset
-func (a *analysis) pointerNewAnalysisHandleFunc(ptr pointer.PointerWCtx, labels []*pointer.Label, location ssa.Value, goID int, theIns ssa.Instruction) {
-	if len(labels) > 1 { // pta returns multiple targets
-		a.filterLabels(labels, ptr, location, goID, theIns)
+func (a *analysis) pointerNewAnalysisHandleFunc(ptr pointer.PointerWCtx, labels []*pointer.Label, location ssa.Value, goID int, goInstr *ssa.Go,
+	theIns ssa.Instruction) {
+	if len(labels) > 1 { // pta returns multiple targets TODO: bz: wip
+		//labels = a.ptaRes.FilterTargets(labels, ptr, location, goInstr, theIns)
+		//labels = a.filterLabels(labels, ptr, location, goID, theIns)
 	}
 
-	for _, label := range labels { //bz: labels are reduced
+	for _, label := range labels { //bz: labels are reduced -> TODO: bz: here should use mutual exclusion too
 		var fnName string
 		switch theFunc := label.Value().(type) {
 		case *ssa.Function:
-			if theFunc == testEntry {
+			if theFunc == a.testEntry {
 				return
 			}
 			if a.getParam {
@@ -158,10 +171,10 @@ func (a *analysis) pointerNewAnalysisHandleFunc(ptr pointer.PointerWCtx, labels 
 			switch theIns.(type) {
 			case *ssa.Call:
 				methodName := theIns.(*ssa.Call).Call.Method.Name()
-				if a.prog.MethodSets.MethodSet(ptr.PointsTo().DynamicTypes().Keys()[0]).Lookup(a.mains[0].Pkg, methodName) == nil { // ignore abstract methods
+				if a.prog.MethodSets.MethodSet(ptr.PointsTo().DynamicTypes().Keys()[0]).Lookup(a.main.Pkg, methodName) == nil { // ignore abstract methods
 					break
 				}
-				check := a.prog.LookupMethod(ptr.PointsTo().DynamicTypes().Keys()[0], a.mains[0].Pkg, methodName)
+				check := a.prog.LookupMethod(ptr.PointsTo().DynamicTypes().Keys()[0], a.main.Pkg, methodName)
 				fnName = check.Name()
 				if !a.exploredFunction(check, goID, theIns) {
 					a.updateRecords(fnName, goID, "PUSH ", check, theIns)
@@ -184,9 +197,9 @@ func (a *analysis) pointerNewAnalysisHandleFunc(ptr pointer.PointerWCtx, labels 
 				} else {
 					goInstr = a.RWIns[goID][0].(*ssa.Go)
 				}
-				invokeFunc := a.ptaRes[a.main].GetFreeVarFunc(theIns.Parent(), call, goInstr)
+				invokeFunc := a.ptaRes.GetFreeVarFunc(theIns.Parent(), call, goInstr)
 				if invokeFunc == nil {
-					fmt.Println("no pta target")
+					fmt.Println("no pta target@", theIns)
 					break //bz: pta cannot find the target. how?
 				}
 				fnName = invokeFunc.Name()
@@ -202,7 +215,7 @@ func (a *analysis) pointerNewAnalysisHandleFunc(ptr pointer.PointerWCtx, labels 
 	}
 }
 
-//TODO: bz: need some heuristics to remove impossible targets,
+//TODO: bz: need some heuristics to remove impossible targets, especially for test
 // e.g.,
 // when t4(ctx, method, req, reply, cc, t9, opts...) in google.golang.org/grpc.chainUnaryClientInterceptors$1
 // returns 3 targets: TestInterceptorCanAccessCallOptions$2, failOkayRPC and chainUnaryClientInterceptors$1
@@ -211,29 +224,30 @@ func (a *analysis) pointerNewAnalysisHandleFunc(ptr pointer.PointerWCtx, labels 
 // chainUnaryClientInterceptors$1 already pushed and failOkayRPC is used by TestUnaryClientInterceptor
 //bz: reduce targets
 // the rule is we are supposed to find a target that (1) in the same scope of test/main (2) has been pushed, or already popped
-func (a *analysis) filterLabels(labels []*pointer.Label, ptr pointer.PointerWCtx, location ssa.Value, goID int, theIns ssa.Instruction) {
-	targetNames := make([]string, len(labels)) // get names of all targets
+func (a *analysis) filterLabels(labels []*pointer.Label, ptr pointer.PointerWCtx, location ssa.Value, goID int, theIns ssa.Instruction) []*pointer.Label {
+	var result []*pointer.Label
+	//if theIns.Parent() != nil && theIns.Parent().Name() == "withRetry" {
+	//	fmt.Println()
+	//}
 	for i, eachLabel := range labels {
 		fmt.Println("label", i, eachLabel.String())
 		switch theFunc := eachLabel.Value().(type) {
 		case *ssa.Function:
-			if theFunc == testEntry {
-				return
+			if theFunc == a.testEntry {
+				continue
 			}
-			targetNames[i] = theFunc.Name()
 		case *ssa.MakeInterface:
 			switch theIns.(type) {
 			case *ssa.Call:
 				methodName := theIns.(*ssa.Call).Call.Method.Name()
-				if a.prog.MethodSets.MethodSet(ptr.PointsTo().DynamicTypes().Keys()[0]).Lookup(a.mains[0].Pkg, methodName) == nil { // ignore abstract methods
+				if a.prog.MethodSets.MethodSet(ptr.PointsTo().DynamicTypes().Keys()[0]).Lookup(a.main.Pkg, methodName) == nil { // ignore abstract methods
 					break
 				}
-				check := a.prog.LookupMethod(ptr.PointsTo().DynamicTypes().Keys()[0], a.mains[0].Pkg, methodName)
-				targetNames[i] = check.Name()
+				check := a.prog.LookupMethod(ptr.PointsTo().DynamicTypes().Keys()[0], a.main.Pkg, methodName)
+				fmt.Println(check)
 			case *ssa.Go:
 				switch theFunc.X.(type) {
 				case *ssa.Parameter:
-					targetNames[i] = theFunc.X.Name()
 				}
 			}
 		case *ssa.Alloc:
@@ -244,29 +258,28 @@ func (a *analysis) filterLabels(labels []*pointer.Label, ptr pointer.PointerWCtx
 				} else {
 					goInstr = a.RWIns[goID][0].(*ssa.Go)
 				}
-				invokeFunc := a.ptaRes[a.main].GetFreeVarFunc(theIns.Parent(), call, goInstr)
+				invokeFunc := a.ptaRes.GetFreeVarFunc(theIns.Parent(), call, goInstr)
 				if invokeFunc == nil {
 					fmt.Println("no pta target")
-					break //bz: pta cannot find the target. how?
+					continue //bz: pta cannot find the target. how?
 				}
-				targetNames[i] = invokeFunc.Name()
 			}
 		case *ssa.MakeSlice:
-			targetNames[i] = theFunc.Name()
 		default:
-			break
+			continue
 		}
 	}
 	//log.Debug("PTA identified multiple targets: ", targetNames)
 
-	if theIns.Parent() != nil && theIns.Parent().Name() == "withRetry" {
-		for j, tName := range targetNames {
-			if tName == "commitAttemptLocked$bound" || tName == "RecvMsg$1" {
-				label := labels[j]
-				log.Debug("manually selecting pta target: ", tName, label)
-			}
-		}
-	}
+	//if theIns.Parent() != nil && theIns.Parent().Name() == "withRetry" {
+	//	for j, tName := range targetNames {
+	//		if tName == "commitAttemptLocked$bound" || tName == "RecvMsg$1" {
+	//			label := labels[j]
+	//			log.Debug("manually selecting pta target: ", tName, label)
+	//		}
+	//	}
+	//}
+	return result
 }
 
 //bz: an example use of new api

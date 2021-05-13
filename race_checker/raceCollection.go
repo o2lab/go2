@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"github.com/april1989/origin-go-tools/go/pointer"
 	"github.com/april1989/origin-go-tools/go/ssa"
 	"github.com/logrusorgru/aurora"
 	log "github.com/sirupsen/logrus"
@@ -345,9 +344,9 @@ func (a *analysis) sameAddress(addr1 ssa.Value, addr2 ssa.Value, go1 int, go2 in
 		return ptsets[addr1].PointsTo().Intersects(ptsets[addr2].PointsTo())
 	}
 	// new PTA
-	if go1 == 0 && go2 == 0 {
-		ptset1 := a.ptaRes[a.main].Queries[addr1]
-		ptset2 := a.ptaRes[a.main].Queries[addr2]
+	if go1 == 0 && go2 == 0 { //TODO: bz: does this mean two goroutines are both main goroutines? then no need to compare?
+		ptset1 := a.ptaRes.Queries[addr1]
+		ptset2 := a.ptaRes.Queries[addr2]
 		for _, ptrCtx1 := range ptset1 {
 			for _, ptrCtx2 := range ptset2 {
 				if ptrCtx1.MayAlias(ptrCtx2) {
@@ -357,19 +356,22 @@ func (a *analysis) sameAddress(addr1 ssa.Value, addr2 ssa.Value, go1 int, go2 in
 		}
 		return false
 	}
-	var pt1 pointer.PointerWCtx
-	var pt2 pointer.PointerWCtx
+
+	var goInstr1 *ssa.Go
 	if go1 == 0 {
-		pt1 = a.ptaRes[a.main].PointsToByGoWithLoopID(addr1, nil, a.loopIDs[go1])
+		goInstr1 = nil
 	} else {
-		pt1 = a.ptaRes[a.main].PointsToByGoWithLoopID(addr1, a.RWIns[go1][0].(*ssa.Go), a.loopIDs[go1])
+		goInstr1 = a.RWIns[go1][0].(*ssa.Go)
 	}
+	ptr1 := a.ptaRes.PointsToByGoWithLoopID(addr1, goInstr1, a.loopIDs[go1])
+	var goInstr2 *ssa.Go
 	if go2 == 0 {
-		pt2 = a.ptaRes[a.main].PointsToByGoWithLoopID(addr2, nil, a.loopIDs[go2])
+		goInstr2 = nil
 	} else {
-		pt2 = a.ptaRes[a.main].PointsToByGoWithLoopID(addr2, a.RWIns[go2][0].(*ssa.Go), a.loopIDs[go2])
+		goInstr2 = a.RWIns[go2][0].(*ssa.Go)
 	}
-	return pt1.MayAlias(pt2)
+	ptr2 := a.ptaRes.PointsToByGoWithLoopID(addr2, goInstr2, a.loopIDs[go2])
+	return ptr1.MayAlias(ptr2)
 }
 
 // reachable determines if 2 input instructions are connected in the Happens-Before Graph

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"github.com/april1989/origin-go-tools/go/ssa"
 	log "github.com/sirupsen/logrus"
 	"go/constant"
@@ -94,9 +93,6 @@ func isWriteIns(ins ssa.Instruction) bool {
 
 // updateRecords will print out the stack trace
 func (a *analysis) updateRecords(fnName string, goID int, pushPop string, theFn *ssa.Function, theIns ssa.Instruction) {
-	if strings.EqualFold(fnName, "InitialConnWindowSize") || strings.EqualFold(fnName, "listenWithConnControl"){
-		fmt.Println(pushPop)
-	}
 	if pushPop == "POP  " {
 		a.storeFns = a.storeFns[:len(a.storeFns)-1]
 		a.levels[goID]--
@@ -203,26 +199,26 @@ func (a *analysis) insUnOp(examIns *ssa.UnOp, goID int, theIns ssa.Instruction) 
 			a.ptaCfg0.AddQuery(examIns.X)
 			a.mu.Unlock()
 		}
-		if v, isGlobalVar := examIns.X.(*ssa.Global); isGlobalVar {
-			if strct, isStruct := v.Type().(*types.Pointer).Elem().Underlying().(*types.Struct); isStruct {
-				for i := 0; i < strct.NumFields(); i++ {
-					f := strct.Field(i)
-					switch f.Type().(type) {
-					case *types.Interface: //bz: fit checkpointCommand field Action in /tests/runc_simple.go, is there other types that leads to func?
-						a.pointerNewAnalysisOffset(v, i, goID, theIns) //bz: i here is the offset
-					}
-				}
-
-				//for fnKey, member := range v.Pkg.Members {//bz: why .... are you creating calls to all the functions in v.pkg.members????
-				//	if memberFn, isFn := member.(*ssa.Function); isFn && fnKey != "main" && fnKey != "init" {
-				//		if !a.exploredFunction(memberFn, goID, theIns) {
-				//			a.updateRecords(memberFn.Name(), goID, "PUSH ", memberFn, theIns)
-				//			a.visitAllInstructions(memberFn, goID)
-				//		}
-				//	}
-				//}
-			}
-		}
+		//if v, isGlobalVar := examIns.X.(*ssa.Global); isGlobalVar {
+		//	if strct, isStruct := v.Type().(*types.Pointer).Elem().Underlying().(*types.Struct); isStruct {
+		//		for i := 0; i < strct.NumFields(); i++ {
+		//			f := strct.Field(i)
+		//			switch f.Type().(type) {
+		//			case *types.Interface: //bz: fit checkpointCommand field Action in /tests/runc_simple.go, is there other types that leads to func?
+		//				a.pointerNewAnalysisOffset(v, i, goID, theIns) //bz: i here is the offset
+		//			}
+		//		}
+		//
+		//		//for fnKey, member := range v.Pkg.Members {//bz: why .... are you creating calls to all the functions in v.pkg.members????
+		//		//	if memberFn, isFn := member.(*ssa.Function); isFn && fnKey != "main" && fnKey != "init" {
+		//		//		if !a.exploredFunction(memberFn, goID, theIns) {
+		//		//			a.updateRecords(memberFn.Name(), goID, "PUSH ", memberFn, theIns)
+		//		//			a.visitAllInstructions(memberFn, goID)
+		//		//		}
+		//		//	}
+		//		//}
+		//	}
+		//}
 		a.RWIns[goID] = append(a.RWIns[goID], theIns)
 	} else if examIns.Op == token.ARROW { // channel receive op (not waited on by select)
 		ch := examIns.X.Name()
@@ -403,10 +399,6 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 						a.mu.Unlock()
 					}
 				}
-			case *ssa.Function:
-				a.updateRecords(access.Name(), goID, "PUSH ", access, theIns)
-				a.RWIns[goID] = append(a.RWIns[goID], theIns)
-				a.visitAllInstructions(access, goID)
 			case *ssa.UnOp:
 				if !isLocalAddr(access.X) {
 					a.RWIns[goID] = append(a.RWIns[goID], theIns)
@@ -417,10 +409,16 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 			//	a.RWIns[goID] = append(a.RWIns[goID], theIns)
 			//	a.updateLockMap(goID, theIns)
 			//	a.updateRLockMap(goID, theIns)
-			case *ssa.MakeClosure:
-				a.updateRecords(access.Fn.(*ssa.Function).Name(), goID, "PUSH ", access.Fn.(*ssa.Function), theIns)
-				a.RWIns[goID] = append(a.RWIns[goID], theIns)
-				a.visitAllInstructions(access.Fn.(*ssa.Function), goID)
+
+			//bz: this should not be pushed -> this just stores a func pointer in parameters (or wrapped in MakeClosure), this func pointer will be invoked later not here
+			//case *ssa.Function:
+			//	a.updateRecords(access.Name(), goID, "PUSH ", access, theIns)
+			//	a.RWIns[goID] = append(a.RWIns[goID], theIns)
+			//	a.visitAllInstructions(access, goID)
+			//case *ssa.MakeClosure:
+			//	a.updateRecords(access.Fn.(*ssa.Function).Name(), goID, "PUSH ", access.Fn.(*ssa.Function), theIns)
+			//	a.RWIns[goID] = append(a.RWIns[goID], theIns)
+			//	a.visitAllInstructions(access.Fn.(*ssa.Function), goID)
 			default:
 				continue
 			}
