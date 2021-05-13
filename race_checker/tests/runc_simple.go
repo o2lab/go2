@@ -18,13 +18,16 @@ checkpointed.`,
 	Flags: []cli.Flag{
 		cli.StringFlag{Name: "image-path", Value: "", Usage: "path for saving criu image files"},
 	},
-	Action: someFn(),
+	Action:  func(context *cli.Context) error {
+		err := someFn()
+		return err
+	},
 }
 
-func someFn() int {
+func someFn() error {
 	x /* RACE Write */ = 3
 	fmt.Println(x)
-	return x
+	return fmt.Errorf("x is racy")
 }
 
 func main() {
@@ -46,5 +49,7 @@ func main() {
 	app.Commands = []cli.Command{
 		checkpointCommand,
 	}
-	fmt.Println(app.Commands[0].Action)
+	ctx := cli.NewContext(app, nil, nil)
+	f := app.Commands[0].Action.(func(context *cli.Context) error) //bz: this is the correct invoke
+	f(ctx)
 }
