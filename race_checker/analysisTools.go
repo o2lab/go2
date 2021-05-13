@@ -321,7 +321,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 		}
 		if strings.Contains(b.Comment, ".done") && i < len(bVisit0)-1 { // not the last block
 			statement = strings.Split(b.Comment, ".done")[0]
-			pushBack = append([]*ssa.BasicBlock{b}, pushBack...)
+			pushBack = append(pushBack, b)
 		} else {
 			bVisit = append(bVisit, b)
 		}
