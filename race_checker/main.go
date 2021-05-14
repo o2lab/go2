@@ -19,7 +19,7 @@ import (
 
 type analysis struct {
 	mu      sync.RWMutex
-	ptaRes  map[*ssa.Package]*pointer.Result //now can reuse the ptaRes
+	ptaRes  *pointer.Result //now can reuse the ptaRes
 	ptaRes0 *pta0.Result
 	ptaCfg  *pointer.Config
 	ptaCfg0 *pta0.Config
@@ -28,8 +28,6 @@ type analysis struct {
 	trieLimit       int
 	getGo           bool // flag
 	prog            *ssa.Program
-	pkgs            []*ssa.Package
-	mains           []*ssa.Package
 	main            *ssa.Package
 	analysisStat    stat
 	HBgraph         *graph.Graph
@@ -77,6 +75,9 @@ type analysis struct {
 	pbr             *ssa.Alloc
 	commIDs         map[int][]int
 	deferToRet      map[*ssa.Defer]ssa.Instruction
+
+	entryFn         string         //bz: move from global to analysis field
+	testEntry       *ssa.Function  //bz: test entry point
 }
 
 type lockInfo struct {
@@ -169,8 +170,6 @@ var useNewPTA = true
 var trieLimit = 2      // set as user config option later, an integer that dictates how many times a function can be called under identical context
 var efficiency = true  // configuration setting to avoid recursion in tested program
 var channelComm = true // analyze channel communication
-var entryFn = "main"
-var testEntry *ssa.Function
 var allEntries = false
 var useDefaultPTA = false
 var getGo = false
