@@ -7,12 +7,12 @@ import (
 )
 
 // insToCallStack will return the callStack of the input instructions that called a function but did not return
-func insToCallStack(allIns []ssa.Instruction) ([]*ssa.Function, string) {
+func insToCallStack(allIns []*insInfo) ([]*ssa.Function, string) {
 	var callStack []*ssa.Function
 	for _, anIns := range allIns {
-		if fnCall, ok := anIns.(*ssa.Call); ok {
+		if fnCall, ok := anIns.ins.(*ssa.Call); ok {
 			callStack = append(callStack, fnCall.Call.StaticCallee())
-		} else if _, ok1 := anIns.(*ssa.Return); ok1 && len(callStack) > 0 { // TODO: need to consider function with multiple return statements
+		} else if _, ok1 := anIns.ins.(*ssa.Return); ok1 && len(callStack) > 0 { // TODO: need to consider function with multiple return statements
 			callStack = callStack[:len(callStack)-1]
 		}
 	}
@@ -35,7 +35,7 @@ func sliceContains(s []ssa.Value, e ssa.Value) bool {
 	return false
 }
 
-func stackContainsDefer(stack []fnCallInfo) bool {
+func stackContainsDefer(stack []*fnCallInfo) bool {
 	for _, eachIns := range stack {
 		if _, isDefer := eachIns.ssaIns.(*ssa.Defer); isDefer {
 			return true
@@ -44,7 +44,7 @@ func stackContainsDefer(stack []fnCallInfo) bool {
 	return false
 }
 
-func noGoAfterFn(stack []fnCallInfo, divFnAt int) bool {
+func noGoAfterFn(stack []*fnCallInfo, divFnAt int) bool {
 	for i := divFnAt; i < len(stack); i++ {
 		if stack[i].ssaIns != nil && i != 0 {
 			if _, isGo := stack[i].ssaIns.(*ssa.Go); isGo {
@@ -55,7 +55,7 @@ func noGoAfterFn(stack []fnCallInfo, divFnAt int) bool {
 	return true
 }
 
-func sliceContainsFnCall(s []fnCallInfo, e fnCallInfo) bool {
+func sliceContainsFnCall(s []*fnCallInfo, e fnCallInfo) bool {
 	for _, a := range s {
 		if a.fnIns.Pos() == e.fnIns.Pos() && a.ssaIns.Pos() == e.ssaIns.Pos() {
 			return true
@@ -147,6 +147,15 @@ func sliceContainsStrCtr(s []string, e string) int {
 func sliceContainsInsAt(s []ssa.Instruction, e ssa.Instruction) int {
 	for i := 0; i < len(s); i++ {
 		if s[i] == e {
+			return i
+		}
+	}
+	return -1
+}
+
+func sliceContainsInsInfoAt(s []*insInfo, e ssa.Instruction) int {
+	for i := 0; i < len(s); i++ {
+		if s[i].ins == e {
 			return i
 		}
 	}

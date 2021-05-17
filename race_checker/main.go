@@ -46,7 +46,7 @@ type analysis struct {
 	RlockSet     map[int][]*lockInfo             // active lockset, to be maintained along instruction traversal
 	getParam     bool
 	paramFunc       *ssa.Function
-	goStack         [][]fnCallInfo
+	goStack         [][]*fnCallInfo
 	goCaller        map[int]int
 	goCalls         map[int]*goCallInfo
 	chanToken       map[string]string      // map token number to channel name
@@ -99,7 +99,7 @@ type lockInfo struct {
 }
 
 type raceInfo struct {
-	insPair  []ssa.Instruction
+	insPair  []*insInfo
 	addrPair [2]ssa.Value
 	goIDs    []int
 	insInd   []int

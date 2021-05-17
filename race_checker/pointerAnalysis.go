@@ -62,7 +62,8 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 			fnName = theFunc.Name()
 			if !a.exploredFunction(theFunc, goID, theIns) {
 				a.updateRecords(fnName, goID, "PUSH ", theFunc, theIns)
-				a.RWIns[goID] = append(a.RWIns[goID], theIns)
+				a.recordIns(goID, theIns)
+				//a.RWIns[goID] = append(a.RWIns[goID], theIns)
 				a.visitAllInstructions(theFunc, goID)
 			}
 		case *ssa.MakeInterface:
@@ -74,7 +75,8 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 			fnName = check.Name()
 			if !a.exploredFunction(check, goID, theIns) {
 				a.updateRecords(fnName, goID, "PUSH ", check, theIns)
-				a.RWIns[goID] = append(a.RWIns[goID], theIns)
+				a.recordIns(goID, theIns)
+				//a.RWIns[goID] = append(a.RWIns[goID], theIns)
 				a.visitAllInstructions(check, goID)
 			}
 		case *ssa.MakeChan:
@@ -93,7 +95,7 @@ func (a *analysis) pointerNewAnalysisOffset(location ssa.Value, f int, goID int,
 	if goID == 0 {
 		goInstr = nil
 	} else {
-		goInstr = a.RWIns[goID][0].(*ssa.Go)
+		goInstr = a.RWIns[goID][0].ins.(*ssa.Go)
 	}
 	ptr := a.ptaRes.PointsToByGoWithLoopIDOffset(location, f, goInstr, a.loopIDs[goID])
 	labels := ptr.PointsTo().Labels()
@@ -114,7 +116,7 @@ func (a *analysis) pointerNewAnalysis(location ssa.Value, goID int, theIns ssa.I
 	if goID == 0 {
 		goInstr = nil
 	} else {
-		goInstr = a.RWIns[goID][0].(*ssa.Go)
+		goInstr = a.RWIns[goID][0].ins.(*ssa.Go)
 	}
 	//if strings.Contains(theIns.String(), "onSuccess()") || strings.Contains(theIns.String(), "withRetry") {
 	//	fmt.Println("###", theIns) //bz:debug
@@ -164,7 +166,8 @@ func (a *analysis) pointerNewAnalysisHandleFunc(ptr pointer.PointerWCtx, labels 
 				fnName = theFunc.Name()
 				if !a.exploredFunction(theFunc, goID, theIns) {
 					a.updateRecords(fnName, goID, "PUSH ", theFunc, theIns)
-					a.RWIns[goID] = append(a.RWIns[goID], theIns)
+					a.recordIns(goID, theIns)
+					//a.RWIns[goID] = append(a.RWIns[goID], theIns)
 					a.visitAllInstructions(theFunc, goID)
 				}
 			}
@@ -179,7 +182,8 @@ func (a *analysis) pointerNewAnalysisHandleFunc(ptr pointer.PointerWCtx, labels 
 				fnName = check.Name()
 				if !a.exploredFunction(check, goID, theIns) {
 					a.updateRecords(fnName, goID, "PUSH ", check, theIns)
-					a.RWIns[goID] = append(a.RWIns[goID], theIns)
+					a.recordIns(goID, theIns)
+					//a.RWIns[goID] = append(a.RWIns[goID], theIns)
 					a.visitAllInstructions(check, goID)
 				}
 			case *ssa.Go:
@@ -192,13 +196,13 @@ func (a *analysis) pointerNewAnalysisHandleFunc(ptr pointer.PointerWCtx, labels 
 			a.chanName = theFunc.Name()
 		case *ssa.Alloc:
 			if call, ok := theIns.(*ssa.Call); ok {
-				var goInstr *ssa.Go
+				var goInst *ssa.Go
 				if goID == 0 {
-					goInstr = nil
+					goInst = nil
 				} else {
-					goInstr = a.RWIns[goID][0].(*ssa.Go)
+					goInst = a.RWIns[goID][0].ins.(*ssa.Go)
 				}
-				invokeFunc := a.ptaRes.GetFreeVarFunc(theIns.Parent(), call, goInstr)
+				invokeFunc := a.ptaRes.GetFreeVarFunc(theIns.Parent(), call, goInst)
 				if invokeFunc == nil {
 					fmt.Println("no pta target@", theIns)
 					break //bz: pta cannot find the target. how?
@@ -206,7 +210,8 @@ func (a *analysis) pointerNewAnalysisHandleFunc(ptr pointer.PointerWCtx, labels 
 				fnName = invokeFunc.Name()
 				if !a.exploredFunction(invokeFunc, goID, theIns) {
 					a.updateRecords(fnName, goID, "PUSH ", invokeFunc, theIns)
-					a.RWIns[goID] = append(a.RWIns[goID], theIns)
+					a.recordIns(goID, theIns)
+					//a.RWIns[goID] = append(a.RWIns[goID], theIns)
 					a.visitAllInstructions(invokeFunc, goID)
 				}
 			}
@@ -257,7 +262,7 @@ func (a *analysis) filterLabels(labels []*pointer.Label, ptr pointer.PointerWCtx
 				if goID == 0 {
 					goInstr = nil
 				} else {
-					goInstr = a.RWIns[goID][0].(*ssa.Go)
+					goInstr = a.RWIns[goID][0].ins.(*ssa.Go)
 				}
 				invokeFunc := a.ptaRes.GetFreeVarFunc(theIns.Parent(), call, goInstr)
 				if invokeFunc == nil {

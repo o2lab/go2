@@ -297,7 +297,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				a.levels[goID] = 0 // initialize level count at main entry
 				a.loopIDs[goID] = 0
 				a.updateRecords(fn.Name(), goID, "PUSH ", fn, nil)
-				a.goStack = append(a.goStack, []fnCallInfo{}) // initialize first interior slice for main goroutine
+				a.goStack = append(a.goStack, []*fnCallInfo{}) // initialize first interior slice for main goroutine
 			} else { //revisiting entry-point
 				return
 			}
@@ -377,11 +377,8 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 		}
 		for ii, theIns := range aBlock.Instrs { // examine each instruction
 			if theIns.String() == "rundefers" { // execute deferred calls at this index
-				thisIns := &insInfo{
-					ins: theIns,
-					stack:
-				}
-				a.RWIns[goID] = append(a.RWIns[goID], theIns)
+				a.recordIns(goID, theIns)
+				//a.RWIns[goID] = append(a.RWIns[goID], theIns)
 				for _, dIns := range toDefer {  // ----> !!! SEE HERE: bz: the same as above, from line 307 to 347 can be separated out
 					deferIns := dIns.(*ssa.Defer)
 					a.deferToRet[deferIns] = theIns
@@ -395,7 +392,8 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 						fnName = checkTokenNameDefer(fnName, deferIns)
 						if !a.exploredFunction(deferIns.Call.StaticCallee(), goID, dIns) {
 							a.updateRecords(fnName, goID, "PUSH ", deferIns.Call.StaticCallee(), dIns)
-							a.RWIns[goID] = append(a.RWIns[goID], dIns)
+							a.recordIns(goID, dIns)
+							//a.RWIns[goID] = append(a.RWIns[goID], dIns)
 							a.visitAllInstructions(deferIns.Call.StaticCallee(), goID)
 						}
 					} else if deferIns.Call.StaticCallee().Name() == "Unlock" {
@@ -415,7 +413,8 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 						}
 						toRUnlock = append(toRUnlock, RlockLoc)
 					} else if deferIns.Call.Value.Name() == "Done" {
-						a.RWIns[goID] = append(a.RWIns[goID], dIns)
+						a.recordIns(goID, dIns)
+						//a.RWIns[goID] = append(a.RWIns[goID], dIns)
 						if !useNewPTA {
 							a.mu.Lock()
 							a.ptaCfg0.AddQuery(deferIns.Call.Args[0])
@@ -486,7 +485,8 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				toUnlock = append(toUnlock, unlockOps...)
 				toRUnlock = append(toRUnlock, runlockOps...)
 			case *ssa.Alloc:
-				a.RWIns[goID] = append(a.RWIns[goID], theIns)
+				a.recordIns(goID, theIns)
+				//a.RWIns[goID] = append(a.RWIns[goID], theIns)
 				if a.inLoop {
 					a.allocLoop[examIns.Parent()] = append(a.allocLoop[examIns.Parent()], examIns.Comment)
 				}
@@ -507,7 +507,8 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				}
 				a.insGo(examIns, goID, theIns, loopID) // loopID == 2 if goroutine in loop, loopID == 0 otherwise
 			case *ssa.Return:
-				a.RWIns[goID] = append(a.RWIns[goID], theIns)
+				a.recordIns(goID, theIns)
+				//a.RWIns[goID] = append(a.RWIns[goID], theIns)
 				if examIns.Block().Comment == "if.then" || examIns.Block().Comment == "if.else" || examIns.Block().Comment == "if.done" {
 					a.ifFnReturn[fn] = examIns // will be revised iteratively to eventually contain final return instruction
 				}
@@ -519,10 +520,12 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				selIns = examIns
 				a.selectBloc[aBlock.Index] = examIns
 			case *ssa.If:
-				a.RWIns[goID] = append(a.RWIns[goID], theIns)
+				a.recordIns(goID, theIns)
+				//a.RWIns[goID] = append(a.RWIns[goID], theIns)
 				ifIns = examIns
 			default:
-				a.RWIns[goID] = append(a.RWIns[goID], theIns) // TODO: consolidate
+				a.recordIns(goID, theIns)
+				//a.RWIns[goID] = append(a.RWIns[goID], theIns) // TODO: consolidate
 			}
 			if ii == len(aBlock.Instrs)-1 && len(toUnlock) > 0 { // TODO: this can happen too early
 				for _, l := range toUnlock {
@@ -540,14 +543,16 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 			if activeCase && readyChans[selCount] != "defaultCase" && readyChans[selCount] != "timeOut" {
 				if ii == 0 {
 					a.selectCaseBegin[theIns] = readyChans[selCount] // map first instruction in case to channel name
-					if a.RWIns[goID][len(a.RWIns[goID])-1] != theIns {
-						a.RWIns[goID] = append(a.RWIns[goID], theIns)
+					if a.RWIns[goID][len(a.RWIns[goID])-1].ins != theIns {
+						a.recordIns(goID, theIns)
+						//a.RWIns[goID] = append(a.RWIns[goID], theIns)
 					}
 					a.selectCaseBody[theIns] = selIns
 				} else if ii == len(aBlock.Instrs)-1 {
 					a.selectCaseEnd[theIns] = readyChans[selCount] // map last instruction in case to channel name
-					if a.RWIns[goID][len(a.RWIns[goID])-1] != theIns {
-						a.RWIns[goID] = append(a.RWIns[goID], theIns)
+					if a.RWIns[goID][len(a.RWIns[goID])-1].ins != theIns {
+						a.recordIns(goID, theIns)
+						//a.RWIns[goID] = append(a.RWIns[goID], theIns)
 					}
 					a.selectCaseBody[theIns] = selIns
 				} else {
@@ -558,8 +563,9 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				a.selectCaseBody[theIns] = selIns
 			}
 			if selDone && ii == 0 {
-				if sliceContainsInsAt(a.RWIns[goID], theIns) == -1 {
-					a.RWIns[goID] = append(a.RWIns[goID], theIns)
+				if sliceContainsInsInfoAt(a.RWIns[goID], theIns) == -1 {
+					a.recordIns(goID, theIns)
+					//a.RWIns[goID] = append(a.RWIns[goID], theIns)
 				}
 			}
 		}
@@ -588,7 +594,8 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				fnName = checkTokenNameDefer(fnName, deferIns)
 				if !a.exploredFunction(deferIns.Call.StaticCallee(), goID, dIns) {
 					a.updateRecords(fnName, goID, "PUSH ", deferIns.Call.StaticCallee(), dIns)
-					a.RWIns[goID] = append(a.RWIns[goID], dIns)
+					a.recordIns(goID, dIns)
+					//a.RWIns[goID] = append(a.RWIns[goID], dIns)
 					a.visitAllInstructions(deferIns.Call.StaticCallee(), goID)
 				}
 			} else if deferIns.Call.StaticCallee().Name() == "Unlock" {
@@ -614,7 +621,8 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				}
 				toRUnlock = append(toRUnlock, RlockLoc)
 			} else if deferIns.Call.Value.Name() == "Done" {
-				a.RWIns[goID] = append(a.RWIns[goID], dIns)
+				a.recordIns(goID, dIns)
+				//a.RWIns[goID] = append(a.RWIns[goID], dIns)
 				if !useNewPTA {
 					a.mu.Lock()
 					a.ptaCfg0.AddQuery(deferIns.Call.Args[0])
@@ -689,12 +697,13 @@ func (a *analysis) newGoroutine(info goroutineInfo) {
 	if a.goCalls[a.goCaller[info.goID]] != nil && info.goIns == a.goCalls[a.goCaller[info.goID]].goIns {
 		return // recursive spawning of same goroutine
 	}
-	newFn := fnCallInfo{fnIns: info.entryMethod, ssaIns: info.ssaIns}
+	newFn := &fnCallInfo{fnIns: info.entryMethod, ssaIns: info.ssaIns}
 	a.storeFns = append(a.storeFns, newFn)
 	if info.goID >= len(a.RWIns) { // initialize interior slice for new goroutine
-		a.RWIns = append(a.RWIns, []ssa.Instruction{})
+		a.RWIns = append(a.RWIns, []*insInfo{})
 	}
-	a.RWIns[info.goID] = append(a.RWIns[info.goID], info.ssaIns)
+	a.recordIns(info.goID, info.ssaIns)
+	//a.RWIns[info.goID] = append(a.RWIns[info.goID], info.ssaIns)
 	newGoInfo := &goCallInfo{goIns: info.goIns, ssaIns: info.ssaIns}
 	a.goCalls[info.goID] = newGoInfo
 	if !allEntries {
@@ -710,10 +719,10 @@ func (a *analysis) newGoroutine(info goroutineInfo) {
 	}
 	if !allEntries {
 		log.Debug(strings.Repeat(" ", a.levels[info.goID]), "PUSH ", info.entryMethod.Name(), " at lvl ", a.levels[info.goID])
-		fnCall := fnCallIns{fnIns: info.entryMethod, goID: info.goID}
-		stack := make([]fnCallInfo, len(a.storeFns))
-		copy(stack, a.storeFns)
-		a.stackMap[fnCall] = stackInfo{fnCalls: stack}
+		//fnCall := fnCallIns{fnIns: info.entryMethod, goID: info.goID}
+		//stack := make([]fnCallInfo, len(a.storeFns))
+		//copy(stack, a.storeFns)
+		//a.stackMap[fnCall] = stackInfo{fnCalls: stack}
 	}
 	a.levels[info.goID]++
 	switch info.goIns.Call.Value.(type) {
@@ -741,7 +750,7 @@ func (a *analysis) exploredFunction(fn *ssa.Function, goID int, theIns ssa.Instr
 	if a.efficiency && sliceContainsFnCall(a.storeFns, theFn) { // for temporary debugging purposes only
 		return true
 	}
-	var visitedIns []ssa.Instruction
+	var visitedIns []*insInfo
 	if len(a.RWIns) > 0 {
 		visitedIns = a.RWIns[goID]
 	}

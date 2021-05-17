@@ -31,9 +31,9 @@ func isLocal(ins ssa.Instruction) bool {
 
 func (a *analysis) canRunInParallel(goID1 int, goID2 int) bool {
 	paths := [2][]int{}         // thread traversal
-	stacks := [2][]fnCallInfo{} // fn traversal
+	stacks := [2][]*fnCallInfo{} // fn traversal
 	goIDs := []int{goID1, goID2}
-	divFn := fnCallInfo{nil, nil} // fn where divergence happens
+	divFn := &fnCallInfo{nil, nil} // fn where divergence happens
 	for i, ID := range goIDs {    // for each thread
 		for ID > 0 { // traverse up the call chain
 			paths[i] = append([]int{ID}, paths[i]...) // prepend
@@ -73,12 +73,12 @@ func (a *analysis) canRunInParallel(goID1 int, goID2 int) bool {
 	return true
 }
 
-func (a *analysis) mutuallyExcluded(goI ssa.Instruction, I int, goJ ssa.Instruction, J int) bool {
+func (a *analysis) mutuallyExcluded(goI *insInfo, I int, goJ *insInfo, J int) bool {
 	paths := [2][]int{}         // thread traversal
-	stacks := [2][]fnCallInfo{} // fn traversal
+	stacks := [2][]*fnCallInfo{} // fn traversal
 	goIDs := []int{I, J}
-	insPair := []ssa.Instruction{goI, goJ}
-	divFn := fnCallInfo{nil, nil} // fn where divergence happens
+	insPair := []*insInfo{goI, goJ}
+	divFn := &fnCallInfo{nil, nil} // fn where divergence happens
 	for i, ID := range goIDs {    // for each thread
 		for ID > 0 { // traverse up the call chain
 			paths[i] = append([]int{ID}, paths[i]...) // prepend
@@ -88,8 +88,8 @@ func (a *analysis) mutuallyExcluded(goI ssa.Instruction, I int, goJ ssa.Instruct
 		for _, eachGo := range paths[i] { // concatenate call chain from each thread
 			stacks[i] = append(stacks[i], a.goStack[eachGo][:len(a.goStack[eachGo])-1]...)
 		}
-		fnCall := fnCallIns{insPair[i].Parent(), goIDs[i]}
-		stacks[i] = append(stacks[i], a.stackMap[fnCall].fnCalls...)
+		//fnCall := fnCallIns{insPair[i].Parent(), goIDs[i]}
+		stacks[i] = append(stacks[i], insPair[i].stack...)
 	}
 	var divFnAt int
 	var b1, b2 *ssa.BasicBlock
@@ -98,7 +98,7 @@ func (a *analysis) mutuallyExcluded(goI ssa.Instruction, I int, goJ ssa.Instruct
 			if j == len(stacks[0])-1 { // this access is in main function
 				divFn = fn // divergence happened in main
 				divFnAt = j
-				b1 = goI.Block()
+				b1 = goI.ins.Block()
 				b2 = stacks[1][j+1].ssaIns.Block()
 				if deferIns, isDefer := stacks[1][j+1].ssaIns.(*ssa.Defer); isDefer && a.deferToRet[deferIns] != nil {
 					b2 = a.deferToRet[deferIns].Block()
@@ -107,7 +107,7 @@ func (a *analysis) mutuallyExcluded(goI ssa.Instruction, I int, goJ ssa.Instruct
 			} else if j == len(stacks[1])-1 {
 				divFn = fn
 				divFnAt = j
-				b2 = goJ.Block()
+				b2 = goJ.ins.Block()
 				b1 = stacks[0][j+1].ssaIns.Block()
 				if deferIns, isDefer := stacks[0][j+1].ssaIns.(*ssa.Defer); isDefer && a.deferToRet[deferIns] != nil {
 					b1 = a.deferToRet[deferIns].Block()
@@ -119,7 +119,7 @@ func (a *analysis) mutuallyExcluded(goI ssa.Instruction, I int, goJ ssa.Instruct
 			if fn == stacks[1][j] { // common call
 				divFn = fn
 				divFnAt = j
-				b1 = goI.Block()
+				b1 = goI.ins.Block()
 				if j == len(stacks[1])-1 { // same access in different iterations of loop
 					return false
 				} else {
@@ -145,7 +145,7 @@ func (a *analysis) mutuallyExcluded(goI ssa.Instruction, I int, goJ ssa.Instruct
 			if fn == stacks[1][j] { // common call
 				divFn = fn
 				divFnAt = j
-				b2 = goJ.Block()
+				b2 = goJ.ins.Block()
 				b1 = stacks[0][j+1].ssaIns.Block()
 				if deferIns, isDefer := stacks[0][j+1].ssaIns.(*ssa.Defer); isDefer && a.deferToRet[deferIns] != nil {
 					b1 = a.deferToRet[deferIns].Block()
@@ -212,18 +212,18 @@ func (a *analysis) checkRacyPairs() []*raceInfo {
 				continue
 			}
 			for ii, goI := range a.RWIns[i] {
-				if (i == 0 && ii < a.insMono) || (channelComm && sliceContainsBloc(a.omitComm, goI.Block())) {
+				if (i == 0 && ii < a.insMono) || (channelComm && sliceContainsBloc(a.omitComm, goI.ins.Block())) {
 					continue
 				}
 				for jj, goJ := range a.RWIns[j] {
-					if channelComm && sliceContainsBloc(a.omitComm, goJ.Block()) {
+					if channelComm && sliceContainsBloc(a.omitComm, goJ.ins.Block()) {
 						continue
 					}
-					if (isWriteIns(goI) && isWriteIns(goJ)) || (isWriteIns(goI) && a.isReadIns(goJ)) || (a.isReadIns(goI) && isWriteIns(goJ)) { // only read and write instructions
-						if isLocal(goI) && isLocal(goJ) { // both are locally declared
+					if (isWriteIns(goI.ins) && isWriteIns(goJ.ins)) || (isWriteIns(goI.ins) && a.isReadIns(goJ.ins)) || (a.isReadIns(goI.ins) && isWriteIns(goJ.ins)) { // only read and write instructions
+						if isLocal(goI.ins) && isLocal(goJ.ins) { // both are locally declared
 							continue
 						}
-						insSlice := []ssa.Instruction{goI, goJ}
+						insSlice := []*insInfo{goI, goJ}
 						addressPair := a.insAddress(insSlice) // one instruction from each goroutine
 						if addressPair[0] == nil || addressPair[1] == nil {
 							continue
@@ -248,11 +248,11 @@ func (a *analysis) checkRacyPairs() []*raceInfo {
 
 						if a.sameAddress(addressPair[0], addressPair[1], i, j) &&
 							!sliceContains(a.reportedAddr, addressPair[0]) &&
-							!a.reachable(goI, i, goJ, j) &&
-							!a.reachable(goJ, j, goI, i) &&
-							!a.bothAtomic(insSlice[0], insSlice[1]) &&
-							!a.lockSetsIntersect(goI, goJ, i, j) &&
-							!a.selectMutEx(insSlice[0], insSlice[1]) &&
+							!a.reachable(goI.ins, i, goJ.ins, j) &&
+							!a.reachable(goJ.ins, j, goI.ins, i) &&
+							!a.bothAtomic(insSlice[0].ins, insSlice[1].ins) &&
+							!a.lockSetsIntersect(goI.ins, goJ.ins, i, j) &&
+							!a.selectMutEx(insSlice[0].ins, insSlice[1].ins) &&
 							!a.mutuallyExcluded(goI, i, goJ, j) {
 							a.reportedAddr = append(a.reportedAddr, addressPair[0])
 							ri = &raceInfo{
@@ -262,7 +262,7 @@ func (a *analysis) checkRacyPairs() []*raceInfo {
 								insInd:   []int{ii, jj},
 							}
 							if !allEntries {
-								a.printRace(len(a.reportedAddr), insSlice, addressPair, []int{i, j}, []int{ii, jj})
+								a.printRace(len(a.reportedAddr), ri)
 							}
 							races = append(races, ri)
 						}
@@ -275,10 +275,10 @@ func (a *analysis) checkRacyPairs() []*raceInfo {
 }
 
 // insAddress takes a slice of ssa instructions and returns a slice of their corresponding addresses
-func (a *analysis) insAddress(insSlice []ssa.Instruction) [2]ssa.Value { // obtain addresses of instructions
+func (a *analysis) insAddress(insSlice []*insInfo) [2]ssa.Value { // obtain addresses of instructions
 	theAddrs := [2]ssa.Value{}
 	for i, anIns := range insSlice {
-		switch theIns := anIns.(type) {
+		switch theIns := anIns.ins.(type) {
 		case *ssa.Store: // write
 			theAddrs[i] = theIns.Addr
 		case *ssa.Call:
@@ -323,7 +323,7 @@ func (a *analysis) sameAddress(addr1 ssa.Value, addr2 ssa.Value, go1 int, go2 in
 	} else if freevar1, ok := addr1.(*ssa.FreeVar); ok {
 		if freevar2, ok2 := addr2.(*ssa.FreeVar); ok2 {
 			if freevar1.Pos() == freevar2.Pos() { // compare position of identifiers
-				if go1 != 0 && !sliceContainsFreeVar(a.bindingFV[a.RWIns[go1][0].(*ssa.Go)], freevar1) {
+				if go1 != 0 && !sliceContainsFreeVar(a.bindingFV[a.RWIns[go1][0].ins.(*ssa.Go)], freevar1) {
 					return true
 				} else {
 					return false
@@ -355,14 +355,14 @@ func (a *analysis) sameAddress(addr1 ssa.Value, addr2 ssa.Value, go1 int, go2 in
 	if go1 == 0 {
 		goInstr1 = nil
 	} else {
-		goInstr1 = a.RWIns[go1][0].(*ssa.Go)
+		goInstr1 = a.RWIns[go1][0].ins.(*ssa.Go)
 	}
 	ptr1 := a.ptaRes.PointsToByGoWithLoopID(addr1, goInstr1, a.loopIDs[go1])
 	var goInstr2 *ssa.Go
 	if go2 == 0 {
 		goInstr2 = nil
 	} else {
-		goInstr2 = a.RWIns[go2][0].(*ssa.Go)
+		goInstr2 = a.RWIns[go2][0].ins.(*ssa.Go)
 	}
 	ptr2 := a.ptaRes.PointsToByGoWithLoopID(addr2, goInstr2, a.loopIDs[go2])
 	return ptr1.MayAlias(ptr2)
@@ -468,7 +468,10 @@ func getSrcPos(address ssa.Value) token.Pos {
 }
 
 // printRace will print the details of a data race such as the write/read of a variable and other helpful information
-func (a *analysis) printRace(counter int, insPair []ssa.Instruction, addrPair [2]ssa.Value, goIDs []int, insInd []int) {
+func (a *analysis) printRace(counter int, race *raceInfo) {
+	insPair := race.insPair
+	addrPair := race.addrPair
+	goIDs := race.goIDs
 	log.Printf("Data race #%d", counter)
 	log.Println(strings.Repeat("=", 100))
 	var writeLocks []ssa.Value
@@ -476,18 +479,18 @@ func (a *analysis) printRace(counter int, insPair []ssa.Instruction, addrPair [2
 	for i, anIns := range insPair {
 		var errMsg string
 		var access string
-		if isWriteIns(anIns) {
+		if isWriteIns(anIns.ins) {
 			access = " Write of "
-			if _, ok := anIns.(*ssa.Call); ok {
-				errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].String()), " in function ", aurora.BrightGreen(anIns.Parent().Name()), " at ", a.prog.Fset.Position(addrPair[i].Pos()))
+			if _, ok := anIns.ins.(*ssa.Call); ok {
+				errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].String()), " in function ", aurora.BrightGreen(anIns.ins.Parent().Name()), " at ", a.prog.Fset.Position(addrPair[i].Pos()))
 			} else {
-				errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].String()), " in function ", aurora.BrightGreen(anIns.Parent().Name()), " at ", a.prog.Fset.Position(insPair[i].Pos()))
+				errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].String()), " in function ", aurora.BrightGreen(anIns.ins.Parent().Name()), " at ", a.prog.Fset.Position(insPair[i].ins.Pos()))
 			}
-			writeLocks = a.lockMap[anIns]
+			writeLocks = a.lockMap[anIns.ins]
 		} else {
 			access = " Read of "
-			errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].String()), " in function ", aurora.BrightGreen(anIns.Parent().Name()), " at ", a.prog.Fset.Position(anIns.Pos()))
-			readLocks = append(a.lockMap[anIns], a.RlockMap[anIns]...)
+			errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].String()), " in function ", aurora.BrightGreen(anIns.ins.Parent().Name()), " at ", a.prog.Fset.Position(anIns.ins.Pos()))
+			readLocks = append(a.lockMap[anIns.ins], a.RlockMap[anIns.ins]...)
 		}
 		if testMode {
 			colorOutput := regexp.MustCompile(`\x1b\[\d+m`)
@@ -527,8 +530,8 @@ func (a *analysis) printRace(counter int, insPair []ssa.Instruction, addrPair [2
 					}
 				}
 			}
-			fnCall := fnCallIns{insPair[i].Parent(), goIDs[i]}
-			for p, everyFn := range a.stackMap[fnCall].fnCalls {
+			//fnCall := fnCallIns{insPair[i].Parent(), goIDs[i]}
+			for p, everyFn := range anIns.stack {
 				if everyFn.ssaIns == nil {
 					if p == 0 {
 						log.Println("\t ", strings.Repeat(" ", p+len(pathGo)), "--> Goroutine: ", everyFn.fnIns.Name(), "[", goIDs[i], "] ", a.prog.Fset.Position(everyFn.fnIns.Pos()))
