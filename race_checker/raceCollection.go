@@ -338,18 +338,6 @@ func (a *analysis) sameAddress(addr1 ssa.Value, addr2 ssa.Value, go1 int, go2 in
 		return ptsets[addr1].PointsTo().Intersects(ptsets[addr2].PointsTo())
 	}
 	// new PTA
-	if go1 == 0 && go2 == 0 { // locks do not contain goroutine info, hence used 0. TODO: change these to -1
-		ptset1 := a.ptaRes.Queries[addr1]
-		ptset2 := a.ptaRes.Queries[addr2]
-		for _, ptrCtx1 := range ptset1 {
-			for _, ptrCtx2 := range ptset2 {
-				if ptrCtx1.MayAlias(ptrCtx2) {
-					return true
-				}
-			}
-		}
-		return false
-	}
 
 	var goInstr1 *ssa.Go
 	if go1 == 0 {

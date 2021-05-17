@@ -204,7 +204,7 @@ func (a *analysis) lockSetContainsAt(s map[int][]*lockInfo, e ssa.Value, goID in
 		if aPos == bPos {
 			return i
 		}
-		if a.sameAddress(locA, locB, 0, 0) {
+		if a.sameAddress(locA, locB, goID, goID) {
 			return i
 		}
 	}
