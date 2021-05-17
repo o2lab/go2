@@ -24,27 +24,27 @@ type analysis struct {
 	ptaCfg  *pointer.Config
 	ptaCfg0 *pta0.Config
 
-	efficiency      bool
-	trieLimit       int
-	getGo           bool // flag
-	prog            *ssa.Program
-	main            *ssa.Package
-	analysisStat    stat
-	HBgraph         *graph.Graph
-	RWinsMap        map[goIns]graph.Node
-	trieMap         map[fnInfo]*trie    // map each function to a trie node
-	RWIns           [][]ssa.Instruction // instructions grouped by goroutine
-	insDRA          int                 // index of instruction (in main goroutine) at which to begin data race analysis
-	storeFns        []fnCallInfo
-	stackMap        map[fnCallIns]stackInfo
-	workList        []goroutineInfo
-	reportedAddr    []ssa.Value // stores already reported addresses
-	levels          map[int]int
-	lockMap         map[ssa.Instruction][]ssa.Value // map each read/write access to a snapshot of actively maintained lockset
-	lockSet         map[int][]*lockInfo             // active lockset, to be maintained along instruction traversal
-	RlockMap        map[ssa.Instruction][]ssa.Value // map each read/write access to a snapshot of actively maintained lockset
-	RlockSet        map[int][]*lockInfo             // active lockset, to be maintained along instruction traversal
-	getParam        bool
+	efficiency   bool
+	trieLimit    int
+	getGo        bool // flag
+	prog         *ssa.Program
+	main         *ssa.Package
+	analysisStat stat
+	HBgraph      *graph.Graph
+	RWinsMap     map[goIns]graph.Node
+	trieMap      map[fnInfo]*trie    // map each function to a trie node
+	RWIns        [][]ssa.Instruction // instructions grouped by goroutine
+	insMono      int                 // index of instruction (in main goroutine) before which the program is single-threaded
+	storeFns     []fnCallInfo
+	stackMap     map[fnCallIns]stackInfo
+	workList     []goroutineInfo
+	reportedAddr []ssa.Value // stores already reported addresses
+	levels       map[int]int
+	lockMap      map[ssa.Instruction][]ssa.Value // map each read/write access to a snapshot of actively maintained lockset
+	lockSet      map[int][]*lockInfo             // active lockset, to be maintained along instruction traversal
+	RlockMap     map[ssa.Instruction][]ssa.Value // map each read/write access to a snapshot of actively maintained lockset
+	RlockSet     map[int][]*lockInfo             // active lockset, to be maintained along instruction traversal
+	getParam     bool
 	paramFunc       *ssa.Function
 	goStack         [][]fnCallInfo
 	goCaller        map[int]int

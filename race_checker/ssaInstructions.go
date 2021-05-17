@@ -553,8 +553,8 @@ func (a *analysis) insGo(examIns *ssa.Go, goID int, theIns ssa.Instruction, loop
 		a.loopIDs[newGoID] = 0
 	}
 	a.RWIns[goID] = append(a.RWIns[goID], theIns)
-	if goID == 0 && a.insDRA == -1 { // this is first *ssa.Go instruction in main goroutine
-		a.insDRA = len(a.RWIns[goID]) // race analysis will begin at this instruction
+	if goID == 0 && a.insMono == -1 { // this is first *ssa.Go instruction in main goroutine
+		a.insMono = len(a.RWIns[goID]) // race analysis will begin at this instruction
 	}
 	var info = goroutineInfo{theIns, examIns, entryMethod, newGoID}
 	a.goStack = append(a.goStack, []fnCallInfo{}) // initialize interior slice

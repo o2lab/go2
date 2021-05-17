@@ -147,6 +147,7 @@ func (a *analysis) pointerNewAnalysisHandleFunc(ptr pointer.PointerWCtx, labels 
 	if len(labels) > 1 { // pta returns multiple targets TODO: bz: wip
 		//labels = a.ptaRes.FilterTargets(labels, ptr, location, goInstr, theIns)
 		//labels = a.filterLabels(labels, ptr, location, goID, theIns)
+		labels = labels[:2] // use first two targets for now
 	}
 
 	for _, label := range labels { //bz: labels are reduced -> TODO: bz: here should use mutual exclusion too

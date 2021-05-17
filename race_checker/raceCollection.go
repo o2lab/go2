@@ -207,18 +207,12 @@ func (a *analysis) checkRacyPairs() []*raceInfo {
 	var races []*raceInfo
 	var ri *raceInfo
 	for i := 0; i < len(a.RWIns); i++ {
-		//if i != 0 { // for debugging
-		//	continue
-		//}
 		for j := i + 1; j < len(a.RWIns); j++ { // must be in different goroutines, j always greater than i
-			//if a.goNames(a.RWIns[j][0].(*ssa.Go)) != "testMetadataStreamingRPC$1" { // for debugging
-			//	continue
-			//}
 			if !a.canRunInParallel(i, j) {
 				continue
 			}
 			for ii, goI := range a.RWIns[i] {
-				if (i == 0 && ii < a.insDRA) || (channelComm && sliceContainsBloc(a.omitComm, goI.Block())) {
+				if (i == 0 && ii < a.insMono) || (channelComm && sliceContainsBloc(a.omitComm, goI.Block())) {
 					continue
 				}
 				for jj, goJ := range a.RWIns[j] {
