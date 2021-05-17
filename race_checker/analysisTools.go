@@ -714,7 +714,7 @@ func (a *analysis) newGoroutine(info goroutineInfo) {
 			log.Debug(strings.Repeat("-", 35), "Goroutine ", info.entryMethod.Name(), strings.Repeat("-", 35), "[", info.goID, "]")
 		}
 	}
-	if len(a.lockSet[a.goCaller[info.goID]]) > 0 {
+	if len(a.lockSet[a.goCaller[info.goID]]) > 0 { // carry over lockset from parent goroutine
 		a.lockSet[info.goID] = a.lockSet[a.goCaller[info.goID]]
 	}
 	if !allEntries {

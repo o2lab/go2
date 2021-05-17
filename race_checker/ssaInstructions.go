@@ -669,17 +669,19 @@ func (a *analysis) insSelect(examIns *ssa.Select, goID int, theIns ssa.Instructi
 }
 
 func (a *analysis) updateLockMap(goID int, theIns ssa.Instruction) {
-	for _, l := range a.lockSet[goID] {
+	a.lockMap[theIns] = make([]ssa.Value, len(a.lockSet[goID]))
+	for i, l := range a.lockSet[goID] {
 		if !l.locFreeze {
-			a.lockMap[theIns] = append(a.lockMap[theIns], l.locAddr)
+			a.lockMap[theIns][i] = l.locAddr
 		}
 	}
 }
 
 func (a *analysis) updateRLockMap(goID int, theIns ssa.Instruction) {
-	for _, l := range a.RlockSet[goID] {
+	a.RlockMap[theIns] = make([]ssa.Value, len(a.RlockSet[goID]))
+	for i, l := range a.RlockSet[goID] {
 		if !l.locFreeze {
-			a.RlockMap[theIns] = append(a.RlockMap[theIns], l.locAddr)
+			a.RlockMap[theIns][i] = l.locAddr
 		}
 	}
 }

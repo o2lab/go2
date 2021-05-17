@@ -396,16 +396,24 @@ func sliceContainsNode(slice []graph.Node, node graph.Node) bool {
 
 // lockSetsIntersect determines if two input instructions are trying to access a variable that is protected by the same set of locks
 func (a *analysis) lockSetsIntersect(insA ssa.Instruction, insB ssa.Instruction, goA int, goB int) bool {
-	setA := a.lockMap[insA] // lockset of instruction-A
+	locksA := make([]ssa.Value, len(a.lockMap[insA])) // lockset of instruction-A
+	locksB := make([]ssa.Value, len(a.lockMap[insB])) // lockset of instruction-B
+	copy(locksA, a.lockMap[insA])
+	copy(locksB, a.lockMap[insB])
+
 	if a.isReadIns(insA) {
-		setA = append(setA, a.RlockMap[insA]...)
+		RlocksA := make([]ssa.Value, len(a.RlockMap[insA]))
+		copy(RlocksA, a.RlockMap[insA])
+		locksA = append(locksA, RlocksA...)
 	}
-	setB := a.lockMap[insB] // lockset of instruction-B
+
 	if a.isReadIns(insB) {
-		setB = append(setB, a.RlockMap[insB]...)
+		RlocksB := make([]ssa.Value, len(a.RlockMap[insB]))
+		copy(RlocksB, a.RlockMap[insB])
+		locksB = append(locksB, RlocksB...)
 	}
-	for _, addrA := range setA {
-		for _, addrB := range setB {
+	for _, addrA := range locksA {
+		for _, addrB := range locksB {
 			if a.sameAddress(addrA, addrB, goA, goB) {
 				return true
 			} else {
