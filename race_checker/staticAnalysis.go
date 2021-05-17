@@ -358,7 +358,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 				main:       main,
 				RWinsMap:   make(map[goIns]graph.Node),
 				trieMap:    make(map[fnInfo]*trie),
-				stackMap:   make(map[fnCallIns]stackInfo),
+				//stackMap:   make(map[fnCallIns]stackInfo),
 				insMono:    -1,
 				levels:     make(map[int]int),
 				lockMap:    make(map[ssa.Instruction][]ssa.Value),

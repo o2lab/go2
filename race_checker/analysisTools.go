@@ -19,7 +19,8 @@ func (a *analysis) buildHB() {
 	chanRecvs := make(map[string]graph.Node) // map channel name to graph node
 	chanSends := make(map[string]graph.Node) // map channel name to graph node
 	for nGo, insSlice := range a.RWIns {
-		for i, anIns := range insSlice {
+		for i, eachIns := range insSlice {
+			anIns := eachIns.ins
 			disjoin := false // detach select case statement from subsequent instruction
 			insKey := goIns{ins: anIns, goID: nGo}
 			if nGo == 0 && i == 0 { // main goroutine, first instruction
@@ -146,12 +147,12 @@ func (a *analysis) buildHB() {
 							if nGo == 0 {
 								fromName = a.entryFn
 							} else {
-								fromName = a.goNames(a.RWIns[nGo][0].(*ssa.Go))
+								fromName = a.goNames(a.RWIns[nGo][0].ins.(*ssa.Go))
 							}
 							if (*wNode.Value).(goIns).goID == 0 {
 								toName = a.entryFn
 							} else {
-								toName = a.goNames(a.RWIns[(*wNode.Value).(goIns).goID][0].(*ssa.Go))
+								toName = a.goNames(a.RWIns[(*wNode.Value).(goIns).goID][0].ins.(*ssa.Go))
 							}
 							if debugFlag {
 								log.Debug("WaitGroup edge from Goroutine ", fromName, " [", nGo, "] to Goroutine ", toName, " [", (*wNode.Value).(goIns).goID, "]")
@@ -173,12 +174,12 @@ func (a *analysis) buildHB() {
 							if nGo == 0 {
 								fromName = a.entryFn
 							} else {
-								fromName = a.goNames(a.RWIns[nGo][0].(*ssa.Go))
+								fromName = a.goNames(a.RWIns[nGo][0].ins.(*ssa.Go))
 							}
 							if (*wNode.Value).(goIns).goID == 0 {
 								toName = a.entryFn
 							} else {
-								toName = a.goNames(a.RWIns[(*wNode.Value).(goIns).goID][0].(*ssa.Go))
+								toName = a.goNames(a.RWIns[(*wNode.Value).(goIns).goID][0].ins.(*ssa.Go))
 							}
 							if debugFlag {
 								log.Debug("WaitGroup edge from Goroutine ", fromName, " [", nGo, "] to Goroutine ", toName, " [", (*wNode.Value).(goIns).goID, "]")
@@ -199,12 +200,12 @@ func (a *analysis) buildHB() {
 						if nGo == 0 {
 							fromName = a.entryFn
 						} else {
-							fromName = a.goNames(a.RWIns[nGo][0].(*ssa.Go))
+							fromName = a.goNames(a.RWIns[nGo][0].ins.(*ssa.Go))
 						}
 						if (*rcvN.Value).(goIns).goID == 0 {
 							toName = a.entryFn
 						} else {
-							toName = a.goNames(a.RWIns[(*rcvN.Value).(goIns).goID][0].(*ssa.Go))
+							toName = a.goNames(a.RWIns[(*rcvN.Value).(goIns).goID][0].ins.(*ssa.Go))
 						}
 						if debugFlag {
 							log.Debug("Channel comm edge from Goroutine ", fromName, " [", nGo, "] to Goroutine ", toName, " [", (*rcvN.Value).(goIns).goID, "]")
@@ -227,12 +228,12 @@ func (a *analysis) buildHB() {
 						if (*sndN.Value).(goIns).goID == 0 {
 							fromName = a.entryFn
 						} else {
-							fromName = a.goNames(a.RWIns[(*sndN.Value).(goIns).goID][0].(*ssa.Go))
+							fromName = a.goNames(a.RWIns[(*sndN.Value).(goIns).goID][0].ins.(*ssa.Go))
 						}
 						if nGo == 0 {
 							toName = a.entryFn
 						} else {
-							toName = a.goNames(a.RWIns[nGo][0].(*ssa.Go))
+							toName = a.goNames(a.RWIns[nGo][0].ins.(*ssa.Go))
 						}
 						if debugFlag {
 							log.Debug("Channel comm edge from Goroutine ", fromName, " [", (*sndN.Value).(goIns).goID, "] to Goroutine ", toName, " [", nGo, "]")
@@ -262,6 +263,16 @@ func (a *analysis) buildHB() {
 			}
 		}
 	}
+}
+
+func (a *analysis) recordIns(goID int, newIns ssa.Instruction) {
+	newInsInfo := &insInfo{ins: newIns}
+	if !allEntries {
+		stack := make([]*fnCallInfo, len(a.storeFns))
+		copy(stack, a.storeFns)
+		newInsInfo.stack = stack
+	}
+	a.RWIns[goID] = append(a.RWIns[goID], newInsInfo)
 }
 
 // visitAllInstructions visits each line and calls the corresponding helper function to drive the tool
@@ -297,17 +308,8 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 		a.levels[goID] = 1
 	}
 	if goID >= len(a.RWIns) { // initialize interior slice for new goroutine
-		a.RWIns = append(a.RWIns, []ssa.Instruction{})
+		a.RWIns = append(a.RWIns, []*insInfo{})
 	}
-	//fmt.Println(" ... ", fn.String(), " goID:", goID) //bz: debug, please comment off
-	//if strings.Contains(fn.String(), "google.golang.org/grpc.newProxyDialer") {
-	//	fmt.Println()
-		//for _, bb := range fn.Blocks {
-		//	for _, instr := range bb.Instrs {
-		//		fmt.Println(instr.String())
-		//	}
-		//}
-	//}
 
 	bVisit0 := fn.DomPreorder()
 	var bVisit []*ssa.BasicBlock
@@ -375,6 +377,10 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 		}
 		for ii, theIns := range aBlock.Instrs { // examine each instruction
 			if theIns.String() == "rundefers" { // execute deferred calls at this index
+				thisIns := &insInfo{
+					ins: theIns,
+					stack:
+				}
 				a.RWIns[goID] = append(a.RWIns[goID], theIns)
 				for _, dIns := range toDefer {  // ----> !!! SEE HERE: bz: the same as above, from line 307 to 347 can be separated out
 					deferIns := dIns.(*ssa.Defer)

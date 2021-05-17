@@ -33,10 +33,10 @@ type analysis struct {
 	HBgraph      *graph.Graph
 	RWinsMap     map[goIns]graph.Node
 	trieMap      map[fnInfo]*trie    // map each function to a trie node
-	RWIns        [][]ssa.Instruction // instructions grouped by goroutine
+	RWIns        [][]*insInfo // instructions grouped by goroutine
 	insMono      int                 // index of instruction (in main goroutine) before which the program is single-threaded
-	storeFns     []fnCallInfo
-	stackMap     map[fnCallIns]stackInfo
+	storeFns     []*fnCallInfo
+	//stackMap     map[fnCallIns]stackInfo
 	workList     []goroutineInfo
 	reportedAddr []ssa.Value // stores already reported addresses
 	levels       map[int]int
@@ -80,6 +80,17 @@ type analysis struct {
 	testEntry       *ssa.Function  //bz: test entry point
 }
 
+type insInfo struct {
+	ins 	ssa.Instruction
+	stack 	[]*fnCallInfo
+}
+
+type fnCallInfo struct {
+	fnIns  *ssa.Function
+	ssaIns ssa.Instruction
+}
+
+
 type lockInfo struct {
 	locAddr    ssa.Value
 	locFreeze  bool
@@ -118,14 +129,9 @@ type fnInfo struct { // all fields must be comparable for fnInfo to be used as k
 	contextStr string
 }
 
-type stackInfo struct {
-	fnCalls []fnCallInfo
-}
 
-type fnCallInfo struct {
-	fnIns  *ssa.Function
-	ssaIns ssa.Instruction
-}
+
+
 
 type goCallInfo struct {
 	ssaIns ssa.Instruction
