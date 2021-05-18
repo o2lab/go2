@@ -161,130 +161,7 @@ func pkgSelection(initial []*packages.Package) ([]*ssa.Package, *ssa.Program, []
 	return mains, prog, pkgs
 }
 
-func (runner *AnalysisRunner) Run(args []string) error {
-	trieLimit = runner.trieLimit
-	efficiency = runner.efficiency
-	// Load packages...
-	cfg := &packages.Config{
-		Mode: packages.LoadAllSyntax, // the level of information returned for each package
-		Dir:  "",                     // directory in which to run the build system's query tool
-		//TODO: bz: change this to true if you want to analyze test
-		Tests: true,
-		//Tests: false,                  // setting Tests will include related test packages
-	}
-	log.Info("Loading input packages...")
-
-	os.Stderr = nil // No need to output package errors for now. Delete this line to view package errors
-	initial, _ := packages.Load(cfg, args...)
-	if len(initial) == 0 {
-		return fmt.Errorf("No Go files detected. ")
-	}
-	log.Info("Done  -- ", len(initial), " packages detected. ")
-
-	mains, prog, pkgs := pkgSelection(initial)
-	runner.prog = prog
-	runner.pkgs = pkgs
-	startExec := time.Now() // measure total duration of running entire code base
-	// Configure pointer analysis...
-	if useNewPTA {
-		var scope = make([]string, 1)
-		//if pkgs[0] != nil { // Note: only if main dir contains main.go.
-		//	scope[0] = pkgs[0].Pkg.Path() //bz: the 1st pkg has the scope info == the root pkg or default .go input
-		//} else
-		if pkgs[0] == nil && len(pkgs) == 1 {
-			log.Fatal("Error: No packages detected. Please verify directory provided contains Go Files. ")
-		} else if len(pkgs) > 1 && pkgs[1] != nil && !strings.Contains(pkgs[1].Pkg.Path(), "/") {
-			scope[0] = pkgs[1].Pkg.Path()
-		} else if len(pkgs) > 1 {
-			scope[0] = strings.Split(pkgs[1].Pkg.Path(), "/")[0] + "/" + strings.Split(pkgs[1].Pkg.Path(), "/")[1]
-			if strings.Contains(pkgs[1].Pkg.Path(), "checker") {
-				scope[0] += "/race-checker"
-			}
-			if strings.Contains(pkgs[1].Pkg.Path(), "ethereum") {
-				scope[0] += "/go-ethereum"
-			}
-		} else if len(pkgs) == 1 {
-			scope[0] = pkgs[0].Pkg.Path()
-		}
-		//scope[0] = "google.golang.org/grpc"
-
-		//bz: update a bit to avoid duplicate scope addition, e.g., grpc
-		// return with error if error exist, skip panic
-		if len(scope) == 0 && len(pkgs) >= 1 && !goTest { // ** assuming more than one package detected in real programs
-			path, err := os.Getwd() //current working directory == project path
-			if err != nil {
-				panic("Error while os.Getwd: " + err.Error())
-			}
-			gomodFile, err := os.Open(path + "/go.mod") // For read access.
-			if err != nil {
-				return fmt.Errorf("Error while reading go.mod: " + err.Error())
-			}
-			defer gomodFile.Close()
-			scanner := bufio.NewScanner(gomodFile)
-			var mod string
-			for scanner.Scan() {
-				s := scanner.Text()
-				if strings.HasPrefix(s, "module ") {
-					mod = s
-					break //this is the line "module xxx.xxx.xx/xxx"
-				}
-			}
-			if mod == "" {
-				return fmt.Errorf("Cannot find go.mod in default location: " + gomodFile.Name())
-			}
-			if err2 := scanner.Err(); err2 != nil {
-				return fmt.Errorf("Error while scanning go.mod: " + err2.Error())
-			}
-			parts := strings.Split(mod, " ")
-			scope = append(scope, parts[1])
-		}
-
-		//logfile, _ := os.Create("/Users/bozhen/Documents/GO2/pta_replaced/go2/gorace/pta_log_0") //bz: debug
-		flags.DoTests = true //bz: set to true if your folder has tests and you want to analyze them
-		flags.PTSLimit = 10  //bz: limit the size of pts to 10
-		runner.ptaConfig = &pointer.Config{
-			Mains:          mains, //bz: all mains/tests in a project
-			Reflection:     false,
-			BuildCallGraph: true,
-			Log:            nil,
-			Origin:         true, //origin
-			//shared config
-			K:          1,
-			LimitScope: true,         //bz: only consider app methods with origin
-			Scope:      scope,        //bz: analyze scope
-			Exclusion:  excludedPkgs, //bz: copied from gorace if any
-			TrackMore:  true,         //bz: track pointers with all types
-			Level:      0,            //bz: see pointer.Config
-		}
-		start := time.Now() //performance
-		var err error
-		runner.ptaResult, err = pointer.AnalyzeMultiMains(runner.ptaConfig) // conduct pointer analysis for multiple mains
-		if err != nil {
-			panic("Pointer Analysis Error: " + err.Error())
-		}
-
-		t := time.Now()
-		elapsed := t.Sub(start)
-		fmt.Println("\nDone  -- PTA/CG Build; Using " + elapsed.String() + ".\n ")
-		//!!!! bz: for my debug, please comment off, do not delete
-		//fmt.Println("#Receive Result: ", len(runner.ptaResult))
-		//for mainEntry, ptaRes := range runner.ptaResult { //bz: you can get the ptaRes for each main here
-		//	fmt.Println("Receive ptaRes (#Queries: ", len(ptaRes.Queries), ", #IndirectQueries: ", len(ptaRes.IndirectQueries), ") for main: ", mainEntry.String())
-		//	ptaRes.DumpAll()
-		//}
-
-	} else {
-		runner.ptaConfig0 = &pta0.Config{
-			Mains:          mains,
-			BuildCallGraph: false,
-		}
-		runner.ptaResult0, _ = pta0.Analyze(runner.ptaConfig0)
-	}
-
-	if len(mains) > 1 {
-		allEntries = true
-	}
-
+func (runner *AnalysisRunner) analyzeTestEntry(mains []*ssa.Package) (*ssa.Function, string){
 	//bz: for analyzing tests
 	entry := "main" //bz: default value, will update later
 	var selectTest *ssa.Function
@@ -337,6 +214,144 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		}
 		fmt.Println("Done  -- CG node of test function ", entry, " extracted...")
 	}
+	return selectTest, entry
+}
+
+func determineScope(pkgs []*ssa.Package) []string {
+	var scope = make([]string, 1)
+	//if pkgs[0] != nil { // Note: only if main dir contains main.go.
+	//	scope[0] = pkgs[0].Pkg.Path() //bz: the 1st pkg has the scope info == the root pkg or default .go input
+	//} else
+	if pkgs[0] == nil && len(pkgs) == 1 {
+		log.Fatal("Error: No packages detected. Please verify directory provided contains Go Files. ")
+	} else if len(pkgs) > 1 && pkgs[1] != nil && !strings.Contains(pkgs[1].Pkg.Path(), "/") {
+		scope[0] = pkgs[1].Pkg.Path()
+	} else if len(pkgs) > 1 {
+		scope[0] = strings.Split(pkgs[1].Pkg.Path(), "/")[0] + "/" + strings.Split(pkgs[1].Pkg.Path(), "/")[1]
+		if strings.Contains(pkgs[1].Pkg.Path(), "checker") {
+			scope[0] += "/race-checker"
+		}
+		if strings.Contains(pkgs[1].Pkg.Path(), "ethereum") {
+			scope[0] += "/go-ethereum"
+		}
+		if strings.Contains(pkgs[1].Pkg.Path(), "grpc") {
+			scope[0] += "/go-grpc"
+		}
+	} else if len(pkgs) == 1 {
+		scope[0] = pkgs[0].Pkg.Path()
+	}
+	//scope[0] = "google.golang.org/grpc"
+
+	//bz: update a bit to avoid duplicate scope addition, e.g., grpc
+	// return with error if error exist, skip panic
+	if len(scope) == 0 && len(pkgs) >= 1 && !goTest { // ** assuming more than one package detected in real programs
+		path, err := os.Getwd() //current working directory == project path
+		if err != nil {
+			panic("Error while os.Getwd: " + err.Error())
+		}
+		gomodFile, err := os.Open(path + "/go.mod") // For read access.
+		if err != nil {
+			e0 := fmt.Errorf("Error while reading go.mod: " + err.Error())
+			fmt.Println(e0.Error())
+		}
+		defer gomodFile.Close()
+		scanner := bufio.NewScanner(gomodFile)
+		var mod string
+		for scanner.Scan() {
+			s := scanner.Text()
+			if strings.HasPrefix(s, "module ") {
+				mod = s
+				break //this is the line "module xxx.xxx.xx/xxx"
+			}
+		}
+		if mod == "" {
+			e1 := fmt.Errorf("Cannot find go.mod in default location: " + gomodFile.Name())
+			fmt.Println(e1.Error())
+		}
+		if err2 := scanner.Err(); err2 != nil {
+			e2 := fmt.Errorf("Error while scanning go.mod: " + err2.Error())
+			fmt.Println(e2.Error())
+		}
+		parts := strings.Split(mod, " ")
+		scope = append(scope, parts[1])
+	}
+	return scope
+}
+
+func (runner *AnalysisRunner) Run(args []string) error {
+	trieLimit = runner.trieLimit
+	efficiency = runner.efficiency
+	// Load packages...
+	cfg := &packages.Config{
+		Mode: packages.LoadAllSyntax, // the level of information returned for each package
+		Dir:  "",                     // directory in which to run the build system's query tool
+		//TODO: bz: change this to true if you want to analyze test
+		Tests: true,
+		//Tests: false,                  // setting Tests will include related test packages
+	}
+	log.Info("Loading input packages...")
+
+	os.Stderr = nil // No need to output package errors for now. Delete this line to view package errors
+	initial, _ := packages.Load(cfg, args...)
+	if len(initial) == 0 {
+		return fmt.Errorf("No Go files detected. ")
+	}
+	log.Info("Done  -- ", len(initial), " packages detected. ")
+
+	mains, prog, pkgs := pkgSelection(initial)
+	runner.prog = prog
+	runner.pkgs = pkgs
+	startExec := time.Now() // measure total duration of running entire code base
+	// Configure pointer analysis...
+	if useNewPTA {
+		scope := determineScope(pkgs)
+
+		//logfile, _ := os.Create("/Users/bozhen/Documents/GO2/pta_replaced/go2/gorace/pta_log_0") //bz: debug
+		flags.DoTests = true //bz: set to true if your folder has tests and you want to analyze them
+		flags.PTSLimit = 10  //bz: limit the size of pts to 10
+		runner.ptaConfig = &pointer.Config{
+			Mains:          mains, //bz: all mains/tests in a project
+			Reflection:     false,
+			BuildCallGraph: true,
+			Log:            nil,
+			Origin:         true, //origin
+			//shared config
+			K:          1,
+			LimitScope: true,         //bz: only consider app methods with origin
+			Scope:      scope,        //bz: analyze scope
+			Exclusion:  excludedPkgs, //bz: copied from gorace if any
+			TrackMore:  true,         //bz: track pointers with all types
+			Level:      0,            //bz: see pointer.Config
+		}
+		start := time.Now() //performance
+		var err error
+		runner.ptaResult, err = pointer.AnalyzeMultiMains(runner.ptaConfig) // conduct pointer analysis for multiple mains
+		if err != nil {
+			panic("Pointer Analysis Error: " + err.Error())
+		}
+
+		t := time.Now()
+		elapsed := t.Sub(start)
+		fmt.Println("\nDone  -- PTA/CG Build; Using " + elapsed.String() + ".\n ")
+		//!!!! bz: for my debug, please comment off, do not delete
+		//fmt.Println("#Receive Result: ", len(runner.ptaResult))
+		//for mainEntry, ptaRes := range runner.ptaResult { //bz: you can get the ptaRes for each main here
+		//	fmt.Println("Receive ptaRes (#Queries: ", len(ptaRes.Queries), ", #IndirectQueries: ", len(ptaRes.IndirectQueries), ") for main: ", mainEntry.String())
+		//	ptaRes.DumpAll()
+		//}
+
+	} else {
+		runner.ptaConfig0 = &pta0.Config{
+			Mains:          mains,
+			BuildCallGraph: false,
+		}
+		runner.ptaResult0, _ = pta0.Analyze(runner.ptaConfig0)
+	}
+
+	if len(mains) > 1 {
+		allEntries = true
+	}
+	selectTest, entry := runner.analyzeTestEntry(mains)
 
 	// Iterate each entry point...
 	var wg sync.WaitGroup
@@ -344,7 +359,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		wg.Add(1)
 		go func(main *ssa.Package) {
 			// Configure static analysis...
-			Analysis := analysis{
+			a := analysis{
 				ptaRes:          runner.ptaResult[m],
 				ptaRes0:         runner.ptaResult0,
 				ptaCfg:     runner.ptaConfig,
@@ -356,7 +371,6 @@ func (runner *AnalysisRunner) Run(args []string) error {
 				main:       main,
 				RWinsMap:   make(map[goIns]graph.Node),
 				trieMap:    make(map[fnInfo]*trie),
-				//stackMap:   make(map[fnCallIns]stackInfo),
 				insMono:    -1,
 				levels:     make(map[int]int),
 				lockMap:    make(map[ssa.Instruction][]ssa.Value),
@@ -390,93 +404,56 @@ func (runner *AnalysisRunner) Run(args []string) error {
 				entryFn:         entry,
 			}
 			if strings.Contains(main.Pkg.Path(), "GoBench") { // for testing purposes
-				Analysis.efficiency = false
-				Analysis.trieLimit = 2
+				a.efficiency = false
+				a.trieLimit = 2
 			} else if !goTest {
-				Analysis.efficiency = true
+				a.efficiency = true
 			}
 			if !allEntries {
 				log.Info("Compiling stack trace for every Goroutine... ")
 				log.Debug(strings.Repeat("-", 35), "Stack trace begins", strings.Repeat("-", 35))
 			}
-			if Analysis.testEntry != nil {
+			if a.testEntry != nil {
 				//bz: a test now uses itself as main context, tell pta which test will be analyzed for this analysis
-				Analysis.ptaRes.AnalyzeTest(Analysis.testEntry)
-				Analysis.visitAllInstructions(Analysis.testEntry, 0)
+				a.ptaRes.AnalyzeTest(a.testEntry)
+				a.visitAllInstructions(a.testEntry, 0)
 			} else {
-				Analysis.visitAllInstructions(main.Func(Analysis.entryFn), 0)
+				a.visitAllInstructions(main.Func(a.entryFn), 0)
 			}
 
 			if !allEntries {
 				log.Debug(strings.Repeat("-", 35), "Stack trace ends", strings.Repeat("-", 35))
 			}
 			totalIns := 0
-			for g := range Analysis.RWIns {
-				totalIns += len(Analysis.RWIns[g])
+			for g := range a.RWIns {
+				totalIns += len(a.RWIns[g])
 			}
 			if !allEntries {
-				log.Info("Done  -- ", len(Analysis.RWIns), " goroutines analyzed! ", totalIns, " instructions of interest detected! ")
+				log.Info("Done  -- ", len(a.RWIns), " goroutines analyzed! ", totalIns, " instructions of interest detected! ")
 			}
-			if len(mains) > 1 {
-				Analysis.getGo = false // turn off debug logging if running in parallel
-			}
-			if Analysis.getGo { // print call stack of each goroutine
-				for i := 0; i < len(Analysis.RWIns); i++ {
-					name := "main"
-					if i > 0 {
-						name = Analysis.goNames(Analysis.goCalls[i].goIns)
-					}
-					if Analysis.goInLoop[i] {
-						log.Debug("Goroutine ", i, "  --  ", name, strings.Repeat(" *", 10), " spawned by a loop", strings.Repeat(" *", 10))
-					} else {
-						log.Debug("Goroutine ", i, "  --  ", name)
-					}
-					if i > 0 {
-						log.Debug("call stack: ")
-					}
-					var pathGo []int
-					goID := i
-					for goID > 0 {
-						pathGo = append([]int{goID}, pathGo...)
-						temp := Analysis.goCaller[goID]
-						goID = temp
-					}
-					if !allEntries {
-						for q, eachGo := range pathGo {
-							eachStack := Analysis.goStack[eachGo]
-							for k, eachFn := range eachStack {
-								if k == 0 {
-									log.Debug("\t ", strings.Repeat(" ", q), "--> Goroutine: ", eachFn.fnIns.Name(), "[", Analysis.goCaller[eachGo], "] ", Analysis.prog.Fset.Position(eachFn.ssaIns.Pos()))
-								} else {
-									log.Debug("\t   ", strings.Repeat(" ", q), strings.Repeat(" ", k), eachFn.fnIns.Name(), " ", Analysis.prog.Fset.Position(eachFn.ssaIns.Pos()))
-								}
-							}
-						}
-					}
-				}
-			}
+
 			if useDefaultPTA {
-				Analysis.ptaRes0, _ = pta0.Analyze(Analysis.ptaCfg0) // all queries have been added, conduct pointer analysis
+				a.ptaRes0, _ = pta0.Analyze(a.ptaCfg0) // all queries have been added, conduct pointer analysis
 			}
 			if !allEntries {
 				log.Info("Building Happens-Before graph... ")
 			}
 			// confirm channel readiness for unknown select cases:
-			if len(Analysis.selUnknown) > 0 {
-				for sel, chs := range Analysis.selUnknown {
+			if len(a.selUnknown) > 0 {
+				for sel, chs := range a.selUnknown {
 					for i, ch := range chs {
-						if _, ready := Analysis.chanSnds[ch]; !ready && ch != "" {
-							if _, ready0 := Analysis.chanRcvs[ch]; !ready0 {
-								if _, ready1 := Analysis.chanBuf[Analysis.chanToken[ch]]; !ready1 {
-									Analysis.selReady[sel][i] = ""
+						if _, ready := a.chanSnds[ch]; !ready && ch != "" {
+							if _, ready0 := a.chanRcvs[ch]; !ready0 {
+								if _, ready1 := a.chanBuf[a.chanToken[ch]]; !ready1 {
+									a.selReady[sel][i] = ""
 								}
 							}
 						}
 					}
 				}
 			}
-			Analysis.HBgraph = graph.New(graph.Directed)
-			Analysis.buildHB()
+			a.HBgraph = graph.New(graph.Directed)
+			a.buildHB()
 			if !allEntries {
 				log.Info("Done  -- Happens-Before graph built ")
 				log.Info("Checking for data races... ")
@@ -484,9 +461,9 @@ func (runner *AnalysisRunner) Run(args []string) error {
 			rr := raceReport{
 				entryInfo: main.Pkg.Path(),
 			}
-			rr.racePairs = Analysis.checkRacyPairs()
+			rr.racePairs = a.checkRacyPairs()
 			runner.mu.Lock()
-			runner.racyStackTops = Analysis.racyStackTops
+			runner.racyStackTops = a.racyStackTops
 			runner.finalReport = append(runner.finalReport, rr)
 			runner.mu.Unlock()
 			wg.Done()
@@ -509,4 +486,43 @@ func (runner *AnalysisRunner) Run(args []string) error {
 	log.Info(execDur, " elapsed. ")
 
 	return nil
+}
+
+//stackGo prints the callstack of a goroutine
+func (a *analysis) stackGo() {
+	if a.getGo { // print call stack of each goroutine
+		for i := 0; i < len(a.RWIns); i++ {
+			name := "main"
+			if i > 0 {
+				name = a.goNames(a.goCalls[i].goIns)
+			}
+			if a.goInLoop[i] {
+				log.Debug("Goroutine ", i, "  --  ", name, strings.Repeat(" *", 10), " spawned by a loop", strings.Repeat(" *", 10))
+			} else {
+				log.Debug("Goroutine ", i, "  --  ", name)
+			}
+			if i > 0 {
+				log.Debug("call stack: ")
+			}
+			var pathGo []int
+			goID := i
+			for goID > 0 {
+				pathGo = append([]int{goID}, pathGo...)
+				temp := a.goCaller[goID]
+				goID = temp
+			}
+			if !allEntries {
+				for q, eachGo := range pathGo {
+					eachStack := a.goStack[eachGo]
+					for k, eachFn := range eachStack {
+						if k == 0 {
+							log.Debug("\t ", strings.Repeat(" ", q), "--> Goroutine: ", eachFn.fnIns.Name(), "[", a.goCaller[eachGo], "] ", a.prog.Fset.Position(eachFn.ssaIns.Pos()))
+						} else {
+							log.Debug("\t   ", strings.Repeat(" ", q), strings.Repeat(" ", k), eachFn.fnIns.Name(), " ", a.prog.Fset.Position(eachFn.ssaIns.Pos()))
+						}
+					}
+				}
+			}
+		}
+	}
 }
