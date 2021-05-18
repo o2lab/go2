@@ -33,7 +33,7 @@ race-checker ./examples/helloworld/greeter_client
 
 When multiple entry points are identified, race-checker will request your input for which entry-points to analyze
 
-![Image of screenshot](race_checker/tests/grpc.png)
+![Image of screenshot](gorace/tests/grpc.png)
 
 For example, if you would like to analyze entry points 1 to 20, just enter
 `1-20`

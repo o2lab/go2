@@ -1,6 +1,6 @@
-race_checker/.*
-race_checker/go.*
-race_checker/race-checker
+gorace/.*
+gorace/go.*
+gorace/race-checker
 .DS_STORE
 .idea
 
@@ -9,10 +9,10 @@ go_tools/_logs/
 go_tools/_mytestresult/
 go_tools/_mytests/
 grpc-go/
-race_checker/go_pta_log
-race_checker/pta_summary.md
+gorace/go_pta_log
+gorace/pta_summary.md
 runc/
 tidb/
 
-race_checker/console.txt
+gorace/console.txt
 

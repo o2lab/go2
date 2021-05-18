@@ -1,0 +1,686 @@
+[36mINFO[0m[13:48:48] Loading input packages...                    
+[36mINFO[0m[13:48:49] command-line-arguments[/home/yiqingzhao94/Downloads/research/go2/race_checker/WIP/grpc-go-master/examples/helloworld/greeter_client/main.go] 
+[36mINFO[0m[13:48:49] Done  -- packages loaded                     
+[36mINFO[0m[13:48:49] Building SSA code for entire program...      
+[36mINFO[0m[13:48:49] Done  -- SSA code built                      
+[36mINFO[0m[13:48:49] Compiling stack trace for every Goroutine...  
+[37mDEBU[0m[13:48:49] -----------------------------------Stack trace begins----------------------------------- 
+[37mDEBU[0m[13:48:49] PUSH main at lvl 0                           
+[37mDEBU[0m[13:48:49]  PUSH WithInsecure at lvl 1                  
+[37mDEBU[0m[13:48:49]   PUSH newFuncDialOption at lvl 2            
+[37mDEBU[0m[13:48:49]   POP  newFuncDialOption at lvl 2            
+[37mDEBU[0m[13:48:52]  POP  WithInsecure at lvl 1                  
+[37mDEBU[0m[13:48:52]  PUSH WithBlock at lvl 1                     
+[37mDEBU[0m[13:48:52]   PUSH newFuncDialOption at lvl 2            
+[37mDEBU[0m[13:48:52]   POP  newFuncDialOption at lvl 2            
+[37mDEBU[0m[13:48:55]  POP  WithBlock at lvl 1                     
+[37mDEBU[0m[13:48:55]  PUSH Dial at lvl 1                          
+[37mDEBU[0m[13:48:55]   PUSH DialContext at lvl 2                  
+[37mDEBU[0m[13:48:55]    PUSH defaultDialOptions at lvl 3          
+[37mDEBU[0m[13:48:55]    POP  defaultDialOptions at lvl 3          
+[37mDEBU[0m[13:48:55]    PUSH newPickerWrapper at lvl 3            
+[37mDEBU[0m[13:48:55]    POP  newPickerWrapper at lvl 3            
+[37mDEBU[0m[13:48:55]    PUSH NewEvent at lvl 3                    
+[37mDEBU[0m[13:48:55]    POP  NewEvent at lvl 3                    
+[37mDEBU[0m[13:48:55]    PUSH Store at lvl 3                       
+[37mDEBU[0m[13:48:55]    POP  Store at lvl 3                       
+[37mDEBU[0m[13:49:01]    PUSH chainUnaryClientInterceptors at lvl 3 
+[37mDEBU[0m[13:49:01]     PUSH chainUnaryClientInterceptors$1 at lvl 4 
+[37mDEBU[0m[13:49:01]      PUSH getChainUnaryInvoker at lvl 5      
+[37mDEBU[0m[13:49:01]       PUSH getChainUnaryInvoker$1 at lvl 6   
+[37mDEBU[0m[13:49:04]       POP  getChainUnaryInvoker$1 at lvl 6   
+[37mDEBU[0m[13:49:04]      POP  getChainUnaryInvoker at lvl 5      
+[37mDEBU[0m[13:49:08]     POP  chainUnaryClientInterceptors$1 at lvl 4 
+[37mDEBU[0m[13:49:08]    POP  chainUnaryClientInterceptors at lvl 3 
+[37mDEBU[0m[13:49:08]    PUSH chainStreamClientInterceptors at lvl 3 
+[37mDEBU[0m[13:49:08]     PUSH chainStreamClientInterceptors$1 at lvl 4 
+[37mDEBU[0m[13:49:08]      PUSH getChainStreamer at lvl 5          
+[37mDEBU[0m[13:49:08]       PUSH getChainStreamer$1 at lvl 6       
+[37mDEBU[0m[13:49:11]       POP  getChainStreamer$1 at lvl 6       
+[37mDEBU[0m[13:49:11]      POP  getChainStreamer at lvl 5          
+[37mDEBU[0m[13:49:14]     POP  chainStreamClientInterceptors$1 at lvl 4 
+[37mDEBU[0m[13:49:14]    POP  chainStreamClientInterceptors at lvl 3 
+[37mDEBU[0m[13:49:17]    PUSH DialContext$1 at lvl 3               
+[37mDEBU[0m[13:49:17]     PUSH Close at lvl 4                      
+[37mTRAC[0m[13:49:17] Locking   &cc.mu [#9]  (11463706)  lockset now contains: [11463706] 
+[37mDEBU[0m[13:49:17]      PUSH updateState at lvl 5               
+[37mTRAC[0m[13:49:17] Locking   &csm.mu [#0]  (11445715)  lockset now contains: [11463706 11445715] 
+[37mTRAC[0m[13:49:20] Unlocking &csm.mu [#0]  (11445715) removing index 1 from: [11463706 11445715] 
+[37mDEBU[0m[13:49:20]      POP  updateState at lvl 5               
+[37mDEBU[0m[13:49:20]      PUSH close at lvl 5                     
+[37mTRAC[0m[13:49:20] Locking   &pw.mu [#0]  (11259957)  lockset now contains: [11463706 11259957] 
+[37mTRAC[0m[13:49:20] Unlocking &pw.mu [#0]  (11259957) removing index 1 from: [11463706 11259957] 
+[37mDEBU[0m[13:49:20]      POP  close at lvl 5                     
+[37mDEBU[0m[13:49:20]      PUSH tearDown at lvl 5                  
+[37mTRAC[0m[13:49:20] Locking   &ac.mu [#7]  (11476572)  lockset now contains: [11463706 11476572] 
+[37mDEBU[0m[13:49:20]       PUSH updateConnectivityState at lvl 6  
+[37mDEBU[0m[13:49:23]        PUSH handleSubConnStateChange at lvl 7 
+[37mTRAC[0m[13:49:23] Locking   &cc.mu [#9]  (11454851)  lockset now contains: [11463706 11476572 11454851] 
+[37mTRAC[0m[13:49:23] Unlocking &cc.mu [#9]  (11454851) removing index 2 from: [11463706 11476572 11454851] 
+[37mDEBU[0m[13:49:23]        POP  handleSubConnStateChange at lvl 7 
+[37mDEBU[0m[13:49:23]       POP  updateConnectivityState at lvl 6  
+[37mTRAC[0m[13:49:29] Locking   &ac.mu [#7]  (11477375)  lockset now contains: [11463706 11476572 11477375] 
+[37mTRAC[0m[13:49:32] Unlocking &ac.mu [#7]  (11476572) removing index 1 from: [11463706 11476572 11477375] 
+[37mTRAC[0m[13:49:32] Unlocking &ac.mu [#7]  (11477375) removing index 1 from: [11463706 11477375] 
+[37mDEBU[0m[13:49:32]      POP  tearDown at lvl 5                  
+[37mTRAC[0m[13:49:35] Unlocking &cc.mu [#9]  (11463706) removing index 0 from: [11463706] 
+[37mDEBU[0m[13:49:35]     POP  Close at lvl 4                      
+[37mDEBU[0m[13:49:35]    POP  DialContext$1 at lvl 3               
+[37mDEBU[0m[13:49:42]    PUSH parseServiceConfig at lvl 3          
+[37mDEBU[0m[13:49:45]     PUSH Warningf at lvl 4                   
+[37mDEBU[0m[13:49:48]      PUSH WarningDepth at lvl 5              
+[37mDEBU[0m[13:49:48]      POP  WarningDepth at lvl 5              
+[37mDEBU[0m[13:49:48]     POP  Warningf at lvl 4                   
+[37mDEBU[0m[13:49:48]     PUSH parseDuration at lvl 4              
+[37mDEBU[0m[13:50:07]     POP  parseDuration at lvl 4              
+[37mDEBU[0m[13:50:10]     PUSH convertRetryPolicy at lvl 4         
+[37mDEBU[0m[13:50:16]     POP  convertRetryPolicy at lvl 4         
+[37mDEBU[0m[13:50:19]     PUSH newInt at lvl 4                     
+[37mDEBU[0m[13:50:19]     POP  newInt at lvl 4                     
+[37mDEBU[0m[13:50:19]     PUSH generatePath at lvl 4               
+[37mDEBU[0m[13:50:19]     POP  generatePath at lvl 4               
+[37mDEBU[0m[13:50:32]    POP  parseServiceConfig at lvl 3          
+[37mDEBU[0m[13:50:32]    PUSH newProxyDialer at lvl 3              
+[37mDEBU[0m[13:50:32]    POP  newProxyDialer at lvl 3              
+[37mDEBU[0m[13:50:32]    PUSH ParseTarget at lvl 3                 
+[37mDEBU[0m[13:50:32]     PUSH split2 at lvl 4                     
+[37mDEBU[0m[13:50:32]     POP  split2 at lvl 4                     
+[37mDEBU[0m[13:50:32]     PUSH split2 at lvl 4                     
+[37mDEBU[0m[13:50:32]     POP  split2 at lvl 4                     
+[37mDEBU[0m[13:50:32]    POP  ParseTarget at lvl 3                 
+[37mDEBU[0m[13:50:35]    PUSH getResolver at lvl 3                 
+[37mDEBU[0m[13:50:41]     PUSH Get at lvl 4                        
+[37mDEBU[0m[13:50:41]     POP  Get at lvl 4                        
+[37mDEBU[0m[13:50:41]    POP  getResolver at lvl 3                 
+[37mDEBU[0m[13:50:44]    PUSH GetDefaultScheme at lvl 3            
+[37mDEBU[0m[13:50:44]    POP  GetDefaultScheme at lvl 3            
+[37mDEBU[0m[13:50:47]    PUSH DialContext$3 at lvl 3               
+[37mDEBU[0m[13:50:57]    POP  DialContext$3 at lvl 3               
+[37mDEBU[0m[13:51:09]    spawning Goroutine ----->  scWatcher      
+[37mDEBU[0m[13:51:12]    PUSH newCCResolverWrapper at lvl 3        
+[37mDEBU[0m[13:51:12]     PUSH NewEvent at lvl 4                   
+[37mDEBU[0m[13:51:12]     POP  NewEvent at lvl 4                   
+[37mTRAC[0m[13:51:16] Locking   &t0.resolverMu [#1]  (11355994)  lockset now contains: [11355994] 
+[37mDEBU[0m[13:51:19]     PUSH Build at lvl 4                      
+[37mDEBU[0m[13:51:19]      PUSH start at lvl 5                     
+[37mDEBU[0m[13:51:22]       PUSH UpdateState at lvl 6              
+[37mDEBU[0m[13:51:22]        PUSH HasFired at lvl 7                
+[37mDEBU[0m[13:51:22]        POP  HasFired at lvl 7                
+[37mDEBU[0m[13:51:25]        PUSH addChannelzTraceEvent at lvl 7   
+[37mDEBU[0m[13:51:31]        POP  addChannelzTraceEvent at lvl 7   
+[37mDEBU[0m[13:51:31]        PUSH updateResolverState at lvl 7     
+[37mTRAC[0m[13:51:31] Locking   &cc.mu [#9]  (11451047)  lockset now contains: [11355994 11451047] 
+[37mDEBU[0m[13:51:31]         PUSH Fire at lvl 8                   
+[37mDEBU[0m[13:51:31]         POP  Fire at lvl 8                   
+[37mDEBU[0m[13:51:31]         PUSH maybeApplyDefaultServiceConfig at lvl 8 
+[37mDEBU[0m[13:51:31]          PUSH applyServiceConfigAndBalancer at lvl 9 
+[37mDEBU[0m[13:51:31]           PUSH Store at lvl 10               
+[37mDEBU[0m[13:51:31]           POP  Store at lvl 10               
+[37mDEBU[0m[13:51:31]           PUSH Store at lvl 10               
+[37mDEBU[0m[13:51:31]           POP  Store at lvl 10               
+[37mDEBU[0m[13:51:31]           PUSH switchBalancer at lvl 10      
+[37mDEBU[0m[13:51:31]            PUSH Get at lvl 11                
+[37mDEBU[0m[13:51:31]            POP  Get at lvl 11                
+[37mDEBU[0m[13:51:31]            PUSH newPickfirstBuilder at lvl 11 
+[37mDEBU[0m[13:51:31]            POP  newPickfirstBuilder at lvl 11 
+[37mDEBU[0m[13:51:34]            PUSH Name at lvl 11               
+[37mDEBU[0m[13:51:34]            POP  Name at lvl 11               
+[37mDEBU[0m[13:51:34]            PUSH newCCBalancerWrapper at lvl 11 
+[37mDEBU[0m[13:51:34]             PUSH NewUnbounded at lvl 12      
+[37mDEBU[0m[13:51:34]             POP  NewUnbounded at lvl 12      
+[37mDEBU[0m[13:51:34]             PUSH NewEvent at lvl 12          
+[37mDEBU[0m[13:51:34]             POP  NewEvent at lvl 12          
+[37mDEBU[0m[13:51:34]             spawning Goroutine ----->  watcher 
+[37mDEBU[0m[13:51:38]            POP  newCCBalancerWrapper at lvl 11 
+[37mDEBU[0m[13:51:38]           POP  switchBalancer at lvl 10      
+[37mDEBU[0m[13:51:41]          POP  applyServiceConfigAndBalancer at lvl 9 
+[37mDEBU[0m[13:51:41]          PUSH applyServiceConfigAndBalancer at lvl 9 
+[37mDEBU[0m[13:51:44]          POP  applyServiceConfigAndBalancer at lvl 9 
+[37mDEBU[0m[13:51:44]         POP  maybeApplyDefaultServiceConfig at lvl 8 
+[37mDEBU[0m[13:51:44]         PUSH resolverError at lvl 8          
+[37mTRAC[0m[13:51:44] Locking   &ccb.balancerMu [#1]  (11427825)  lockset now contains: [11355994 11451047 11427825] 
+[37mDEBU[0m[13:51:47]          PUSH ResolverError at lvl 9         
+[37mDEBU[0m[13:51:47]           PUSH regeneratePicker at lvl 10    
+[37mDEBU[0m[13:51:47]            PUSH mergeErrors at lvl 11        
+[37mDEBU[0m[13:51:47]            POP  mergeErrors at lvl 11        
+[37mDEBU[0m[13:51:47]            PUSH NewErrPicker at lvl 11       
+[37mDEBU[0m[13:51:47]            POP  NewErrPicker at lvl 11       
+[37mDEBU[0m[13:51:50]           POP  regeneratePicker at lvl 10    
+[37mDEBU[0m[13:51:53]          POP  ResolverError at lvl 9         
+[37mTRAC[0m[13:51:53] Unlocking &ccb.balancerMu [#1]  (11427825) removing index 2 from: [11355994 11451047 11427825] 
+[37mDEBU[0m[13:51:53]         POP  resolverError at lvl 8          
+[37mDEBU[0m[13:51:53]         PUSH Fire at lvl 8                   
+[37mDEBU[0m[13:51:53]         POP  Fire at lvl 8                   
+[37mDEBU[0m[13:51:53]         PUSH maybeApplyDefaultServiceConfig at lvl 8 
+[37mDEBU[0m[13:51:53]         POP  maybeApplyDefaultServiceConfig at lvl 8 
+[37mDEBU[0m[13:51:53]         PUSH updatePicker at lvl 8           
+[37mTRAC[0m[13:51:53] Locking   &pw.mu [#0]  (11256590)  lockset now contains: [11355994 11451047 11256590] 
+[37mTRAC[0m[13:51:53] Unlocking &pw.mu [#0]  (11256590) removing index 2 from: [11355994 11451047 11256590] 
+[37mDEBU[0m[13:51:53]         POP  updatePicker at lvl 8           
+[37mDEBU[0m[13:51:53]         PUSH updateClientConnState at lvl 8  
+[37mTRAC[0m[13:51:53] Locking   &ccb.balancerMu [#1]  (11427662)  lockset now contains: [11355994 11451047 11427662] 
+[37mDEBU[0m[13:51:57]          PUSH UpdateClientConnState at lvl 9 
+[37mDEBU[0m[13:51:57]           PUSH ResolverError at lvl 10       
+[37mDEBU[0m[13:52:00]            PUSH V at lvl 11                  
+[37mDEBU[0m[13:52:00]            POP  V at lvl 11                  
+[37mDEBU[0m[13:52:06]            PUSH Infof at lvl 11              
+[37mDEBU[0m[13:52:09]             PUSH InfoDepth at lvl 12         
+[37mDEBU[0m[13:52:09]             POP  InfoDepth at lvl 12         
+[37mDEBU[0m[13:52:09]            POP  Infof at lvl 11              
+[37mDEBU[0m[13:52:09]           POP  ResolverError at lvl 10       
+[37mDEBU[0m[13:52:13]           PUSH NewSubConn at lvl 10          
+[37mTRAC[0m[13:52:13] Locking   &ccb.mu [#5]  (11428142)  lockset now contains: [11355994 11451047 11427662 11428142] 
+[37mDEBU[0m[13:52:13]            PUSH newAddrConn at lvl 11        
+[37mTRAC[0m[13:52:13] Locking   &cc.mu [#9]  (11455688)  lockset now contains: [11355994 11451047 11427662 11428142 11455688] 
+[37mTRAC[0m[13:52:16] Unlocking &cc.mu [#9]  (11455688) removing index 4 from: [11355994 11451047 11427662 11428142 11455688] 
+[37mDEBU[0m[13:52:16]            POP  newAddrConn at lvl 11        
+[37mTRAC[0m[13:52:16] Locking   &t21.mu [#7]  (11428404)  lockset now contains: [11355994 11451047 11427662 11428142 11428404] 
+[37mTRAC[0m[13:52:16] Unlocking &ccb.mu [#5]  (11428142) removing index 3 from: [11355994 11451047 11427662 11428142 11428404] 
+[37mTRAC[0m[13:52:16] Unlocking &t27.mu [#7]  (11428404) removing index 3 from: [11355994 11451047 11427662 11428404] 
+[37mDEBU[0m[13:52:16]           POP  NewSubConn at lvl 10          
+[37mDEBU[0m[13:52:19]           PUSH UpdateAddresses at lvl 10     
+[37mTRAC[0m[13:52:19] Locking   &acbw.mu [#0]  (11429834)  lockset now contains: [11355994 11451047 11427662 11429834] 
+[37mDEBU[0m[13:52:19]            PUSH tearDown at lvl 11           
+[37mTRAC[0m[13:52:19] Locking   &ac.mu [#7]  (11476572)  lockset now contains: [11355994 11451047 11427662 11429834 11476572] 
+[37mTRAC[0m[13:52:25] Locking   &ac.mu [#7]  (11477375)  lockset now contains: [11355994 11451047 11427662 11429834 11476572 11477375] 
+[37mTRAC[0m[13:52:29] Unlocking &ac.mu [#7]  (11476572) removing index 4 from: [11355994 11451047 11427662 11429834 11476572 11477375] 
+[37mTRAC[0m[13:52:29] Unlocking &ac.mu [#7]  (11477375) removing index 4 from: [11355994 11451047 11427662 11429834 11477375] 
+[37mDEBU[0m[13:52:29]            POP  tearDown at lvl 11           
+[37mDEBU[0m[13:52:29]            PUSH tryUpdateAddrs at lvl 11     
+[37mTRAC[0m[13:52:29] Locking   &ac.mu [#7]  (11459060)  lockset now contains: [11355994 11451047 11427662 11429834 11459060] 
+[37mTRAC[0m[13:52:48] Unlocking &ac.mu [#7]  (11459060) removing index 4 from: [11355994 11451047 11427662 11429834 11459060] 
+[37mDEBU[0m[13:52:48]            POP  tryUpdateAddrs at lvl 11     
+[37mTRAC[0m[13:52:48] Locking   &t22.mu [#7]  (11430026)  lockset now contains: [11355994 11451047 11427662 11429834 11430026] 
+[37mDEBU[0m[13:52:48]            PUSH getState at lvl 11           
+[37mTRAC[0m[13:52:48] Locking   &ac.mu [#7]  (11477995)  lockset now contains: [11355994 11451047 11427662 11429834 11430026 11477995] 
+[37mTRAC[0m[13:52:48] Unlocking &ac.mu [#7]  (11477995) removing index 5 from: [11355994 11451047 11427662 11429834 11430026 11477995] 
+[37mDEBU[0m[13:52:48]            POP  getState at lvl 11           
+[37mTRAC[0m[13:52:48] Locking   &t42.mu [#7]  (11430628)  lockset now contains: [11355994 11451047 11427662 11429834 11430026 11430628] 
+[37mDEBU[0m[13:52:51]            PUSH connect at lvl 11            
+[37mTRAC[0m[13:52:51] Locking   &ac.mu [#7]  (11457789)  lockset now contains: [11355994 11451047 11427662 11429834 11430026 11430628 11457789] 
+[37mDEBU[0m[13:52:51]             spawning Goroutine ----->  resetTransport 
+[37mTRAC[0m[13:52:51] Unlocking &ac.mu [#7]  (11457789) removing index 6 from: [11355994 11451047 11427662 11429834 11430026 11430628 11457789] 
+[37mDEBU[0m[13:52:51]            POP  connect at lvl 11            
+[37mTRAC[0m[13:52:51] Unlocking &acbw.mu [#0]  (11429834) removing index 3 from: [11355994 11451047 11427662 11429834 11430026 11430628] 
+[37mTRAC[0m[13:52:51] Unlocking &t29.mu [#7]  (11430026) removing index 3 from: [11355994 11451047 11427662 11430026 11430628] 
+[37mTRAC[0m[13:52:51] Unlocking &t42.mu [#7]  (11430628) removing index 3 from: [11355994 11451047 11427662 11430628] 
+[37mDEBU[0m[13:52:51]           POP  UpdateAddresses at lvl 10     
+[37mDEBU[0m[13:52:55]           PUSH Connect at lvl 10             
+[37mTRAC[0m[13:52:55] Locking   &acbw.mu [#0]  (11430783)  lockset now contains: [11355994 11451047 11427662 11430783] 
+[37mDEBU[0m[13:52:55]            PUSH connect at lvl 11            
+[37mTRAC[0m[13:52:55] Locking   &ac.mu [#7]  (11457789)  lockset now contains: [11355994 11451047 11427662 11430783 11457789] 
+[37mDEBU[0m[13:52:55]             spawning Goroutine ----->  resetTransport 
+[37mTRAC[0m[13:52:55] Unlocking &ac.mu [#7]  (11457789) removing index 4 from: [11355994 11451047 11427662 11430783 11457789] 
+[37mDEBU[0m[13:52:55]            POP  connect at lvl 11            
+[37mTRAC[0m[13:52:55] Unlocking &acbw.mu [#0]  (11430783) removing index 3 from: [11355994 11451047 11427662 11430783] 
+[37mDEBU[0m[13:52:55]           POP  Connect at lvl 10             
+[37mDEBU[0m[13:52:58]           PUSH V at lvl 10                   
+[37mDEBU[0m[13:52:58]           POP  V at lvl 10                   
+[37mDEBU[0m[13:53:08]           PUSH Errorf at lvl 10              
+[37mDEBU[0m[13:53:11]            PUSH ErrorDepth at lvl 11         
+[37mDEBU[0m[13:53:11]            POP  ErrorDepth at lvl 11         
+[37mDEBU[0m[13:53:11]           POP  Errorf at lvl 10              
+[37mDEBU[0m[13:53:15]          POP  UpdateClientConnState at lvl 9 
+[37mTRAC[0m[13:53:15] Unlocking &ccb.balancerMu [#1]  (11427662) removing index 2 from: [11355994 11451047 11427662] 
+[37mDEBU[0m[13:53:15]         POP  updateClientConnState at lvl 8  
+[37mTRAC[0m[13:53:15] Unlocking &cc.mu [#9]  (11451047) removing index 1 from: [11355994 11451047] 
+[37mDEBU[0m[13:53:15]        POP  updateResolverState at lvl 7     
+[37mDEBU[0m[13:53:15]        PUSH poll at lvl 7                    
+[37mTRAC[0m[13:53:15] Locking   &t1.pollingMu [#5]  (11356632)  lockset now contains: [11355994 11356632] 
+[37mDEBU[0m[13:53:15]         spawning Goroutine ----->  poll$1    
+[37mTRAC[0m[13:53:15] Unlocking &t4.pollingMu [#5]  (11356632) removing index 1 from: [11355994 11356632] 
+[37mDEBU[0m[13:53:15]        POP  poll at lvl 7                    
+[37mDEBU[0m[13:53:15]       POP  UpdateState at lvl 6              
+[37mDEBU[0m[13:53:15]      POP  start at lvl 5                     
+[37mDEBU[0m[13:53:15]     POP  Build at lvl 4                      
+[37mTRAC[0m[13:53:15] Unlocking &t0.resolverMu [#1]  (11355994) removing index 0 from: [11355994] 
+[37mDEBU[0m[13:53:15]    POP  newCCResolverWrapper at lvl 3        
+[37mTRAC[0m[13:53:15] Locking   &t474.mu [#9]  (11441673)  lockset now contains: [11441673] 
+[37mDEBU[0m[13:53:15]    PUSH GetState at lvl 3                    
+[37mDEBU[0m[13:53:15]     PUSH getState at lvl 4                   
+[37mTRAC[0m[13:53:15] Locking   &csm.mu [#0]  (11446153)  lockset now contains: [11441673 11446153] 
+[37mTRAC[0m[13:53:15] Unlocking &csm.mu [#0]  (11446153) removing index 1 from: [11441673 11446153] 
+[37mDEBU[0m[13:53:15]     POP  getState at lvl 4                   
+[37mDEBU[0m[13:53:15]    POP  GetState at lvl 3                    
+[37mDEBU[0m[13:53:15]    PUSH connectionError at lvl 3             
+[37mTRAC[0m[13:53:15] Locking   &cc.lceMu [#20]  (11480505)  lockset now contains: [11441673 11480505] 
+[37mTRAC[0m[13:53:15] Unlocking &cc.lceMu [#20]  (11480505) removing index 1 from: [11441673 11480505] 
+[37mDEBU[0m[13:53:15]    POP  connectionError at lvl 3             
+[37mDEBU[0m[13:53:15]    PUSH WaitForStateChange at lvl 3          
+[37mDEBU[0m[13:53:15]     PUSH getNotifyChan at lvl 4              
+[37mTRAC[0m[13:53:15] Locking   &csm.mu [#0]  (11446283)  lockset now contains: [11441673 11446283] 
+[37mTRAC[0m[13:53:15] Unlocking &csm.mu [#0]  (11446283) removing index 1 from: [11441673 11446283] 
+[37mDEBU[0m[13:53:15]     POP  getNotifyChan at lvl 4              
+[37mDEBU[0m[13:53:15]     PUSH getState at lvl 4                   
+[37mTRAC[0m[13:53:15] Locking   &csm.mu [#0]  (11446153)  lockset now contains: [11441673 11446153] 
+[37mTRAC[0m[13:53:15] Unlocking &csm.mu [#0]  (11446153) removing index 1 from: [11441673 11446153] 
+[37mDEBU[0m[13:53:15]     POP  getState at lvl 4                   
+[37mDEBU[0m[13:53:18]    POP  WaitForStateChange at lvl 3          
+[37mTRAC[0m[13:53:24] Unlocking &t479.mu [#9]  (11441673) removing index 0 from: [11441673] 
+[37mDEBU[0m[13:53:24]   POP  DialContext at lvl 2                  
+[37mDEBU[0m[13:53:24]  POP  Dial at lvl 1                          
+[37mDEBU[0m[13:53:24]  PUSH NewGreeterClient at lvl 1              
+[37mDEBU[0m[13:53:24]  POP  NewGreeterClient at lvl 1              
+[37mDEBU[0m[13:53:28]  PUSH SayHello at lvl 1                      
+[37mDEBU[0m[13:53:34]   PUSH Invoke at lvl 2                       
+[37mDEBU[0m[13:53:34]    PUSH combine at lvl 3                     
+[37mDEBU[0m[13:53:34]    POP  combine at lvl 3                     
+[37mDEBU[0m[13:53:37]    PUSH chainUnaryClientInterceptors$1 at lvl 3 
+[37mDEBU[0m[13:53:41]    POP  chainUnaryClientInterceptors$1 at lvl 3 
+[37mDEBU[0m[13:53:41]    PUSH invoke at lvl 3                      
+[37mDEBU[0m[13:53:41]     PUSH newClientStream at lvl 4            
+[37mDEBU[0m[13:53:41]      PUSH incrCallsStarted at lvl 5          
+[37mDEBU[0m[13:53:41]       PUSH Now at lvl 6                      
+[37mDEBU[0m[13:53:41]       POP  Now at lvl 6                      
+[37mDEBU[0m[13:53:41]       PUSH UnixNano at lvl 6                 
+[37mDEBU[0m[13:53:41]        PUSH unixSec at lvl 7                 
+[37mDEBU[0m[13:53:41]         PUSH sec at lvl 8                    
+[37mDEBU[0m[13:53:41]         POP  sec at lvl 8                    
+[37mDEBU[0m[13:53:41]        POP  unixSec at lvl 7                 
+[37mDEBU[0m[13:53:41]        PUSH nsec at lvl 7                    
+[37mDEBU[0m[13:53:41]        POP  nsec at lvl 7                    
+[37mDEBU[0m[13:53:41]       POP  UnixNano at lvl 6                 
+[37mDEBU[0m[13:53:41]      POP  incrCallsStarted at lvl 5          
+[37mDEBU[0m[13:53:41]      PUSH defaultCallInfo at lvl 5           
+[37mDEBU[0m[13:53:41]      POP  defaultCallInfo at lvl 5           
+[37mDEBU[0m[13:53:41]      PUSH waitForResolvedAddrs at lvl 5      
+[37mDEBU[0m[13:53:41]       PUSH HasFired at lvl 6                 
+[37mDEBU[0m[13:53:41]       POP  HasFired at lvl 6                 
+[37mDEBU[0m[13:53:41]       PUSH Done at lvl 6                     
+[37mDEBU[0m[13:53:41]       POP  Done at lvl 6                     
+[37mDEBU[0m[13:53:47]      POP  waitForResolvedAddrs at lvl 5      
+[37mDEBU[0m[13:53:47]      PUSH newClientStream$1 at lvl 5         
+[37mDEBU[0m[13:53:47]       PUSH incrCallsFailed at lvl 6          
+[37mDEBU[0m[13:53:47]       POP  incrCallsFailed at lvl 6          
+[37mDEBU[0m[13:53:47]      POP  newClientStream$1 at lvl 5         
+[37mDEBU[0m[13:53:47]      PUSH GetMethodConfig at lvl 5           
+[37mTRAC[0m[13:53:47] RLocking   &cc.mu [#9]  (11460366)  Rlockset now contains: [11460366] 
+[37mTRAC[0m[13:53:47] RUnlocking &cc.mu [#9]  (11460366) removing index 0 from: [11460366] 
+[37mDEBU[0m[13:53:47]      POP  GetMethodConfig at lvl 5           
+[37mDEBU[0m[13:53:54]      PUSH getMaxSize at lvl 5                
+[37mDEBU[0m[13:53:54]       PUSH min at lvl 6                      
+[37mDEBU[0m[13:53:54]       POP  min at lvl 6                      
+[37mDEBU[0m[13:53:54]      POP  getMaxSize at lvl 5                
+[37mDEBU[0m[13:53:54]      PUSH setCallInfoCodec at lvl 5          
+[37mDEBU[0m[13:53:57]      POP  setCallInfoCodec at lvl 5          
+[37mDEBU[0m[13:53:57]      PUSH toRPCErr at lvl 5                  
+[37mDEBU[0m[13:53:57]      POP  toRPCErr at lvl 5                  
+[37mDEBU[0m[13:53:57]      PUSH newClientStream$2 at lvl 5         
+[37mDEBU[0m[13:54:00]      POP  newClientStream$2 at lvl 5         
+[37mDEBU[0m[13:54:00]      PUSH newClientStream$1 at lvl 5         
+[37mDEBU[0m[13:54:00]      POP  newClientStream$1 at lvl 5         
+[37mDEBU[0m[13:54:07]      PUSH methodFamily at lvl 5              
+[37mDEBU[0m[13:54:07]      POP  methodFamily at lvl 5              
+[37mDEBU[0m[13:54:10]      PUSH newContextWithRPCInfo at lvl 5     
+[37mDEBU[0m[13:54:13]      POP  newContextWithRPCInfo at lvl 5     
+[37mDEBU[0m[13:54:13]      PUSH Until at lvl 5                     
+[37mDEBU[0m[13:54:13]       PUSH Sub at lvl 6                      
+[37mDEBU[0m[13:54:13]        PUSH sec at lvl 7                     
+[37mDEBU[0m[13:54:13]        POP  sec at lvl 7                     
+[37mDEBU[0m[13:54:13]        PUSH sec at lvl 7                     
+[37mDEBU[0m[13:54:13]        POP  sec at lvl 7                     
+[37mDEBU[0m[13:54:13]        PUSH nsec at lvl 7                    
+[37mDEBU[0m[13:54:13]        POP  nsec at lvl 7                    
+[37mDEBU[0m[13:54:13]        PUSH Add at lvl 7                     
+[37mDEBU[0m[13:54:13]         PUSH nsec at lvl 8                   
+[37mDEBU[0m[13:54:13]         POP  nsec at lvl 8                   
+[37mDEBU[0m[13:54:13]         PUSH addSec at lvl 8                 
+[37mDEBU[0m[13:54:13]          PUSH stripMono at lvl 9             
+[37mDEBU[0m[13:54:13]           PUSH sec at lvl 10                 
+[37mDEBU[0m[13:54:13]           POP  sec at lvl 10                 
+[37mDEBU[0m[13:54:13]          POP  stripMono at lvl 9             
+[37mDEBU[0m[13:54:13]         POP  addSec at lvl 8                 
+[37mDEBU[0m[13:54:13]        POP  Add at lvl 7                     
+[37mDEBU[0m[13:54:13]        PUSH Equal at lvl 7                   
+[37mDEBU[0m[13:54:13]         PUSH sec at lvl 8                    
+[37mDEBU[0m[13:54:13]         POP  sec at lvl 8                    
+[37mDEBU[0m[13:54:13]        POP  Equal at lvl 7                   
+[37mDEBU[0m[13:54:13]        PUSH Before at lvl 7                  
+[37mDEBU[0m[13:54:13]        POP  Before at lvl 7                  
+[37mDEBU[0m[13:54:13]       POP  Sub at lvl 6                      
+[37mDEBU[0m[13:54:13]       PUSH Now at lvl 6                      
+[37mDEBU[0m[13:54:13]       POP  Now at lvl 6                      
+[37mDEBU[0m[13:54:13]      POP  Until at lvl 5                     
+[37mDEBU[0m[13:54:23]      PUSH Load at lvl 5                      
+[37mDEBU[0m[13:54:23]      POP  Load at lvl 5                      
+[37mDEBU[0m[13:54:23]      PUSH newAttemptLocked at lvl 5          
+[37mDEBU[0m[13:54:26]       PUSH toRPCErr at lvl 6                 
+[37mDEBU[0m[13:54:26]       POP  toRPCErr at lvl 6                 
+[37mDEBU[0m[13:54:26]       PUSH newAttemptLocked$1 at lvl 6       
+[37mDEBU[0m[13:54:26]        PUSH finish at lvl 7                  
+[37mTRAC[0m[13:54:26] Locking   &a.mu [#9]  (11389614)  lockset now contains: [11389614] 
+[37mDEBU[0m[13:54:30]         PUSH Parse at lvl 8                  
+[37mDEBU[0m[13:54:33]         POP  Parse at lvl 8                  
+[37mDEBU[0m[13:54:36]         PUSH doneChannelzWrapper$1 at lvl 8  
+[37mDEBU[0m[13:54:36]          PUSH incrCallsFailed at lvl 9       
+[37mDEBU[0m[13:54:36]          POP  incrCallsFailed at lvl 9       
+[37mDEBU[0m[13:54:36]          PUSH incrCallsSucceeded at lvl 9    
+[37mDEBU[0m[13:54:36]          POP  incrCallsSucceeded at lvl 9    
+[37mDEBU[0m[13:54:40]         POP  doneChannelzWrapper$1 at lvl 8  
+[37mDEBU[0m[13:54:40]         PUSH Now at lvl 8                    
+[37mDEBU[0m[13:54:40]         POP  Now at lvl 8                    
+[37mTRAC[0m[13:54:56] Unlocking &a.mu [#9]  (11389614) removing index 0 from: [11389614] 
+[37mDEBU[0m[13:54:56]        POP  finish at lvl 7                  
+[37mDEBU[0m[13:54:56]       POP  newAttemptLocked$1 at lvl 6       
+[37mDEBU[0m[13:54:56]       PUSH ContentType at lvl 6              
+[37mDEBU[0m[13:54:56]       POP  ContentType at lvl 6              
+[37mDEBU[0m[13:54:56]       PUSH Pairs at lvl 6                    
+[37mDEBU[0m[13:55:02]       POP  Pairs at lvl 6                    
+[37mDEBU[0m[13:55:02]       PUSH WithExtraMetadata at lvl 6        
+[37mDEBU[0m[13:55:09]       POP  WithExtraMetadata at lvl 6        
+[37mDEBU[0m[13:55:09]       PUSH getTransport at lvl 6             
+[37mDEBU[0m[13:55:09]        PUSH pick at lvl 7                    
+[37mTRAC[0m[13:55:09] Locking   &pw.mu [#0]  (11257731)  lockset now contains: [11257731] 
+[37mDEBU[0m[13:55:15]         PUSH Pick at lvl 8                   
+[37mTRAC[0m[13:55:15] Locking   &p.mu [#1]  (9899861)  lockset now contains: [11257731 9899861] 
+[37mTRAC[0m[13:55:15] Unlocking &p.mu [#1]  (9899861) removing index 1 from: [11257731 9899861] 
+[37mDEBU[0m[13:55:15]         POP  Pick at lvl 8                   
+[37mDEBU[0m[13:55:25]         PUSH Error at lvl 8                  
+[37mDEBU[0m[13:55:25]          PUSH ErrorDepth at lvl 9            
+[37mDEBU[0m[13:55:25]          POP  ErrorDepth at lvl 9            
+[37mDEBU[0m[13:55:25]         POP  Error at lvl 8                  
+[37mDEBU[0m[13:55:25]         PUSH getAddrConn at lvl 8            
+[37mTRAC[0m[13:55:25] Locking   &acbw.mu [#0]  (11430902)  lockset now contains: [11257731 11430902] 
+[37mTRAC[0m[13:55:25] Unlocking &acbw.mu [#0]  (11430902) removing index 1 from: [11257731 11430902] 
+[37mDEBU[0m[13:55:25]         POP  getAddrConn at lvl 8            
+[37mDEBU[0m[13:55:25]         PUSH getReadyTransport at lvl 8      
+[37mTRAC[0m[13:55:25] Locking   &ac.mu [#7]  (11475969)  lockset now contains: [11257731 11475969] 
+[37mTRAC[0m[13:55:25] Unlocking &ac.mu [#7]  (11475969) removing index 1 from: [11257731 11475969] 
+[37mDEBU[0m[13:55:25]         POP  getReadyTransport at lvl 8      
+[37mDEBU[0m[13:55:25]         PUSH doneChannelzWrapper at lvl 8    
+[37mTRAC[0m[13:55:25] Locking   &acw.mu [#0]  (11256885)  lockset now contains: [11257731 11256885] 
+[37mDEBU[0m[13:55:25]          PUSH incrCallsStarted at lvl 9      
+[37mDEBU[0m[13:55:25]           PUSH Now at lvl 10                 
+[37mDEBU[0m[13:55:25]           POP  Now at lvl 10                 
+[37mDEBU[0m[13:55:25]           PUSH UnixNano at lvl 10            
+[37mDEBU[0m[13:55:25]           POP  UnixNano at lvl 10            
+[37mDEBU[0m[13:55:25]          POP  incrCallsStarted at lvl 9      
+[37mTRAC[0m[13:55:25] Unlocking &acw.mu [#0]  (11256885) removing index 1 from: [11257731 11256885] 
+[37mDEBU[0m[13:55:25]         POP  doneChannelzWrapper at lvl 8    
+[37mDEBU[0m[13:55:31]         PUSH Infof at lvl 8                  
+[37mDEBU[0m[13:55:35]         POP  Infof at lvl 8                  
+[37mTRAC[0m[13:55:35] Unlocking &pw.mu [#0]  (11257731) removing index 0 from: [11257731] 
+[37mDEBU[0m[13:55:35]        POP  pick at lvl 7                    
+[37mDEBU[0m[13:55:35]       POP  getTransport at lvl 6             
+[37mDEBU[0m[13:55:38]       PUSH SetRemoteAddr at lvl 6            
+[37mTRAC[0m[13:55:38] Locking   &f.mu [#0]  (11422985)  lockset now contains: [11422985] 
+[37mTRAC[0m[13:55:38] Unlocking &f.mu [#0]  (11422985) removing index 0 from: [11422985] 
+[37mDEBU[0m[13:55:38]       POP  SetRemoteAddr at lvl 6            
+[37mDEBU[0m[13:55:38]      POP  newAttemptLocked at lvl 5          
+[37mDEBU[0m[13:55:38]      PUSH withRetry at lvl 5                 
+[37mTRAC[0m[13:55:38] Locking   &cs.mu [#16]  (11380015)  lockset now contains: [11380015] 
+[37mDEBU[0m[13:55:42]       PUSH newClientStream$3 at lvl 6        
+[37mDEBU[0m[13:55:42]        PUSH newStream at lvl 7               
+[37mDEBU[0m[13:55:45]         PUSH toRPCErr at lvl 8               
+[37mDEBU[0m[13:55:45]         POP  toRPCErr at lvl 8               
+[37mDEBU[0m[13:55:45]        POP  newStream at lvl 7               
+[37mDEBU[0m[13:55:45]       POP  newClientStream$3 at lvl 6        
+[37mDEBU[0m[13:55:49]       PUSH newClientStream$3 at lvl 6        
+[37mDEBU[0m[13:55:49]       POP  newClientStream$3 at lvl 6        
+[37mTRAC[0m[13:55:49] Locking   &cs.mu [#16]  (11380154)  lockset now contains: [11380015 11380154] 
+[37mDEBU[0m[13:55:52]       PUSH newClientStream$4 at lvl 6        
+[37mDEBU[0m[13:55:52]        PUSH bufferForRetryLocked at lvl 7    
+[37mDEBU[0m[13:55:52]         PUSH commitAttemptLocked at lvl 8    
+[37mDEBU[0m[13:55:52]         POP  commitAttemptLocked at lvl 8    
+[37mDEBU[0m[13:55:52]        POP  bufferForRetryLocked at lvl 7    
+[37mDEBU[0m[13:55:52]       POP  newClientStream$4 at lvl 6        
+[37mDEBU[0m[13:55:52]       PUSH retryLocked at lvl 6              
+[37mDEBU[0m[13:55:52]        PUSH finish at lvl 7                  
+[37mTRAC[0m[13:55:52] Locking   &a.mu [#9]  (11389614)  lockset now contains: [11380015 11380154 11389614] 
+[37mTRAC[0m[13:56:16] Unlocking &a.mu [#9]  (11389614) removing index 2 from: [11380015 11380154 11389614] 
+[37mDEBU[0m[13:56:16]        POP  finish at lvl 7                  
+[37mDEBU[0m[13:56:16]        PUSH shouldRetry at lvl 7             
+[37mDEBU[0m[13:56:16]         PUSH toRPCErr at lvl 8               
+[37mDEBU[0m[13:56:16]         POP  toRPCErr at lvl 8               
+[37mDEBU[0m[13:56:22]         PUSH throttle at lvl 8               
+[37mTRAC[0m[13:56:22] Locking   &rt.mu [#3]  (11479378)  lockset now contains: [11380015 11380154 11479378] 
+[37mTRAC[0m[13:56:22] Unlocking &rt.mu [#3]  (11479378) removing index 2 from: [11380015 11380154 11479378] 
+[37mDEBU[0m[13:56:22]         POP  throttle at lvl 8               
+[37mDEBU[0m[13:56:22]         PUSH NewTimer at lvl 8               
+[37mDEBU[0m[13:56:22]          PUSH when at lvl 9                  
+[37mDEBU[0m[13:56:22]          POP  when at lvl 9                  
+[37mDEBU[0m[13:56:22]          PUSH sendTime at lvl 9              
+[37mDEBU[0m[13:56:22]          POP  sendTime at lvl 9              
+[37mDEBU[0m[13:56:22]         POP  NewTimer at lvl 8               
+[37mDEBU[0m[13:56:26]         PUSH Int63n at lvl 8                 
+[37mTRAC[0m[13:56:26] Locking   google.golang.org/grpc/internal/grpcrand.mu  (3626601)  lockset now contains: [11380015 11380154 3626601] 
+[37mTRAC[0m[13:56:26] Unlocking google.golang.org/grpc/internal/grpcrand.mu  (3626601) removing index 2 from: [11380015 11380154 3626601] 
+[37mDEBU[0m[13:56:26]         POP  Int63n at lvl 8                 
+[37mDEBU[0m[13:56:26]        POP  shouldRetry at lvl 7             
+[37mDEBU[0m[13:56:26]        PUSH commitAttemptLocked at lvl 7     
+[37mDEBU[0m[13:56:26]        POP  commitAttemptLocked at lvl 7     
+[37mDEBU[0m[13:56:26]        PUSH replayBufferLocked at lvl 7      
+[37mDEBU[0m[13:56:29]         PUSH newClientStream$3 at lvl 8      
+[37mDEBU[0m[13:56:29]         POP  newClientStream$3 at lvl 8      
+[37mDEBU[0m[13:56:32]        POP  replayBufferLocked at lvl 7      
+[37mDEBU[0m[13:56:32]       POP  retryLocked at lvl 6              
+[37mTRAC[0m[13:56:32] Unlocking &cs.mu [#16]  (11380015) removing index 0 from: [11380015 11380154] 
+[37mTRAC[0m[13:56:32] Unlocking &cs.mu [#16]  (11380154) removing index 0 from: [11380154] 
+[37mDEBU[0m[13:56:32]      POP  withRetry at lvl 5                 
+[37mDEBU[0m[13:56:32]      PUSH FromOutgoingContext at lvl 5       
+[37mDEBU[0m[13:56:39]       PUSH Join at lvl 6                     
+[37mDEBU[0m[13:56:39]       POP  Join at lvl 6                     
+[37mDEBU[0m[13:56:39]      POP  FromOutgoingContext at lvl 5       
+[37mDEBU[0m[13:56:42]      spawning Goroutine ----->  newClientStream$5 
+[37mDEBU[0m[13:56:45]     POP  newClientStream at lvl 4            
+[37mDEBU[0m[13:56:49]     PUSH SendMsg at lvl 4                    
+[37mDEBU[0m[13:56:49]      PUSH SendMsg$1 at lvl 5                 
+[37mDEBU[0m[13:56:49]       PUSH finish at lvl 6                   
+[37mTRAC[0m[13:56:49] Locking   &cs.mu [#16]  (11385724)  lockset now contains: [11385724] 
+[37mDEBU[0m[13:56:49]        PUSH commitAttemptLocked at lvl 7     
+[37mDEBU[0m[13:56:49]        POP  commitAttemptLocked at lvl 7     
+[37mDEBU[0m[13:56:55]        PUSH successfulRPC at lvl 7           
+[37mTRAC[0m[13:56:55] Locking   &rt.mu [#3]  (11479572)  lockset now contains: [11385724 11479572] 
+[37mTRAC[0m[13:56:55] Unlocking &rt.mu [#3]  (11479572) removing index 1 from: [11385724 11479572] 
+[37mDEBU[0m[13:56:55]        POP  successfulRPC at lvl 7           
+[37mDEBU[0m[13:56:58]        PUSH incrCallsFailed at lvl 7         
+[37mDEBU[0m[13:56:58]        POP  incrCallsFailed at lvl 7         
+[37mDEBU[0m[13:56:58]        PUSH incrCallsSucceeded at lvl 7      
+[37mDEBU[0m[13:56:58]        POP  incrCallsSucceeded at lvl 7      
+[37mTRAC[0m[13:56:58] Unlocking &cs.mu [#16]  (11385724) removing index 0 from: [11385724] 
+[37mDEBU[0m[13:56:58]       POP  finish at lvl 6                   
+[37mDEBU[0m[13:56:58]      POP  SendMsg$1 at lvl 5                 
+[37mDEBU[0m[13:56:58]      PUSH prepareMsg at lvl 5                
+[37mDEBU[0m[13:56:58]       PUSH encode at lvl 6                   
+[37mDEBU[0m[13:57:08]       POP  encode at lvl 6                   
+[37mDEBU[0m[13:57:08]       PUSH compress at lvl 6                 
+[37mDEBU[0m[13:57:15]        PUSH compress$1 at lvl 7              
+[37mDEBU[0m[13:57:18]        POP  compress$1 at lvl 7              
+[37mDEBU[0m[13:57:24]       POP  compress at lvl 6                 
+[37mDEBU[0m[13:57:24]       PUSH msgHeader at lvl 6                
+[37mDEBU[0m[13:57:24]        PUSH PutUint32 at lvl 7               
+[37mDEBU[0m[13:57:24]        POP  PutUint32 at lvl 7               
+[37mDEBU[0m[13:57:24]       POP  msgHeader at lvl 6                
+[37mDEBU[0m[13:57:24]      POP  prepareMsg at lvl 5                
+[37mDEBU[0m[13:57:24]      PUSH SendMsg$1 at lvl 5                 
+[37mDEBU[0m[13:57:24]      POP  SendMsg$1 at lvl 5                 
+[37mDEBU[0m[13:57:34]     POP  SendMsg at lvl 4                    
+[37mDEBU[0m[13:57:37]     PUSH RecvMsg at lvl 4                    
+[37mDEBU[0m[13:57:37]      PUSH Header at lvl 5                    
+[37mDEBU[0m[13:57:37]       PUSH withRetry at lvl 6                
+[37mTRAC[0m[13:57:37] Locking   &cs.mu [#16]  (11380015)  lockset now contains: [11380015] 
+[37mTRAC[0m[13:57:44] Locking   &cs.mu [#16]  (11380154)  lockset now contains: [11380015 11380154] 
+[37mTRAC[0m[13:57:47] Unlocking &cs.mu [#16]  (11380015) removing index 0 from: [11380015 11380154] 
+[37mTRAC[0m[13:57:47] Unlocking &cs.mu [#16]  (11380154) removing index 0 from: [11380154] 
+[37mDEBU[0m[13:57:47]       POP  withRetry at lvl 6                
+[37mDEBU[0m[13:57:47]       PUSH Context at lvl 6                  
+[37mDEBU[0m[13:57:47]        PUSH commitAttempt at lvl 7           
+[37mTRAC[0m[13:57:47] Locking   &cs.mu [#16]  (11376181)  lockset now contains: [11376181] 
+[37mDEBU[0m[13:57:47]         PUSH commitAttemptLocked at lvl 8    
+[37mDEBU[0m[13:57:47]         POP  commitAttemptLocked at lvl 8    
+[37mTRAC[0m[13:57:47] Unlocking &cs.mu [#16]  (11376181) removing index 0 from: [11376181] 
+[37mDEBU[0m[13:57:47]        POP  commitAttempt at lvl 7           
+[37mDEBU[0m[13:57:47]       POP  Context at lvl 6                  
+[37mDEBU[0m[13:57:47]       PUSH FromContext at lvl 6              
+[37mDEBU[0m[13:57:54]       POP  FromContext at lvl 6              
+[37mDEBU[0m[13:57:54]      POP  Header at lvl 5                    
+[37mDEBU[0m[13:57:57]      PUSH Trailer at lvl 5                   
+[37mDEBU[0m[13:57:57]       PUSH commitAttempt at lvl 6            
+[37mTRAC[0m[13:57:57] Locking   &cs.mu [#16]  (11376181)  lockset now contains: [11376181] 
+[37mTRAC[0m[13:57:57] Unlocking &cs.mu [#16]  (11376181) removing index 0 from: [11376181] 
+[37mDEBU[0m[13:57:57]       POP  commitAttempt at lvl 6            
+[37mDEBU[0m[13:57:57]      POP  Trailer at lvl 5                   
+[37mDEBU[0m[13:57:57]     POP  RecvMsg at lvl 4                    
+[37mDEBU[0m[13:57:57]    POP  invoke at lvl 3                      
+[37mDEBU[0m[13:57:57]   POP  Invoke at lvl 2                       
+[37mDEBU[0m[13:57:57]  POP  SayHello at lvl 1                      
+[37mDEBU[0m[13:57:57]  PUSH GetMessage at lvl 1                    
+[37mDEBU[0m[13:57:57]  POP  GetMessage at lvl 1                    
+[37mDEBU[0m[13:58:00] POP  main at lvl 0                           
+[37mDEBU[0m[13:58:00] -----------------------------------Goroutine scWatcher-----------------------------------[1] 
+[37mDEBU[0m[13:58:00] PUSH scWatcher at lvl 0                      
+[37mTRAC[0m[13:58:07] Locking   &cc.mu [#9]  (11449476)  lockset now contains: [11449476] 
+[37mTRAC[0m[13:58:07] Unlocking &cc.mu [#9]  (11449476) removing index 0 from: [11449476] 
+[37mDEBU[0m[13:58:07] POP  scWatcher at lvl 0                      
+[37mDEBU[0m[13:58:07] -----------------------------------Goroutine watcher-----------------------------------[2] 
+[37mDEBU[0m[13:58:07] PUSH watcher at lvl 0                        
+[37mDEBU[0m[13:58:07]  PUSH Done at lvl 1                          
+[37mDEBU[0m[13:58:07]  POP  Done at lvl 1                          
+[37mDEBU[0m[13:58:07]  PUSH HasFired at lvl 1                      
+[37mDEBU[0m[13:58:07]  POP  HasFired at lvl 1                      
+[37mTRAC[0m[13:58:07] Locking   &ccb.balancerMu [#1]  (11426253)  lockset now contains: [11426253] 
+[37mDEBU[0m[13:58:10]  PUSH UpdateSubConnState at lvl 1            
+[37mDEBU[0m[13:58:13]   PUSH V at lvl 2                            
+[37mDEBU[0m[13:58:13]   POP  V at lvl 2                            
+[37mDEBU[0m[13:58:20]   PUSH Infof at lvl 2                        
+[37mDEBU[0m[13:58:23]    PUSH InfoDepth at lvl 3                   
+[37mDEBU[0m[13:58:23]    POP  InfoDepth at lvl 3                   
+[37mDEBU[0m[13:58:23]   POP  Infof at lvl 2                        
+[37mDEBU[0m[13:58:33]   PUSH UpdateState at lvl 2                  
+[37mTRAC[0m[13:58:33] Locking   &ccb.mu [#5]  (11428862)  lockset now contains: [11426253 11428862] 
+[37mTRAC[0m[13:58:33] Unlocking &ccb.mu [#5]  (11428862) removing index 1 from: [11426253 11428862] 
+[37mDEBU[0m[13:58:33]   POP  UpdateState at lvl 2                  
+[37mDEBU[0m[13:58:39]  POP  UpdateSubConnState at lvl 1            
+[37mTRAC[0m[13:58:43] Locking   &ccb.mu [#5]  (11426534)  lockset now contains: [11426253 11426534] 
+[37mDEBU[0m[13:58:43]  PUSH removeAddrConn at lvl 1                
+[37mTRAC[0m[13:58:43] Locking   &cc.mu [#9]  (11456413)  lockset now contains: [11426253 11426534 11456413] 
+[37mDEBU[0m[13:58:43]   PUSH tearDown at lvl 2                     
+[37mTRAC[0m[13:58:43] Locking   &ac.mu [#7]  (11476572)  lockset now contains: [11426253 11426534 11456413 11476572] 
+[37mDEBU[0m[13:58:43]    PUSH updateConnectivityState at lvl 3     
+[37mDEBU[0m[13:58:46]     PUSH handleSubConnStateChange at lvl 4   
+[37mTRAC[0m[13:58:46] Locking   &cc.mu [#9]  (11454851)  lockset now contains: [11426253 11426534 11456413 11476572 11454851] 
+[37mTRAC[0m[13:58:46] Unlocking &cc.mu [#9]  (11454851) removing index 4 from: [11426253 11426534 11456413 11476572 11454851] 
+[37mDEBU[0m[13:58:46]     POP  handleSubConnStateChange at lvl 4   
+[37mDEBU[0m[13:58:46]    POP  updateConnectivityState at lvl 3     
+[37mTRAC[0m[13:58:52] Locking   &ac.mu [#7]  (11477375)  lockset now contains: [11426253 11426534 11456413 11476572 11477375] 
+[37mTRAC[0m[13:58:56] Unlocking &ac.mu [#7]  (11476572) removing index 3 from: [11426253 11426534 11456413 11476572 11477375] 
+[37mTRAC[0m[13:58:56] Unlocking &ac.mu [#7]  (11477375) removing index 3 from: [11426253 11426534 11456413 11477375] 
+[37mDEBU[0m[13:58:56]   POP  tearDown at lvl 2                     
+[37mTRAC[0m[13:58:56] Unlocking &cc.mu [#9]  (11456413) removing index 2 from: [11426253 11426534 11456413] 
+[37mDEBU[0m[13:58:56]  POP  removeAddrConn at lvl 1                
+[37mTRAC[0m[13:58:56] Unlocking &ccb.balancerMu [#1]  (11426253) removing index 0 from: [11426253 11426534] 
+[37mTRAC[0m[13:58:56] Unlocking &ccb.mu [#5]  (11426534) removing index 0 from: [11426534] 
+[37mDEBU[0m[13:58:56] POP  watcher at lvl 0                        
+[37mDEBU[0m[13:58:56] -----------------------------------Goroutine resetTransport-----------------------------------[3] 
+[37mDEBU[0m[13:58:56] PUSH resetTransport at lvl 0                 
+[37mDEBU[0m[13:58:56]  PUSH resolveNow at lvl 1                    
+[37mTRAC[0m[13:58:56] RLocking   &cc.mu [#9]  (11462703)  Rlockset now contains: [11462703] 
+[37mDEBU[0m[13:58:56]   spawning Goroutine ----->  resolveNow      
+[37mTRAC[0m[13:58:56] RUnlocking &cc.mu [#9]  (11462703) removing index 0 from: [11462703] 
+[37mDEBU[0m[13:58:56]  POP  resolveNow at lvl 1                    
+[37mTRAC[0m[13:58:56] Locking   &ac.mu [#7]  (11466659)  lockset now contains: [11466659] 
+[37mDEBU[0m[13:59:02]  PUSH tryAllAddrs at lvl 1                   
+[37mTRAC[0m[13:59:02] Locking   &ac.mu [#7]  (11469681)  lockset now contains: [11466659 11469681] 
+[37mTRAC[0m[13:59:02] RLocking   &t22.mu [#9]  (11469818)  Rlockset now contains: [11469818] 
+[37mDEBU[0m[13:59:05]   PUSH createTransport at lvl 2              
+[37mDEBU[0m[13:59:05]    PUSH NewEvent at lvl 3                    
+[37mDEBU[0m[13:59:05]    POP  NewEvent at lvl 3                    
+[37mDEBU[0m[13:59:09]    PUSH After at lvl 3                       
+[37mDEBU[0m[13:59:09]     PUSH NewTimer at lvl 4                   
+[37mDEBU[0m[13:59:09]      PUSH when at lvl 5                      
+[37mDEBU[0m[13:59:09]      POP  when at lvl 5                      
+[37mDEBU[0m[13:59:09]      PUSH sendTime at lvl 5                  
+[37mDEBU[0m[13:59:09]       PUSH Now at lvl 6                      
+[37mDEBU[0m[13:59:09]       POP  Now at lvl 6                      
+[37mDEBU[0m[13:59:09]      POP  sendTime at lvl 5                  
+[37mDEBU[0m[13:59:09]     POP  NewTimer at lvl 4                   
+[37mDEBU[0m[13:59:09]    POP  After at lvl 3                       
+[37mDEBU[0m[13:59:09]   POP  createTransport at lvl 2              
+[37mDEBU[0m[13:59:09]   PUSH updateConnectionError at lvl 2        
+[37mTRAC[0m[13:59:09] Locking   &cc.lceMu [#20]  (11480388)  lockset now contains: [11466659 11469681 11480388] 
+[37mTRAC[0m[13:59:09] Unlocking &cc.lceMu [#20]  (11480388) removing index 2 from: [11466659 11469681 11480388] 
+[37mDEBU[0m[13:59:09]   POP  updateConnectionError at lvl 2        
+[37mTRAC[0m[13:59:09] Unlocking &ac.mu [#7]  (11469681) removing index 1 from: [11466659 11469681] 
+[37mTRAC[0m[13:59:09] RUnlocking &t33.mu [#9]  (11469818) removing index 0 from: [11469818] 
+[37mDEBU[0m[13:59:09]  POP  tryAllAddrs at lvl 1                   
+[37mTRAC[0m[13:59:09] Locking   &ac.mu [#7]  (11467810)  lockset now contains: [11466659 11467810] 
+[37mTRAC[0m[13:59:09] Locking   &ac.mu [#7]  (11468257)  lockset now contains: [11466659 11467810 11468257] 
+[37mTRAC[0m[13:59:12] Locking   &ac.mu [#7]  (11468098)  lockset now contains: [11466659 11467810 11468257 11468098] 
+[37mDEBU[0m[13:59:12]  PUSH Stop at lvl 1                          
+[37mDEBU[0m[13:59:12]  POP  Stop at lvl 1                          
+[37mDEBU[0m[13:59:16]  PUSH startHealthCheck at lvl 1              
+[37mDEBU[0m[13:59:16]   PUSH startHealthCheck$1 at lvl 2           
+[37mDEBU[0m[13:59:16]    PUSH updateConnectivityState at lvl 3     
+[37mDEBU[0m[13:59:19]     PUSH handleSubConnStateChange at lvl 4   
+[37mTRAC[0m[13:59:19] Locking   &cc.mu [#9]  (11454851)  lockset now contains: [11466659 11467810 11468257 11468098 11454851] 
+[37mTRAC[0m[13:59:19] Unlocking &cc.mu [#9]  (11454851) removing index 4 from: [11466659 11467810 11468257 11468098 11454851] 
+[37mDEBU[0m[13:59:19]     POP  handleSubConnStateChange at lvl 4   
+[37mDEBU[0m[13:59:19]    POP  updateConnectivityState at lvl 3     
+[37mDEBU[0m[13:59:19]   POP  startHealthCheck$1 at lvl 2           
+[37mDEBU[0m[13:59:19]   PUSH healthCheckConfig at lvl 2            
+[37mTRAC[0m[13:59:19] RLocking   &cc.mu [#9]  (11460695)  Rlockset now contains: [11460695] 
+[37mTRAC[0m[13:59:19] RUnlocking &cc.mu [#9]  (11460695) removing index 0 from: [11460695] 
+[37mDEBU[0m[13:59:19]   POP  healthCheckConfig at lvl 2            
+[37mDEBU[0m[13:59:19]   PUSH startHealthCheck$1 at lvl 2           
+[37mDEBU[0m[13:59:19]   POP  startHealthCheck$1 at lvl 2           
+[37mDEBU[0m[13:59:19]   spawning Goroutine ----->  startHealthCheck$4 
+[37mDEBU[0m[13:59:19]  POP  startHealthCheck at lvl 1              
+[37mTRAC[0m[13:59:26] Unlocking &ac.mu [#7]  (11466659) removing index 0 from: [11466659 11467810 11468257 11468098] 
+[37mTRAC[0m[13:59:26] Unlocking &ac.mu [#7]  (11467810) removing index 0 from: [11467810 11468257 11468098] 
+[37mTRAC[0m[13:59:26] Unlocking &ac.mu [#7]  (11468257) removing index 0 from: [11468257 11468098] 
+[37mTRAC[0m[13:59:26] Unlocking &ac.mu [#7]  (11468098) removing index 0 from: [11468098] 
+[37mDEBU[0m[13:59:26] POP  resetTransport at lvl 0                 
+[37mDEBU[0m[13:59:26] -----------------------------------Goroutine resetTransport-----------------------------------[4] 
+[37mDEBU[0m[13:59:26] PUSH resetTransport at lvl 0                 
+[37mTRAC[0m[13:59:26] Locking   &ac.mu [#7]  (11466659)  lockset now contains: [11466659] 
+[37mTRAC[0m[13:59:33] Locking   &ac.mu [#7]  (11467810)  lockset now contains: [11466659 11467810] 
+[37mTRAC[0m[13:59:33] Locking   &ac.mu [#7]  (11468257)  lockset now contains: [11466659 11467810 11468257] 
+[37mTRAC[0m[13:59:36] Locking   &ac.mu [#7]  (11468098)  lockset now contains: [11466659 11467810 11468257 11468098] 
+[37mTRAC[0m[13:59:47] Unlocking &ac.mu [#7]  (11466659) removing index 0 from: [11466659 11467810 11468257 11468098] 
+[37mTRAC[0m[13:59:47] Unlocking &ac.mu [#7]  (11467810) removing index 0 from: [11467810 11468257 11468098] 
+[37mTRAC[0m[13:59:47] Unlocking &ac.mu [#7]  (11468257) removing index 0 from: [11468257 11468098] 
+[37mTRAC[0m[13:59:47] Unlocking &ac.mu [#7]  (11468098) removing index 0 from: [11468098] 
+[37mDEBU[0m[13:59:47] POP  resetTransport at lvl 0                 
+[37mDEBU[0m[13:59:47] -----------------------------------Goroutine poll$1-----------------------------------[5] 
+[37mDEBU[0m[13:59:47] PUSH poll$1 at lvl 0                         
+[37mDEBU[0m[13:59:54] POP  poll$1 at lvl 0                         
+[37mDEBU[0m[13:59:54] -----------------------------------Goroutine newClientStream$5-----------------------------------[6] 
+[37mDEBU[0m[13:59:54] PUSH newClientStream$5 at lvl 0              
+[37mDEBU[0m[14:00:00] POP  newClientStream$5 at lvl 0              
+[37mDEBU[0m[14:00:00] -----------------------------------Goroutine resolveNow-----------------------------------[7] 
+[37mDEBU[0m[14:00:00] PUSH resolveNow at lvl 0                     
+[37mTRAC[0m[14:00:00] Locking   &ccr.resolverMu [#1]  (11356236)  lockset now contains: [11356236] 
+[37mDEBU[0m[14:00:04]  PUSH ResolveNow at lvl 1                    
+[37mDEBU[0m[14:00:04]  POP  ResolveNow at lvl 1                    
+[37mTRAC[0m[14:00:04] Unlocking &ccr.resolverMu [#1]  (11356236) removing index 0 from: [11356236] 
+[37mDEBU[0m[14:00:04] POP  resolveNow at lvl 0                     
+[37mDEBU[0m[14:00:04] -----------------------------------Goroutine startHealthCheck$4-----------------------------------[8] 
+[37mDEBU[0m[14:00:04] PUSH startHealthCheck$4 at lvl 0             
+[37mDEBU[0m[14:00:07] POP  startHealthCheck$4 at lvl 0             
+[37mDEBU[0m[14:00:07] -----------------------------------Stack trace ends----------------------------------- 
+[36mINFO[0m[14:00:07] Done  -- 9 goroutines analyzed! 4154 instructions of interest detected!  
+[36mINFO[0m[14:00:07] Building Happens-Before graph...             
+[36mINFO[0m[14:00:07] Done  -- Happens-Before graph built          
+[36mINFO[0m[14:00:11] Checking for data races...                   
+[36mINFO[0m[14:00:11] Data race #1                                 
+[36mINFO[0m[14:00:11] ==================================================================================================== 
+[36mINFO[0m[14:00:11]  Write of [35m&t1.balancer [#2][0m in function [102mnewCCBalancerWrapper[0m at /home/yiqingzhao94/go/pkg/mod/google.golang.org/grpc@v1.33.1/balancer_conn_wrappers.go:61:6 
+[36mINFO[0m[14:00:11] 	called by function[s]:                      
+[36mINFO[0m[14:00:11] 	   newCCBalancerWrapper /home/yiqingzhao94/go/pkg/mod/google.golang.org/grpc@v1.33.1/clientconn.go:708:43 
+[36mINFO[0m[14:00:11] 	in goroutine  ***  [ 0 ] *** , with the following call stack:  
+[36mINFO[0m[14:00:11]  Read of [35m&ccb.balancer [#2][0m in function [102mwatcher[0m at /home/yiqingzhao94/go/pkg/mod/google.golang.org/grpc@v1.33.1/balancer_conn_wrappers.go:77:8 
+[36mINFO[0m[14:00:11] 	in goroutine  *** watcher [ 2 ] *** , with the following call stack:  
+[36mINFO[0m[14:00:11] 	   --> Goroutine:  main [ 0 ]               
+[36mINFO[0m[14:00:11] 	       Dial                                 
+[36mINFO[0m[14:00:11] 	        DialContext                         
+[36mINFO[0m[14:00:11] 	         newCCResolverWrapper               
+[36mINFO[0m[14:00:11] 	          Build                             
+[36mINFO[0m[14:00:11] 	           start                            
+[36mINFO[0m[14:00:11] 	            UpdateState                     
+[36mINFO[0m[14:00:11] 	             updateResolverState            
+[36mINFO[0m[14:00:11] 	              maybeApplyDefaultServiceConfig 
+[36mINFO[0m[14:00:11] 	               applyServiceConfigAndBalancer 
+[36mINFO[0m[14:00:11] 	                switchBalancer              
+[36mINFO[0m[14:00:11] 	                 newCCBalancerWrapper       
+[36mINFO[0m[14:00:11] ==================================================================================================== 
+[36mINFO[0m[14:00:11] Done  --  1 race found!                      
