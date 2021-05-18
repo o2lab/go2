@@ -261,9 +261,7 @@ func (a *analysis) checkRacyPairs() []*raceInfo {
 								goIDs:    []int{i, j},
 								insInd:   []int{ii, jj},
 							}
-							if !allEntries {
-								a.printRace(len(a.reportedAddr), ri)
-							}
+							a.printRace(len(a.reportedAddr), ri)
 							races = append(races, ri)
 						}
 					}

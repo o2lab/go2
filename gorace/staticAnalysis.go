@@ -13,8 +13,6 @@ import (
 	"github.com/twmb/algoimpl/go/graph"
 	"go/token"
 	"go/types"
-	"sync"
-
 	"os"
 	"strconv"
 	"strings"
@@ -354,10 +352,10 @@ func (runner *AnalysisRunner) Run(args []string) error {
 	selectTest, entry := runner.analyzeTestEntry(mains)
 
 	// Iterate each entry point...
-	var wg sync.WaitGroup
+	//var wg sync.WaitGroup
 	for _, m := range mains {
-		wg.Add(1)
-		go func(main *ssa.Package) {
+		//wg.Add(1)
+		//go func(main *ssa.Package) {
 			// Configure static analysis...
 			a := analysis{
 				ptaRes:          runner.ptaResult[m],
@@ -368,7 +366,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 				trieLimit:  trieLimit,
 				getGo:      getGo,
 				prog:       runner.prog,
-				main:       main,
+				main:       m,
 				RWinsMap:   make(map[goIns]graph.Node),
 				trieMap:    make(map[fnInfo]*trie),
 				insMono:    -1,
@@ -403,7 +401,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 				testEntry:       selectTest,
 				entryFn:         entry,
 			}
-			if strings.Contains(main.Pkg.Path(), "GoBench") { // for testing purposes
+			if strings.Contains(m.Pkg.Path(), "GoBench") { // for testing purposes
 				a.efficiency = false
 				a.trieLimit = 2
 			} else if !goTest {
@@ -418,7 +416,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 				a.ptaRes.AnalyzeTest(a.testEntry)
 				a.visitAllInstructions(a.testEntry, 0)
 			} else {
-				a.visitAllInstructions(main.Func(a.entryFn), 0)
+				a.visitAllInstructions(m.Func(a.entryFn), 0)
 			}
 
 			if !allEntries {
@@ -459,17 +457,17 @@ func (runner *AnalysisRunner) Run(args []string) error {
 				log.Info("Checking for data races... ")
 			}
 			rr := raceReport{
-				entryInfo: main.Pkg.Path(),
+				entryInfo: m.Pkg.Path(),
 			}
 			rr.racePairs = a.checkRacyPairs()
-			runner.mu.Lock()
+			//runner.mu.Lock()
 			runner.racyStackTops = a.racyStackTops
 			runner.finalReport = append(runner.finalReport, rr)
-			runner.mu.Unlock()
-			wg.Done()
-		}(m)
+			//runner.mu.Unlock()
+			//wg.Done()
+		//}(m)
 	}
-	wg.Wait()
+	//wg.Wait()
 
 	raceCount := 0
 	for _, e := range runner.finalReport {
