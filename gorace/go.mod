@@ -2,7 +2,7 @@ module github.com/o2lab/gorace
 
 go 1.13
 
-//replace github.com/april1989/origin-go-tools  => ../../../origin-go-tools //bz: debug use
+replace github.com/april1989/origin-go-tools  => ../gopta
 
 require (
 	github.com/april1989/origin-go-tools v0.0.32
