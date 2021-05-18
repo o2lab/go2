@@ -3,7 +3,7 @@ gorace/go.*
 gorace/race-checker
 .DS_STORE
 .idea
-gorace
+gorace/gorace
 
 go_tools/_local/
 go_tools/_logs/
