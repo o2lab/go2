@@ -37,7 +37,6 @@ type analysis struct {
 	storeFns     []*fnCallInfo
 	//stackMap     map[fnCallIns]stackInfo
 	workList     []goroutineInfo
-	reportedAddr []ssa.Value // stores already reported addresses
 	levels       map[int]int
 	lockMap      map[ssa.Instruction][]ssa.Value // map each read/write access to a snapshot of actively maintained lockset
 	lockSet      map[int][]*lockInfo             // active lockset, to be maintained along instruction traversal
@@ -77,6 +76,16 @@ type analysis struct {
 
 	entryFn         string         //bz: move from global to analysis field
 	testEntry       *ssa.Function  //bz: test entry point
+
+	mutualTargets   map[int]*mutualFns //bz: this mutual exclusion is for this specific go id (i.e., int)
+}
+
+type mutualFns struct {
+	fns     map[*ssa.Function]*mutualGroup //bz: fn <-> all its mutual fns (now including itself)
+}
+
+type mutualGroup struct {
+	group   map[*ssa.Function]*ssa.Function //bz: this is a group of mutual fns
 }
 
 type insInfo struct {

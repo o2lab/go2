@@ -6,6 +6,8 @@ import (
 	pta0 "github.com/april1989/origin-go-tools/go/pointer_default"
 	"github.com/april1989/origin-go-tools/go/ssa"
 	"go/types"
+	"strconv"
+	"strings"
 )
 
 //bz: i separate the original function, too long .... this code mainly used for default pta, otherwise direct to pointerNewAnalysis
@@ -108,17 +110,6 @@ func (a *analysis) pointerNewAnalysis(location ssa.Value, goID int, theIns ssa.I
 	} else {
 		goInstr = a.RWIns[goID][0].ins.(*ssa.Go)
 	}
-	//if strings.Contains(theIns.String(), "onSuccess()") || strings.Contains(theIns.String(), "withRetry") {
-	//	fmt.Println("###", theIns) //bz:debug
-	//	parent := theIns.Parent()
-	//	for k, v := range a.stackMap {
-	//		if k.fnIns == parent && k.goID == goID {
-	//			for i, s := range v.fnCalls {
-	//				fmt.Println("-", i, s.fnIns)
-	//			}
-	//		}
-	//	}
-	//}
 
 	ptr := a.ptaRes.PointsToByGoWithLoopID(location, goInstr, a.loopIDs[goID])
 	labels := ptr.PointsTo().Labels()
@@ -136,13 +127,13 @@ func (a *analysis) pointerNewAnalysis(location ssa.Value, goID int, theIns ssa.I
 //bz: use my pta: comment job for both pointerNewAnalysis and pointerNewAnalysisOffset
 func (a *analysis) pointerNewAnalysisHandleFunc(ptr pointer.PointerWCtx, labels []*pointer.Label, location ssa.Value, goID int, goInstr *ssa.Go,
 	theIns ssa.Instruction) {
-	if len(labels) > 1 { // pta returns multiple targets TODO: bz: wip
-		//labels = a.ptaRes.FilterTargets(labels, ptr, location, goInstr, theIns)
-		//labels = a.filterLabels(labels, ptr, location, goID, theIns)
-		labels = labels[:2] // use first two targets for now
+	if len(labels) > 1 { // pta returns multiple targets
+		labels = a.filterLabels(labels, ptr, location, goID, goInstr, theIns)
 	}
 
-	for _, label := range labels { //bz: labels are reduced -> TODO: bz: here should use mutual exclusion too
+	var fns []*ssa.Function //bz: let's record mutual excluded fns
+	isInvoke := false
+	for _, label := range labels { //bz: labels are reduced -> TODO: bz: here should use mutual exclusion too, len > 1
 		var fnName string
 		switch theFunc := label.Value().(type) {
 		case *ssa.Function:
@@ -169,68 +160,11 @@ func (a *analysis) pointerNewAnalysisHandleFunc(ptr pointer.PointerWCtx, labels 
 			case *ssa.Go:
 				switch theFunc.X.(type) {
 				case *ssa.Parameter:
-					a.pointerAnalysis(theFunc.X, goID, theIns)
+					a.pointerAnalysis(theFunc.X, goID, theIns) //TODO: bz: how to exclude this ?
 				}
 			}
 		case *ssa.MakeChan:
-			a.chanName = theFunc.Name()
-		case *ssa.Alloc:
-			if call, ok := theIns.(*ssa.Call); ok {
-				var goInst *ssa.Go
-				if goID == 0 {
-					goInst = nil
-				} else {
-					goInst = a.RWIns[goID][0].ins.(*ssa.Go)
-				}
-				invokeFunc := a.ptaRes.GetFreeVarFunc(theIns.Parent(), call, goInst)
-				if invokeFunc == nil {
-					fmt.Println("no pta target@", theIns)
-					break //bz: pta cannot find the target. how?
-				}
-				fnName = invokeFunc.Name()
-				a.traverseFn(invokeFunc, fnName, goID, theIns, false)
-			}
-		default:
-			break
-		}
-	}
-}
-
-//TODO: bz: need some heuristics to remove impossible targets, especially for test
-// e.g.,
-// when t4(ctx, method, req, reply, cc, t9, opts...) in google.golang.org/grpc.chainUnaryClientInterceptors$1
-// returns 3 targets: TestInterceptorCanAccessCallOptions$2, failOkayRPC and chainUnaryClientInterceptors$1
-// since chainUnaryClientInterceptors is already pushed (or popped) before,
-// the correct target should be nil, since TestInterceptorCanAccessCallOptions$2 is from another test and
-// chainUnaryClientInterceptors$1 already pushed and failOkayRPC is used by TestUnaryClientInterceptor
-//bz: reduce targets
-// the rule is we are supposed to find a target that (1) in the same scope of test/main (2) has been pushed, or already popped
-func (a *analysis) filterLabels(labels []*pointer.Label, ptr pointer.PointerWCtx, location ssa.Value, goID int, theIns ssa.Instruction) []*pointer.Label {
-	var result []*pointer.Label
-	//if theIns.Parent() != nil && theIns.Parent().Name() == "withRetry" {
-	//	fmt.Println()
-	//}
-	for i, eachLabel := range labels {
-		fmt.Println("label", i, eachLabel.String())
-		switch theFunc := eachLabel.Value().(type) {
-		case *ssa.Function:
-			if theFunc == a.testEntry {
-				continue
-			}
-		case *ssa.MakeInterface:
-			switch theIns.(type) {
-			case *ssa.Call:
-				methodName := theIns.(*ssa.Call).Call.Method.Name()
-				if a.prog.MethodSets.MethodSet(ptr.PointsTo().DynamicTypes().Keys()[0]).Lookup(a.main.Pkg, methodName) == nil { // ignore abstract methods
-					break
-				}
-				check := a.prog.LookupMethod(ptr.PointsTo().DynamicTypes().Keys()[0], a.main.Pkg, methodName)
-				fmt.Println(check)
-			case *ssa.Go:
-				switch theFunc.X.(type) {
-				case *ssa.Parameter:
-				}
-			}
+			a.chanName = theFunc.Name() //TODO: bz: how to deal with this ?
 		case *ssa.Alloc:
 			if call, ok := theIns.(*ssa.Call); ok {
 				var goInstr *ssa.Go
@@ -241,17 +175,71 @@ func (a *analysis) filterLabels(labels []*pointer.Label, ptr pointer.PointerWCtx
 				}
 				invokeFunc := a.ptaRes.GetFreeVarFunc(theIns.Parent(), call, goInstr)
 				if invokeFunc == nil {
-					fmt.Println("no pta target")
-					continue //bz: pta cannot find the target. how?
+					fmt.Println("no pta target@", theIns)
+					break //bz: pta cannot find the target. how?
 				}
+				fnName = invokeFunc.Name()
+				a.traverseFn(invokeFunc, fnName, goID, theIns, false)
 			}
-		case *ssa.MakeSlice:
-		default:
-			continue
+		default: //bz: this label is a pointer/named/interface, why not consider ...
+			isInvoke = true
+		}
+		if isInvoke {
+			break //bz: no need to continue, all are pointer-similar type, skip for loop
 		}
 	}
-	//log.Debug("PTA identified multiple targets: ", targetNames)
 
+	if isInvoke { //bz: handle invoke call
+		if call, ok := theIns.(*ssa.Call); ok {
+			targets := a.ptaRes.GetInvokeFuncs(call, ptr, goInstr)
+			for _, target := range targets {
+				a.traverseFn(target, target.Name(), goID, theIns, false)
+			}
+		} else {
+			//bz: here will have weired behavior if running in debug mode
+			// -> make interface, skip; e.g. make ServerOption <- *funcServerOption (t2)
+			return
+		}
+	}
+
+	if len(fns) > 1 {
+		//bz: let's mutual exclude them
+		mFns := a.mutualTargets[goID]
+		if mFns == nil {
+			mFns = &mutualFns{}
+			mFns.fns = make(map[*ssa.Function]*mutualGroup)
+		}
+		group := make(map[*ssa.Function]*ssa.Function)
+		for _, fn := range fns {
+			group[fn] = fn
+		}
+		mGroup := &mutualGroup{
+			group: group,
+		}
+		for _, fn := range fns {
+			mFns.fns[fn] = mGroup
+		}
+	}
+}
+
+//bz: reduce targets
+func (a *analysis) filterLabels(labels []*pointer.Label, ptr pointer.PointerWCtx, location ssa.Value, goID int, goInstr *ssa.Go,
+	theIns ssa.Instruction) []*pointer.Label {
+	switch v := location.(type) {
+	case *ssa.Parameter:
+		targets := a.filterParam(v, labels, ptr, goID, theIns)
+		if targets != nil {
+			return targets
+		}
+	case *ssa.Call:
+		targets := a.filterInvoke(v, labels, ptr, goID, theIns)
+		if targets != nil {
+			return targets
+		}
+	default:
+		break
+	}
+	//a.conservative()
 	//if theIns.Parent() != nil && theIns.Parent().Name() == "withRetry" {
 	//	for j, tName := range targetNames {
 	//		if tName == "commitAttemptLocked$bound" || tName == "RecvMsg$1" {
@@ -260,8 +248,79 @@ func (a *analysis) filterLabels(labels []*pointer.Label, ptr pointer.PointerWCtx
 	//		}
 	//	}
 	//}
+	return nil
+}
+
+//bz: a simple heuristics now:
+// the receiver of this invoke should be already allocated, so let;s check a.RWIns[goID] for *ssa.Alloc -> too many, cannot use as reference
+// totally no idea how to filter ...  return all
+func (a *analysis) filterInvoke(v *ssa.Call, labels []*pointer.Label, ptr pointer.PointerWCtx, goID int, ins ssa.Instruction) []*pointer.Label {
+	//var existAllocs []types.Type //store type now
+	//for _, instr := range a.RWIns[goID] {
+	//	if alloc, ok := instr.(*ssa.Alloc); ok {
+	//		typ := alloc.Type()
+	//		existAllocs = append(existAllocs, typ)
+	//	}
+	//}
+	//
+	//for _, s := range a.storeFns {
+	//	fmt.Println(s.fnIns.String())
+	//}
+	//fmt.Println()
+	//
+	//var result []*pointer.Label
+	//for _, label := range labels {
+	//	fmt.Println(label.String())
+	//}
+	//return result
+	return labels
+}
+
+//bz: a simple heuristics now:
+//  if ptr is a parameter, use the one level smaller parent (the push, not popped yet) as the standard to filter the target;
+//     if we cannot find such a target, then continue reduce one level until no parent exist; TODO: what is we still cannot find?
+//     e.g., withRetry() in google.golang.org/grpc/test.(*s).TestMetadataStreamingRPC()
+func (a *analysis) filterParam(v *ssa.Parameter, labels []*pointer.Label, ptr pointer.PointerWCtx, goID int, ins ssa.Instruction) []*pointer.Label {
+	var result []*pointer.Label
+	i := len(a.storeFns) - 1
+	parent := a.storeFns[i] //all push here
+	for parent.fnIns != nil {
+		pStr := parent.fnIns.String()
+		for _, label := range labels {
+			if strings.HasPrefix(label.String(), pStr) {
+				//mostly end with xx.xxx$xxx, which means fn is wrapped in this parent as makeclosure
+				result = append(result, label)
+			}
+		}
+		//if cannot find, try next parent
+		if len(result) == 0{
+			i--
+			if i < 0 { //reach main ...
+				break
+			}
+			parent = a.storeFns[i]
+		}else{
+			return result
+		}
+	}
+
+	//if exist any label with xx.xxx$xxx but we cannot locate its parent in current stack (if located, it will be stored in result)
+	//  -> remove it because it cannot be the correct target
+	for _, label := range labels {
+		lStr := label.String()
+		if strings.Contains(lStr, "$") {
+			afterDollarSign := strings.Split(lStr, "$")[1]
+			if _, err := strconv.Atoi(afterDollarSign); err != nil { //this is not a number, probably "xxx.xx$bound"
+				result = append(result, label)
+			}
+		}else{ //label is "makeinterface:XXX" and ins is "xx.invoke(...)"
+			result = append(result, label)
+		}
+	}
+
 	return result
 }
+
 
 //bz: an example use of new api
 //allocSites := a.ptaRes[a.main].GetAllocations(ptr)

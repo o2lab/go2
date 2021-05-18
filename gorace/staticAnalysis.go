@@ -400,6 +400,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 				deferToRet:      make(map[*ssa.Defer]ssa.Instruction),
 				testEntry:       selectTest,
 				entryFn:         entry,
+				mutualTargets:   make(map[int]*mutualFns),
 			}
 			if strings.Contains(m.Pkg.Path(), "GoBench") { // for testing purposes
 				a.efficiency = false

@@ -26,9 +26,13 @@ func insToCallStack(allIns []*insInfo) ([]*ssa.Function, string) {
 }
 
 // sliceContains if the e value is present in the slice, s, of ssa values that true, and false otherwise
-func sliceContains(s []ssa.Value, e ssa.Value) bool {
-	for _, a := range s {
-		if a == e {
+// bz: update: needs to match both ssa.Value and same goids (may fron another possible goroutine/path)
+func sliceContains(races []*raceInfo, curAddrs [2]ssa.Value, goID1, goID2 int) bool {
+	for _, race := range races {
+		exist := race.addrPair
+		existIDs := race.goIDs
+		if (exist[0] == curAddrs[0] && exist[1] == curAddrs[1] && existIDs[0] == goID1 && existIDs[1] == goID2) ||
+			(exist[0] == curAddrs[1] && exist[1] == curAddrs[0] && existIDs[1] == goID1 && existIDs[0] == goID2) {
 			return true
 		}
 	}

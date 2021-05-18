@@ -247,21 +247,19 @@ func (a *analysis) checkRacyPairs() []*raceInfo {
 						//}
 
 						if a.sameAddress(addressPair[0], addressPair[1], i, j) &&
-							!sliceContains(a.reportedAddr, addressPair[0]) &&
+							!sliceContains(races, addressPair, i, j) &&
 							!a.reachable(goI.ins, i, goJ.ins, j) &&
 							!a.reachable(goJ.ins, j, goI.ins, i) &&
 							!a.bothAtomic(insSlice[0].ins, insSlice[1].ins) &&
 							!a.lockSetsIntersect(goI.ins, goJ.ins, i, j) &&
 							!a.selectMutEx(insSlice[0].ins, insSlice[1].ins) &&
 							!a.mutuallyExcluded(goI, i, goJ, j) {
-							a.reportedAddr = append(a.reportedAddr, addressPair[0])
 							ri = &raceInfo{
 								insPair:  insSlice,
 								addrPair: addressPair,
 								goIDs:    []int{i, j},
 								insInd:   []int{ii, jj},
 							}
-							a.printRace(len(a.reportedAddr), ri)
 							races = append(races, ri)
 						}
 					}
