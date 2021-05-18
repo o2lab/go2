@@ -60,12 +60,7 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 		switch theFunc := PT0Set[rightLoc].Value().(type) {
 		case *ssa.Function:
 			fnName = theFunc.Name()
-			if !a.exploredFunction(theFunc, goID, theIns) {
-				a.updateRecords(fnName, goID, "PUSH ", theFunc, theIns)
-				a.recordIns(goID, theIns)
-				//a.RWIns[goID] = append(a.RWIns[goID], theIns)
-				a.visitAllInstructions(theFunc, goID)
-			}
+			a.traverseFn(theFunc, fnName, goID, theIns, false)
 		case *ssa.MakeInterface:
 			methodName := theIns.(*ssa.Call).Call.Method.Name()
 			if a.prog.MethodSets.MethodSet(pta0Set[location].PointsTo().DynamicTypes().Keys()[0]).Lookup(a.main.Pkg, methodName) == nil { // ignore abstract methods
@@ -73,12 +68,7 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 			}
 			check := a.prog.LookupMethod(pta0Set[location].PointsTo().DynamicTypes().Keys()[0], a.main.Pkg, methodName)
 			fnName = check.Name()
-			if !a.exploredFunction(check, goID, theIns) {
-				a.updateRecords(fnName, goID, "PUSH ", check, theIns)
-				a.recordIns(goID, theIns)
-				//a.RWIns[goID] = append(a.RWIns[goID], theIns)
-				a.visitAllInstructions(check, goID)
-			}
+			a.traverseFn(check, fnName, goID, theIns, false)
 		case *ssa.MakeChan:
 			a.chanName = theFunc.Name()
 		default:
@@ -164,12 +154,7 @@ func (a *analysis) pointerNewAnalysisHandleFunc(ptr pointer.PointerWCtx, labels 
 				a.getParam = !a.getParam
 			} else {
 				fnName = theFunc.Name()
-				if !a.exploredFunction(theFunc, goID, theIns) {
-					a.updateRecords(fnName, goID, "PUSH ", theFunc, theIns)
-					a.recordIns(goID, theIns)
-					//a.RWIns[goID] = append(a.RWIns[goID], theIns)
-					a.visitAllInstructions(theFunc, goID)
-				}
+				a.traverseFn(theFunc, fnName, goID, theIns, false)
 			}
 		case *ssa.MakeInterface:
 			switch theIns.(type) {
@@ -180,12 +165,7 @@ func (a *analysis) pointerNewAnalysisHandleFunc(ptr pointer.PointerWCtx, labels 
 				}
 				check := a.prog.LookupMethod(ptr.PointsTo().DynamicTypes().Keys()[0], a.main.Pkg, methodName)
 				fnName = check.Name()
-				if !a.exploredFunction(check, goID, theIns) {
-					a.updateRecords(fnName, goID, "PUSH ", check, theIns)
-					a.recordIns(goID, theIns)
-					//a.RWIns[goID] = append(a.RWIns[goID], theIns)
-					a.visitAllInstructions(check, goID)
-				}
+				a.traverseFn(check, fnName, goID, theIns, false)
 			case *ssa.Go:
 				switch theFunc.X.(type) {
 				case *ssa.Parameter:
@@ -208,12 +188,7 @@ func (a *analysis) pointerNewAnalysisHandleFunc(ptr pointer.PointerWCtx, labels 
 					break //bz: pta cannot find the target. how?
 				}
 				fnName = invokeFunc.Name()
-				if !a.exploredFunction(invokeFunc, goID, theIns) {
-					a.updateRecords(fnName, goID, "PUSH ", invokeFunc, theIns)
-					a.recordIns(goID, theIns)
-					//a.RWIns[goID] = append(a.RWIns[goID], theIns)
-					a.visitAllInstructions(invokeFunc, goID)
-				}
+				a.traverseFn(invokeFunc, fnName, goID, theIns, false)
 			}
 		default:
 			break

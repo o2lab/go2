@@ -265,16 +265,6 @@ func (a *analysis) buildHB() {
 	}
 }
 
-func (a *analysis) recordIns(goID int, newIns ssa.Instruction) {
-	newInsInfo := &insInfo{ins: newIns}
-	if !allEntries {
-		stack := make([]*fnCallInfo, len(a.storeFns))
-		copy(stack, a.storeFns)
-		newInsInfo.stack = stack
-	}
-	a.RWIns[goID] = append(a.RWIns[goID], newInsInfo)
-}
-
 // visitAllInstructions visits each line and calls the corresponding helper function to drive the tool
 func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 	lockSetSize := len(a.lockSet[goID])
@@ -390,12 +380,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 					} else if a.fromPkgsOfInterest(deferIns.Call.StaticCallee()) && deferIns.Call.StaticCallee().Pkg.Pkg.Name() != "sync" {
 						fnName := deferIns.Call.Value.Name()
 						fnName = checkTokenNameDefer(fnName, deferIns)
-						if !a.exploredFunction(deferIns.Call.StaticCallee(), goID, dIns) {
-							a.updateRecords(fnName, goID, "PUSH ", deferIns.Call.StaticCallee(), dIns)
-							a.recordIns(goID, dIns)
-							//a.RWIns[goID] = append(a.RWIns[goID], dIns)
-							a.visitAllInstructions(deferIns.Call.StaticCallee(), goID)
-						}
+						a.traverseFn(deferIns.Call.StaticCallee(), fnName, goID, dIns, false)
 					} else if deferIns.Call.StaticCallee().Name() == "Unlock" {
 						lockLoc := deferIns.Call.Args[0]
 						if !useNewPTA {
@@ -592,12 +577,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 			} else if a.fromPkgsOfInterest(deferIns.Call.StaticCallee()) && deferIns.Call.StaticCallee().Pkg.Pkg.Name() != "sync" {
 				fnName := deferIns.Call.Value.Name()
 				fnName = checkTokenNameDefer(fnName, deferIns)
-				if !a.exploredFunction(deferIns.Call.StaticCallee(), goID, dIns) {
-					a.updateRecords(fnName, goID, "PUSH ", deferIns.Call.StaticCallee(), dIns)
-					a.recordIns(goID, dIns)
-					//a.RWIns[goID] = append(a.RWIns[goID], dIns)
-					a.visitAllInstructions(deferIns.Call.StaticCallee(), goID)
-				}
+				a.traverseFn(deferIns.Call.StaticCallee(), fnName, goID, dIns, false)
 			} else if deferIns.Call.StaticCallee().Name() == "Unlock" {
 				lockLoc := deferIns.Call.Args[0]
 				if !useNewPTA {
@@ -735,6 +715,18 @@ func (a *analysis) newGoroutine(info goroutineInfo) {
 	}
 }
 
+// recordIns places newly encountered instructions into data structure for analyzing later
+func (a *analysis) recordIns(goID int, newIns ssa.Instruction) {
+	newInsInfo := &insInfo{ins: newIns}
+	if !allEntries {
+		stack := make([]*fnCallInfo, len(a.storeFns))
+		copy(stack, a.storeFns)
+		newInsInfo.stack = stack
+	}
+	a.RWIns[goID] = append(a.RWIns[goID], newInsInfo)
+}
+
+
 // exploredFunction determines if we already visited this function
 func (a *analysis) exploredFunction(fn *ssa.Function, goID int, theIns ssa.Instruction) bool {
 	if a.fromExcludedFns(fn) {
@@ -781,4 +773,16 @@ func (t trie) isBudgetExceeded() bool {
 		return true
 	}
 	return false
+}
+
+func (a *analysis) traverseFn(fn *ssa.Function, fnName string, goID int, theIns ssa.Instruction, lock bool) {
+	if !a.exploredFunction(fn, goID, theIns) {
+		a.updateRecords(fnName, goID, "PUSH ", fn, theIns)
+		a.recordIns(goID, theIns)
+		a.visitAllInstructions(fn, goID)
+	}
+	if lock {
+		a.updateLockMap(goID, theIns)
+		a.updateRLockMap(goID, theIns)
+	}
 }

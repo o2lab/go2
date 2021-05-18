@@ -183,12 +183,7 @@ func (a *analysis) insStore(examIns *ssa.Store, goID int, theIns ssa.Instruction
 		}
 	}
 	if theFunc, storeFn := examIns.Val.(*ssa.Function); storeFn {
-		if !a.exploredFunction(theFunc, goID, theIns) {
-			a.updateRecords(theFunc.Name(), goID, "PUSH ", theFunc, theIns)
-			a.recordIns(goID, theIns)
-			//a.RWIns[goID] = append(a.RWIns[goID], theIns)
-			a.visitAllInstructions(theFunc, goID)
-		}
+		a.traverseFn(theFunc, theFunc.Name(), goID, theIns, false)
 	}
 }
 
@@ -304,18 +299,11 @@ func (a *analysis) insChangeType(examIns *ssa.ChangeType, goID int, theIns ssa.I
 		theFn := mc.Fn.(*ssa.Function)
 		if a.fromPkgsOfInterest(theFn) {
 			fnName := mc.Fn.Name()
-			if !a.exploredFunction(theFn, goID, theIns) {
-				a.updateRecords(fnName, goID, "PUSH ", theFn, theIns)
-				a.recordIns(goID, theIns)
-				//a.RWIns[goID] = append(a.RWIns[goID], theIns)
-				a.updateLockMap(goID, theIns)
-				a.updateRLockMap(goID, theIns)
-				if !useNewPTA {
-					a.mu.Lock()
-					a.ptaCfg0.AddQuery(examIns.X)
-					a.mu.Unlock()
-				}
-				a.visitAllInstructions(theFn, goID)
+			a.traverseFn(theFn, fnName, goID, theIns, true)
+			if !useNewPTA {
+				a.mu.Lock()
+				a.ptaCfg0.AddQuery(examIns.X)
+				a.mu.Unlock()
 			}
 		}
 	default:
@@ -440,22 +428,12 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 		}
 		fnName := examIns.Call.Value.Name()
 		fnName = checkTokenName(fnName, examIns)
-		if !a.exploredFunction(examIns.Call.StaticCallee(), goID, theIns) {
-			a.updateRecords(fnName, goID, "PUSH ", examIns.Call.StaticCallee(), theIns)
-			a.recordIns(goID, theIns)
-			//a.RWIns[goID] = append(a.RWIns[goID], theIns)
-			a.visitAllInstructions(examIns.Call.StaticCallee(), goID)
-		}
+		a.traverseFn(examIns.Call.StaticCallee(), fnName, goID, theIns, false)
 	} else if examIns.Call.StaticCallee().Pkg != nil && examIns.Call.StaticCallee().Pkg.Pkg.Name() == "sync" {
 		switch examIns.Call.Value.Name() {
 		case "Range":
 			fnName := examIns.Call.Value.Name()
-			if !a.exploredFunction(examIns.Call.StaticCallee(), goID, theIns) {
-				a.updateRecords(fnName, goID, "PUSH ", examIns.Call.StaticCallee(), theIns)
-				a.recordIns(goID, theIns)
-				//a.RWIns[goID] = append(a.RWIns[goID], theIns)
-				a.visitAllInstructions(examIns.Call.StaticCallee(), goID)
-			}
+			a.traverseFn(examIns.Call.StaticCallee(), fnName, goID, theIns, false)
 		case "Lock":
 			lockLoc := examIns.Call.Args[0] // identifier for address of lock
 			if !useNewPTA {
