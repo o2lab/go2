@@ -228,23 +228,23 @@ func (a *analysis) checkRacyPairs() []*raceInfo {
 						if addressPair[0] == nil || addressPair[1] == nil {
 							continue
 						}
-						////!!!! bz: for my debug, please comment off, do not delete
-						//var goIinstr string
-						//var goJinstr string
-						//if i == 0 {
-						//	goIinstr = "main"
-						//} else {
-						//	goIinstr = a.RWIns[i][0].String()
-						//}
-						//if j == 0 {
-						//	goJinstr = "main"
-						//} else {
-						//	goJinstr = a.RWIns[j][0].String()
-						//}
-						//if strings.Contains(addressPair[0].String(), "returnBuffers") && strings.Contains(addressPair[1].String(), "returnBuffers") &&
-						//	goI.Parent().Name() == "commitAttemptLocked" && goJ.Parent().Name() == "SendMsg" {
-						//	fmt.Println(addressPair[0], " Go: ", goIinstr, " loopid: ", a.loopIDs[i], ";  ", addressPair[1], " Go: ", goJinstr, " loopid: ", a.loopIDs[j])
-						//}
+						//!!!! bz: for my debug, please comment off, do not delete
+						var goIinstr string
+						var goJinstr string
+						if i == 0 {
+							goIinstr = "main"
+						} else {
+							goIinstr = a.RWIns[i][0].ins.String()
+						}
+						if j == 0 {
+							goJinstr = "main"
+						} else {
+							goJinstr = a.RWIns[j][0].ins.String()
+						}
+						if strings.Contains(addressPair[0].String(), "returnBuffers") && strings.Contains(addressPair[1].String(), "returnBuffers") &&
+							goI.ins.Parent().Name() == "commitAttemptLocked" && goJ.ins.Parent().Name() == "SendMsg" {
+							fmt.Println(addressPair[0], " Go: ", goIinstr, " loopid: ", a.loopIDs[i], ";  ", addressPair[1], " Go: ", goJinstr, " loopid: ", a.loopIDs[j])
+						}
 
 						if a.sameAddress(addressPair[0], addressPair[1], i, j) &&
 							!sliceContains(races, addressPair, i, j) &&
@@ -261,6 +261,8 @@ func (a *analysis) checkRacyPairs() []*raceInfo {
 								insInd:   []int{ii, jj},
 							}
 							races = append(races, ri)
+
+							a.printRace(len(races), ri)
 						}
 					}
 				}
