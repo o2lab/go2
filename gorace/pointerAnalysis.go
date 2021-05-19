@@ -167,12 +167,6 @@ func (a *analysis) pointerNewAnalysisHandleFunc(ptr pointer.PointerWCtx, labels 
 			a.chanName = theFunc.Name() //TODO: bz: how to deal with this ?
 		case *ssa.Alloc:
 			if call, ok := theIns.(*ssa.Call); ok {
-				var goInstr *ssa.Go
-				if goID == 0 {
-					goInstr = nil
-				} else {
-					goInstr = a.RWIns[goID][0].ins.(*ssa.Go)
-				}
 				invokeFunc := a.ptaRes.GetFreeVarFunc(theIns.Parent(), call, goInstr)
 				if invokeFunc == nil {
 					fmt.Println("no pta target@", theIns)
