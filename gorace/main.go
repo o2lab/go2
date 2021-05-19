@@ -36,7 +36,6 @@ type analysis struct {
 	RWIns        [][]*insInfo // instructions grouped by goroutine
 	insMono      int                 // index of instruction (in main goroutine) before which the program is single-threaded
 	storeFns     []*fnCallInfo
-	//stackMap     map[fnCallIns]stackInfo
 	workList     []goroutineInfo
 	levels       map[int]int
 	lockMap      map[ssa.Instruction][]ssa.Value // map each read/write access to a snapshot of actively maintained lockset
@@ -144,11 +143,6 @@ type fnInfo struct { // all fields must be comparable for fnInfo to be used as k
 type goCallInfo struct {
 	ssaIns ssa.Instruction
 	goIns  *ssa.Go
-}
-
-type fnCallIns struct {
-	fnIns *ssa.Function
-	goID  int
 }
 
 type goIns struct { // an ssa.Instruction with goroutine info

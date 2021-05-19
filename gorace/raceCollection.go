@@ -484,20 +484,24 @@ func (a *analysis) printRace(counter int, race *raceInfo) {
 	log.Println(strings.Repeat("=", 100))
 	var writeLocks []ssa.Value
 	var readLocks []ssa.Value
+	var rwPos [2]token.Position
 	for i, anIns := range insPair {
 		var errMsg string
 		var access string
 		if isWriteIns(anIns.ins) {
 			access = " Write of "
 			if _, ok := anIns.ins.(*ssa.Call); ok {
-				errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].String()), " in function ", aurora.BrightGreen(anIns.ins.Parent().Name()), " at ", a.prog.Fset.Position(addrPair[i].Pos()))
+				rwPos[i] = a.prog.Fset.Position(addrPair[i].Pos())
+				errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].String()), " in function ", aurora.BrightGreen(anIns.ins.Parent().Name()), " at ", rwPos[i])
 			} else {
-				errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].String()), " in function ", aurora.BrightGreen(anIns.ins.Parent().Name()), " at ", a.prog.Fset.Position(insPair[i].ins.Pos()))
+				rwPos[i] = a.prog.Fset.Position(insPair[i].ins.Pos())
+				errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].String()), " in function ", aurora.BrightGreen(anIns.ins.Parent().Name()), " at ", rwPos[i])
 			}
 			writeLocks = a.lockMap[anIns.ins]
 		} else {
 			access = " Read of "
-			errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].String()), " in function ", aurora.BrightGreen(anIns.ins.Parent().Name()), " at ", a.prog.Fset.Position(anIns.ins.Pos()))
+			rwPos[i] = a.prog.Fset.Position(anIns.ins.Pos())
+			errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].String()), " in function ", aurora.BrightGreen(anIns.ins.Parent().Name()), " at ", rwPos[i])
 			readLocks = append(a.lockMap[anIns.ins], a.RlockMap[anIns.ins]...)
 		}
 		if testMode {
@@ -505,6 +509,15 @@ func (a *analysis) printRace(counter int, race *raceInfo) {
 			a.racyStackTops = append(a.racyStackTops, colorOutput.ReplaceAllString(errMsg, ""))
 		}
 		log.Print(errMsg)
+
+		for lineNum := rwPos[i].Line-3; lineNum <= rwPos[i].Line+3; lineNum++ {
+			theLine, _ := getLineNumber(rwPos[i].Filename, lineNum)
+			if lineNum == rwPos[i].Line {
+				log.Info("\t>> ", theLine)
+			} else {
+				log.Info("\t>> ", theLine)
+			}
+		} // TODO: include pointer to highlight racy location
 
 		if goIDs[i] == 0 { // main goroutine
 			log.Println("\tin goroutine  ***  main  [", goIDs[i], "] *** ")
@@ -518,7 +531,6 @@ func (a *analysis) printRace(counter int, race *raceInfo) {
 			temp := a.goCaller[goID]
 			goID = temp
 		}
-		//if !allEntries { // bz: we want this now
 			for q, eachGo := range pathGo {
 				eachStack := a.goStack[eachGo][:len(a.goStack[eachGo])-1]
 				for k, eachFn := range eachStack {
@@ -538,7 +550,6 @@ func (a *analysis) printRace(counter int, race *raceInfo) {
 					}
 				}
 			}
-			//fnCall := fnCallIns{insPair[i].Parent(), goIDs[i]}
 			for p, everyFn := range anIns.stack {
 				if everyFn.ssaIns == nil {
 					if p == 0 {
@@ -555,8 +566,7 @@ func (a *analysis) printRace(counter int, race *raceInfo) {
 				}
 			}
 		}
-	//}
-	log.Println("Locks acquired before Write access: ", writeLocks)
-	log.Println("Locks acquired before Read  access: ", readLocks)
+	log.Debug("Locks acquired before Write access: ", writeLocks)
+	log.Debug("Locks acquired before Read  access: ", readLocks)
 	log.Println(strings.Repeat("=", 100))
 }
