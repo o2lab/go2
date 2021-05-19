@@ -454,12 +454,14 @@ func AnalyzeMultiMains(config *Config) (results map[*ssa.Package]*Result, err er
 	maxTime = 0
 	minTime = 1000000000
 
-	printConfig(config)
+	if flags.DoPrintInfo {
+		printConfig(config)
 
-	if flags.DoTests {
-		fmt.Println(" *** Multiple Mains/Tests ********** ")
-	} else {
-		fmt.Println(" *** Multiple Mains **************** ")
+		if flags.DoTests {
+			fmt.Println(" *** Multiple Mains/Tests ********** ")
+		} else {
+			fmt.Println(" *** Multiple Mains **************** ")
+		}
 	}
 
 	for i, main := range config.Mains { //analyze mains
@@ -499,7 +501,7 @@ func AnalyzeMultiMains(config *Config) (results map[*ssa.Package]*Result, err er
 
 		//we initially run the analysis
 		start := time.Now()
-		_result, err := AnalyzeWCtx(_config, false, isMain)
+		_result, err := AnalyzeWCtx(_config, isMain)
 		if err != nil {
 			return nil, err
 		}
@@ -530,7 +532,7 @@ func AnalyzeMultiMains(config *Config) (results map[*ssa.Package]*Result, err er
 			//run analysis again
 			fmt.Println("\n\n", i, ": "+main.String(), " (No PTSLimit) ... ")
 			start := time.Now()
-			fullResult, err := AnalyzeWCtx(_config, false, isMain)
+			fullResult, err := AnalyzeWCtx(_config, isMain)
 			if err != nil {
 				return nil, err
 			}
@@ -612,7 +614,7 @@ func Analyze(config *Config) (result *Result, err error) {
 		isMain = false
 	}
 	//we initially run the analysis
-	_result, err := AnalyzeWCtx(config, true, isMain)
+	_result, err := AnalyzeWCtx(config, isMain)
 	if err != nil {
 		return nil, err
 	}
@@ -627,7 +629,7 @@ func Analyze(config *Config) (result *Result, err error) {
 // Pointer analysis of a transitively closed well-typed program should
 // always succeed.  An error can occur only due to an internal bug.
 //
-func AnalyzeWCtx(config *Config, doPrintConfig bool, isMain bool) (result *ResultWCtx, err error) { //Result
+func AnalyzeWCtx(config *Config, isMain bool) (result *ResultWCtx, err error) { //Result
 	if config.Mains == nil {
 		return nil, fmt.Errorf("no main/test packages to analyze (check $GOROOT/$GOPATH)")
 	}
@@ -688,7 +690,7 @@ func AnalyzeWCtx(config *Config, doPrintConfig bool, isMain bool) (result *Resul
 		}
 	}
 
-	if doPrintConfig {
+	if flags.DoPrintInfo {
 		printConfig(a.config)
 	}
 

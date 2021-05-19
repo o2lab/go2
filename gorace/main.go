@@ -75,7 +75,8 @@ type analysis struct {
 	deferToRet      map[*ssa.Defer]ssa.Instruction
 
 	entryFn         string         //bz: move from global to analysis field
-	testEntry       []*ssa.Function  //bz: test entry point
+	testEntry       *ssa.Function  //bz: test entry point -> just one!
+	otherTests      []*ssa.Function //bz: all other tests that are in the same test pkg
 
 	twinGoID        map[*ssa.Go][]int //bz: whether two goroutines are spawned by the same loop; this might not be useful now since !sliceContains(a.reportedAddr, addressPair) && already filtered out the duplicate race check
 	mutualTargets   map[int]*mutualFns //bz: this mutual exclusion is for this specific go id (i.e., int)
@@ -124,7 +125,8 @@ type AnalysisRunner struct {
 	prog          *ssa.Program
 	pkgs          []*ssa.Package
 	ptaConfig     *pointer.Config
-	ptaResult     map[*ssa.Package]*pointer.Result
+	ptaResult     *pointer.Result //bz: added for convenience
+	ptaResults    map[*ssa.Package]*pointer.Result //bz: original code, renamed here
 	ptaConfig0    *pta0.Config
 	ptaResult0    *pta0.Result
 	trieLimit     int  // set as user config option later, an integer that dictates how many times a function can be called under identical context
@@ -186,6 +188,7 @@ var trieLimit = 2      // set as user config option later, an integer that dicta
 var efficiency = true  // configuration setting to avoid recursion in tested program
 var channelComm = true // analyze channel communication
 var allEntries = false
+var printDebugInfo = false //bz: replace the usage for old allEntries
 var useDefaultPTA = false
 var getGo = false
 var goTest bool // running test script
@@ -304,7 +307,8 @@ func main() { //default: -useNewPTA
 		trieLimit:  trieLimit,
 		efficiency: efficiency,
 	}
-	err0 := runner.Run(flag.Args())
+	//err0 := runner.Run(flag.Args()) //bz: original code
+	err0 := runner.Run2(flag.Args())
 	if stats.CollectStats {
 		stats.ShowStats()
 	}

@@ -22,10 +22,11 @@ var DoDiff = false //bz: compute the diff functions when turn on/off ptsLimit
 var TimeLimit time.Duration //bz: time limit set by users, unit: ?h?m?s
 
 //my use
-var PrintCGNodes = false //bz: print #cgnodes (before solve())
+var PrintCGNodes = false  //bz: print #cgnodes (before solve())
 var DoPerformance = false //bz: print out all statistics (time, number)
-var DoDetail = false     //bz: print out all data from countReachUnreachXXX
-var DoCommonPart = false //bz: do compute common path
+var DoDetail = false      //bz: print out all data from countReachUnreachXXX
+var DoCommonPart = false  //bz: do compute common path
+var DoPrintInfo = false   //bz: whether we print out the details of config and other process info
 
 //different run scenario
 var DoSameRoot = false //bz: do all main in a pkg together from the same root -> all mains linked by the root node
@@ -51,6 +52,7 @@ func ParseFlags() {
 	_doSameRoot := flag.Bool("doSameRoot", false, "Do all main together from the same root in one pkg, linked by the root node.")
 	_doParallel := flag.Bool("doParallel", false, "Do all mains in a pkg in parallel, but input is multiple mains.")
 	_doCoverage := flag.Bool("doCoverage", false, "Compute (#analyzed fn/#total fn) in a program")
+	_doPrintConfig := flag.Bool("doPrintConfig", false, "Do we print out the details of config and other process info?")
 
 	//test useage in race checker -> main usage
 	_doSeq := flag.Bool("doSeq", false, "Do all mains in a pkg sequential, but input is multiple mains.")
@@ -102,6 +104,9 @@ func ParseFlags() {
 	}
 	if *_doParallel {
 		DoParallel = true
+	}
+	if *_doPrintConfig {
+		DoPrintInfo = true
 	}
 
 	//test useage in race checker

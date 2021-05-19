@@ -1201,7 +1201,9 @@ func (r *Result) GetMySyntheticFn(fn *ssa.Function) *ssa.Function {
 // from a test analyzed by this r *Result
 func (r *Result) GetTests() map[*ssa.Function]*cgnode {
 	if r.a.isMain {
-		fmt.Println("This result is for the main entry:", r.a.config.Mains[0], ", not for a test. Return.")
+		if r.a.result.DEBUG {
+			fmt.Println("This result is for the main entry:", r.a.config.Mains[0], ", not for a test. Return.")
+		}
 		return nil
 	}
 

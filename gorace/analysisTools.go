@@ -1,11 +1,77 @@
 package main
 
 import (
+	pta0 "github.com/april1989/origin-go-tools/go/pointer_default"
 	"github.com/april1989/origin-go-tools/go/ssa"
 	log "github.com/sirupsen/logrus"
 	"github.com/twmb/algoimpl/go/graph"
 	"strings"
 )
+
+//bz: abstract out
+func (a *analysis) runChecker() raceReport {
+	if strings.Contains(a.main.Pkg.Path(), "GoBench") { // for testing purposes
+		a.efficiency = false
+		a.trieLimit = 2
+	} else if !goTest {
+		a.efficiency = true
+	}
+	if !printDebugInfo {
+		log.Info("Compiling stack trace for every Goroutine... ")
+		log.Debug(strings.Repeat("-", 35), "Stack trace begins", strings.Repeat("-", 35))
+	}
+	if a.testEntry != nil {
+		//bz: a test now uses itself as main context, tell pta which test will be analyzed for this analysis
+		a.ptaRes.AnalyzeTest(a.testEntry)
+		a.visitAllInstructions(a.testEntry, 0)
+	} else {
+		a.visitAllInstructions(a.main.Func(a.entryFn), 0)
+	}
+
+	if !printDebugInfo {
+		log.Debug(strings.Repeat("-", 35), "Stack trace ends", strings.Repeat("-", 35))
+	}
+	totalIns := 0
+	for g := range a.RWIns {
+		totalIns += len(a.RWIns[g])
+	}
+	//if !allEntries { //bz: we want this now
+	log.Info("Done  -- ", len(a.RWIns), " goroutines analyzed! ", totalIns, " instructions of interest detected! ")
+	//}
+
+	if useDefaultPTA {
+		a.ptaRes0, _ = pta0.Analyze(a.ptaCfg0) // all queries have been added, conduct pointer analysis
+	}
+	//if !allEntries {
+	log.Info("Building Happens-Before graph... ")
+	//}
+	// confirm channel readiness for unknown select cases:
+	if len(a.selUnknown) > 0 {
+		for sel, chs := range a.selUnknown {
+			for i, ch := range chs {
+				if _, ready := a.chanSnds[ch]; !ready && ch != "" {
+					if _, ready0 := a.chanRcvs[ch]; !ready0 {
+						if _, ready1 := a.chanBuf[a.chanToken[ch]]; !ready1 {
+							a.selReady[sel][i] = ""
+						}
+					}
+				}
+			}
+		}
+	}
+	a.HBgraph = graph.New(graph.Directed)
+	a.buildHB()
+	//if !allEntries {
+	log.Info("Done  -- Happens-Before graph built ")
+	log.Info("Checking for data races... ")
+	//}
+	rr := raceReport{
+		entryInfo: a.main.Pkg.Path(),
+	}
+	rr.racePairs = a.checkRacyPairs()
+
+	return rr
+}
 
 func (a *analysis) buildHB() {
 	var prevN graph.Node
@@ -304,12 +370,12 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 	bVisit0 := fn.DomPreorder()
 	var bVisit []*ssa.BasicBlock
 	var pushBack []*ssa.BasicBlock // stack of .done blocks
-	statement := "" // could be if, for or rangeiter
+	statement := ""                // could be if, for or rangeiter
 	for i, b := range bVisit0 {
 		if len(pushBack) > 0 && !strings.Contains(b.Comment, statement) { // reach end of statement blocks
 			bVisit = append(bVisit, pushBack...) // LIFO
-			pushBack = []*ssa.BasicBlock{} // empty stack
-			statement = "" // reinitialize
+			pushBack = []*ssa.BasicBlock{}       // empty stack
+			statement = ""                       // reinitialize
 		}
 		if strings.Contains(b.Comment, ".done") && i < len(bVisit0)-1 { // not the last block
 			statement = strings.Split(b.Comment, ".done")[0]
@@ -319,7 +385,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 		}
 		if len(pushBack) > 0 && i == len(bVisit0)-1 { // reach end of statement blocks
 			bVisit = append(bVisit, pushBack...) // LIFO
-			pushBack = []*ssa.BasicBlock{} // empty stack
+			pushBack = []*ssa.BasicBlock{}       // empty stack
 		}
 	}
 
@@ -336,7 +402,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 	var ifEnds []ssa.Instruction
 	for bInd, aBlock := range bVisit {
 		activeCase, selDone = false, false
-		if aBlock.Comment == "recover" {// ----> !!! SEE HERE: bz: the same as above, from line 279 to 293 (or even 304) can be separated out
+		if aBlock.Comment == "recover" { // ----> !!! SEE HERE: bz: the same as above, from line 279 to 293 (or even 304) can be separated out
 			continue
 		}
 		if aBlock.Comment == "select.done" {
@@ -369,7 +435,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 			if theIns.String() == "rundefers" { // execute deferred calls at this index
 				a.recordIns(goID, theIns)
 				//a.RWIns[goID] = append(a.RWIns[goID], theIns)
-				for _, dIns := range toDefer {  // ----> !!! SEE HERE: bz: the same as above, from line 307 to 347 can be separated out
+				for _, dIns := range toDefer { // ----> !!! SEE HERE: bz: the same as above, from line 307 to 347 can be separated out
 					deferIns := dIns.(*ssa.Defer)
 					a.deferToRet[deferIns] = theIns
 					if _, ok := deferIns.Call.Value.(*ssa.Builtin); ok {
@@ -450,7 +516,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 							a.insStore(examIns, goID, theIns)
 						}
 					}
-				}else {
+				} else {
 					a.insStore(examIns, goID, theIns)
 				}
 			case *ssa.UnOp:
@@ -488,14 +554,14 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				twin := make([]int, 2)
 				if a.inLoop {
 					loopID++
-					newGoID1 := a.insGo(examIns, goID, theIns, loopID)// loopID == 1 if goroutine in loop
+					newGoID1 := a.insGo(examIns, goID, theIns, loopID) // loopID == 1 if goroutine in loop
 					if newGoID1 != -1 {
 						twin[0] = newGoID1
 					}
 					loopID++
 				}
 				newGoID2 := a.insGo(examIns, goID, theIns, loopID) // loopID == 2 if goroutine in loop, loopID == 0 otherwise
-				if loopID != 0 && newGoID2 != -1 { //bz: record the twin goroutines
+				if loopID != 0 && newGoID2 != -1 {                 //bz: record the twin goroutines
 					exist := a.twinGoID[examIns]
 					if exist == nil { //fill in the blank
 						twin[1] = newGoID2
@@ -578,7 +644,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 		}
 	}
 	if len(toDefer) > 0 {
-		for _, dIns := range toDefer {  // ----> !!! SEE HERE: bz: the same as above, from line 307 to 347 can be separated out
+		for _, dIns := range toDefer { // ----> !!! SEE HERE: bz: the same as above, from line 307 to 347 can be separated out
 			deferIns := dIns.(*ssa.Defer)
 			if _, ok := deferIns.Call.Value.(*ssa.Builtin); ok {
 				continue
@@ -623,7 +689,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 			toDefer = []ssa.Instruction{}
 		}
 	}
-	if len(toUnlock) > 0 {// ----> !!! SEE HERE: bz: the same as above, from line 488 to 501 can be separated out
+	if len(toUnlock) > 0 { // ----> !!! SEE HERE: bz: the same as above, from line 488 to 501 can be separated out
 		for _, loc := range toUnlock {
 			if z := a.lockSetContainsAt(a.lockSet, loc, goID); z >= 0 {
 				log.Trace("Unlocking ", loc.String(), "  (", a.lockSet[goID][z].locAddr.Pos(), ") removing index ", z, " from: ", lockSetVal(a.lockSet, goID))
@@ -638,7 +704,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 			}
 		}
 	}
-	if len(toRUnlock) > 0 {// ----> !!! SEE HERE: bz: the same as above, from line 502 to 509 can be separated out
+	if len(toRUnlock) > 0 { // ----> !!! SEE HERE: bz: the same as above, from line 502 to 509 can be separated out
 		for _, rloc := range toRUnlock {
 			if z := a.lockSetContainsAt(a.RlockSet, rloc, goID); z >= 0 {
 				log.Trace("RUnlocking ", rloc.String(), "  (", a.RlockSet[goID][z].locAddr.Pos(), ") removing index ", z, " from: ", lockSetVal(a.RlockSet, goID))
@@ -697,7 +763,7 @@ func (a *analysis) newGoroutine(info goroutineInfo) {
 	//a.RWIns[info.goID] = append(a.RWIns[info.goID], info.ssaIns)
 	newGoInfo := &goCallInfo{goIns: info.goIns, ssaIns: info.ssaIns}
 	a.goCalls[info.goID] = newGoInfo
-	if !allEntries {
+	if !printDebugInfo {
 		if a.loopIDs[info.goID] > 0 {
 			a.goInLoop[info.goID] = true
 			log.Debug(strings.Repeat("-", 35), "Goroutine ", info.entryMethod.Name(), " (in loop)", strings.Repeat("-", 35), "[", info.goID, "]")
@@ -708,7 +774,7 @@ func (a *analysis) newGoroutine(info goroutineInfo) {
 	if len(a.lockSet[a.goCaller[info.goID]]) > 0 { // carry over lockset from parent goroutine
 		a.lockSet[info.goID] = a.lockSet[a.goCaller[info.goID]]
 	}
-	if !allEntries {
+	if !printDebugInfo {
 		log.Debug(strings.Repeat(" ", a.levels[info.goID]), "PUSH ", info.entryMethod.Name(), " at lvl ", a.levels[info.goID])
 		//fnCall := fnCallIns{fnIns: info.entryMethod, goID: info.goID}
 		//stack := make([]fnCallInfo, len(a.storeFns))
@@ -729,14 +795,13 @@ func (a *analysis) newGoroutine(info goroutineInfo) {
 // recordIns places newly encountered instructions into data structure for analyzing later
 func (a *analysis) recordIns(goID int, newIns ssa.Instruction) {
 	newInsInfo := &insInfo{ins: newIns}
-	if !allEntries {
-		stack := make([]*fnCallInfo, len(a.storeFns))
-		copy(stack, a.storeFns)
-		newInsInfo.stack = stack
-	}
+	//if !allEntries { //bz: we want this now
+	stack := make([]*fnCallInfo, len(a.storeFns))
+	copy(stack, a.storeFns)
+	newInsInfo.stack = stack
+	//}
 	a.RWIns[goID] = append(a.RWIns[goID], newInsInfo)
 }
-
 
 // exploredFunction determines if we already visited this function
 func (a *analysis) exploredFunction(fn *ssa.Function, goID int, theIns ssa.Instruction) bool {

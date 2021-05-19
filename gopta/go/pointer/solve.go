@@ -125,7 +125,9 @@ func (a *analysis) solveLimit() {
 	//setting
 	ptsLimit = flags.PTSLimit
 	skipIDs = make(map[int]int)
-	fmt.Println(" *** PTS Limit:", ptsLimit, "*** ")
+	if flags.DoPrintInfo {
+		fmt.Println(" *** PTS Limit:", ptsLimit, "*** ")
+	}
 
 	// Solver main loop.
 	var delta nodeset

@@ -518,7 +518,7 @@ func (a *analysis) printRace(counter int, race *raceInfo) {
 			temp := a.goCaller[goID]
 			goID = temp
 		}
-		if !allEntries {
+		//if !allEntries { // bz: we want this now
 			for q, eachGo := range pathGo {
 				eachStack := a.goStack[eachGo][:len(a.goStack[eachGo])-1]
 				for k, eachFn := range eachStack {
@@ -555,7 +555,7 @@ func (a *analysis) printRace(counter int, race *raceInfo) {
 				}
 			}
 		}
-	}
+	//}
 	log.Println("Locks acquired before Write access: ", writeLocks)
 	log.Println("Locks acquired before Read  access: ", readLocks)
 	log.Println(strings.Repeat("=", 100))

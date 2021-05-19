@@ -137,7 +137,7 @@ func (a *analysis) pointerNewAnalysisHandleFunc(ptr pointer.PointerWCtx, labels 
 		var fnName string
 		switch theFunc := label.Value().(type) {
 		case *ssa.Function:
-			if sliceContainsFnCtr(a.testEntry, theFunc) > 0 {
+			if sliceContainsFnCtr(a.otherTests, theFunc) > 0 {
 				return
 			}
 			if a.getParam {
@@ -169,7 +169,9 @@ func (a *analysis) pointerNewAnalysisHandleFunc(ptr pointer.PointerWCtx, labels 
 			if call, ok := theIns.(*ssa.Call); ok {
 				invokeFunc := a.ptaRes.GetFreeVarFunc(theIns.Parent(), call, goInstr)
 				if invokeFunc == nil {
-					fmt.Println("no pta target@", theIns)
+					if printDebugInfo {
+						fmt.Println("no pta target@", theIns)
+					}
 					break //bz: pta cannot find the target. how?
 				}
 				fnName = invokeFunc.Name()

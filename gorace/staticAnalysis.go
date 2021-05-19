@@ -165,12 +165,12 @@ func (runner *AnalysisRunner) analyzeTestEntry(mains []*ssa.Package) ([]*ssa.Fun
 	entry := "main" //bz: default value, will update later
 	if strings.Contains(mains[0].String(), ".test") {
 		fmt.Println("Extracting test functions from PTA/CG...")
-		for mainEntry, ptaRes := range runner.ptaResult {
+		for mainEntry, ptaRes := range runner.ptaResults {
 			tests := ptaRes.GetTests()
 			if tests == nil {
 				continue //this is a main entry
 			}
-			fmt.Println("The following are functions found within: ", mainEntry)
+			fmt.Println("The following are functsions found within: ", mainEntry)
 			var testSelect string
 			var testFns []*ssa.Function // all test functions in this entry
 			counter := 1
@@ -279,6 +279,203 @@ func determineScope(pkgs []*ssa.Package) []string {
 	return scope
 }
 
+//bz: do not want to see this big block ...
+func initialAnalysis() *analysis {
+	return &analysis{
+		efficiency:      efficiency,
+		trieLimit:       trieLimit,
+		getGo:           getGo,
+		RWinsMap:        make(map[goIns]graph.Node),
+		trieMap:         make(map[fnInfo]*trie),
+		insMono:         -1,
+		levels:          make(map[int]int),
+		lockMap:         make(map[ssa.Instruction][]ssa.Value),
+		lockSet:         make(map[int][]*lockInfo),
+		RlockMap:        make(map[ssa.Instruction][]ssa.Value),
+		RlockSet:        make(map[int][]*lockInfo),
+		goCaller:        make(map[int]int),
+		goCalls:         make(map[int]*goCallInfo),
+		chanToken:       make(map[string]string),
+		chanBuf:         make(map[string]int),
+		chanRcvs:        make(map[string][]*ssa.UnOp),
+		chanSnds:        make(map[string][]*ssa.Send),
+		selectBloc:      make(map[int]*ssa.Select),
+		selReady:        make(map[*ssa.Select][]string),
+		selUnknown:      make(map[*ssa.Select][]string),
+		selectCaseBegin: make(map[ssa.Instruction]string),
+		selectCaseEnd:   make(map[ssa.Instruction]string),
+		selectCaseBody:  make(map[ssa.Instruction]*ssa.Select),
+		selectDone:      make(map[ssa.Instruction]*ssa.Select),
+		ifSuccBegin:     make(map[ssa.Instruction]*ssa.If),
+		ifFnReturn:      make(map[*ssa.Function]*ssa.Return),
+		ifSuccEnd:       make(map[ssa.Instruction]*ssa.Return),
+		inLoop:          false,
+		goInLoop:        make(map[int]bool),
+		loopIDs:         make(map[int]int),
+		allocLoop:       make(map[*ssa.Function][]string),
+		bindingFV:       make(map[*ssa.Go][]*ssa.FreeVar),
+		commIDs:         make(map[int][]int),
+		deferToRet:      make(map[*ssa.Defer]ssa.Instruction),
+		twinGoID:        make(map[*ssa.Go][]int),
+		mutualTargets:   make(map[int]*mutualFns),
+	}
+}
+
+
+
+//bz: update the run order of pta and checker
+//  -> sequentially now; do not provide selection of test entry
+func (runner *AnalysisRunner) Run2(args []string) error {
+	trieLimit = runner.trieLimit
+	efficiency = runner.efficiency
+	// Load packages...
+	cfg := &packages.Config{
+		Mode: packages.LoadAllSyntax, // the level of information returned for each package
+		Dir:  "",                     // directory in which to run the build system's query tool
+		//TODO: bz: change this to true if you want to analyze test
+		Tests: true,
+		//Tests: false,                  // setting Tests will include related test packages
+	}
+	log.Info("Loading input packages...")
+
+	os.Stderr = nil // No need to output package errors for now. Delete this line to view package errors
+	initial, _ := packages.Load(cfg, args...)
+	if len(initial) == 0 {
+		return fmt.Errorf("No Go files detected. ")
+	}
+	log.Info("Done  -- ", len(initial), " packages detected. ")
+
+	mains, prog, pkgs := pkgSelection(initial)
+	runner.prog = prog //TODO: bz: optimize, no need to do like this.
+
+	if len(mains) > 1 {
+		allEntries = true
+	}
+
+	startExec := time.Now() // measure total duration of running entire code base
+
+	//run one by one: Iterate each entry point...
+	//var wg sync.WaitGroup
+	for _, main := range mains {
+		log.Info("Start for entry point: ", main.String(), "... ")
+		// Configure pointer analysis...
+		if useNewPTA {
+			scope := determineScope(pkgs)
+
+			var mains []*ssa.Package
+			mains = append(mains, main) //TODO: bz: optimize
+
+			//logfile, _ := os.Create("/Users/bozhen/Documents/GO2/pta_replaced/go2/gorace/pta_log_0") //bz: debug
+			flags.DoTests = true //bz: set to true if your folder has tests and you want to analyze them
+			flags.PTSLimit = 10  //bz: limit the size of pts to 10
+			runner.ptaConfig = &pointer.Config{
+				Mains:          mains, //bz: all mains/tests in a project
+				Reflection:     false,
+				BuildCallGraph: true,
+				Log:            nil,
+				Origin:         true, //origin
+				//shared config
+				K:          1,
+				LimitScope: true,         //bz: only consider app methods with origin
+				Scope:      scope,        //bz: analyze scope
+				Exclusion:  excludedPkgs, //bz: copied from gorace if any
+				TrackMore:  true,         //bz: track pointers with all types
+				Level:      0,            //bz: see pointer.Config
+			}
+			start := time.Now() //performance
+			var err error
+			runner.ptaResult, err = pointer.Analyze(runner.ptaConfig) // conduct pointer analysis for multiple mains
+			if err != nil {
+				panic("Pointer Analysis Error: " + err.Error())
+			}
+
+			t := time.Now()
+			elapsed := t.Sub(start)
+			log.Info("Done  -- PTA/CG Build; Using " + elapsed.String() + ". ")
+			//!!!! bz: for my debug, please comment off, do not delete
+			//fmt.Println("#Receive Result: ", len(runner.ptaResult))
+			//for mainEntry, ptaRes := range runner.ptaResult { //bz: you can get the ptaRes for each main here
+			//	fmt.Println("Receive ptaRes (#Queries: ", len(ptaRes.Queries), ", #IndirectQueries: ", len(ptaRes.IndirectQueries), ") for main: ", mainEntry.String())
+			//	ptaRes.DumpAll()
+			//}
+
+		} else {
+			//TODO: bz: i did not touch here and we are not using default now
+			runner.ptaConfig0 = &pta0.Config{
+				Mains:          mains,
+				BuildCallGraph: false,
+			}
+			runner.ptaResult0, _ = pta0.Analyze(runner.ptaConfig0)
+		}
+
+		// Configure static analysis...
+		var selectTests []*ssa.Function //bz: can be nil if is main
+		if !allEntries {
+			//bz: select tests by users, can be nil if is main
+			selectTests, _ = runner.analyzeTestEntry(mains)
+		}else {
+			//bz: do for all
+			for test, _ := range runner.ptaResult.GetTests() {
+				selectTests = append(selectTests, test)
+			}
+		}
+
+		if selectTests == nil { //bz: is a main
+			a := initialAnalysis()
+			a.main = main
+			a.ptaRes = runner.ptaResult
+			a.ptaRes0 = runner.ptaResult0
+			a.ptaCfg = runner.ptaConfig
+			a.ptaCfg0 = runner.ptaConfig0
+			a.prog = runner.prog
+
+			rr := a.runChecker()
+			runner.racyStackTops = a.racyStackTops
+			runner.finalReport = append(runner.finalReport, rr)
+		} else { //bz: is a test
+			for _, test := range selectTests {
+				log.Info("Start for test entry point: ", test.String(), "... ")
+
+				a := initialAnalysis()
+				a.main = main
+				a.ptaRes = runner.ptaResult
+				a.ptaRes0 = runner.ptaResult0
+				a.ptaCfg = runner.ptaConfig
+				a.ptaCfg0 = runner.ptaConfig0
+				a.prog = runner.prog
+				a.testEntry = test
+				a.entryFn = test.Name()
+				a.otherTests = selectTests
+
+				rr := a.runChecker()
+				runner.racyStackTops = a.racyStackTops
+				runner.finalReport = append(runner.finalReport, rr)
+
+				log.Info("Finish for test entry point: ", test.String(), "\n========================================================================================================")
+			}
+		}
+		log.Info("Finish for entry point: ", main.String(), "\n========================================================================================================")
+	}
+
+	//summary report
+	log.Info("\n\nSummary Report:")
+	raceCount := 0
+	for _, e := range runner.finalReport {
+		if len(e.racePairs) > 0 && e.racePairs[0] != nil {
+			log.Info(len(e.racePairs), " races found for entry point ", e.entryInfo, "...")
+			raceCount += len(e.racePairs)
+		} else {
+			log.Info("No races found for ", e.entryInfo, "...")
+		}
+	}
+	log.Info("Total of ", raceCount, " races found for all entry points. ")
+
+	execDur := time.Since(startExec)
+	log.Info(execDur, " elapsed. ")
+
+	return nil
+}
+
 func (runner *AnalysisRunner) Run(args []string) error {
 	trieLimit = runner.trieLimit
 	efficiency = runner.efficiency
@@ -326,7 +523,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		}
 		start := time.Now() //performance
 		var err error
-		runner.ptaResult, err = pointer.AnalyzeMultiMains(runner.ptaConfig) // conduct pointer analysis for multiple mains
+		runner.ptaResults, err = pointer.AnalyzeMultiMains(runner.ptaConfig) // conduct pointer analysis for multiple mains
 		if err != nil {
 			panic("Pointer Analysis Error: " + err.Error())
 		}
@@ -352,7 +549,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 	if len(mains) > 1 {
 		allEntries = true
 	}
-	selectTests, entry := runner.analyzeTestEntry(mains)
+	_, entry := runner.analyzeTestEntry(mains)
 
 	// Iterate each entry point...
 	//var wg sync.WaitGroup
@@ -361,7 +558,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		//go func(main *ssa.Package) {
 		// Configure static analysis...
 		a := analysis{
-			ptaRes:          runner.ptaResult[m],
+			ptaRes:          runner.ptaResults[m],
 			ptaRes0:         runner.ptaResult0,
 			ptaCfg:          runner.ptaConfig,
 			ptaCfg0:         runner.ptaConfig0,
@@ -401,7 +598,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 			bindingFV:       make(map[*ssa.Go][]*ssa.FreeVar),
 			commIDs:         make(map[int][]int),
 			deferToRet:      make(map[*ssa.Defer]ssa.Instruction),
-			testEntry:       selectTests,
+			//testEntry:       selectTests, //bz: this is wrong ...
 			entryFn:         entry,
 			twinGoID:        make(map[*ssa.Go][]int),
 			mutualTargets:   make(map[int]*mutualFns),
@@ -418,10 +615,10 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		}
 		if a.testEntry != nil {
 			//bz: a test now uses itself as main context, tell pta which test will be analyzed for this analysis
-			for _, eachTest := range a.testEntry {
-				a.ptaRes.AnalyzeTest(eachTest)
-				a.visitAllInstructions(eachTest, 0)
-			}
+			//for _, eachTest := range a.testEntry {//bz: this is wrong ...
+			//	a.ptaRes.AnalyzeTest(eachTest)
+			//	a.visitAllInstructions(eachTest, 0)
+			//}
 		} else {
 			a.visitAllInstructions(m.Func(a.entryFn), 0)
 		}
@@ -493,7 +690,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 	return nil
 }
 
-//stackGo prints the callstack of a goroutine
+//stackGo prints the callstack of a goroutine -> not used now
 func (a *analysis) stackGo() {
 	if a.getGo { // print call stack of each goroutine
 		for i := 0; i < len(a.RWIns); i++ {

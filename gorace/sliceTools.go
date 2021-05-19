@@ -85,6 +85,7 @@ func sliceContainsFnCall(s []*fnCallInfo, e fnCallInfo) bool {
 	return false
 }
 
+//bz: i guess your intended to check whether e is other tests ... update .
 func sliceContainsFnCtr(s []*ssa.Function, e *ssa.Function) int {
 	ctr := 0
 	if e != nil {
