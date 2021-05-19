@@ -10,6 +10,7 @@ import (
 	"github.com/o2lab/gorace/stats"
 	log "github.com/sirupsen/logrus"
 	"github.com/twmb/algoimpl/go/graph"
+	"os"
 	"sync"
 	"syscall"
 
@@ -140,10 +141,6 @@ type fnInfo struct { // all fields must be comparable for fnInfo to be used as k
 	contextStr string
 }
 
-
-
-
-
 type goCallInfo struct {
 	ssaIns ssa.Instruction
 	goIns  *ssa.Go
@@ -177,28 +174,10 @@ type trie struct {
 	fnContext []*ssa.Function
 }
 
-var (
-	excludedPkgs []string
-	excludedFns  []string
-	testMode     = false // Used by race_test.go for collecting output.
-)
-
-var useNewPTA = true
-var trieLimit = 2      // set as user config option later, an integer that dictates how many times a function can be called under identical context
-var efficiency = true  // configuration setting to avoid recursion in tested program
-var channelComm = true // analyze channel communication
-var allEntries = false
-var printDebugInfo = false //bz: replace the usage for old allEntries
-var useDefaultPTA = false
-var getGo = false
-var goTest bool // running test script
-var debugFlag bool
-
 func init() {
-	excludedPkgs = []string{
-		"fmt",
-		"logrus",
-	}
+	curDir, _ := os.Getwd()
+	ymlPath := curDir + "/gorace.yml"
+	DecodeYmlFile(ymlPath)
 	//bz: skip traversing some functions that are not important in detection (or too verbose, do not want to analyze)
 	excludedFns = []string{ //bz: grpc specific, hasprefix
 		"google.golang.org/grpc/grpclog",

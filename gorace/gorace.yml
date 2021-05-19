@@ -1,0 +1,12 @@
+# user to input the config options
+goracecfgs:
+  # provide name of packages to exclude race chekcing analysis from
+  - excludePkgs:
+      - fmt
+      - logrus
+
+  # provide integer value of limit on points-to set
+    PTSlimit: 10
+
+  # provide scope on which to perform race checking analysis
+    analysisScope: command-line-arguments
