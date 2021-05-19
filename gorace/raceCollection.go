@@ -247,7 +247,7 @@ func (a *analysis) checkRacyPairs() []*raceInfo {
 						}
 
 						if a.sameAddress(addressPair[0], addressPair[1], i, j) &&
-							!sliceContains(races, addressPair, i, j) &&
+							!sliceContains(a, races, addressPair, i, j) &&
 							!a.reachable(goI.ins, i, goJ.ins, j) &&
 							!a.reachable(goJ.ins, j, goI.ins, i) &&
 							!a.bothAtomic(insSlice[0].ins, insSlice[1].ins) &&
@@ -270,6 +270,20 @@ func (a *analysis) checkRacyPairs() []*raceInfo {
 		}
 	}
 	return races
+}
+
+//bz: get the twin goid for the same goroutine spawned in a loop
+// assume go id creation will have no problem
+func (a *analysis) getMyGoTwin(goID int) (*ssa.Go, int) {
+	for goIns, twins := range a.twinGoID {
+		if twins[0] == goID {
+			return goIns, twins[1]
+		}
+		if twins[1] == goID {
+			return goIns, twins[0]
+		}
+	}
+	return nil, -1 //no loop exist
 }
 
 // insAddress takes a slice of ssa instructions and returns a slice of their corresponding addresses

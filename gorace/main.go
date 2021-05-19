@@ -77,6 +77,7 @@ type analysis struct {
 	entryFn         string         //bz: move from global to analysis field
 	testEntry       []*ssa.Function  //bz: test entry point
 
+	twinGoID        map[*ssa.Go][]int //bz: whether two goroutines are spawned by the same loop; this might not be useful now since !sliceContains(a.reportedAddr, addressPair) && already filtered out the duplicate race check
 	mutualTargets   map[int]*mutualFns //bz: this mutual exclusion is for this specific go id (i.e., int)
 }
 

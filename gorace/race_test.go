@@ -114,7 +114,7 @@ var passed int32 = 0
 var fset = token.NewFileSet()
 
 // Positioned errors are of the form "(Read|Write) of ... at filename:line:column".
-var posMsgRx = regexp.MustCompile(`^ (.*) at (.*:[0-9]+:[0-9]+)$`)
+var posMsgRx = regexp.MustCompile(`^(.*) at (.*:[0-9]+:[0-9]+)$`)
 
 // splitError splits an error's error message into a position string
 // and the actual error message. If there's no position information,

@@ -27,13 +27,30 @@ func insToCallStack(allIns []*insInfo) ([]*ssa.Function, string) {
 
 // sliceContains if the e value is present in the slice, s, of ssa values that true, and false otherwise
 // bz: update: needs to match both ssa.Value and same goids (may fron another possible goroutine/path)
-func sliceContains(races []*raceInfo, curAddrs [2]ssa.Value, goID1, goID2 int) bool {
+func sliceContains(a *analysis, races []*raceInfo, curAddrs [2]ssa.Value, goID1, goID2 int) bool {
+	_, goID1twin := a.getMyGoTwin(goID1)
+	_, goID2twin := a.getMyGoTwin(goID2)
 	for _, race := range races {
 		exist := race.addrPair
 		existIDs := race.goIDs
-		if (exist[0] == curAddrs[0] && exist[1] == curAddrs[1] && existIDs[0] == goID1 && existIDs[1] == goID2) ||
-			(exist[0] == curAddrs[1] && exist[1] == curAddrs[0] && existIDs[1] == goID1 && existIDs[0] == goID2) {
-			return true
+
+		if exist[0] == curAddrs[0] && exist[1] == curAddrs[1] {
+			if (existIDs[0] == goID1 && existIDs[1] == goID2) ||
+				//bz: loop id also count as the same
+				(existIDs[0] == goID1twin && existIDs[1] == goID2) ||
+				(existIDs[0] == goID1 && existIDs[1] == goID2twin) ||
+				(existIDs[0] == goID1twin && existIDs[1] == goID2twin) {
+				return true
+			}
+		}
+		if exist[0] == curAddrs[1] && exist[1] == curAddrs[0] {
+			if (existIDs[1] == goID1 && existIDs[0] == goID2) ||
+				//bz: loop id also count as the same
+				(existIDs[1] == goID1twin && existIDs[0] == goID2) ||
+				(existIDs[1] == goID1 && existIDs[0] == goID2twin) ||
+				(existIDs[1] == goID1twin && existIDs[0] == goID2twin) {
+				return true
+			}
 		}
 	}
 	return false

@@ -159,7 +159,7 @@ func pkgSelection(initial []*packages.Package) ([]*ssa.Package, *ssa.Program, []
 	return mains, prog, pkgs
 }
 
-func (runner *AnalysisRunner) analyzeTestEntry(mains []*ssa.Package) ([]*ssa.Function, string){
+func (runner *AnalysisRunner) analyzeTestEntry(mains []*ssa.Package) ([]*ssa.Function, string) {
 	var selectedFns []*ssa.Function
 	//bz: for analyzing tests
 	entry := "main" //bz: default value, will update later
@@ -359,118 +359,119 @@ func (runner *AnalysisRunner) Run(args []string) error {
 	for _, m := range mains {
 		//wg.Add(1)
 		//go func(main *ssa.Package) {
-			// Configure static analysis...
-			a := analysis{
-				ptaRes:        runner.ptaResult[m],
-				ptaRes0:       runner.ptaResult0,
-				ptaCfg:     runner.ptaConfig,
-				ptaCfg0:    runner.ptaConfig0,
-				efficiency: efficiency,
-				trieLimit:  trieLimit,
-				getGo:      getGo,
-				prog:       runner.prog,
-				main:       m,
-				RWinsMap:   make(map[goIns]graph.Node),
-				trieMap:    make(map[fnInfo]*trie),
-				insMono:    -1,
-				levels:     make(map[int]int),
-				lockMap:    make(map[ssa.Instruction][]ssa.Value),
-				lockSet:    make(map[int][]*lockInfo),
-				RlockMap:   make(map[ssa.Instruction][]ssa.Value),
-				RlockSet:   make(map[int][]*lockInfo),
-				goCaller:   make(map[int]int),
-				goCalls:    make(map[int]*goCallInfo),
-				chanToken:  make(map[string]string),
-				chanBuf:    make(map[string]int),
-				chanRcvs:   make(map[string][]*ssa.UnOp),
-				chanSnds:        make(map[string][]*ssa.Send),
-				selectBloc:      make(map[int]*ssa.Select),
-				selReady:        make(map[*ssa.Select][]string),
-				selUnknown:      make(map[*ssa.Select][]string),
-				selectCaseBegin: make(map[ssa.Instruction]string),
-				selectCaseEnd:   make(map[ssa.Instruction]string),
-				selectCaseBody:  make(map[ssa.Instruction]*ssa.Select),
-				selectDone:      make(map[ssa.Instruction]*ssa.Select),
-				ifSuccBegin:   make(map[ssa.Instruction]*ssa.If),
-				ifFnReturn:    make(map[*ssa.Function]*ssa.Return),
-				ifSuccEnd:     make(map[ssa.Instruction]*ssa.Return),
-				inLoop:        false,
-				goInLoop:      make(map[int]bool),
-				loopIDs:       make(map[int]int),
-				allocLoop:     make(map[*ssa.Function][]string),
-				bindingFV:     make(map[*ssa.Go][]*ssa.FreeVar),
-				commIDs:       make(map[int][]int),
-				deferToRet:    make(map[*ssa.Defer]ssa.Instruction),
-				testEntry:     selectTests,
-				entryFn:       entry,
-				mutualTargets: make(map[int]*mutualFns),
+		// Configure static analysis...
+		a := analysis{
+			ptaRes:          runner.ptaResult[m],
+			ptaRes0:         runner.ptaResult0,
+			ptaCfg:          runner.ptaConfig,
+			ptaCfg0:         runner.ptaConfig0,
+			efficiency:      efficiency,
+			trieLimit:       trieLimit,
+			getGo:           getGo,
+			prog:            runner.prog,
+			main:            m,
+			RWinsMap:        make(map[goIns]graph.Node),
+			trieMap:         make(map[fnInfo]*trie),
+			insMono:         -1,
+			levels:          make(map[int]int),
+			lockMap:         make(map[ssa.Instruction][]ssa.Value),
+			lockSet:         make(map[int][]*lockInfo),
+			RlockMap:        make(map[ssa.Instruction][]ssa.Value),
+			RlockSet:        make(map[int][]*lockInfo),
+			goCaller:        make(map[int]int),
+			goCalls:         make(map[int]*goCallInfo),
+			chanToken:       make(map[string]string),
+			chanBuf:         make(map[string]int),
+			chanRcvs:        make(map[string][]*ssa.UnOp),
+			chanSnds:        make(map[string][]*ssa.Send),
+			selectBloc:      make(map[int]*ssa.Select),
+			selReady:        make(map[*ssa.Select][]string),
+			selUnknown:      make(map[*ssa.Select][]string),
+			selectCaseBegin: make(map[ssa.Instruction]string),
+			selectCaseEnd:   make(map[ssa.Instruction]string),
+			selectCaseBody:  make(map[ssa.Instruction]*ssa.Select),
+			selectDone:      make(map[ssa.Instruction]*ssa.Select),
+			ifSuccBegin:     make(map[ssa.Instruction]*ssa.If),
+			ifFnReturn:      make(map[*ssa.Function]*ssa.Return),
+			ifSuccEnd:       make(map[ssa.Instruction]*ssa.Return),
+			inLoop:          false,
+			goInLoop:        make(map[int]bool),
+			loopIDs:         make(map[int]int),
+			allocLoop:       make(map[*ssa.Function][]string),
+			bindingFV:       make(map[*ssa.Go][]*ssa.FreeVar),
+			commIDs:         make(map[int][]int),
+			deferToRet:      make(map[*ssa.Defer]ssa.Instruction),
+			testEntry:       selectTests,
+			entryFn:         entry,
+			twinGoID:        make(map[*ssa.Go][]int),
+			mutualTargets:   make(map[int]*mutualFns),
+		}
+		if strings.Contains(m.Pkg.Path(), "GoBench") { // for testing purposes
+			a.efficiency = false
+			a.trieLimit = 2
+		} else if !goTest {
+			a.efficiency = true
+		}
+		if !allEntries {
+			log.Info("Compiling stack trace for every Goroutine... ")
+			log.Debug(strings.Repeat("-", 35), "Stack trace begins", strings.Repeat("-", 35))
+		}
+		if a.testEntry != nil {
+			//bz: a test now uses itself as main context, tell pta which test will be analyzed for this analysis
+			for _, eachTest := range a.testEntry {
+				a.ptaRes.AnalyzeTest(eachTest)
+				a.visitAllInstructions(eachTest, 0)
 			}
-			if strings.Contains(m.Pkg.Path(), "GoBench") { // for testing purposes
-				a.efficiency = false
-				a.trieLimit = 2
-			} else if !goTest {
-				a.efficiency = true
-			}
-			if !allEntries {
-				log.Info("Compiling stack trace for every Goroutine... ")
-				log.Debug(strings.Repeat("-", 35), "Stack trace begins", strings.Repeat("-", 35))
-			}
-			if a.testEntry != nil {
-				//bz: a test now uses itself as main context, tell pta which test will be analyzed for this analysis
-				for _, eachTest := range a.testEntry {
-					a.ptaRes.AnalyzeTest(eachTest)
-					a.visitAllInstructions(eachTest, 0)
-				}
-			} else {
-				a.visitAllInstructions(m.Func(a.entryFn), 0)
-			}
+		} else {
+			a.visitAllInstructions(m.Func(a.entryFn), 0)
+		}
 
-			if !allEntries {
-				log.Debug(strings.Repeat("-", 35), "Stack trace ends", strings.Repeat("-", 35))
-			}
-			totalIns := 0
-			for g := range a.RWIns {
-				totalIns += len(a.RWIns[g])
-			}
-			if !allEntries {
-				log.Info("Done  -- ", len(a.RWIns), " goroutines analyzed! ", totalIns, " instructions of interest detected! ")
-			}
+		if !allEntries {
+			log.Debug(strings.Repeat("-", 35), "Stack trace ends", strings.Repeat("-", 35))
+		}
+		totalIns := 0
+		for g := range a.RWIns {
+			totalIns += len(a.RWIns[g])
+		}
+		if !allEntries {
+			log.Info("Done  -- ", len(a.RWIns), " goroutines analyzed! ", totalIns, " instructions of interest detected! ")
+		}
 
-			if useDefaultPTA {
-				a.ptaRes0, _ = pta0.Analyze(a.ptaCfg0) // all queries have been added, conduct pointer analysis
-			}
-			if !allEntries {
-				log.Info("Building Happens-Before graph... ")
-			}
-			// confirm channel readiness for unknown select cases:
-			if len(a.selUnknown) > 0 {
-				for sel, chs := range a.selUnknown {
-					for i, ch := range chs {
-						if _, ready := a.chanSnds[ch]; !ready && ch != "" {
-							if _, ready0 := a.chanRcvs[ch]; !ready0 {
-								if _, ready1 := a.chanBuf[a.chanToken[ch]]; !ready1 {
-									a.selReady[sel][i] = ""
-								}
+		if useDefaultPTA {
+			a.ptaRes0, _ = pta0.Analyze(a.ptaCfg0) // all queries have been added, conduct pointer analysis
+		}
+		if !allEntries {
+			log.Info("Building Happens-Before graph... ")
+		}
+		// confirm channel readiness for unknown select cases:
+		if len(a.selUnknown) > 0 {
+			for sel, chs := range a.selUnknown {
+				for i, ch := range chs {
+					if _, ready := a.chanSnds[ch]; !ready && ch != "" {
+						if _, ready0 := a.chanRcvs[ch]; !ready0 {
+							if _, ready1 := a.chanBuf[a.chanToken[ch]]; !ready1 {
+								a.selReady[sel][i] = ""
 							}
 						}
 					}
 				}
 			}
-			a.HBgraph = graph.New(graph.Directed)
-			a.buildHB()
-			if !allEntries {
-				log.Info("Done  -- Happens-Before graph built ")
-				log.Info("Checking for data races... ")
-			}
-			rr := raceReport{
-				entryInfo: m.Pkg.Path(),
-			}
-			rr.racePairs = a.checkRacyPairs()
-			//runner.mu.Lock()
-			runner.racyStackTops = a.racyStackTops
-			runner.finalReport = append(runner.finalReport, rr)
-			//runner.mu.Unlock()
-			//wg.Done()
+		}
+		a.HBgraph = graph.New(graph.Directed)
+		a.buildHB()
+		if !allEntries {
+			log.Info("Done  -- Happens-Before graph built ")
+			log.Info("Checking for data races... ")
+		}
+		rr := raceReport{
+			entryInfo: m.Pkg.Path(),
+		}
+		rr.racePairs = a.checkRacyPairs()
+		//runner.mu.Lock()
+		runner.racyStackTops = a.racyStackTops
+		runner.finalReport = append(runner.finalReport, rr)
+		//runner.mu.Unlock()
+		//wg.Done()
 		//}(m)
 	}
 	//wg.Wait()

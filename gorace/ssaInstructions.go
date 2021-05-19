@@ -512,8 +512,8 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 	return unlockOps, runlockOps
 }
 
-// insGo analyzes go calls
-func (a *analysis) insGo(examIns *ssa.Go, goID int, theIns ssa.Instruction, loopID int) {
+// insGo analyzes go calls //bz: return new goid
+func (a *analysis) insGo(examIns *ssa.Go, goID int, theIns ssa.Instruction, loopID int) int {
 	fnName := a.goNames(examIns)
 	var entryMethod *ssa.Function
 	switch fn := examIns.Call.Value.(type) {
@@ -529,13 +529,13 @@ func (a *analysis) insGo(examIns *ssa.Go, goID int, theIns ssa.Instruction, loop
 			entryMethod = a.paramFunc
 			fnName = entryMethod.Name()
 		} else {
-			return
+			return -1
 		}
 	default:
 		entryMethod = examIns.Call.StaticCallee()
 	}
 	if entryMethod == nil {
-		return
+		return -1
 	}
 	newGoID := goID + 1      // increment goID for child goroutine
 	if len(a.workList) > 0 { // spawned by subroutine
@@ -565,6 +565,8 @@ func (a *analysis) insGo(examIns *ssa.Go, goID int, theIns ssa.Instruction, loop
 			log.Debug(strings.Repeat(" ", a.levels[goID]), "spawning Goroutine ----->  ", fnName)
 		}
 	}
+
+	return newGoID
 }
 
 func (a *analysis) insMapUpdate(examIns *ssa.MapUpdate, goID int, theIns ssa.Instruction) {

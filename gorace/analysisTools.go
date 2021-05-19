@@ -485,12 +485,23 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 					}
 				}
 				loopID := 0
+				twin := make([]int, 2)
 				if a.inLoop {
 					loopID++
-					a.insGo(examIns, goID, theIns, loopID) // loopID == 1 if goroutine in loop
+					newGoID1 := a.insGo(examIns, goID, theIns, loopID)// loopID == 1 if goroutine in loop
+					if newGoID1 != -1 {
+						twin[0] = newGoID1
+					}
 					loopID++
 				}
-				a.insGo(examIns, goID, theIns, loopID) // loopID == 2 if goroutine in loop, loopID == 0 otherwise
+				newGoID2 := a.insGo(examIns, goID, theIns, loopID) // loopID == 2 if goroutine in loop, loopID == 0 otherwise
+				if loopID != 0 && newGoID2 != -1 { //bz: record the twin goroutines
+					exist := a.twinGoID[examIns]
+					if exist == nil { //fill in the blank
+						twin[1] = newGoID2
+						a.twinGoID[examIns] = twin
+					} //else: already exist, skip
+				}
 			case *ssa.Return:
 				a.recordIns(goID, theIns)
 				//a.RWIns[goID] = append(a.RWIns[goID], theIns)
