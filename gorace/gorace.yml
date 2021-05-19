@@ -9,4 +9,5 @@ goracecfgs:
     PTSlimit: 10
 
   # provide scope on which to perform race checking analysis
-    analysisScope: command-line-arguments
+    analysisScope:
+      - command-line-arguments

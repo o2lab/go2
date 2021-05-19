@@ -36,7 +36,7 @@ type GoRace struct {
 type GoRaceCfg struct {
 	ExPkgs []string `yaml:"excludePkgs"`
 	PTS    int      `yaml:"PTSlimit"`
-	Scope  string   `yaml:"analysisScope"`
+	Scope  []string   `yaml:"analysisScope"`
 }
 
 // DecodeYmlFile takes in absolute path of gorace.yml file
@@ -54,6 +54,6 @@ func DecodeYmlFile(absPath string) {
 	for _, eachCfg := range grs.GoRaceCfgs {
 		excludedPkgs = eachCfg.ExPkgs
 		PTSlimit = eachCfg.PTS
-		PTAscope = append(PTAscope, eachCfg.Scope)
+		PTAscope = eachCfg.Scope
 	}
 }
