@@ -159,10 +159,10 @@ func pkgSelection(initial []*packages.Package) ([]*ssa.Package, *ssa.Program, []
 	return mains, prog, pkgs
 }
 
-func (runner *AnalysisRunner) analyzeTestEntry(mains []*ssa.Package) (*ssa.Function, string){
+func (runner *AnalysisRunner) analyzeTestEntry(mains []*ssa.Package) ([]*ssa.Function, string){
+	var selectedFns []*ssa.Function
 	//bz: for analyzing tests
 	entry := "main" //bz: default value, will update later
-	var selectTest *ssa.Function
 	if strings.Contains(mains[0].String(), ".test") {
 		fmt.Println("Extracting test functions from PTA/CG...")
 		for mainEntry, ptaRes := range runner.ptaResult {
@@ -172,13 +172,15 @@ func (runner *AnalysisRunner) analyzeTestEntry(mains []*ssa.Package) (*ssa.Funct
 			}
 			fmt.Println("The following are functions found within: ", mainEntry)
 			var testSelect string
-			var testFns []*ssa.Function
-			var selectedFns []*ssa.Function
+			var testFns []*ssa.Function // all test functions in this entry
 			counter := 1
 			for fn := range tests {
 				fmt.Println("Option", counter, ": ", fn.Name())
 				testFns = append(testFns, fn)
 				counter++
+			}
+			if allEntries { // analyze all test functions
+				return testFns, ""
 			}
 			fmt.Print("Enter option number of choice or test name: \n")
 			fmt.Scan(&testSelect)
@@ -188,6 +190,7 @@ func (runner *AnalysisRunner) analyzeTestEntry(mains []*ssa.Package) (*ssa.Funct
 					i, _ := strconv.Atoi(s)                         // convert to integer
 					selectedFns = append(selectedFns, testFns[i-1]) // TODO: analyze multiple tests concurrently
 				}
+				entry = ""
 			} else if strings.Contains(testSelect, "-") && testFns != nil { // selected range
 				selection := strings.Split(testSelect, "-")
 				begin, _ := strconv.Atoi(selection[0])
@@ -195,15 +198,15 @@ func (runner *AnalysisRunner) analyzeTestEntry(mains []*ssa.Package) (*ssa.Funct
 				for i := begin; i <= end; i++ {
 					selectedFns = append(selectedFns, testFns[i-1]) // TODO: analyze multiple tests concurrently
 				}
-			} else if i, err0 := strconv.Atoi(testSelect); err0 == nil && testFns != nil {
+				entry = ""
+			} else if i, err0 := strconv.Atoi(testSelect); err0 == nil && testFns != nil { // single selection
 				selectedFns = append(selectedFns, testFns[i-1]) // TODO: analyze multiple tests concurrently
-				selectTest = testFns[i-1]
-				entry = selectTest.Name()
-			} else if strings.Contains(testSelect, "Test") {
+				entry = testFns[i-1].Name()
+			} else if strings.Contains(testSelect, "Test") { // user input name of test function
 				for _, fn := range testFns {
 					if fn.Name() == testSelect {
-						selectTest = fn
-						entry = selectTest.Name()
+						selectedFns = append(selectedFns, fn)
+						entry = fn.Name()
 					}
 				}
 			} else {
@@ -212,7 +215,7 @@ func (runner *AnalysisRunner) analyzeTestEntry(mains []*ssa.Package) (*ssa.Funct
 		}
 		fmt.Println("Done  -- CG node of test function ", entry, " extracted...")
 	}
-	return selectTest, entry
+	return selectedFns, entry
 }
 
 func determineScope(pkgs []*ssa.Package) []string {
@@ -349,7 +352,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 	if len(mains) > 1 {
 		allEntries = true
 	}
-	selectTest, entry := runner.analyzeTestEntry(mains)
+	selectTests, entry := runner.analyzeTestEntry(mains)
 
 	// Iterate each entry point...
 	//var wg sync.WaitGroup
@@ -358,8 +361,8 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		//go func(main *ssa.Package) {
 			// Configure static analysis...
 			a := analysis{
-				ptaRes:          runner.ptaResult[m],
-				ptaRes0:         runner.ptaResult0,
+				ptaRes:        runner.ptaResult[m],
+				ptaRes0:       runner.ptaResult0,
 				ptaCfg:     runner.ptaConfig,
 				ptaCfg0:    runner.ptaConfig0,
 				efficiency: efficiency,
@@ -388,19 +391,19 @@ func (runner *AnalysisRunner) Run(args []string) error {
 				selectCaseEnd:   make(map[ssa.Instruction]string),
 				selectCaseBody:  make(map[ssa.Instruction]*ssa.Select),
 				selectDone:      make(map[ssa.Instruction]*ssa.Select),
-				ifSuccBegin:     make(map[ssa.Instruction]*ssa.If),
-				ifFnReturn:      make(map[*ssa.Function]*ssa.Return),
-				ifSuccEnd:       make(map[ssa.Instruction]*ssa.Return),
-				inLoop:          false,
-				goInLoop:        make(map[int]bool),
-				loopIDs:         make(map[int]int),
-				allocLoop:       make(map[*ssa.Function][]string),
-				bindingFV:       make(map[*ssa.Go][]*ssa.FreeVar),
-				commIDs:         make(map[int][]int),
-				deferToRet:      make(map[*ssa.Defer]ssa.Instruction),
-				testEntry:       selectTest,
-				entryFn:         entry,
-				mutualTargets:   make(map[int]*mutualFns),
+				ifSuccBegin:   make(map[ssa.Instruction]*ssa.If),
+				ifFnReturn:    make(map[*ssa.Function]*ssa.Return),
+				ifSuccEnd:     make(map[ssa.Instruction]*ssa.Return),
+				inLoop:        false,
+				goInLoop:      make(map[int]bool),
+				loopIDs:       make(map[int]int),
+				allocLoop:     make(map[*ssa.Function][]string),
+				bindingFV:     make(map[*ssa.Go][]*ssa.FreeVar),
+				commIDs:       make(map[int][]int),
+				deferToRet:    make(map[*ssa.Defer]ssa.Instruction),
+				testEntry:     selectTests,
+				entryFn:       entry,
+				mutualTargets: make(map[int]*mutualFns),
 			}
 			if strings.Contains(m.Pkg.Path(), "GoBench") { // for testing purposes
 				a.efficiency = false
@@ -414,8 +417,10 @@ func (runner *AnalysisRunner) Run(args []string) error {
 			}
 			if a.testEntry != nil {
 				//bz: a test now uses itself as main context, tell pta which test will be analyzed for this analysis
-				a.ptaRes.AnalyzeTest(a.testEntry)
-				a.visitAllInstructions(a.testEntry, 0)
+				for _, eachTest := range a.testEntry {
+					a.ptaRes.AnalyzeTest(eachTest)
+					a.visitAllInstructions(eachTest, 0)
+				}
 			} else {
 				a.visitAllInstructions(m.Func(a.entryFn), 0)
 			}

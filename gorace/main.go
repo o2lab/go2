@@ -75,7 +75,7 @@ type analysis struct {
 	deferToRet      map[*ssa.Defer]ssa.Instruction
 
 	entryFn         string         //bz: move from global to analysis field
-	testEntry       *ssa.Function  //bz: test entry point
+	testEntry       []*ssa.Function  //bz: test entry point
 
 	mutualTargets   map[int]*mutualFns //bz: this mutual exclusion is for this specific go id (i.e., int)
 }

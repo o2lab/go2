@@ -137,7 +137,7 @@ func (a *analysis) pointerNewAnalysisHandleFunc(ptr pointer.PointerWCtx, labels 
 		var fnName string
 		switch theFunc := label.Value().(type) {
 		case *ssa.Function:
-			if theFunc == a.testEntry {
+			if sliceContainsFnCtr(a.testEntry, theFunc) > 0 {
 				return
 			}
 			if a.getParam {
