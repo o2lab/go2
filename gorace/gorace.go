@@ -4,6 +4,7 @@ import (
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"log"
+	"github.com/april1989/origin-go-tools/go/myutil/flags"
 )
 
 /*
@@ -27,6 +28,15 @@ var (
 	excludedPkgs   []string // ******** FOR ISSUE 14 *************
 	PTSlimit       int      // ******** FOR ISSUE 14 *************
 	PTAscope       []string // ******** FOR ISSUE 14 *************
+
+	////bz: skip traversing some functions that are not important in detection (or too verbose, do not want to analyze)
+	//excludedFns = []string{ //bz: grpc specific, hasprefix
+	//	"google.golang.org/grpc/grpclog",
+	//	"(*testing.common).Log",
+	//	"(*testing.common).Error",
+	//	"(*testing.common).Fatal",
+	//	"(*testing.common).Skip",
+	//}
 )
 
 type GoRace struct {
@@ -53,7 +63,7 @@ func DecodeYmlFile(absPath string) {
 
 	for _, eachCfg := range grs.GoRaceCfgs {
 		excludedPkgs = eachCfg.ExPkgs
-		PTSlimit = eachCfg.PTS
+		flags.PTSLimit = eachCfg.PTS
 		PTAscope = append(PTAscope, eachCfg.Scope)
 	}
 }

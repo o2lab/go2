@@ -219,6 +219,10 @@ func (runner *AnalysisRunner) analyzeTestEntry(mains []*ssa.Package) ([]*ssa.Fun
 }
 
 func determineScope(pkgs []*ssa.Package) []string {
+	if len(PTAscope) > 0 {
+		//bz: let's use the one from users
+		return PTAscope
+	}
 	var scope = make([]string, 1)
 	//if pkgs[0] != nil { // Note: only if main dir contains main.go.
 	//	scope[0] = pkgs[0].Pkg.Path() //bz: the 1st pkg has the scope info == the root pkg or default .go input

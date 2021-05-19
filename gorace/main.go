@@ -178,14 +178,6 @@ func init() {
 	curDir, _ := os.Getwd()
 	ymlPath := curDir + "/gorace.yml"
 	DecodeYmlFile(ymlPath)
-	//bz: skip traversing some functions that are not important in detection (or too verbose, do not want to analyze)
-	excludedFns = []string{ //bz: grpc specific, hasprefix
-		"google.golang.org/grpc/grpclog",
-		"(*testing.common).Log",
-		"(*testing.common).Error",
-		"(*testing.common).Fatal",
-		"(*testing.common).Skip",
-	}
 }
 
 // main sets up arguments and calls staticAnalysis function
