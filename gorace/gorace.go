@@ -1,10 +1,10 @@
 package main
 
 import (
+	"github.com/april1989/origin-go-tools/go/myutil/flags"
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"log"
-	"github.com/april1989/origin-go-tools/go/myutil/flags"
 )
 
 /*

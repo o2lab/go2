@@ -97,7 +97,7 @@ func (a *analysis) updateRecords(fnName string, goID int, pushPop string, theFn 
 		a.storeFns = a.storeFns[:len(a.storeFns)-1]
 		a.levels[goID]--
 	}
-	if !printDebugInfo {
+	if printDebugInfo {
 		log.Debug(strings.Repeat(" ", a.levels[goID]), pushPop, theFn.String(), " at lvl ", a.levels[goID])
 	}
 	if pushPop == "PUSH " {
@@ -558,7 +558,7 @@ func (a *analysis) insGo(examIns *ssa.Go, goID int, theIns ssa.Instruction, loop
 	theGoCall := &fnCallInfo{ssaIns: theIns, fnIns: entryMethod}
 	a.goStack[newGoID] = append(a.goStack[newGoID], theGoCall)
 	a.workList = append(a.workList, info) // store encountered goroutines
-	if !printDebugInfo {
+	if printDebugInfo {
 		if loopID > 0 {
 			log.Debug(strings.Repeat(" ", a.levels[goID]), "spawning Goroutine (in loop) ----->  ", fnName)
 		} else {

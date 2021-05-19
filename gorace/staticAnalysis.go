@@ -432,8 +432,9 @@ func (runner *AnalysisRunner) Run2(args []string) error {
 			a.ptaCfg = runner.ptaConfig
 			a.ptaCfg0 = runner.ptaConfig0
 			a.prog = runner.prog
+			a.entryFn = "main"
 
-			rr := a.runChecker()
+				rr := a.runChecker()
 			runner.racyStackTops = a.racyStackTops
 			runner.finalReport = append(runner.finalReport, rr)
 		} else { //bz: is a test
