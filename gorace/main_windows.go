@@ -3,11 +3,11 @@ package main
 //bz: try to replace the import path, not sure if it works, since i cannot test on windows os.
 import (
 	"flag"
-	"github.com/o2lab/race-checker/stats"
-	log "github.com/sirupsen/logrus"
-	"github.com/twmb/algoimpl/go/graph"
 	"github.com/april1989/origin-go-tools/go/pointer"
 	pta0 "github.com/april1989/origin-go-tools/go/pointer_default"
+	"github.com/o2lab/gorace/stats"
+	log "github.com/sirupsen/logrus"
+	"github.com/twmb/algoimpl/go/graph"
 	"sync"
 	//"golang.org/x/tools/go/pointer"
 	"github.com/april1989/origin-go-tools/go/ssa"

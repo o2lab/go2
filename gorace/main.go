@@ -11,6 +11,8 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/twmb/algoimpl/go/graph"
 	"os"
+	"path/filepath"
+	"strings"
 	"sync"
 	"syscall"
 
@@ -228,23 +230,32 @@ func main() { //default: -useNewPTA
 	if *analyzeAll {
 		allEntries = true
 	}
-	// from Dr. H
-	//analysisDirectories := flag.Args()
-	//var directoryName = ""
-	//if len(analysisDirectories) != 1 {
-	//	fmt.Fprintf(os.Stderr, "Must provide one analysis directory: %v\n", analysisDirectories)
-	//	os.Exit(1)
-	//} else {
-	//	directoryName = analysisDirectories[0]
-	//	//JEFF: check if directory exists
-	//	_, err := os.Stat(directoryName)
-	//	if err != nil {
-	//		//println("os.Stat(): error for directory name ", directoryName)
-	//		fmt.Fprintf(os.Stderr, "Error: %v\n", err.Error())
-	//	} else {
-	//		directoryName, _ = filepath.Abs(directoryName)
-	//	}
-	//}
+
+	// from Dr. H : input a dir or .go file
+	input := flag.Args()
+	if len(input) != 1 {
+		fmt.Fprintf(os.Stderr, "Must provide one analysis directory: %v\n", input)
+		os.Exit(1)
+	} else {
+		userDir = input[0]
+		//JEFF: check if directory exists
+		_, err := os.Stat(userDir)
+		if err != nil {
+			//println("os.Stat(): error for directory name ", directoryName)
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err.Error())
+			os.Exit(1)
+		} else {
+			userDir, _ = filepath.Abs(userDir)
+		}
+
+		if strings.HasSuffix(userDir, ".go") {
+			//bz: special handling when input is a .go file
+			tmp := userDir
+			idx := strings.LastIndex(tmp, "/")
+			userDir = tmp[0:idx]
+			userInputFile = append(userInputFile, tmp[idx + 1:])
+		}
+	}
 
 	log.SetFormatter(&log.TextFormatter{
 		FullTimestamp:   true,
@@ -273,7 +284,7 @@ func main() { //default: -useNewPTA
 		efficiency: efficiency,
 	}
 	//err0 := runner.Run(flag.Args()) //bz: original code
-	err0 := runner.Run2(flag.Args())
+	err0 := runner.Run2()
 	if stats.CollectStats {
 		stats.ShowStats()
 	}

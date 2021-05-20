@@ -41,6 +41,13 @@ func (a *analysis) runChecker() raceReport {
 		traversed[fn.fnName] = fn.fnName
 	}
 	log.Info("Done  -- ", len(a.RWIns), " goroutines analyzed! ", len(traversed), " function traversed! ", totalIns, " instructions of interest detected! ")
+
+	if len(a.RWIns) == 1 { //bz: only main thread, no races.
+		log.Info("Only has the main goroutine, no need to continue. Return. ")
+		return raceReport{
+			entryInfo: a.main.Pkg.Path(),
+		}
+	}
 	//}
 
 	if useDefaultPTA {

@@ -19,7 +19,7 @@ require (
 	golang.org/x/net v0.0.0-20201224014010-6772e930b67b // indirect
 	golang.org/x/sync v0.0.0-20201207232520-09787c993a3a
 	golang.org/x/sys v0.0.0-20201221093633-bc327ba9c2f0 // indirect
-	golang.org/x/tools v0.0.0-20191119224855-298f0cb1881e
+	//golang.org/x/tools v0.0.0-20191119224855-298f0cb1881e
 	google.golang.org/genproto v0.0.0-20201203001206-6486ece9c497 // indirect
 	google.golang.org/grpc v1.34.0
 	gopkg.in/check.v1 v1.0.0-20200227125254-8fa46927fb4f // indirect

@@ -29,6 +29,9 @@ var (
 	PTSlimit       int      // ******** FOR ISSUE 14 *************
 	PTAscope       []string // ******** FOR ISSUE 14 *************
 
+	userDir        string //bz: user specify dir -> we run gorace here
+	userInputFile  []string //bz: used when input is a .go file, not a path
+
 	////bz: skip traversing some functions that are not important in detection (or too verbose, do not want to analyze)
 	//excludedFns = []string{ //bz: grpc specific, hasprefix
 	//	"google.golang.org/grpc/grpclog",
@@ -63,7 +66,7 @@ func DecodeYmlFile(absPath string) {
 
 	for _, eachCfg := range grs.GoRaceCfgs {
 		excludedPkgs = eachCfg.ExPkgs
-		flags.PTSLimit = eachCfg.PTS //bz: limit the size of pts 
+		flags.PTSLimit = eachCfg.PTS //bz: limit the size of pts
 		PTAscope = eachCfg.Scope
 	}
 }

@@ -57,6 +57,9 @@ type Package struct {
 	ninit     int32       // number of init functions
 	info      *types.Info // package type information
 	files     []*ast.File // package ASTs
+
+	//bz: this is test cases for main pkg, but go ssa/pkg builder cannot identify the diff, so they use the same pkg name but different contents -> mark it here
+	IsMainTest  bool
 }
 
 // A Member is a member of a Go package, implemented by *NamedConst,

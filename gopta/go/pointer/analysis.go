@@ -410,7 +410,7 @@ func printConfig(config *Config) {
 	fmt.Println(" *********************************** ")
 	if len(config.imports) == 0 {
 		fmt.Println(" *** No Import Libs **************** ")
-	}else{
+	} else {
 		fmt.Println(" *** Import Libs ******************* ")
 		if len(config.imports) > 0 {
 			for _, pkg := range config.imports {
@@ -422,7 +422,7 @@ func printConfig(config *Config) {
 	}
 	if len(config.Exclusion) == 0 {
 		fmt.Println(" *** No Excluded Pkgs **************** ")
-	}else{
+	} else {
 		fmt.Println(" *** Excluded Pkgs ******************* ")
 		if len(config.Exclusion) > 0 {
 			for _, pkg := range config.Exclusion {
@@ -472,7 +472,7 @@ func AnalyzeMultiMains(config *Config) (results map[*ssa.Package]*Result, err er
 		//bz: !! turn on reflection if includes tests requires base objs, e.g., grpc/internal/cache/TestCacheExpire
 		doReflect := config.Reflection
 		isMain := true
-		if flags.DoTests && strings.HasSuffix(main.Pkg.Path(), ".test") {
+		if flags.DoTests && strings.HasSuffix(main.Pkg.Path(), ".test") || main.IsMainTest {
 			doReflect = true
 			isMain = false
 		}
@@ -611,7 +611,7 @@ func Analyze(config *Config) (result *Result, err error) {
 
 	//bz: !! turn on reflection if includes tests requires base objs, e.g., grpc/internal/cache/TestCacheExpire
 	isMain := true
-	if flags.DoTests && strings.HasSuffix(main.Pkg.Path(), ".test") {
+	if flags.DoTests && strings.HasSuffix(main.Pkg.Path(), ".test") || main.IsMainTest {
 		config.Reflection = true
 		isMain = false
 	}
@@ -620,6 +620,12 @@ func Analyze(config *Config) (result *Result, err error) {
 	_result, err := AnalyzeWCtx(config, isMain)
 	if err != nil {
 		return nil, err
+	}
+
+	if main.IsMainTest && len(_result.a.tests) == 0 {
+		//TODO: bz: main.IsMainTest == true but we cannot find/link the test func now
+		//  reset to main mode, not test mode
+		_result.a.isMain = true
 	}
 
 	result = translateResult(_result, main)

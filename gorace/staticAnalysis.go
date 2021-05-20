@@ -81,10 +81,22 @@ func isSynthetic(fn *ssa.Function) bool { // ignore functions that are NOT true 
 	return fn.Synthetic != "" || fn.Pkg == nil
 }
 
+//bz: whether the function name follows the go test form: https://golang.org/pkg/testing/
+// copied from /gopta/go/pointer/gen.go -> remember to update
+func isGoTestForm(name string) bool {
+	if strings.Contains(name, "$") {
+		return false //closure
+	}
+	if strings.HasPrefix(name, "Test") || strings.HasPrefix(name, "Benchmark") || strings.HasPrefix(name, "Example") {
+		return true
+	}
+	return false
+}
+
 func pkgSelection(initial []*packages.Package) ([]*ssa.Package, *ssa.Program, []*ssa.Package) {
 	var prog *ssa.Program
 	var pkgs []*ssa.Package
-	var mainPkgs []*ssa.Package
+	var mainPkgs []*ssa.Package //bz: selected
 
 	log.Info("Building SSA code for entire program...")
 	prog, pkgs = ssautil.AllPackages(initial, 0)
@@ -104,9 +116,40 @@ func pkgSelection(initial []*packages.Package) ([]*ssa.Package, *ssa.Program, []
 	var mains []*ssa.Package
 	userEP := false // user specified entry function
 	if len(mainPkgs) > 1 {
+		//bz: we need a check to mark duplicate pkg in a program, also tell user the diff
+		pkgMap := make(map[string][]*ssa.Package)
+		for _, pkg := range mainPkgs {
+			key := pkg.String()
+			exist := pkgMap[key]
+			if exist == nil {
+				exist = make([]*ssa.Package, 1)
+				exist[0] = pkg
+			} else {
+				exist = append(exist, pkg)
+			}
+			pkgMap[key] = exist
+		}
 		// Provide entry-point options and retrieve user selection
 		fmt.Println(len(mainPkgs), "main() entry-points identified: ")
 		for i, ep := range mainPkgs {
+			//bz: check if exist duplicate
+			pkgStr := ep.String()
+			if dup := pkgMap[pkgStr]; len(dup) > 1 {
+				isTest := false
+				for memName, _ := range ep.Members {
+					if isGoTestForm(memName) {
+						isTest = true
+						break
+					}
+				}
+				if isTest {
+					//bz: this is test cases for main pkg, but go ssa/pkg builder cannot identify the diff, so they use the same pkg name but different contents
+					ep.IsMainTest = true //bz: mark it -> change the code in pta is too complex, just mark it
+					fmt.Println("Option", i+1, ": ", ep.String()+".main.test")
+					continue
+				}
+			}
+			//all other
 			fmt.Println("Option", i+1, ": ", ep.String())
 		}
 		if allEntries { // no selection from user required
@@ -163,8 +206,8 @@ func pkgSelection(initial []*packages.Package) ([]*ssa.Package, *ssa.Program, []
 func (runner *AnalysisRunner) analyzeTestEntry(main *ssa.Package) ([]*ssa.Function, string) {
 	var selectedFns []*ssa.Function
 	//bz: for analyzing tests
-	entry := "main"                                  //bz: default value, will update later
-	if strings.HasSuffix(main.Pkg.Path(), ".test") { //bz: strict end with .test
+	entry := "main"                                                     //bz: default value, will update later
+	if strings.HasSuffix(main.Pkg.Path(), ".test") || main.IsMainTest { //bz: strict end with .test or the pkg that i set
 		log.Info("Extracting test functions from PTA/CG...")
 		//for mainEntry, ptaRes := range runner.ptaResults { //bz: do not need this ...
 		tests := runner.ptaResult.GetTests()
@@ -327,13 +370,13 @@ func initialAnalysis() *analysis {
 
 //bz: update the run order of pta and checker
 //  -> sequentially now; do not provide selection of test entry
-func (runner *AnalysisRunner) Run2(args []string) error {
+func (runner *AnalysisRunner) Run2() error {
 	trieLimit = runner.trieLimit
 	efficiency = runner.efficiency
 	// Load packages...
 	cfg := &packages.Config{
 		Mode: packages.LoadAllSyntax, // the level of information returned for each package
-		Dir:  "",                     // directory in which to run the build system's query tool
+		Dir:  userDir,                     // directory in which to run the build system's query tool
 		//TODO: bz: change this to true if you want to analyze test
 		Tests: true,
 		//Tests: false,                  // setting Tests will include related test packages
@@ -341,7 +384,7 @@ func (runner *AnalysisRunner) Run2(args []string) error {
 	log.Info("Loading input packages...")
 
 	os.Stderr = nil // No need to output package errors for now. Delete this line to view package errors
-	initial, _ := packages.Load(cfg, args...)
+	initial, _ := packages.Load(cfg, userInputFile ... )
 	if len(initial) == 0 {
 		return fmt.Errorf("No Go files detected. ")
 	}
@@ -356,7 +399,11 @@ func (runner *AnalysisRunner) Run2(args []string) error {
 	//var wg sync.WaitGroup
 	for _, main := range mains {
 		log.Info("****************************************************************************************************")
-		log.Info("Start for entry point: ", main.String(), "... ")
+		if main.IsMainTest {
+			log.Info("Start for entry point: ", main.String() + ".main.test", "... ")
+		} else {
+			log.Info("Start for entry point: ", main.String(), "... ")
+		}
 		// Configure pointer analysis...
 		log.Info("Running Pointer Analysis... ")
 		if useNewPTA {
@@ -366,7 +413,7 @@ func (runner *AnalysisRunner) Run2(args []string) error {
 			mains = append(mains, main) //TODO: bz: optimize
 
 			//logfile, _ := os.Create("/Users/bozhen/Documents/GO2/pta_replaced/go2/gorace/pta_log_0") //bz: debug
-			if allEntries || strings.HasSuffix(main.Pkg.Path(), ".test") { //bz: set to default behavior
+			if allEntries || strings.HasSuffix(main.Pkg.Path(), ".test") || main.IsMainTest { //bz: set to default behavior
 				flags.DoTests = true //bz: set to true if your folder has tests and you want to analyze them
 			}
 			runner.ptaConfig = &pointer.Config{
@@ -393,11 +440,11 @@ func (runner *AnalysisRunner) Run2(args []string) error {
 			t := time.Now()
 			elapsed := t.Sub(start)
 			log.Info("Done  -- Pointer Analysis Finished. Using " + elapsed.String() + ". ")
-			//!!!! bz: for my debug, please comment off, do not delete
-			//fmt.Println("#Receive Result: ", len(runner.ptaResult))
-			//for mainEntry, ptaRes := range runner.ptaResult { //bz: you can get the ptaRes for each main here
-			//	fmt.Println("Receive ptaRes (#Queries: ", len(ptaRes.Queries), ", #IndirectQueries: ", len(ptaRes.IndirectQueries), ") for main: ", mainEntry.String())
-			//	ptaRes.DumpAll()
+			//////!!!! bz: for my debug, please comment off, do not delete
+			//if strings.Contains(main.String(), "github.com/ethereum/go-ethereum/cmd/ethkey") && main.IsMainTest {
+			//	fmt.Println("Receive Result: ")
+			//	fmt.Println("Receive ptaRes (#Queries: ", len(runner.ptaResult.Queries), ", #IndirectQueries: ", len(runner.ptaResult.IndirectQueries), ") for main: ", main.String())
+			//	runner.ptaResult.DumpCG()
 			//}
 
 		} else {
@@ -419,7 +466,7 @@ func (runner *AnalysisRunner) Run2(args []string) error {
 			selectTests, _ = runner.analyzeTestEntry(main)
 		}
 
-		if selectTests == nil { //bz: is a main
+		if selectTests == nil { //bz: is a main TODO: or main.IsMainTest == true but we cannot find/link the test func now
 			log.Info("Traversing Statements... ")
 
 			a := initialAnalysis()
@@ -469,7 +516,7 @@ func (runner *AnalysisRunner) Run2(args []string) error {
 		if s > 0 && e.racePairs[0] != nil {
 			if s == 1 {
 				log.Info(s, " race found for entry point ", e.entryInfo, ".")
-			}else{
+			} else {
 				log.Info(s, " races found for entry point ", e.entryInfo, ".")
 			}
 			raceCount += s
@@ -479,7 +526,7 @@ func (runner *AnalysisRunner) Run2(args []string) error {
 	}
 	if raceCount == 1 {
 		log.Info("Total of ", raceCount, " race found for all entry points. ")
-	}else{
+	} else {
 		log.Info("Total of ", raceCount, " races found for all entry points. ")
 	}
 	execDur := time.Since(startExec)
