@@ -30,11 +30,11 @@ func isLocal(ins ssa.Instruction) bool {
 }
 
 func (a *analysis) canRunInParallel(goID1 int, goID2 int) bool {
-	paths := [2][]int{}         // thread traversal
+	paths := [2][]int{}          // thread traversal
 	stacks := [2][]*fnCallInfo{} // fn traversal
 	goIDs := []int{goID1, goID2}
 	divFn := &fnCallInfo{nil, nil} // fn where divergence happens
-	for i, ID := range goIDs {    // for each thread
+	for i, ID := range goIDs {     // for each thread
 		for ID > 0 { // traverse up the call chain
 			paths[i] = append([]int{ID}, paths[i]...) // prepend
 			temp := a.goCaller[ID]
@@ -74,12 +74,12 @@ func (a *analysis) canRunInParallel(goID1 int, goID2 int) bool {
 }
 
 func (a *analysis) mutuallyExcluded(goI *insInfo, I int, goJ *insInfo, J int) bool {
-	paths := [2][]int{}         // thread traversal
+	paths := [2][]int{}          // thread traversal
 	stacks := [2][]*fnCallInfo{} // fn traversal
 	goIDs := []int{I, J}
 	insPair := []*insInfo{goI, goJ}
 	divFn := &fnCallInfo{nil, nil} // fn where divergence happens
-	for i, ID := range goIDs {    // for each thread
+	for i, ID := range goIDs {     // for each thread
 		for ID > 0 { // traverse up the call chain
 			paths[i] = append([]int{ID}, paths[i]...) // prepend
 			temp := a.goCaller[ID]
@@ -482,8 +482,12 @@ func (a *analysis) printRace(counter int, race *raceInfo) {
 	goIDs := race.goIDs
 	log.Printf("Data race #%d", counter)
 	log.Println(strings.Repeat("=", 100))
-	var writeLocks []ssa.Value
-	var readLocks []ssa.Value
+	////bz: this may have problem: what if two accesses are both write? the 2nd writelocks will overwrite the 1st writelocks
+	//var writeLocks []ssa.Value
+	//var readLocks []ssa.Value
+	////bz: updated code below
+	var locks1 []ssa.Value
+	var locks2 []ssa.Value
 	var rwPos [2]token.Position
 	for i, anIns := range insPair {
 		var errMsg string
@@ -496,12 +500,22 @@ func (a *analysis) printRace(counter int, race *raceInfo) {
 				rwPos[i] = a.prog.Fset.Position(insPair[i].ins.Pos())
 			}
 			errMsg = fmt.Sprint(access, aurora.Magenta(checkTokenName(addrPair[i].Name(), anIns.ins)), " in function ", aurora.BrightGreen(anIns.ins.Parent().Name()), " at ", rwPos[i])
-			writeLocks = a.lockMap[anIns.ins]
+			if i == 0 {
+				locks1 = a.lockMap[anIns.ins]
+			} else {
+				locks2 = a.lockMap[anIns.ins]
+			}
+			//writeLocks = a.lockMap[anIns.ins]
 		} else {
 			access = " Read of "
 			rwPos[i] = a.prog.Fset.Position(anIns.ins.Pos())
 			errMsg = fmt.Sprint(access, aurora.Magenta(checkTokenName(addrPair[i].Name(), anIns.ins)), " in function ", aurora.BrightGreen(anIns.ins.Parent().Name()), " at ", rwPos[i])
-			readLocks = append(a.lockMap[anIns.ins], a.RlockMap[anIns.ins]...)
+			if i == 0 {
+				locks1 = append(a.lockMap[anIns.ins], a.RlockMap[anIns.ins]...)
+			} else {
+				locks2 = append(a.lockMap[anIns.ins], a.RlockMap[anIns.ins]...)
+			}
+			//readLocks = append(a.lockMap[anIns.ins], a.RlockMap[anIns.ins]...)
 		}
 		if testMode {
 			colorOutput := regexp.MustCompile(`\x1b\[\d+m`)
@@ -542,7 +556,6 @@ func (a *analysis) printRace(counter int, race *raceInfo) {
 						} else {
 							log.Println("\t   ", strings.Repeat(" ", q), strings.Repeat(" ", k), eachFn.fnIns.Name(), " ", a.prog.Fset.Position(eachFn.ssaIns.Pos()))
 						}
-
 					}
 				}
 			}
@@ -563,7 +576,9 @@ func (a *analysis) printRace(counter int, race *raceInfo) {
 			}
 		}
 	}
-	log.Debug("Locks acquired before Write access: ", writeLocks)
-	log.Debug("Locks acquired before Read  access: ", readLocks)
+	log.Debug("Locks acquired before 1st access: ", locks1)
+	log.Debug("Locks acquired before 2nd access: ", locks2)
+	//log.Debug("Locks acquired before Write access: ", writeLocks)
+	//log.Debug("Locks acquired before Read  access: ", readLocks)
 	log.Println(strings.Repeat("=", 100))
 }
