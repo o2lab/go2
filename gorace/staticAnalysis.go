@@ -9,7 +9,7 @@ import (
 	pta0 "github.com/april1989/origin-go-tools/go/pointer_default"
 	"github.com/april1989/origin-go-tools/go/ssa"
 	"github.com/april1989/origin-go-tools/go/ssa/ssautil"
-	progressbar "github.com/schollz/progressbar/v3"
+	"github.com/briandowns/spinner"
 	log "github.com/sirupsen/logrus"
 	"github.com/twmb/algoimpl/go/graph"
 	"go/token"
@@ -386,16 +386,15 @@ func (runner *AnalysisRunner) Run2() error {
 
 	log.Info("Loading input packages... ")
 	var initial []*packages.Package
-	bar := progressbar.Default(1)
-	for i := 0; i < 1; i++ {
-		bar.Add(1)
-		os.Stderr = nil // No need to output package errors for now. Delete this line to view package errors
-		initial, _ = packages.Load(cfg, userInputFile ... )
-		if len(initial) == 0 {
-			log.Panic("No Go files detected. ")
-		}
-		log.Info("Done  -- ", len(initial), " packages detected. \n")
+	s := spinner.New(spinner.CharSets[9], 100*time.Millisecond)  // Build our new spinner
+	s.Start()                                                    // Start the spinner
+	os.Stderr = nil // No need to output package errors for now. Delete this line to view package errors
+	initial, _ = packages.Load(cfg, userInputFile ... )
+	if len(initial) == 0 {
+		log.Panic("No Go files detected. ")
 	}
+	log.Info("Done  -- ", len(initial), " packages detected. \n")
+	s.Stop()
 
 
 
