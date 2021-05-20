@@ -289,7 +289,6 @@ func initialAnalysis() *analysis {
 	return &analysis{
 		efficiency: efficiency,
 		trieLimit:  trieLimit,
-		//getGo:           getGo,
 		RWinsMap:        make(map[goIns]graph.Node),
 		trieMap:         make(map[fnInfo]*trie),
 		insMono:         -1,
@@ -457,17 +456,17 @@ func (runner *AnalysisRunner) Run2(args []string) error {
 		}
 		log.Info("Finish for entry point: ", main.String(), ".")
 	}
-	log.Info("****************************************************************************************************") //bz: final finish line
+	log.Info("****************************************************************************************************\n\n") //bz: final finish line
 
 	//summary report
-	log.Info("\n\nSummary Report:")
+	fmt.Println("Summary Report:")
 	raceCount := 0
 	for _, e := range runner.finalReport {
 		if len(e.racePairs) > 0 && e.racePairs[0] != nil {
-			log.Info(len(e.racePairs), " races found for entry point ", e.entryInfo, "...")
+			log.Info(len(e.racePairs), " races found for entry point ", e.entryInfo, ".")
 			raceCount += len(e.racePairs)
 		} else {
-			log.Info("No races found for ", e.entryInfo, "...")
+			log.Info("No races found for ", e.entryInfo, ".")
 		}
 	}
 	log.Info("Total of ", raceCount, " races found for all entry points. ")
@@ -560,13 +559,12 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		//go func(main *ssa.Package) {
 		// Configure static analysis...
 		a := analysis{
-			ptaRes:     runner.ptaResults[m],
-			ptaRes0:    runner.ptaResult0,
-			ptaCfg:     runner.ptaConfig,
-			ptaCfg0:    runner.ptaConfig0,
-			efficiency: efficiency,
-			trieLimit:  trieLimit,
-			//getGo:           getGo,
+			ptaRes:          runner.ptaResults[m],
+			ptaRes0:         runner.ptaResult0,
+			ptaCfg:          runner.ptaConfig,
+			ptaCfg0:         runner.ptaConfig0,
+			efficiency:      efficiency,
+			trieLimit:       trieLimit,
 			prog:            runner.prog,
 			main:            m,
 			RWinsMap:        make(map[goIns]graph.Node),
@@ -600,10 +598,9 @@ func (runner *AnalysisRunner) Run(args []string) error {
 			bindingFV:       make(map[*ssa.Go][]*ssa.FreeVar),
 			commIDs:         make(map[int][]int),
 			deferToRet:      make(map[*ssa.Defer]ssa.Instruction),
-			//testEntry:       selectTests, //bz: this is wrong ...
-			entryFn:       entry,
-			twinGoID:      make(map[*ssa.Go][]int),
-			mutualTargets: make(map[int]*mutualFns),
+			entryFn:         entry,
+			twinGoID:        make(map[*ssa.Go][]int),
+			mutualTargets:   make(map[int]*mutualFns),
 		}
 		if strings.Contains(m.Pkg.Path(), "GoBench") { // for testing purposes
 			a.efficiency = false

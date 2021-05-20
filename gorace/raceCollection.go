@@ -492,16 +492,15 @@ func (a *analysis) printRace(counter int, race *raceInfo) {
 			access = " Write of "
 			if _, ok := anIns.ins.(*ssa.Call); ok {
 				rwPos[i] = a.prog.Fset.Position(addrPair[i].Pos())
-				errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].Name()), " in function ", aurora.BrightGreen(anIns.ins.Parent().Name()), " at ", rwPos[i])
 			} else {
 				rwPos[i] = a.prog.Fset.Position(insPair[i].ins.Pos())
-				errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].Name()), " in function ", aurora.BrightGreen(anIns.ins.Parent().Name()), " at ", rwPos[i])
 			}
+			errMsg = fmt.Sprint(access, aurora.Magenta(checkTokenName(addrPair[i].Name(), anIns.ins)), " in function ", aurora.BrightGreen(anIns.ins.Parent().Name()), " at ", rwPos[i])
 			writeLocks = a.lockMap[anIns.ins]
 		} else {
 			access = " Read of "
 			rwPos[i] = a.prog.Fset.Position(anIns.ins.Pos())
-			errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].Name()), " in function ", aurora.BrightGreen(anIns.ins.Parent().Name()), " at ", rwPos[i])
+			errMsg = fmt.Sprint(access, aurora.Magenta(checkTokenName(addrPair[i].Name(), anIns.ins)), " in function ", aurora.BrightGreen(anIns.ins.Parent().Name()), " at ", rwPos[i])
 			readLocks = append(a.lockMap[anIns.ins], a.RlockMap[anIns.ins]...)
 		}
 		if testMode {
@@ -510,12 +509,15 @@ func (a *analysis) printRace(counter int, race *raceInfo) {
 		}
 		log.Print(errMsg)
 		if goIDs[i] == 0 { // main goroutine
-			log.Println("\tin goroutine  ***  main  [", goIDs[i], "] *** ")
+			log.Println("\tin goroutine  ***  main  [ GoID #", goIDs[i], "] *** ")
 		} else {
-			log.Println("\tin goroutine  ***", a.goNames(a.goCalls[goIDs[i]].goIns), "[", goIDs[i], "] *** ")
+			log.Println("\tin goroutine  ***", a.goNames(a.goCalls[goIDs[i]].goIns), "[ GoID #", goIDs[i], "] *** ")
 		}
 
 		printSource(rwPos[i])
+		if i == 0 {
+			log.Info("\n")
+		}
 
 		if printStack {
 			var pathGo []int
