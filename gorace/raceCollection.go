@@ -517,7 +517,6 @@ func (a *analysis) printRace(counter int, race *raceInfo) {
 		printSource(rwPos[i])
 		if i == 0 {
 			log.Info("\n")
-			log.Info("\n")
 		}
 
 		if printStack {

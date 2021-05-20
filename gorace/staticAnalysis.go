@@ -462,10 +462,10 @@ func (runner *AnalysisRunner) Run2(args []string) error {
 		}
 		log.Info("Finish for entry point: ", main.String(), ".")
 	}
-	log.Info("****************************************************************************************************") //bz: final finish line
+	log.Info("****************************************************************************************************\n\n") //bz: final finish line
 
 	//summary report
-	log.Info("\n\nSummary Report:")
+	fmt.Println("Summary Report:")
 	raceCount := 0
 	for _, e := range runner.finalReport {
 		if len(e.racePairs) > 0 && e.racePairs[0] != nil {
