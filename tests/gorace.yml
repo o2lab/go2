@@ -1,13 +1,14 @@
 # user to input the config options
 goracecfgs:
   # provide name of packages to exclude race chekcing analysis from
-  - excludePkgs:
+  - excludePkgs: # default value
       - fmt
       - logrus
 
   # provide integer value of limit on points-to set
-    PTSlimit: 10
+    PTSlimit: 10 # default value
 
   # provide scope on which to perform race checking analysis
     analysisScope:
-      - command-line-arguments
+      - command-line-arguments # if analyzing only one .go file
+      - github.com/o2lab/gorace # if analyzing a package, use the go module name here
