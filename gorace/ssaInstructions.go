@@ -10,20 +10,63 @@ import (
 	"strings"
 )
 
-// checkTokenName will return original name of an input function rather than a token
-func checkTokenName(fnName string, theIns *ssa.Call) string {
-	if strings.HasPrefix(fnName, "t") { // function name begins with letter t
-		if _, err := strconv.Atoi(string([]rune(fnName)[1:])); err == nil { // function name after first character look like an integer
-			switch callVal := theIns.Call.Value.(type) {
-			case *ssa.MakeClosure:
-				fnName = callVal.Fn.Name()
+func checkTokenName(varName string, theIns ssa.Instruction) string {
+	if strings.HasPrefix(varName, "t") { // function name begins with letter t
+		if _, err := strconv.Atoi(string([]rune(varName)[1:])); err == nil { // function name after first character look like an integer
+			switch examIns := theIns.(type) {
+			case *ssa.Call:
+				switch callVal := examIns.Call.Value.(type) {
+				case *ssa.Function:
+					return callVal.Name()
+				case *ssa.MakeClosure:
+					return callVal.Fn.Name()
+				default:
+					return callVal.Type().String()
+				}
+			case *ssa.UnOp:
+				switch unOpX := examIns.X.(type) {
+				case *ssa.FieldAddr:
+					switch faX := unOpX.X.(type) {
+					case *ssa.Parameter:
+						return faX.Name()
+					case *ssa.Alloc:
+						return faX.Name()
+					default:
+						// debug
+					}
+				default:
+					// debug
+				}
+			case *ssa.Store:
+				switch addr := examIns.Addr.(type) {
+				case *ssa.FieldAddr:
+					switch faX := addr.X.(type) {
+					case *ssa.Parameter:
+						return faX.Name()
+					}
+				}
 			default:
-				fnName = callVal.Type().String()
+				// debug
 			}
 		}
 	}
-	return fnName
+	return varName
 }
+
+//// checkTokenName will return original name of an input function rather than a token
+//func checkTokenName(fnName string, theIns *ssa.Call) string {
+//	if strings.HasPrefix(fnName, "t") { // function name begins with letter t
+//		if _, err := strconv.Atoi(string([]rune(fnName)[1:])); err == nil { // function name after first character look like an integer
+//			switch callVal := theIns.Call.Value.(type) {
+//			case *ssa.MakeClosure:
+//				fnName = callVal.Fn.Name()
+//			default:
+//				fnName = callVal.Type().String()
+//			}
+//		}
+//	}
+//	return fnName
+//}
 
 // checkTokenNameDefer will return original name of an input defered function rather than a token
 func checkTokenNameDefer(fnName string, theIns *ssa.Defer) string {
@@ -101,12 +144,8 @@ func (a *analysis) updateRecords(fnName string, goID int, pushPop string, theFn 
 		log.Debug(strings.Repeat(" ", a.levels[goID]), pushPop, theFn.String(), " at lvl ", a.levels[goID])
 	}
 	if pushPop == "PUSH " {
-		//fnCall := fnCallIns{fnIns: theFn, goID: goID}
 		newFn := &fnCallInfo{ssaIns: theIns, fnIns: theFn}
 		a.storeFns = append(a.storeFns, newFn)
-		//stack := make([]fnCallInfo, len(a.storeFns))
-		//copy(stack, a.storeFns)
-		//a.stackMap[fnCall] = stackInfo{fnCalls: stack}
 		a.levels[goID]++
 	}
 }
@@ -401,7 +440,6 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 			case *ssa.UnOp:
 				if !isLocalAddr(access.X) {
 					a.recordIns(goID, theIns)
-					//a.RWIns[goID] = append(a.RWIns[goID], theIns)
 					a.updateLockMap(goID, theIns)
 					a.updateRLockMap(goID, theIns)
 				}
@@ -427,7 +465,7 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 			return
 		}
 		fnName := examIns.Call.Value.Name()
-		fnName = checkTokenName(fnName, examIns)
+		fnName = checkTokenName(fnName, theIns)
 		a.traverseFn(examIns.Call.StaticCallee(), fnName, goID, theIns, false)
 	} else if examIns.Call.StaticCallee().Pkg != nil && examIns.Call.StaticCallee().Pkg.Pkg.Name() == "sync" {
 		switch examIns.Call.Value.Name() {
