@@ -1,22 +1,24 @@
-# Go2 Race Detector (new pta version)
+# GoRace Detector
 
  
-## Build and install race-checker
+## Build and install the tool
 
-Make sure Go is installed in the system. In the go2 repo, checkout this branch with new PTA. 
-```
-git checkout pta_replaced
-```
-In go2/race_checker, execute
+Make sure Go is installed in the system. 
+In go2/gorace, execute
 ```
 go build
 ```
-Dependencies will be automatically downloaded. By default, the built artifact is named `race-checker`.
+Dependencies will be automatically downloaded. By default, the built artifact is named `gorace`.
 
-Install the race-checker in the PATH by executing
+Install the tool in the PATH by executing
 ```
 go install
 ```
+
+### Configuration
+
+Update the gorace.yml file with your preferred config options and place it under the directory where gorace will be executed at. 
+
 
 ### Running the tool
 
@@ -38,7 +40,7 @@ or
 gorace ./examples/helloworld/greeter_client
 ```
 
-When multiple entry points are identified, race-checker will request your input for which entry-points to analyze
+When multiple entry points are identified, gorace will request your input for which entry-points to analyze
 
 ![Image of screenshot](gorace/tests/grpc.png)
 
@@ -57,4 +59,3 @@ or use the `-analyzeAll` flag since the very beginning if trying to run all entr
 ```
 gorace -analyzeAll
 ```
-but process may get killed if running out of memory...
