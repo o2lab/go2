@@ -361,6 +361,7 @@ func (runner *AnalysisRunner) Run2(args []string) error {
 	//run one by one: Iterate each entry point...
 	//var wg sync.WaitGroup
 	for _, main := range mains {
+		log.Info("****************************************************************************************************")
 		log.Info("Start for entry point: ", main.String(), "... ")
 		// Configure pointer analysis...
 		if useNewPTA {
@@ -456,11 +457,13 @@ func (runner *AnalysisRunner) Run2(args []string) error {
 				runner.racyStackTops = a.racyStackTops
 				runner.finalReport = append(runner.finalReport, rr)
 
-				log.Info("Finish for test entry point: ", test.String(), "\n========================================================================================================")
+				log.Info("Finish for test entry point: ", test.String(), ".")
+				log.Info("----------------------------------------------------------------------------------------------------")
 			}
 		}
-		log.Info("Finish for entry point: ", main.String(), "\n========================================================================================================")
+		log.Info("Finish for entry point: ", main.String(), ".")
 	}
+	log.Info("****************************************************************************************************") //bz: final finish line
 
 	//summary report
 	log.Info("\n\nSummary Report:")
