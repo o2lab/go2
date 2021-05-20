@@ -159,18 +159,19 @@ func pkgSelection(initial []*packages.Package) ([]*ssa.Package, *ssa.Program, []
 	return mains, prog, pkgs
 }
 
+//bz: the string return is not necessary
 func (runner *AnalysisRunner) analyzeTestEntry(mains []*ssa.Package) ([]*ssa.Function, string) {
 	var selectedFns []*ssa.Function
 	//bz: for analyzing tests
 	entry := "main" //bz: default value, will update later
 	if strings.Contains(mains[0].String(), ".test") {
-		fmt.Println("Extracting test functions from PTA/CG...")
-		for mainEntry, ptaRes := range runner.ptaResults {
-			tests := ptaRes.GetTests()
+		log.Info("Extracting test functions from PTA/CG...")
+		//for mainEntry, ptaRes := range runner.ptaResults { //bz: do not need this ...
+			tests := runner.ptaResult.GetTests()
 			if tests == nil {
-				continue //this is a main entry
+				return nil, "" //this is a main entry
 			}
-			fmt.Println("The following are functsions found within: ", mainEntry)
+			fmt.Println("The following are functions found within: ", mains[0].String())
 			var testSelect string
 			var testFns []*ssa.Function // all test functions in this entry
 			counter := 1
@@ -213,8 +214,8 @@ func (runner *AnalysisRunner) analyzeTestEntry(mains []*ssa.Package) ([]*ssa.Fun
 				log.Error("Unrecognized input, try again.")
 			}
 		}
-		fmt.Println("Done  -- CG node of test function ", entry, " extracted...")
-	}
+	log.Info("Done  -- CG node of test function ", entry, " extracted...")
+	//}
 	return selectedFns, entry
 }
 
