@@ -20,7 +20,7 @@ var (
 	allEntries     = false
 	printDebugInfo = false //bz: replace the usage for old allEntries
 	useDefaultPTA  = false
-	printStack     = false
+	printStack     = true
 	goTest         bool // running test script
 	debugFlag      bool
 	excludedFns    []string
