@@ -22,9 +22,9 @@ Update the gorace.yml file (located under go2/gorace) with your preferred config
 
 ### Running the tool
 
-Use the -stack flag to show call stack of racy accesses. 
+Use the -show flag to show call stack of racy accesses. 
 ```
-gorace -stack ./
+gorace -show ./
 ```
 
 ### Running on gRPC
