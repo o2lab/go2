@@ -5,6 +5,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"go/token"
 	"os"
+	"regexp"
 	"strings"
 	"unicode"
 )
@@ -29,19 +30,19 @@ func getLineNumber(filePath string, lineNum int) (string, error) {
 	return lineStr, err
 }
 
-func findVar(pos token.Position) string {
-	theLine, _ := getLineNumber(pos.Filename, pos.Line)
-	tabs := len(theLine)-len(strings.TrimLeftFunc(theLine, unicode.IsSpace))
-	idxStart := pos.Column - tabs
-	idxEnd := idxStart
-	for i:= idxStart; i < len(theLine); i++ {
-		c := theLine[i]
-		s := string(c)
-		if unicode.IsLetter(s) || unicode.IsNumber(s) {
-
+func printVarName(rwPos token.Position) string {
+	lineNum := rwPos.Line
+	theLine, _ := getLineNumber(rwPos.Filename, lineNum)
+	lineRmTabs := strings.TrimLeftFunc(theLine, unicode.IsSpace)
+	tabs := len(theLine)-len(lineRmTabs)
+	spaces := rwPos.Column-tabs // should be minimum 0
+	var isStringAlphabetic = regexp.MustCompile(`^[a-zA-Z0-9_]`).MatchString
+	for i := spaces; i < len(lineRmTabs); i++ {
+		if !isStringAlphabetic(lineRmTabs[i:i+1]) {
+			return lineRmTabs[spaces-1:i] // TODO: test result to make sure it looks correct
 		}
 	}
-	return theLine[idxStart:idxEnd]
+	return lineRmTabs[spaces-1:spaces]
 }
 
 func printSource(rwPos token.Position) {

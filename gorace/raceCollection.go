@@ -499,7 +499,7 @@ func (a *analysis) printRace(counter int, race *raceInfo) {
 			} else {
 				rwPos[i] = a.prog.Fset.Position(insPair[i].ins.Pos())
 			}
-			errMsg = fmt.Sprint(access, aurora.Magenta(checkTokenName(addrPair[i].Name(), anIns.ins)), " in function ", aurora.BrightGreen(anIns.ins.Parent().Name()), " at ", rwPos[i])
+			errMsg = fmt.Sprint(access, aurora.Magenta(printVarName(rwPos[i])), " in function ", aurora.BrightGreen(anIns.ins.Parent().Name()), " at ", rwPos[i])
 			if i == 0 {
 				locks1 = a.lockMap[anIns.ins]
 			} else {
@@ -509,7 +509,7 @@ func (a *analysis) printRace(counter int, race *raceInfo) {
 		} else {
 			access = " Read of "
 			rwPos[i] = a.prog.Fset.Position(anIns.ins.Pos())
-			errMsg = fmt.Sprint(access, aurora.Magenta(checkTokenName(addrPair[i].Name(), anIns.ins)), " in function ", aurora.BrightGreen(anIns.ins.Parent().Name()), " at ", rwPos[i])
+			errMsg = fmt.Sprint(access, aurora.Magenta(printVarName(rwPos[i])), " in function ", aurora.BrightGreen(anIns.ins.Parent().Name()), " at ", rwPos[i])
 			if i == 0 {
 				locks1 = append(a.lockMap[anIns.ins], a.RlockMap[anIns.ins]...)
 			} else {
