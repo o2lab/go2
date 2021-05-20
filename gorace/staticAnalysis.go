@@ -160,61 +160,61 @@ func pkgSelection(initial []*packages.Package) ([]*ssa.Package, *ssa.Program, []
 }
 
 //bz: the string return is not necessary
-func (runner *AnalysisRunner) analyzeTestEntry(mains []*ssa.Package) ([]*ssa.Function, string) {
+func (runner *AnalysisRunner) analyzeTestEntry(main *ssa.Package) ([]*ssa.Function, string) {
 	var selectedFns []*ssa.Function
 	//bz: for analyzing tests
 	entry := "main" //bz: default value, will update later
-	if strings.Contains(mains[0].String(), ".test") {
+	if strings.HasSuffix(main.Pkg.Path(), ".test") { //bz: strict end with .test
 		log.Info("Extracting test functions from PTA/CG...")
 		//for mainEntry, ptaRes := range runner.ptaResults { //bz: do not need this ...
-			tests := runner.ptaResult.GetTests()
-			if tests == nil {
-				return nil, "" //this is a main entry
-			}
-			fmt.Println("The following are functions found within: ", mains[0].String())
-			var testSelect string
-			var testFns []*ssa.Function // all test functions in this entry
-			counter := 1
-			for fn := range tests {
-				fmt.Println("Option", counter, ": ", fn.Name())
-				testFns = append(testFns, fn)
-				counter++
-			}
-			if allEntries { // analyze all test functions
-				return testFns, ""
-			}
-			fmt.Print("Enter option number of choice or test name: \n")
-			fmt.Scan(&testSelect)
-			if strings.Contains(testSelect, ",") && testFns != nil { // multiple selections
-				selection := strings.Split(testSelect, ",")
-				for _, s := range selection {
-					i, _ := strconv.Atoi(s)                         // convert to integer
-					selectedFns = append(selectedFns, testFns[i-1]) // TODO: analyze multiple tests concurrently
-				}
-				entry = ""
-			} else if strings.Contains(testSelect, "-") && testFns != nil { // selected range
-				selection := strings.Split(testSelect, "-")
-				begin, _ := strconv.Atoi(selection[0])
-				end, _ := strconv.Atoi(selection[1])
-				for i := begin; i <= end; i++ {
-					selectedFns = append(selectedFns, testFns[i-1]) // TODO: analyze multiple tests concurrently
-				}
-				entry = ""
-			} else if i, err0 := strconv.Atoi(testSelect); err0 == nil && testFns != nil { // single selection
-				selectedFns = append(selectedFns, testFns[i-1]) // TODO: analyze multiple tests concurrently
-				entry = testFns[i-1].Name()
-			} else if strings.Contains(testSelect, "Test") { // user input name of test function
-				for _, fn := range testFns {
-					if fn.Name() == testSelect {
-						selectedFns = append(selectedFns, fn)
-						entry = fn.Name()
-					}
-				}
-			} else {
-				log.Error("Unrecognized input, try again.")
-			}
+		tests := runner.ptaResult.GetTests()
+		if tests == nil {
+			return nil, "" //this is a main entry
 		}
-	log.Info("Done  -- CG node of test function ", entry, " extracted...")
+		fmt.Println("The following are functions found within: ", main.String())
+		var testSelect string
+		var testFns []*ssa.Function // all test functions in this entry
+		counter := 1
+		for _, fn := range tests {
+			fmt.Println("Option", counter, ": ", fn.Name())
+			testFns = append(testFns, fn)
+			counter++
+		}
+		//if allEntries { // analyze all test functions -> bz: if allEntries, will not hit this code
+		//	return testFns, ""
+		//}
+		fmt.Print("Enter option number of choice or test name: \n")
+		fmt.Scan(&testSelect)
+		if strings.Contains(testSelect, ",") && testFns != nil { // multiple selections
+			selection := strings.Split(testSelect, ",")
+			for _, s := range selection {
+				i, _ := strconv.Atoi(s)                         // convert to integer
+				selectedFns = append(selectedFns, testFns[i-1]) // TODO: analyze multiple tests concurrently
+			}
+			entry = ""
+		} else if strings.Contains(testSelect, "-") && testFns != nil { // selected range
+			selection := strings.Split(testSelect, "-")
+			begin, _ := strconv.Atoi(selection[0])
+			end, _ := strconv.Atoi(selection[1])
+			for i := begin; i <= end; i++ {
+				selectedFns = append(selectedFns, testFns[i-1]) // TODO: analyze multiple tests concurrently
+			}
+			entry = ""
+		} else if i, err0 := strconv.Atoi(testSelect); err0 == nil && testFns != nil { // single selection
+			selectedFns = append(selectedFns, testFns[i-1]) // TODO: analyze multiple tests concurrently
+			entry = testFns[i-1].Name()
+		} else if strings.Contains(testSelect, "Test") { // user input name of test function
+			for _, fn := range testFns {
+				if fn.Name() == testSelect {
+					selectedFns = append(selectedFns, fn)
+					entry = fn.Name()
+				}
+			}
+		} else {
+			log.Error("Unrecognized input, try again.")
+		}
+		log.Info("Done  -- CG node of test function ", entry, " extracted...")
+	}
 	//}
 	return selectedFns, entry
 }
@@ -287,9 +287,9 @@ func determineScope(pkgs []*ssa.Package) []string {
 //bz: do not want to see this big block ...
 func initialAnalysis() *analysis {
 	return &analysis{
-		efficiency:      efficiency,
-		trieLimit:       trieLimit,
-		getGo:           getGo,
+		efficiency: efficiency,
+		trieLimit:  trieLimit,
+		//getGo:           getGo,
 		RWinsMap:        make(map[goIns]graph.Node),
 		trieMap:         make(map[fnInfo]*trie),
 		insMono:         -1,
@@ -326,8 +326,6 @@ func initialAnalysis() *analysis {
 	}
 }
 
-
-
 //bz: update the run order of pta and checker
 //  -> sequentially now; do not provide selection of test entry
 func (runner *AnalysisRunner) Run2(args []string) error {
@@ -353,10 +351,6 @@ func (runner *AnalysisRunner) Run2(args []string) error {
 	mains, prog, pkgs := pkgSelection(initial)
 	runner.prog = prog //TODO: bz: optimize, no need to do like this.
 
-	if len(mains) > 1 {
-		allEntries = true
-	}
-
 	startExec := time.Now() // measure total duration of running entire code base
 
 	//run one by one: Iterate each entry point...
@@ -372,8 +366,9 @@ func (runner *AnalysisRunner) Run2(args []string) error {
 			mains = append(mains, main) //TODO: bz: optimize
 
 			//logfile, _ := os.Create("/Users/bozhen/Documents/GO2/pta_replaced/go2/gorace/pta_log_0") //bz: debug
-			flags.DoTests = true //bz: set to true if your folder has tests and you want to analyze them
-			flags.PTSLimit = 10  //bz: limit the size of pts to 10
+			if allEntries || strings.HasSuffix(main.Pkg.Path(), ".test") { //bz: set to default behavior
+				flags.DoTests = true //bz: set to true if your folder has tests and you want to analyze them
+			}
 			runner.ptaConfig = &pointer.Config{
 				Mains:          mains, //bz: all mains/tests in a project
 				Reflection:     false,
@@ -416,14 +411,12 @@ func (runner *AnalysisRunner) Run2(args []string) error {
 
 		// Configure static analysis...
 		var selectTests []*ssa.Function //bz: can be nil if is main
-		if !allEntries {
-			//bz: select tests by users, can be nil if is main
-			selectTests, _ = runner.analyzeTestEntry(mains)
-		}else {
+		if allEntries {
 			//bz: do for all
-			for test, _ := range runner.ptaResult.GetTests() {
-				selectTests = append(selectTests, test)
-			}
+			selectTests = runner.ptaResult.GetTests()
+		} else {
+			//bz: select tests by users, can be nil if is main
+			selectTests, _ = runner.analyzeTestEntry(main)
 		}
 
 		if selectTests == nil { //bz: is a main
@@ -436,7 +429,7 @@ func (runner *AnalysisRunner) Run2(args []string) error {
 			a.prog = runner.prog
 			a.entryFn = "main"
 
-				rr := a.runChecker()
+			rr := a.runChecker()
 			runner.racyStackTops = a.racyStackTops
 			runner.finalReport = append(runner.finalReport, rr)
 		} else { //bz: is a test
@@ -558,7 +551,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 	if len(mains) > 1 {
 		allEntries = true
 	}
-	_, entry := runner.analyzeTestEntry(mains)
+	_, entry := runner.analyzeTestEntry(mains[0]) //bz: unexpected behavior ...
 
 	// Iterate each entry point...
 	//var wg sync.WaitGroup
@@ -567,13 +560,13 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		//go func(main *ssa.Package) {
 		// Configure static analysis...
 		a := analysis{
-			ptaRes:          runner.ptaResults[m],
-			ptaRes0:         runner.ptaResult0,
-			ptaCfg:          runner.ptaConfig,
-			ptaCfg0:         runner.ptaConfig0,
-			efficiency:      efficiency,
-			trieLimit:       trieLimit,
-			getGo:           getGo,
+			ptaRes:     runner.ptaResults[m],
+			ptaRes0:    runner.ptaResult0,
+			ptaCfg:     runner.ptaConfig,
+			ptaCfg0:    runner.ptaConfig0,
+			efficiency: efficiency,
+			trieLimit:  trieLimit,
+			//getGo:           getGo,
 			prog:            runner.prog,
 			main:            m,
 			RWinsMap:        make(map[goIns]graph.Node),
@@ -608,9 +601,9 @@ func (runner *AnalysisRunner) Run(args []string) error {
 			commIDs:         make(map[int][]int),
 			deferToRet:      make(map[*ssa.Defer]ssa.Instruction),
 			//testEntry:       selectTests, //bz: this is wrong ...
-			entryFn:         entry,
-			twinGoID:        make(map[*ssa.Go][]int),
-			mutualTargets:   make(map[int]*mutualFns),
+			entryFn:       entry,
+			twinGoID:      make(map[*ssa.Go][]int),
+			mutualTargets: make(map[int]*mutualFns),
 		}
 		if strings.Contains(m.Pkg.Path(), "GoBench") { // for testing purposes
 			a.efficiency = false
@@ -701,39 +694,39 @@ func (runner *AnalysisRunner) Run(args []string) error {
 
 //stackGo prints the callstack of a goroutine -> not used now
 func (a *analysis) stackGo() {
-	if a.getGo { // print call stack of each goroutine
-		for i := 0; i < len(a.RWIns); i++ {
-			name := "main"
-			if i > 0 {
-				name = a.goNames(a.goCalls[i].goIns)
-			}
-			if a.goInLoop[i] {
-				log.Debug("Goroutine ", i, "  --  ", name, strings.Repeat(" *", 10), " spawned by a loop", strings.Repeat(" *", 10))
-			} else {
-				log.Debug("Goroutine ", i, "  --  ", name)
-			}
-			if i > 0 {
-				log.Debug("call stack: ")
-			}
-			var pathGo []int
-			goID := i
-			for goID > 0 {
-				pathGo = append([]int{goID}, pathGo...)
-				temp := a.goCaller[goID]
-				goID = temp
-			}
-			if !allEntries {
-				for q, eachGo := range pathGo {
-					eachStack := a.goStack[eachGo]
-					for k, eachFn := range eachStack {
-						if k == 0 {
-							log.Debug("\t ", strings.Repeat(" ", q), "--> Goroutine: ", eachFn.fnIns.Name(), "[", a.goCaller[eachGo], "] ", a.prog.Fset.Position(eachFn.ssaIns.Pos()))
-						} else {
-							log.Debug("\t   ", strings.Repeat(" ", q), strings.Repeat(" ", k), eachFn.fnIns.Name(), " ", a.prog.Fset.Position(eachFn.ssaIns.Pos()))
-						}
+	//if a.getGo { // print call stack of each goroutine
+	for i := 0; i < len(a.RWIns); i++ {
+		name := "main"
+		if i > 0 {
+			name = a.goNames(a.goCalls[i].goIns)
+		}
+		if a.goInLoop[i] {
+			log.Debug("Goroutine ", i, "  --  ", name, strings.Repeat(" *", 10), " spawned by a loop", strings.Repeat(" *", 10))
+		} else {
+			log.Debug("Goroutine ", i, "  --  ", name)
+		}
+		if i > 0 {
+			log.Debug("call stack: ")
+		}
+		var pathGo []int
+		goID := i
+		for goID > 0 {
+			pathGo = append([]int{goID}, pathGo...)
+			temp := a.goCaller[goID]
+			goID = temp
+		}
+		if !allEntries {
+			for q, eachGo := range pathGo {
+				eachStack := a.goStack[eachGo]
+				for k, eachFn := range eachStack {
+					if k == 0 {
+						log.Debug("\t ", strings.Repeat(" ", q), "--> Goroutine: ", eachFn.fnIns.Name(), "[", a.goCaller[eachGo], "] ", a.prog.Fset.Position(eachFn.ssaIns.Pos()))
+					} else {
+						log.Debug("\t   ", strings.Repeat(" ", q), strings.Repeat(" ", k), eachFn.fnIns.Name(), " ", a.prog.Fset.Position(eachFn.ssaIns.Pos()))
 					}
 				}
 			}
 		}
 	}
+	//}
 }

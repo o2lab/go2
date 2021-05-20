@@ -63,7 +63,7 @@ func DecodeYmlFile(absPath string) {
 
 	for _, eachCfg := range grs.GoRaceCfgs {
 		excludedPkgs = eachCfg.ExPkgs
-		flags.PTSLimit = eachCfg.PTS
+		flags.PTSLimit = eachCfg.PTS //bz: limit the size of pts 
 		PTAscope = eachCfg.Scope
 	}
 }

@@ -26,7 +26,7 @@ type analysis struct {
 
 	efficiency   bool
 	trieLimit    int
-	getGo        bool // flag
+	//getGo        bool // flag
 	prog         *ssa.Program
 	main         *ssa.Package
 	analysisStat stat
