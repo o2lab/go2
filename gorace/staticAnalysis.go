@@ -9,6 +9,7 @@ import (
 	pta0 "github.com/april1989/origin-go-tools/go/pointer_default"
 	"github.com/april1989/origin-go-tools/go/ssa"
 	"github.com/april1989/origin-go-tools/go/ssa/ssautil"
+	progressbar "github.com/schollz/progressbar/v3"
 	log "github.com/sirupsen/logrus"
 	"github.com/twmb/algoimpl/go/graph"
 	"go/token"
@@ -381,14 +382,22 @@ func (runner *AnalysisRunner) Run2() error {
 		Tests: true,
 		//Tests: false,                  // setting Tests will include related test packages
 	}
-	log.Info("Loading input packages...")
 
-	os.Stderr = nil // No need to output package errors for now. Delete this line to view package errors
-	initial, _ := packages.Load(cfg, userInputFile ... )
-	if len(initial) == 0 {
-		return fmt.Errorf("No Go files detected. ")
+
+	log.Info("Loading input packages... ")
+	var initial []*packages.Package
+	bar := progressbar.Default(1)
+	for i := 0; i < 1; i++ {
+		bar.Add(1)
+		os.Stderr = nil // No need to output package errors for now. Delete this line to view package errors
+		initial, _ = packages.Load(cfg, userInputFile ... )
+		if len(initial) == 0 {
+			log.Panic("No Go files detected. ")
+		}
+		log.Info("Done  -- ", len(initial), " packages detected. \n")
 	}
-	log.Info("Done  -- ", len(initial), " packages detected. ")
+
+
 
 	mains, prog, pkgs := pkgSelection(initial)
 	runner.prog = prog //TODO: bz: optimize, no need to do like this.
