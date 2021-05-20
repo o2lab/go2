@@ -40,19 +40,20 @@ or
 gorace ./examples/helloworld/greeter_client
 ```
 
-When multiple entry points are identified, gorace will request your input for which entry-points to analyze
+When multiple entry points are identified like shown below, 
 
-![Image of screenshot](gorace/tests/grpc.png)
+![Image of screenshot](tests/grpc.png)
+
+gorace will request your input for which entry-points to analyze, 
+
+![Image of screenshot](tests/input.png)
 
 For example, if you would like to analyze entry points 1 to 20, just enter
 `1-20`
 
 or if you would like to analyze the entry point **google.golang.org/grpc/examples/helloworld/greeter_client**, just enter
-`40` 
+`44` 
 as shown in screenshot above. 
-
-*Your option number may be different for this specific entry point. 
-
 
 
 or use the `-analyzeAll` flag since the very beginning if trying to run all entry points, 
