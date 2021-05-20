@@ -823,9 +823,9 @@ func (a *analysis) exploredFunction(fn *ssa.Function, goID int, theIns ssa.Instr
 	if a.efficiency && !a.fromPkgsOfInterest(fn) { // for temporary debugging purposes only
 		return true
 	}
-	//if sliceContainsInsAt(a.RWIns[goID], theIns) >= 0 {
-	//	return true
-	//}
+	if sliceContainsInsInfoAt(a.RWIns[goID], theIns) >= 0 {
+		return true
+	}
 	theFn := fnCallInfo{fn, theIns}
 	if a.efficiency && sliceContainsFnCall(a.storeFns, theFn) { // for temporary debugging purposes only
 		return true
