@@ -37,7 +37,7 @@ func (a *analysis) runChecker() raceReport {
 	}
 	//if !allEntries { //bz: we want this now
 	traversed := make(map[*ssa.Function]*ssa.Function)
-	for fn, _ := range a.trieMap {
+	for fn, _ := range a.trieMap { //bz: remove diff context for the same fn
 		traversed[fn.fnName] = fn.fnName
 	}
 	log.Info("Done  -- ", len(a.RWIns), " goroutines analyzed! ", len(traversed), " function traversed! ", totalIns, " instructions of interest detected! ")

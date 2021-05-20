@@ -56,7 +56,7 @@ type GoRaceCfg struct {
 func DecodeYmlFile(absPath string) {
 	grfile, err := ioutil.ReadFile(absPath)
 	if err != nil {
-		log.Fatal("No gorace.yml file found in current directory. Please provide gorace.yml file with config info. ")
+		log.Fatal("No gorace.yml file found in current directory:", absPath, ". Please provide gorace.yml file with config info. ")
 	}
 	grs := GoRace{}
 	err = yaml.Unmarshal(grfile, &grs)

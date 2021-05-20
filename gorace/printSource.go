@@ -28,21 +28,21 @@ func getLineNumber(filePath string, lineNum int) (string, error) {
 	}
 	return lineStr, err
 }
-
-func findVar(pos token.Position) string {
-	theLine, _ := getLineNumber(pos.Filename, pos.Line)
-	tabs := len(theLine)-len(strings.TrimLeftFunc(theLine, unicode.IsSpace))
-	idxStart := pos.Column - tabs
-	idxEnd := idxStart
-	for i:= idxStart; i < len(theLine); i++ {
-		c := theLine[i]
-		s := string(c)
-		if unicode.IsLetter(s) || unicode.IsNumber(s) {
-
-		}
-	}
-	return theLine[idxStart:idxEnd]
-}
+//
+//func findVar(pos token.Position) string {
+//	theLine, _ := getLineNumber(pos.Filename, pos.Line)
+//	tabs := len(theLine)-len(strings.TrimLeftFunc(theLine, unicode.IsSpace))
+//	idxStart := pos.Column - tabs
+//	idxEnd := idxStart
+//	for i:= idxStart; i < len(theLine); i++ {
+//		c := theLine[i]
+//		s := string(c)
+//		if unicode.IsLetter(s) || unicode.IsNumber(s) {
+//
+//		}
+//	}
+//	return theLine[idxStart:idxEnd]
+//}
 
 func printSource(rwPos token.Position) {
 	for lineNum := rwPos.Line-3; lineNum <= rwPos.Line+3; lineNum++ {
