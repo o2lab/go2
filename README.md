@@ -24,7 +24,7 @@ Update the gorace.yml file (located under go2/gorace) with your preferred config
 
 Use the -stack flag to show call stack of racy accesses. 
 ```
-gorace -stack
+gorace -stack ./
 ```
 
 ### Running on gRPC
@@ -58,5 +58,5 @@ as shown in screenshot above.
 
 or use the `-analyzeAll` flag since the very beginning if trying to run all entry points, 
 ```
-gorace -analyzeAll
+gorace -analyzeAll ./
 ```
