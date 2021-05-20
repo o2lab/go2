@@ -307,8 +307,8 @@ func DoSeq(mains []*ssa.Package) {
 			}
 
 			fmt.Println("\n\nTest Functions of: ", main)
-			for fn, cgn := range mp {
-				fmt.Println(fn, "\t-> ", cgn.String())
+			for i, fn := range mp {
+				fmt.Println(i, "\t-> ", fn.String())
 			}
 		}
 	}

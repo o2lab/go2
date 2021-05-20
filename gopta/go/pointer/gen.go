@@ -258,6 +258,7 @@ func (a *analysis) makeFunctionObject(fn *ssa.Function, callersite *callsite) no
 		//TODO: use itself as target? this pattern only works for grpc, not sure others
 		special := &callsite{targets: obj}
 		cgn.callersite = a.createSingleCallSite(special)
+		a.tests = append(a.tests, fn)
 	}
 
 	sig := fn.Signature

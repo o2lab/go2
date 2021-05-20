@@ -52,7 +52,7 @@ func ParseFlags() {
 	_doSameRoot := flag.Bool("doSameRoot", false, "Do all main together from the same root in one pkg, linked by the root node.")
 	_doParallel := flag.Bool("doParallel", false, "Do all mains in a pkg in parallel, but input is multiple mains.")
 	_doCoverage := flag.Bool("doCoverage", false, "Compute (#analyzed fn/#total fn) in a program")
-	_doPrintConfig := flag.Bool("doPrintConfig", false, "Do we print out the details of config and other process info?")
+	_doPrintConfig := flag.Bool("doPrintInfo", false, "Do we print out the details of config and other process info?")
 
 	//test useage in race checker -> main usage
 	_doSeq := flag.Bool("doSeq", false, "Do all mains in a pkg sequential, but input is multiple mains.")

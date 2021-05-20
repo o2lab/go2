@@ -1197,9 +1197,9 @@ func (r *Result) GetMySyntheticFn(fn *ssa.Function) *ssa.Function {
 	return r.a.GetMySyntheticFn(fn)
 }
 
-//bz: user API: return a map of (fn <-> cgnode) that are Testxxx, Examplexxx, Benchmarkxxx
+//bz: user API: return a set of (fn) that are Testxxx, Examplexxx, Benchmarkxxx
 // from a test analyzed by this r *Result
-func (r *Result) GetTests() map[*ssa.Function]*cgnode {
+func (r *Result) GetTests() []*ssa.Function {
 	if r.a.isMain {
 		if r.a.result.DEBUG {
 			fmt.Println("This result is for the main entry:", r.a.config.Mains[0], ", not for a test. Return.")
@@ -1207,32 +1207,7 @@ func (r *Result) GetTests() map[*ssa.Function]*cgnode {
 		return nil
 	}
 
-	a := r.a
-	result := make(map[*ssa.Function]*cgnode)
-	testSig := a.config.Mains[0].Pkg.Path() // this is xx/xx/xxx.test, we need to remove the '.test'
-	testSig = testSig[0 : len(testSig)-5]
-
-	for v, id := range a.globalobj {
-		if fn, ok := v.(*ssa.Function); ok {
-			name := fn.Name()
-			pkg := fn.String()
-			if (strings.HasPrefix(pkg, testSig) || strings.HasPrefix(pkg, "("+testSig)) && //static/non-static functions
-				(strings.HasPrefix(name, "Test") || strings.HasPrefix(name, "Benchmark") || strings.HasPrefix(name, "Example")) && // test format
-				!strings.Contains(name, "$") { //exclude closure
-				obj := a.nodes[id].obj
-				if obj == nil {
-					panic(fmt.Sprintf("nil obj of %s: %s", id, a.nodes[id]))
-				}
-				cgn := obj.cgn
-				if cgn == nil {
-					panic(fmt.Sprintf("nil cgnode in obj: %s", obj))
-				}
-				result[fn] = cgn
-			}
-		}
-	}
-
-	return result
+	return r.a.tests
 }
 
 //bz: user API: when analyzing test only, tell which test is used as main in order to confirm the correct main context

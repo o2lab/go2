@@ -195,8 +195,8 @@ type analysis struct {
 	curIter int //bz: for debug, the ith iteration of the loop in preSolve() TODO: maybe move to analysis as a field
 
 	//bz: test-related
-	isMain bool //whether this analysis obj is allocated for a main? otherwise, for a test
-
+	isMain bool            //whether this analysis obj is allocated for a main? otherwise, for a test
+	tests  []*ssa.Function //all test fns that following the go test name rules
 	/** bz:
 	  we do have panics when turn on hvn optimization. panics are due to that hvn wrongly computes sccs.
 	  wrong sccs is because some pointers are not marked as indirect (but marked in default).
@@ -608,11 +608,14 @@ func Analyze(config *Config) (result *Result, err error) {
 		optHVN = true
 		optRenumber = true
 	}
-	//see if i'm analyzing a main or test; reflection should be set in config already
+
+	//bz: !! turn on reflection if includes tests requires base objs, e.g., grpc/internal/cache/TestCacheExpire
 	isMain := true
 	if flags.DoTests && strings.HasSuffix(main.Pkg.Path(), ".test") {
+		config.Reflection = true
 		isMain = false
 	}
+
 	//we initially run the analysis
 	_result, err := AnalyzeWCtx(config, isMain)
 	if err != nil {
