@@ -288,7 +288,6 @@ func initialAnalysis() *analysis {
 	return &analysis{
 		efficiency:      efficiency,
 		trieLimit:       trieLimit,
-		getGo:           getGo,
 		RWinsMap:        make(map[goIns]graph.Node),
 		trieMap:         make(map[fnInfo]*trie),
 		insMono:         -1,
@@ -456,14 +455,16 @@ func (runner *AnalysisRunner) Run2(args []string) error {
 				runner.racyStackTops = a.racyStackTops
 				runner.finalReport = append(runner.finalReport, rr)
 
-				log.Info("Finish for test entry point: ", test.String(), "\n========================================================================================================")
+				log.Info("Finish for test entry point: ", test.String())
+				log.Info(strings.Repeat("=", 100), "\n\n")
 			}
 		}
-		log.Info("Finish for entry point: ", main.String(), "\n========================================================================================================")
+		log.Info("Finish for entry point: ", main.String())
+		log.Info(strings.Repeat("=", 100), "\n\n")
 	}
 
 	//summary report
-	log.Info("\n\nSummary Report:")
+	log.Info("Summary Report:")
 	raceCount := 0
 	for _, e := range runner.finalReport {
 		if len(e.racePairs) > 0 && e.racePairs[0] != nil {
@@ -569,7 +570,6 @@ func (runner *AnalysisRunner) Run(args []string) error {
 			ptaCfg0:         runner.ptaConfig0,
 			efficiency:      efficiency,
 			trieLimit:       trieLimit,
-			getGo:           getGo,
 			prog:            runner.prog,
 			main:            m,
 			RWinsMap:        make(map[goIns]graph.Node),

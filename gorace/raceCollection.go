@@ -492,16 +492,16 @@ func (a *analysis) printRace(counter int, race *raceInfo) {
 			access = " Write of "
 			if _, ok := anIns.ins.(*ssa.Call); ok {
 				rwPos[i] = a.prog.Fset.Position(addrPair[i].Pos())
-				errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].String()), " in function ", aurora.BrightGreen(anIns.ins.Parent().Name()), " at ", rwPos[i])
+				errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].Name()), " in function ", aurora.BrightGreen(anIns.ins.Parent().Name()), " at ", rwPos[i])
 			} else {
 				rwPos[i] = a.prog.Fset.Position(insPair[i].ins.Pos())
-				errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].String()), " in function ", aurora.BrightGreen(anIns.ins.Parent().Name()), " at ", rwPos[i])
+				errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].Name()), " in function ", aurora.BrightGreen(anIns.ins.Parent().Name()), " at ", rwPos[i])
 			}
 			writeLocks = a.lockMap[anIns.ins]
 		} else {
 			access = " Read of "
 			rwPos[i] = a.prog.Fset.Position(anIns.ins.Pos())
-			errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].String()), " in function ", aurora.BrightGreen(anIns.ins.Parent().Name()), " at ", rwPos[i])
+			errMsg = fmt.Sprint(access, aurora.Magenta(addrPair[i].Name()), " in function ", aurora.BrightGreen(anIns.ins.Parent().Name()), " at ", rwPos[i])
 			readLocks = append(a.lockMap[anIns.ins], a.RlockMap[anIns.ins]...)
 		}
 		if testMode {
@@ -509,28 +509,22 @@ func (a *analysis) printRace(counter int, race *raceInfo) {
 			a.racyStackTops = append(a.racyStackTops, colorOutput.ReplaceAllString(errMsg, ""))
 		}
 		log.Print(errMsg)
-
-		for lineNum := rwPos[i].Line-3; lineNum <= rwPos[i].Line+3; lineNum++ {
-			theLine, _ := getLineNumber(rwPos[i].Filename, lineNum)
-			if lineNum == rwPos[i].Line {
-				log.Info("\t>> ", theLine)
-			} else {
-				log.Info("\t>> ", theLine)
-			}
-		} // TODO: include pointer to highlight racy location
-
 		if goIDs[i] == 0 { // main goroutine
 			log.Println("\tin goroutine  ***  main  [", goIDs[i], "] *** ")
 		} else {
 			log.Println("\tin goroutine  ***", a.goNames(a.goCalls[goIDs[i]].goIns), "[", goIDs[i], "] *** ")
 		}
-		var pathGo []int
-		goID := goIDs[i]
-		for goID > 0 {
-			pathGo = append([]int{goID}, pathGo...)
-			temp := a.goCaller[goID]
-			goID = temp
-		}
+
+		printSource(rwPos[i])
+
+		if printStack {
+			var pathGo []int
+			goID := goIDs[i]
+			for goID > 0 {
+				pathGo = append([]int{goID}, pathGo...)
+				temp := a.goCaller[goID]
+				goID = temp
+			}
 			for q, eachGo := range pathGo {
 				eachStack := a.goStack[eachGo][:len(a.goStack[eachGo])-1]
 				for k, eachFn := range eachStack {
@@ -566,6 +560,7 @@ func (a *analysis) printRace(counter int, race *raceInfo) {
 				}
 			}
 		}
+	}
 	log.Debug("Locks acquired before Write access: ", writeLocks)
 	log.Debug("Locks acquired before Read  access: ", readLocks)
 	log.Println(strings.Repeat("=", 100))

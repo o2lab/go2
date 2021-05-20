@@ -186,14 +186,14 @@ func main() { //default: -useNewPTA
 	withComm := flag.Bool("withComm", false, "Show analysis results with communication consideration.")
 	analyzeAll := flag.Bool("analyzeAll", false, "Analyze all main() entry-points. ")
 	runTest := flag.Bool("runTest", false, "For micro-benchmark debugging... ")
-	showGo := flag.Bool("showGo", false, "Show goroutine info in analyzed program. ")
+	showStack := flag.Bool("show", false, "Show call stack of each racy access. ")
 	//setTrie := flag.Int("trieLimit", 1, "Set trie limit... ")
 	flag.Parse()
 	//if *setTrie > 1 {
 	//	trieLimit = *setTrie
 	//}
-	if *showGo {
-		getGo = true
+	if *showStack {
+		printStack = true
 	}
 	if *runTest {
 		efficiency = false
