@@ -17,7 +17,7 @@ go install
 
 ### Configuration
 
-Update the gorace.yml file with your preferred config options and place it under the directory where gorace will be executed at. 
+Update the gorace.yml file (located under go2/gorace) with your preferred config options and place it under the directory where gorace will be executed at. 
 
 
 ### Running the tool
