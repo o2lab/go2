@@ -32,6 +32,8 @@ var (
 	userDir        string //bz: user specify dir -> we run gorace here
 	userInputFile  []string //bz: used when input is a .go file, not a path
 
+	turnOnSpinning = true //bz: if we run this in goland, turn this off... this only works for terminal
+
 	////bz: skip traversing some functions that are not important in detection (or too verbose, do not want to analyze)
 	//excludedFns = []string{ //bz: grpc specific, hasprefix
 	//	"google.golang.org/grpc/grpclog",

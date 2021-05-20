@@ -5,6 +5,7 @@ import (
 	"github.com/april1989/origin-go-tools/go/ssa"
 	log "github.com/sirupsen/logrus"
 	"github.com/twmb/algoimpl/go/graph"
+	"strconv"
 	"strings"
 )
 
@@ -40,7 +41,7 @@ func (a *analysis) runChecker() raceReport {
 	for fn, _ := range a.trieMap { //bz: remove diff context for the same fn
 		traversed[fn.fnName] = fn.fnName
 	}
-	log.Info("Done  -- ", len(a.RWIns), " goroutines analyzed! ", len(traversed), " function traversed! ", totalIns, " instructions of interest detected! ")
+	doEndLog("Done  -- " + strconv.Itoa(len(a.RWIns)) + " goroutines analyzed! " + strconv.Itoa(len(traversed)) + " function traversed! " + strconv.Itoa(totalIns) + " instructions of interest detected! ")
 
 	if len(a.RWIns) == 1 { //bz: only main thread, no races.
 		log.Info("Only has the main goroutine, no need to continue. Return. ")
@@ -54,7 +55,7 @@ func (a *analysis) runChecker() raceReport {
 		a.ptaRes0, _ = pta0.Analyze(a.ptaCfg0) // all queries have been added, conduct pointer analysis
 	}
 	//if !allEntries {
-	log.Info("Building Happens-Before graph... ")
+	doStartLog("Building Happens-Before graph... ")
 	//}
 	// confirm channel readiness for unknown select cases:
 	if len(a.selUnknown) > 0 {
@@ -73,8 +74,8 @@ func (a *analysis) runChecker() raceReport {
 	a.HBgraph = graph.New(graph.Directed)
 	a.buildHB()
 	//if !allEntries {
-	log.Info("Done  -- Happens-Before graph built ")
-	log.Info("Checking for data races... ")
+	doEndLog("Done  -- Happens-Before graph built ")
+	log.Info("Checking for data races... ") //bz: no spinner -> we need to print out ...
 	//}
 	rr := raceReport{
 		entryInfo: a.main.Pkg.Path(),

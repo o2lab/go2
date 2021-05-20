@@ -99,7 +99,7 @@ func pkgSelection(initial []*packages.Package) ([]*ssa.Package, *ssa.Program, []
 	var pkgs []*ssa.Package
 	var mainPkgs []*ssa.Package //bz: selected
 
-	log.Info("Building SSA code for entire program...")
+	doStartLog("Building SSA code for entire program...")
 	prog, pkgs = ssautil.AllPackages(initial, 0)
 	if len(pkgs) == 0 {
 		log.Errorf("SSA code could not be constructed due to type errors. ")
@@ -110,7 +110,7 @@ func pkgSelection(initial []*packages.Package) ([]*ssa.Package, *ssa.Program, []
 	if len(mainPkgs) == 0 {
 		log.Errorf("No main function detected. ")
 	}
-	log.Info("Done  -- SSA code built. ", len(pkgs), " packages and ", noFunc, " functions detected. ")
+	doEndLog("Done  -- SSA code built. " + strconv.Itoa(len(pkgs)) + " packages and " + strconv.Itoa(noFunc) + " functions detected. ")
 
 	var mainInd string
 	var enterAt string
@@ -369,6 +369,34 @@ func initialAnalysis() *analysis {
 	}
 }
 
+//bz: global -> all use the same one
+var spin *spinner.Spinner
+
+func doStartLog(_log string) {
+	if turnOnSpinning {
+		if spin == nil {
+			spin = spinner.New(spinner.CharSets[9], 100*time.Millisecond) // Build our new spinner
+			spin.Suffix = _log
+			spin.Start()
+		}else{
+			spin.Suffix = _log
+			spin.Restart()
+		}
+	}else{
+		log.Info(_log)
+	}
+}
+
+func doEndLog(args ...interface{}) {
+	if turnOnSpinning {
+		spin.FinalMSG = fmt.Sprint(args[0]) + "\n"
+		spin.Stop()
+	}else{
+		log.Info(args ... )
+	}
+}
+
+
 //bz: update the run order of pta and checker
 //  -> sequentially now; do not provide selection of test entry
 func (runner *AnalysisRunner) Run2() error {
@@ -384,18 +412,13 @@ func (runner *AnalysisRunner) Run2() error {
 	}
 
 
-	log.Info("Loading input packages... ")
+	doStartLog("Loading input packages... ")
 	var initial []*packages.Package
-	s := spinner.New(spinner.CharSets[9], 100*time.Millisecond)  // Build our new spinner
-	s.Start()                                                    // Start the spinner
-	os.Stderr = nil // No need to output package errors for now. Delete this line to view package errors
 	initial, _ = packages.Load(cfg, userInputFile ... )
 	if len(initial) == 0 {
 		log.Panic("No Go files detected. ")
 	}
-	log.Info("Done  -- ", len(initial), " packages detected. \n")
-	s.Stop()
-
+	doEndLog("Done  -- " + strconv.Itoa(len(initial)) + " packages detected.")
 
 
 	mains, prog, pkgs := pkgSelection(initial)
@@ -413,7 +436,7 @@ func (runner *AnalysisRunner) Run2() error {
 			log.Info("Start for entry point: ", main.String(), "... ")
 		}
 		// Configure pointer analysis...
-		log.Info("Running Pointer Analysis... ")
+		doStartLog("Running Pointer Analysis... ")
 		if useNewPTA {
 			scope := determineScope(pkgs)
 
@@ -447,7 +470,7 @@ func (runner *AnalysisRunner) Run2() error {
 
 			t := time.Now()
 			elapsed := t.Sub(start)
-			log.Info("Done  -- Pointer Analysis Finished. Using " + elapsed.String() + ". ")
+			doEndLog("Done  -- Pointer Analysis Finished. Using " + elapsed.String() + ". ")
 			//////!!!! bz: for my debug, please comment off, do not delete
 			//if strings.Contains(main.String(), "github.com/ethereum/go-ethereum/cmd/ethkey") && main.IsMainTest {
 			//	fmt.Println("Receive Result: ")
@@ -475,7 +498,7 @@ func (runner *AnalysisRunner) Run2() error {
 		}
 
 		if selectTests == nil { //bz: is a main TODO: or main.IsMainTest == true but we cannot find/link the test func now
-			log.Info("Traversing Statements... ")
+			doStartLog("Traversing Statements... ")
 
 			a := initialAnalysis()
 			a.main = main
