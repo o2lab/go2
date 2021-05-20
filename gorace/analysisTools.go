@@ -725,9 +725,13 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 		}
 	}
 	if len(a.lockSet[goID]) > lockSetSize {
-		for i := lockSetSize; i < len(a.lockSet[goID]); i++ {
+		for i := lockSetSize; i < len(a.lockSet[goID]) - 1; i++ {
 			log.Trace("Unlocking ", a.lockSet[goID][i].locAddr.String(), "  (", a.lockSet[goID][i].locAddr.Pos(), ") removing index ", i, " from: ", lockSetVal(a.lockSet, goID))
-			a.lockSet[goID] = append(a.lockSet[a.goCaller[goID]][:i], a.lockSet[goID][i+1:]...)
+			//bz: index out of bound bug ... bypass now ... TODO: fix it ..
+			id := a.goCaller[goID] //bz: what is this id ??
+			if i < len(a.lockSet[id]) {
+				a.lockSet[goID] = append(a.lockSet[id][:i], a.lockSet[goID][i+1:]...)
+			}
 		}
 	}
 	// done with all instructions in function body, now pop the function
