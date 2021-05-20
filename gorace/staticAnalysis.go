@@ -159,18 +159,19 @@ func pkgSelection(initial []*packages.Package) ([]*ssa.Package, *ssa.Program, []
 	return mains, prog, pkgs
 }
 
+//bz: the string return is not necessary
 func (runner *AnalysisRunner) analyzeTestEntry(mains []*ssa.Package) ([]*ssa.Function, string) {
 	var selectedFns []*ssa.Function
 	//bz: for analyzing tests
 	entry := "main" //bz: default value, will update later
 	if strings.Contains(mains[0].String(), ".test") {
-		fmt.Println("Extracting test functions from PTA/CG...")
-		for mainEntry, ptaRes := range runner.ptaResults {
-			tests := ptaRes.GetTests()
+		log.Info("Extracting test functions from PTA/CG...")
+		//for mainEntry, ptaRes := range runner.ptaResults { //bz: do not need this ...
+			tests := runner.ptaResult.GetTests()
 			if tests == nil {
-				continue //this is a main entry
+				return nil, "" //this is a main entry
 			}
-			fmt.Println("The following are functsions found within: ", mainEntry)
+			fmt.Println("The following are functions found within: ", mains[0].String())
 			var testSelect string
 			var testFns []*ssa.Function // all test functions in this entry
 			counter := 1
@@ -213,8 +214,8 @@ func (runner *AnalysisRunner) analyzeTestEntry(mains []*ssa.Package) ([]*ssa.Fun
 				log.Error("Unrecognized input, try again.")
 			}
 		}
-		fmt.Println("Done  -- CG node of test function ", entry, " extracted...")
-	}
+	log.Info("Done  -- CG node of test function ", entry, " extracted...")
+	//}
 	return selectedFns, entry
 }
 
@@ -288,6 +289,7 @@ func initialAnalysis() *analysis {
 	return &analysis{
 		efficiency:      efficiency,
 		trieLimit:       trieLimit,
+		getGo:           getGo,
 		RWinsMap:        make(map[goIns]graph.Node),
 		trieMap:         make(map[fnInfo]*trie),
 		insMono:         -1,
@@ -360,6 +362,7 @@ func (runner *AnalysisRunner) Run2(args []string) error {
 	//run one by one: Iterate each entry point...
 	//var wg sync.WaitGroup
 	for _, main := range mains {
+		log.Info("****************************************************************************************************")
 		log.Info("Start for entry point: ", main.String(), "... ")
 		// Configure pointer analysis...
 		if useNewPTA {
@@ -455,16 +458,16 @@ func (runner *AnalysisRunner) Run2(args []string) error {
 				runner.racyStackTops = a.racyStackTops
 				runner.finalReport = append(runner.finalReport, rr)
 
-				log.Info("Finish for test entry point: ", test.String())
-				log.Info(strings.Repeat("=", 100), "\n\n")
+				log.Info("Finish for test entry point: ", test.String(), ".")
+				log.Info("----------------------------------------------------------------------------------------------------")
 			}
 		}
-		log.Info("Finish for entry point: ", main.String())
-		log.Info(strings.Repeat("=", 100), "\n\n")
+		log.Info("Finish for entry point: ", main.String(), ".")
 	}
+	log.Info("****************************************************************************************************") //bz: final finish line
 
 	//summary report
-	log.Info("Summary Report:")
+	log.Info("\n\nSummary Report:")
 	raceCount := 0
 	for _, e := range runner.finalReport {
 		if len(e.racePairs) > 0 && e.racePairs[0] != nil {
@@ -570,6 +573,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 			ptaCfg0:         runner.ptaConfig0,
 			efficiency:      efficiency,
 			trieLimit:       trieLimit,
+			getGo:           getGo,
 			prog:            runner.prog,
 			main:            m,
 			RWinsMap:        make(map[goIns]graph.Node),
