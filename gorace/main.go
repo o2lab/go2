@@ -1,6 +1,6 @@
 //+build !windows
 
-package gorace
+package main
 
 import (
 	"flag"
@@ -9,7 +9,7 @@ import (
 	"os"
 	"syscall"
 	"github.com/o2lab/gorace/stats"
-	"github.com/o2lab/gorace/gorace"
+	gorace "github.com/o2lab/gorace/analysis"
 
 )
 
@@ -18,7 +18,7 @@ import (
 
 func init() {
 	curDir, _ := os.Getwd()
-	ymlPath := curDir + "/gorace.yml"
+	ymlPath := curDir + "/analysis.yml"
 	gorace.DecodeYmlFile(ymlPath)
 	main()
 }
