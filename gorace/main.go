@@ -18,16 +18,16 @@ import (
 
 func init() {
 	curDir, _ := os.Getwd()
-	ymlPath := curDir + "/analysis.yml"
+	ymlPath := curDir + "/gorace.yml"
 	gorace.DecodeYmlFile(ymlPath)
 	main()
 }
 
 // main sets up arguments and calls staticAnalysis function
 func main() { //default: -useNewPTA
-	newPTA := flag.Bool("useNewPTA", false, "Use the new pointer analysis in go_tools.")
-	builtinPTA := flag.Bool("useDefaultPTA", false, "Use the built-in pointer analysis.")
-	debug := flag.Bool("debug", false, "Prints log.Debug messages.")
+	//newPTA := flag.Bool("useNewPTA", false, "Use the new pointer analysis in go_tools.")
+	//builtinPTA := flag.Bool("useDefaultPTA", false, "Use the built-in pointer analysis.")
+	d := flag.Bool("debug", false, "Prints log.Debug messages.")
 	lockOps := flag.Bool("lockOps", false, "Prints lock and unlock operations. ")
 	flag.BoolVar(&stats.CollectStats, "collectStats", false, "Collect analysis statistics.")
 	help := flag.Bool("help", false, "Show all command-line options.")
@@ -53,15 +53,15 @@ func main() { //default: -useNewPTA
 		flag.PrintDefaults()
 		return
 	}
-	if *newPTA {
-		gorace.UseNewPTA = true
-		gorace.UseDefaultPTA = false
-	}
-	if *builtinPTA {
-		gorace.UseDefaultPTA = true
-		gorace.UseNewPTA = false
-	}
-	if *debug {
+	//if *newPTA {
+	//	gorace.UseNewPTA = true
+	//	gorace.UseDefaultPTA = false
+	//}
+	//if *builtinPTA {
+	//	gorace.UseDefaultPTA = true
+	//	gorace.UseNewPTA = false
+	//}
+	if *d {
 		gorace.DebugFlag = true
 		log.SetLevel(log.DebugLevel)
 	}
