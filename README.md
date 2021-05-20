@@ -18,17 +18,24 @@ Install the race-checker in the PATH by executing
 go install
 ```
 
+### Running the tool
+
+Use the -stack flag to show call stack of racy accesses. 
+```
+gorace -stack
+```
+
 ### Running on gRPC
 
 After installing race-checker, go to the root directory of the gRPC repo, 
 
 Execute race-checker in the **main** directory of a Go program, followed by the path with which to start analysis from, 
 ```
-race-checker ./
+gorace ./
 ```
 or 
 ```
-race-checker ./examples/helloworld/greeter_client
+gorace ./examples/helloworld/greeter_client
 ```
 
 When multiple entry points are identified, race-checker will request your input for which entry-points to analyze
@@ -48,6 +55,6 @@ as shown in screenshot above.
 
 or use the `-analyzeAll` flag since the very beginning if trying to run all entry points, 
 ```
-race-checker -analyzeAll
+gorace -analyzeAll
 ```
 but process may get killed if running out of memory...
