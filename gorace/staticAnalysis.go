@@ -321,7 +321,7 @@ func initialAnalysis() *analysis {
 		commIDs:         make(map[int][]int),
 		deferToRet:      make(map[*ssa.Defer]ssa.Instruction),
 		twinGoID:        make(map[*ssa.Go][]int),
-		mutualTargets:   make(map[int]*mutualFns),
+		//mutualTargets:   make(map[int]*mutualFns),
 	}
 }
 
@@ -465,17 +465,25 @@ func (runner *AnalysisRunner) Run2(args []string) error {
 	fmt.Println("Summary Report:")
 	raceCount := 0
 	for _, e := range runner.finalReport {
-		if len(e.racePairs) > 0 && e.racePairs[0] != nil {
-			log.Info(len(e.racePairs), " races found for entry point ", e.entryInfo, ".")
-			raceCount += len(e.racePairs)
+		s := len(e.racePairs)
+		if s > 0 && e.racePairs[0] != nil {
+			if s == 1 {
+				log.Info(s, " race found for entry point ", e.entryInfo, ".")
+			}else{
+				log.Info(s, " races found for entry point ", e.entryInfo, ".")
+			}
+			raceCount += s
 		} else {
 			log.Info("No races found for ", e.entryInfo, ".")
 		}
 	}
-	log.Info("Total of ", raceCount, " races found for all entry points. ")
-
+	if raceCount == 1 {
+		log.Info("Total of ", raceCount, " race found for all entry points. ")
+	}else{
+		log.Info("Total of ", raceCount, " races found for all entry points. ")
+	}
 	execDur := time.Since(startExec)
-	log.Info(execDur, " elapsed. ")
+	log.Info("Total Time:", execDur, ". ")
 
 	return nil
 }
@@ -603,7 +611,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 			deferToRet:      make(map[*ssa.Defer]ssa.Instruction),
 			entryFn:         entry,
 			twinGoID:        make(map[*ssa.Go][]int),
-			mutualTargets:   make(map[int]*mutualFns),
+			//mutualTargets:   make(map[int]*mutualFns),
 		}
 		if strings.Contains(m.Pkg.Path(), "GoBench") { // for testing purposes
 			a.efficiency = false

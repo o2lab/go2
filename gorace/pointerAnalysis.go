@@ -129,9 +129,10 @@ func (a *analysis) pointerNewAnalysisHandleFunc(ptr pointer.PointerWCtx, labels 
 	theIns ssa.Instruction) {
 	if len(labels) > 1 { // pta returns multiple targets
 		labels = a.filterLabels(labels, ptr, location, goID, goInstr, theIns)
+		labels = labels[:0] //bz: tmp solution, will be removed
 	}
 
-	var fns []*ssa.Function //bz: let's record mutual excluded fns
+	//var fns []*ssa.Function //bz: let's record mutual excluded fns
 	isInvoke := false
 	for _, label := range labels { //bz: labels are reduced -> TODO: bz: here should use mutual exclusion too, len > 1
 		var fnName string
@@ -198,24 +199,24 @@ func (a *analysis) pointerNewAnalysisHandleFunc(ptr pointer.PointerWCtx, labels 
 		}
 	}
 
-	if len(fns) > 1 {
-		//bz: let's mutual exclude them
-		mFns := a.mutualTargets[goID]
-		if mFns == nil {
-			mFns = &mutualFns{}
-			mFns.fns = make(map[*ssa.Function]*mutualGroup)
-		}
-		group := make(map[*ssa.Function]*ssa.Function)
-		for _, fn := range fns {
-			group[fn] = fn
-		}
-		mGroup := &mutualGroup{
-			group: group,
-		}
-		for _, fn := range fns {
-			mFns.fns[fn] = mGroup
-		}
-	}
+	//if len(fns) > 1 {
+	//	//bz: let's mutual exclude them
+	//	mFns := a.mutualTargets[goID]
+	//	if mFns == nil {
+	//		mFns = &mutualFns{}
+	//		mFns.fns = make(map[*ssa.Function]*mutualGroup)
+	//	}
+	//	group := make(map[*ssa.Function]*ssa.Function)
+	//	for _, fn := range fns {
+	//		group[fn] = fn
+	//	}
+	//	mGroup := &mutualGroup{
+	//		group: group,
+	//	}
+	//	for _, fn := range fns {
+	//		mFns.fns[fn] = mGroup
+	//	}
+	//}
 }
 
 //bz: reduce targets

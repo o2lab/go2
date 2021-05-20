@@ -36,7 +36,11 @@ func (a *analysis) runChecker() raceReport {
 		totalIns += len(a.RWIns[g])
 	}
 	//if !allEntries { //bz: we want this now
-	log.Info("Done  -- ", len(a.RWIns), " goroutines analyzed! ", totalIns, " instructions of interest detected! ")
+	traversed := make(map[*ssa.Function]*ssa.Function)
+	for fn, _ := range a.trieMap {
+		traversed[fn.fnName] = fn.fnName
+	}
+	log.Info("Done  -- ", len(a.RWIns), " goroutines analyzed! ", len(traversed), " function traversed! ", totalIns, " instructions of interest detected! ")
 	//}
 
 	if useDefaultPTA {
