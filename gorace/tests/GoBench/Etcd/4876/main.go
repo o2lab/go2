@@ -1,5 +1,5 @@
 //TestEtcd4876 - PASS
-package main
+package gorace_test
 
 import (
 	"sync"

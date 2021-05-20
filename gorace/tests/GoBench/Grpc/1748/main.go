@@ -1,5 +1,5 @@
 //TestGrpc1748 - PASS
-package main
+package gorace_test
 
 import (
 	"sync"

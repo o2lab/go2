@@ -208,7 +208,7 @@
 //		fmt.Println(j)
 //	}()
 //}
-package main
+package gorace_test
 
 import "fmt"
 

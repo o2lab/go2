@@ -1,1 +1,1 @@
-package main
+package gorace_test

@@ -1,9 +1,10 @@
-package main
+package gorace_test
 
 import (
 	"context"
 	"flag"
 	"fmt"
+	"github.com/o2lab/gorace"
 	"github.com/rogpeppe/go-internal/testenv"
 	"github.com/sirupsen/logrus"
 	"go/ast"
@@ -318,7 +319,7 @@ func checkFile(t *testing.T, testfiles []string) {
 
 func TestRace(t *testing.T) {
 	testenv.MustHaveGoBuild(t)
-	testMode = true
+	gorace.TestMode = true
 	if *parallel == 0 {
 		*parallel = runtime.GOMAXPROCS(0)
 	}

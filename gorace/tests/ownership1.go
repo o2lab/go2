@@ -1,4 +1,4 @@
-package main
+package gorace_test
 
 func main() {
 	k := 0

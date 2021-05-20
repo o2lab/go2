@@ -1,5 +1,5 @@
 // TestGrpc3090
-package main
+package gorace_test
 
 import (
 	"sync"

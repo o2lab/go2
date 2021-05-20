@@ -1,5 +1,5 @@
 // TestKubernetes81091
-package main
+package gorace_test
 
 import (
 	"sync"

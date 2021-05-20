@@ -1,4 +1,4 @@
-package main
+package gorace_test
 
 type a4 struct {
 	a5 	int

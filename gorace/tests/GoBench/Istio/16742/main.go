@@ -1,5 +1,5 @@
 // TestIstio16742
-package main
+package gorace_test
 
 import (
 	"sync"

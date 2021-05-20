@@ -1,4 +1,4 @@
-package main
+package gorace_test
 
 type S struct {
 	i int

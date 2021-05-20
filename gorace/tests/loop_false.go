@@ -1,4 +1,4 @@
-package main
+package gorace_test
 
 type some_struct struct {
 	some_other *some_other_struct

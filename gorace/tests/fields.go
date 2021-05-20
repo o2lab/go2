@@ -1,5 +1,5 @@
 // Check if we can distinguish accesses to different fields
-package main
+package gorace_test
 
 type T struct {
 	a, b int
