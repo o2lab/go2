@@ -163,7 +163,7 @@ func pkgSelection(initial []*packages.Package) ([]*ssa.Package, *ssa.Program, []
 func (runner *AnalysisRunner) analyzeTestEntry(main *ssa.Package) ([]*ssa.Function, string) {
 	var selectedFns []*ssa.Function
 	//bz: for analyzing tests
-	entry := "main" //bz: default value, will update later
+	entry := "main"                                  //bz: default value, will update later
 	if strings.HasSuffix(main.Pkg.Path(), ".test") { //bz: strict end with .test
 		log.Info("Extracting test functions from PTA/CG...")
 		//for mainEntry, ptaRes := range runner.ptaResults { //bz: do not need this ...
@@ -287,8 +287,8 @@ func determineScope(pkgs []*ssa.Package) []string {
 //bz: do not want to see this big block ...
 func initialAnalysis() *analysis {
 	return &analysis{
-		efficiency: efficiency,
-		trieLimit:  trieLimit,
+		efficiency:      efficiency,
+		trieLimit:       trieLimit,
 		RWinsMap:        make(map[goIns]graph.Node),
 		trieMap:         make(map[fnInfo]*trie),
 		insMono:         -1,
@@ -358,6 +358,7 @@ func (runner *AnalysisRunner) Run2(args []string) error {
 		log.Info("****************************************************************************************************")
 		log.Info("Start for entry point: ", main.String(), "... ")
 		// Configure pointer analysis...
+		log.Info("Running Pointer Analysis... ")
 		if useNewPTA {
 			scope := determineScope(pkgs)
 
@@ -391,7 +392,7 @@ func (runner *AnalysisRunner) Run2(args []string) error {
 
 			t := time.Now()
 			elapsed := t.Sub(start)
-			log.Info("Done  -- PTA/CG Build; Using " + elapsed.String() + ". ")
+			log.Info("Done  -- Pointer Analysis Finished. Using " + elapsed.String() + ". ")
 			//!!!! bz: for my debug, please comment off, do not delete
 			//fmt.Println("#Receive Result: ", len(runner.ptaResult))
 			//for mainEntry, ptaRes := range runner.ptaResult { //bz: you can get the ptaRes for each main here
@@ -419,6 +420,8 @@ func (runner *AnalysisRunner) Run2(args []string) error {
 		}
 
 		if selectTests == nil { //bz: is a main
+			log.Info("Traversing Statements... ")
+
 			a := initialAnalysis()
 			a.main = main
 			a.ptaRes = runner.ptaResult
@@ -433,7 +436,7 @@ func (runner *AnalysisRunner) Run2(args []string) error {
 			runner.finalReport = append(runner.finalReport, rr)
 		} else { //bz: is a test
 			for _, test := range selectTests {
-				log.Info("Start for test entry point: ", test.String(), "... ")
+				log.Info("Traversing Statements for test entry point: ", test.String(), "... ")
 
 				a := initialAnalysis()
 				a.main = main
@@ -637,7 +640,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 			a.ptaRes0, _ = pta0.Analyze(a.ptaCfg0) // all queries have been added, conduct pointer analysis
 		}
 		if !allEntries {
-			log.Info("Building Happens-Before graph... ")
+			log.Info("Building Static Happens-Before graph... ")
 		}
 		// confirm channel readiness for unknown select cases:
 		if len(a.selUnknown) > 0 {
@@ -655,10 +658,9 @@ func (runner *AnalysisRunner) Run(args []string) error {
 		}
 		a.HBgraph = graph.New(graph.Directed)
 		a.buildHB()
-		if !allEntries {
-			log.Info("Done  -- Happens-Before graph built ")
-			log.Info("Checking for data races... ")
-		}
+		log.Info("Done  -- Static Happens-Before graph built. ")
+		log.Info("Checking for data races... ")
+
 		rr := raceReport{
 			entryInfo: m.Pkg.Path(),
 		}
