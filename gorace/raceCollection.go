@@ -202,6 +202,17 @@ func (a *analysis) mutuallyExcluded(goI *insInfo, I int, goJ *insInfo, J int) bo
 	return false
 }
 
+func (a *analysis) fromLibrary(addrPair [2]ssa.Value) bool {
+	for i := 0; i < 2; i++ {
+		if addrPair[i].Parent() != nil {
+			if !addrPair[i].Parent().IsFromApp {
+				return true // library functions not analyzed
+			}
+		}
+	}
+	return false
+}
+
 // checkRacyPairs checks accesses among two concurrent goroutines
 func (a *analysis) checkRacyPairs() []*raceInfo {
 	var races []*raceInfo
@@ -229,22 +240,22 @@ func (a *analysis) checkRacyPairs() []*raceInfo {
 							continue
 						}
 						//!!!! bz: for my debug, please comment off, do not delete
-						var goIinstr string
-						var goJinstr string
-						if i == 0 {
-							goIinstr = "main"
-						} else {
-							goIinstr = a.RWIns[i][0].ins.String()
-						}
-						if j == 0 {
-							goJinstr = "main"
-						} else {
-							goJinstr = a.RWIns[j][0].ins.String()
-						}
-						if strings.Contains(addressPair[0].String(), "returnBuffers") && strings.Contains(addressPair[1].String(), "returnBuffers") &&
-							goI.ins.Parent().Name() == "commitAttemptLocked" && goJ.ins.Parent().Name() == "SendMsg" {
-							fmt.Println(addressPair[0], " Go: ", goIinstr, " loopid: ", a.loopIDs[i], ";  ", addressPair[1], " Go: ", goJinstr, " loopid: ", a.loopIDs[j])
-						}
+						//var goIinstr string
+						//var goJinstr string
+						//if i == 0 {
+						//	goIinstr = "main"
+						//} else {
+						//	goIinstr = a.RWIns[i][0].ins.String()
+						//}
+						//if j == 0 {
+						//	goJinstr = "main"
+						//} else {
+						//	goJinstr = a.RWIns[j][0].ins.String()
+						//}
+						//if strings.Contains(addressPair[0].String(), "returnBuffers") && strings.Contains(addressPair[1].String(), "returnBuffers") &&
+						//	goI.ins.Parent().Name() == "commitAttemptLocked" && goJ.ins.Parent().Name() == "SendMsg" {
+						//	fmt.Println(addressPair[0], " Go: ", goIinstr, " loopid: ", a.loopIDs[i], ";  ", addressPair[1], " Go: ", goJinstr, " loopid: ", a.loopIDs[j])
+						//}
 
 						if a.sameAddress(addressPair[0], addressPair[1], i, j) &&
 							!sliceContains(a, races, addressPair, i, j) &&
@@ -253,7 +264,8 @@ func (a *analysis) checkRacyPairs() []*raceInfo {
 							!a.bothAtomic(insSlice[0].ins, insSlice[1].ins) &&
 							!a.lockSetsIntersect(goI.ins, goJ.ins, i, j) &&
 							!a.selectMutEx(insSlice[0].ins, insSlice[1].ins) &&
-							!a.mutuallyExcluded(goI, i, goJ, j) {
+							!a.mutuallyExcluded(goI, i, goJ, j) &&
+							!a.fromLibrary(addressPair) {
 							ri = &raceInfo{
 								insPair:  insSlice,
 								addrPair: addressPair,
@@ -261,7 +273,6 @@ func (a *analysis) checkRacyPairs() []*raceInfo {
 								insInd:   []int{ii, jj},
 							}
 							races = append(races, ri)
-
 							a.printRace(len(races), ri)
 						}
 					}
