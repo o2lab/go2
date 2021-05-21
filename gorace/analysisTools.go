@@ -237,7 +237,7 @@ func (a *analysis) buildHB() {
 							} else {
 								toName = a.goNames(a.RWIns[(*wNode.Value).(goIns).goID][0].ins.(*ssa.Go))
 							}
-							if debugFlag {
+							if DEBUGHBGraph {
 								log.Debug("WaitGroup edge from Goroutine ", fromName, " [", nGo, "] to Goroutine ", toName, " [", (*wNode.Value).(goIns).goID, "]")
 							}
 							if err != nil {
@@ -264,7 +264,7 @@ func (a *analysis) buildHB() {
 							} else {
 								toName = a.goNames(a.RWIns[(*wNode.Value).(goIns).goID][0].ins.(*ssa.Go))
 							}
-							if debugFlag {
+							if DEBUGHBGraph {
 								log.Debug("WaitGroup edge from Goroutine ", fromName, " [", nGo, "] to Goroutine ", toName, " [", (*wNode.Value).(goIns).goID, "]")
 							}
 							if err != nil {
@@ -290,7 +290,7 @@ func (a *analysis) buildHB() {
 						} else {
 							toName = a.goNames(a.RWIns[(*rcvN.Value).(goIns).goID][0].ins.(*ssa.Go))
 						}
-						if debugFlag {
+						if DEBUGHBGraph {
 							log.Debug("Channel comm edge from Goroutine ", fromName, " [", nGo, "] to Goroutine ", toName, " [", (*rcvN.Value).(goIns).goID, "]")
 						}
 						if err != nil {
@@ -318,7 +318,7 @@ func (a *analysis) buildHB() {
 						} else {
 							toName = a.goNames(a.RWIns[nGo][0].ins.(*ssa.Go))
 						}
-						if debugFlag {
+						if DEBUGHBGraph {
 							log.Debug("Channel comm edge from Goroutine ", fromName, " [", (*sndN.Value).(goIns).goID, "] to Goroutine ", toName, " [", nGo, "]")
 						}
 						if err != nil {

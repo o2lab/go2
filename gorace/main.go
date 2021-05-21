@@ -188,7 +188,7 @@ func main() { //default: -useNewPTA
 	withComm := flag.Bool("withComm", false, "Show analysis results with communication consideration.")
 	analyzeAll := flag.Bool("analyzeAll", false, "Analyze all main() entry-points. ")
 	runTest := flag.Bool("runTest", false, "For micro-benchmark debugging... ")
-	showStack := flag.Bool("show", false, "Show call stack of each racy access. ")
+	showStack := flag.Bool("show", true, "Show call stack of each racy access. ")
 	//setTrie := flag.Int("trieLimit", 1, "Set trie limit... ")
 	flag.Parse()
 	//if *setTrie > 1 {
@@ -215,7 +215,8 @@ func main() { //default: -useNewPTA
 		useNewPTA = false
 	}
 	if *debug {
-		debugFlag = true
+		DEBUG = true
+		DEBUGHBGraph = true
 		log.SetLevel(log.DebugLevel)
 	}
 	if *lockOps {
