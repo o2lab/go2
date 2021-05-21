@@ -622,7 +622,7 @@ func Analyze(config *Config) (result *Result, err error) {
 		return nil, err
 	}
 
-	if main.IsMainTest && len(_result.a.tests) == 0 {
+	if (!isMain || main.IsMainTest) && _result.a.tests == nil {
 		//TODO: bz: main.IsMainTest == true but we cannot find/link the test func now
 		//  reset to main mode, not test mode
 		_result.a.isMain = true
