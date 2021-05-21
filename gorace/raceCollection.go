@@ -534,16 +534,16 @@ func (a *analysis) printRace(counter int, race *raceInfo) {
 			a.racyStackTops = append(a.racyStackTops, colorOutput.ReplaceAllString(errMsg, ""))
 		}
 		log.Print(errMsg)
+		printSource(rwPos[i])
+
 		if goIDs[i] == 0 { // main goroutine
 			log.Println("\tin goroutine  ***  main  [ GoID #", goIDs[i], "] *** ")
 		} else {
 			log.Println("\tin goroutine  ***", a.goNames(a.goCalls[goIDs[i]].goIns), "[ GoID #", goIDs[i], "] *** ")
 		}
-
-		printSource(rwPos[i])
-		if i == 0 {
-			log.Info("\n")
-		}
+		//if i == 0 {
+		//	log.Info("\n") //bz: why?? not consistent
+		//}
 
 		if printStack {
 			var pathGo []int
@@ -587,6 +587,7 @@ func (a *analysis) printRace(counter int, race *raceInfo) {
 				}
 			}
 		}
+		log.Println()
 	}
 	log.Debug("Locks acquired before 1st access: ", locks1)
 	log.Debug("Locks acquired before 2nd access: ", locks2)
