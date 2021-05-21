@@ -13,26 +13,26 @@ import (
 */
 
 var (
-	useNewPTA      = true
-	trieLimit      = 2    // set as user config option later, an integer that dictates how many times a function can be called under identical context
-	efficiency     = true // configuration setting to avoid recursion in tested program
-	channelComm    = true // analyze channel communication
-	allEntries     = false
-	printDebugInfo = false //bz: replace the usage for old allEntries
-	useDefaultPTA  = false
-	printStack     = true
-	goTest         bool // running test script
-	debugFlag      bool
-	excludedFns    []string
-	testMode       = false  // Used by race_test.go for collecting output.
-	excludedPkgs   []string // ******** FOR ISSUE 14 *************
-	PTSlimit       int      // ******** FOR ISSUE 14 *************
-	PTAscope       []string // ******** FOR ISSUE 14 *************
+	useNewPTA     = true
+	trieLimit     = 2    // set as user config option later, an integer that dictates how many times a function can be called under identical context
+	efficiency    = true // configuration setting to avoid recursion in tested program
+	channelComm   = true // analyze channel communication
+	allEntries    = false
+	DEBUG         = false //bz: replace the usage for old allEntries -> print out verbose debug info
+	useDefaultPTA = false
+	printStack    = true
+	goTest        bool // running test script
+	debugFlag     bool
+	excludedFns   []string
+	testMode      = false  // Used by race_test.go for collecting output.
+	excludedPkgs  []string // ******** FOR ISSUE 14 *************
+	PTSlimit      int      // ******** FOR ISSUE 14 *************
+	PTAscope      []string // ******** FOR ISSUE 14 *************
 
 	userDir        string //bz: user specify dir -> we run gorace here
 	userInputFile  []string //bz: used when input is a .go file, not a path
 
-	turnOnSpinning = false //bz: if run this in goland, turn this off... this only works for terminal
+	turnOnSpinning = true //bz: if we run this in goland, turn this off... this only works for terminal
 
 	////bz: skip traversing some functions that are not important in detection (or too verbose, do not want to analyze)
 	//excludedFns = []string{ //bz: grpc specific, hasprefix

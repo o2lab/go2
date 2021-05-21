@@ -170,7 +170,7 @@ func (a *analysis) pointerNewAnalysisHandleFunc(ptr pointer.PointerWCtx, labels 
 			if call, ok := theIns.(*ssa.Call); ok {
 				invokeFunc := a.ptaRes.GetFreeVarFunc(theIns.Parent(), call, goInstr)
 				if invokeFunc == nil {
-					if printDebugInfo {
+					if DEBUG {
 						fmt.Println("no pta target@", theIns)
 					}
 					break //bz: pta cannot find the target. how?

@@ -17,7 +17,7 @@ func (a *analysis) runChecker() raceReport {
 	} else if !goTest {
 		a.efficiency = true
 	}
-	if printDebugInfo {
+	if DEBUG {
 		log.Info("Compiling stack trace for every Goroutine... ")
 		log.Debug(strings.Repeat("-", 35), "Stack trace begins", strings.Repeat("-", 35))
 	}
@@ -30,7 +30,7 @@ func (a *analysis) runChecker() raceReport {
 		a.traverseFn(mainFn, mainFn.Name(), 0, nil, false)
 	}
 
-	if printDebugInfo {
+	if DEBUG {
 		log.Debug(strings.Repeat("-", 35), "Stack trace ends", strings.Repeat("-", 35))
 	}
 	totalIns := 0
@@ -783,7 +783,7 @@ func (a *analysis) newGoroutine(info goroutineInfo) {
 	//a.RWIns[info.goID] = append(a.RWIns[info.goID], info.ssaIns)
 	newGoInfo := &goCallInfo{goIns: info.goIns, ssaIns: info.ssaIns}
 	a.goCalls[info.goID] = newGoInfo
-	if printDebugInfo {
+	if DEBUG {
 		if a.loopIDs[info.goID] > 0 {
 			a.goInLoop[info.goID] = true
 			log.Debug(strings.Repeat("-", 35), "Goroutine ", info.entryMethod.Name(), " (in loop)", strings.Repeat("-", 35), "[", info.goID, "]")
@@ -794,7 +794,7 @@ func (a *analysis) newGoroutine(info goroutineInfo) {
 	if len(a.lockSet[a.goCaller[info.goID]]) > 0 { // carry over lockset from parent goroutine
 		a.lockSet[info.goID] = a.lockSet[a.goCaller[info.goID]]
 	}
-	if printDebugInfo {
+	if DEBUG {
 		log.Debug(strings.Repeat(" ", a.levels[info.goID]), "PUSH ", info.entryMethod.Name(), " at lvl ", a.levels[info.goID])
 		//fnCall := fnCallIns{fnIns: info.entryMethod, goID: info.goID}
 		//stack := make([]fnCallInfo, len(a.storeFns))
