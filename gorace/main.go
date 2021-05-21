@@ -34,7 +34,7 @@ type analysis struct {
 	analysisStat stat
 	HBgraph      *graph.Graph
 	RWinsMap     map[goIns]graph.Node
-	trieMap      map[fnInfo]*trie    // map each function to a trie node
+	trieMap      map[fnInfo]*trie    // map each function to a trie node -> bz: now it includes all traversed fns
 	RWIns        [][]*insInfo // instructions grouped by goroutine
 	insMono      int                 // index of instruction (in main goroutine) before which the program is single-threaded
 	storeFns     []*fnCallInfo

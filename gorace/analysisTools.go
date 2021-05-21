@@ -24,9 +24,10 @@ func (a *analysis) runChecker() raceReport {
 	if a.testEntry != nil {
 		//bz: a test now uses itself as main context, tell pta which test will be analyzed for this analysis
 		a.ptaRes.AnalyzeTest(a.testEntry)
-		a.visitAllInstructions(a.testEntry, 0)
+		a.traverseFn(a.testEntry, a.testEntry.Name(), 0, nil, false)
 	} else {
-		a.visitAllInstructions(a.main.Func(a.entryFn), 0)
+		mainFn := a.main.Func(a.entryFn)
+		a.traverseFn(mainFn, mainFn.Name(), 0, nil, false)
 	}
 
 	if printDebugInfo {
@@ -36,14 +37,10 @@ func (a *analysis) runChecker() raceReport {
 	for g := range a.RWIns {
 		totalIns += len(a.RWIns[g])
 	}
-	//if !allEntries { //bz: we want this now
 	traversed := make(map[*ssa.Function]*ssa.Function)
 	for fn, _ := range a.trieMap { //bz: remove diff context for the same fn
 		traversed[fn.fnName] = fn.fnName
 	}
-	//if len(traversed) == 0 {
-	//	fmt.Print()
-	//}
 	doEndLog("Done  -- " + strconv.Itoa(len(a.RWIns)) + " goroutines analyzed! " + strconv.Itoa(len(traversed)) + " function traversed! " + strconv.Itoa(totalIns) + " instructions of interest detected! ")
 
 	if len(a.RWIns) == 1 { //bz: only main thread, no races.
@@ -52,7 +49,6 @@ func (a *analysis) runChecker() raceReport {
 			entryInfo: a.main.Pkg.Path(),
 		}
 	}
-	//}
 
 	if useDefaultPTA {
 		a.ptaRes0, _ = pta0.Analyze(a.ptaCfg0) // all queries have been added, conduct pointer analysis
@@ -370,15 +366,14 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 			return
 		}
 		if fn.Name() == a.entryFn {
-			if goID == 0 && len(a.storeFns) == 0 {
-				a.levels[goID] = 0 // initialize level count at main entry
+			if goID == 0 && len(a.storeFns) == 1 {
+				//a.levels[goID] = 0 // initialize level count at main entry -> bz: already initialized
 				a.loopIDs[goID] = 0
-				a.updateRecords(fn.Name(), goID, "PUSH ", fn, nil)
+				//a.updateRecords(fn.Name(), goID, "PUSH ", fn, nil) //bz: already pushed..
 				a.goStack = append(a.goStack, []*fnCallInfo{}) // initialize first interior slice for main goroutine
 			} else { //revisiting entry-point
 				return
 			}
-
 		}
 	}
 	if _, ok := a.levels[goID]; !ok && goID > 0 { // initialize level counter for new goroutine
@@ -807,13 +802,17 @@ func (a *analysis) newGoroutine(info goroutineInfo) {
 		//a.stackMap[fnCall] = stackInfo{fnCalls: stack}
 	}
 	a.levels[info.goID]++
+	var target *ssa.Function
 	switch info.goIns.Call.Value.(type) {
 	case *ssa.MakeClosure:
-		a.visitAllInstructions(info.goIns.Call.StaticCallee(), info.goID)
+		target = info.goIns.Call.StaticCallee()
 	case *ssa.TypeAssert:
-		a.visitAllInstructions(a.paramFunc, info.goID)
+		target = a.paramFunc
 	default:
-		a.visitAllInstructions(info.goIns.Call.StaticCallee(), info.goID)
+		target = info.goIns.Call.StaticCallee()
+	}
+	if target != nil {
+		a.traverseFn(target, target.Name(), info.goID, nil, false)
 	}
 }
 
@@ -830,27 +829,35 @@ func (a *analysis) recordIns(goID int, newIns ssa.Instruction) {
 
 // exploredFunction determines if we already visited this function
 func (a *analysis) exploredFunction(fn *ssa.Function, goID int, theIns ssa.Instruction) bool {
-	if a.fromExcludedFns(fn) {
-		return true
+	var csSlice []*ssa.Function
+	var csStr string
+
+	if theIns == nil { //bz: this happens when analyzing entry point, or from newGoroutine -> i only need a record
+		csStr = ""
+	} else {
+		if a.fromExcludedFns(fn) {
+			return true
+		}
+		if a.efficiency && !a.fromPkgsOfInterest(fn) { // for temporary debugging purposes only
+			return true
+		}
+		if sliceContainsInsInfoAt(a.RWIns[goID], theIns) >= 0 {
+			return true
+		}
+		theFn := fnCallInfo{fn, theIns}
+		if a.efficiency && sliceContainsFnCall(a.storeFns, theFn) { // for temporary debugging purposes only
+			return true
+		}
+		var visitedIns []*insInfo
+		if len(a.RWIns) > 0 {
+			visitedIns = a.RWIns[goID]
+		}
+		csSlice, csStr = insToCallStack(visitedIns)
+		if sliceContainsFnCtr(csSlice, fn) > trieLimit {
+			return true
+		}
 	}
-	if a.efficiency && !a.fromPkgsOfInterest(fn) { // for temporary debugging purposes only
-		return true
-	}
-	if sliceContainsInsInfoAt(a.RWIns[goID], theIns) >= 0 {
-		return true
-	}
-	theFn := fnCallInfo{fn, theIns}
-	if a.efficiency && sliceContainsFnCall(a.storeFns, theFn) { // for temporary debugging purposes only
-		return true
-	}
-	var visitedIns []*insInfo
-	if len(a.RWIns) > 0 {
-		visitedIns = a.RWIns[goID]
-	}
-	csSlice, csStr := insToCallStack(visitedIns)
-	if sliceContainsFnCtr(csSlice, fn) > trieLimit {
-		return true
-	}
+
 	fnKey := fnInfo{
 		fnName:     fn,
 		contextStr: csStr,
@@ -879,10 +886,12 @@ func (t trie) isBudgetExceeded() bool {
 func (a *analysis) traverseFn(fn *ssa.Function, fnName string, goID int, theIns ssa.Instruction, lock bool) {
 	if !a.exploredFunction(fn, goID, theIns) {
 		a.updateRecords(fnName, goID, "PUSH ", fn, theIns)
-		a.recordIns(goID, theIns)
+		if theIns != nil { //bz: this happens when analyzing entry point, or from newGoroutine
+			a.recordIns(goID, theIns)
+		}
 		a.visitAllInstructions(fn, goID)
 	}
-	if lock {
+	if lock { //bz: this happens when analyzing entry point, or from newGoroutine -> will always be false
 		a.updateLockMap(goID, theIns)
 		a.updateRLockMap(goID, theIns)
 	}
