@@ -257,25 +257,36 @@ func determineScope(main *ssa.Package, pkgs []*ssa.Package) {
 		if len(files) == 1 && tmp == "command-line-arguments" { //only 1 file -> no specific pkg
 			PTAscope = append(PTAscope, "command-line-arguments")
 		}else{ //one/multi files or sub dirs with pkg name
-			PTAscope = append(PTAscope, tmp)
+			modScope := recursiveGetScopeFromGoMod(tmp)
+			if modScope != "" {
+				PTAscope = append(PTAscope, modScope)
+			} else {//cannot locate the correct go.mod
+				PTAscope = append(PTAscope, tmp)
+			}
 		}
 	} else { //multiple pkg -> see if we can find go.mod
-		modScope := getScopeFromGOMod()
+		modScope := getScopeFromGOMod("")
 		if modScope != "" {
 			PTAscope = append(PTAscope, modScope)
 		}else {// multiple pkgs: 1st pkg might be the root dir that user run gorace,
 			// need to check with other pkgs, since they all share the most left pkg path
 			tmp := pkgs[0].Pkg.Path()
-			for _, pkg := range pkgs {
-				p1 := pkg.Pkg.Path()
-				if strings.HasPrefix(p1, tmp) {
-					continue
-				}else{ //p1 has shorter path, use this
-					tmp = p1
+			modScope := recursiveGetScopeFromGoMod(tmp)
+			if modScope != "" {
+				PTAscope = append(PTAscope, modScope)
+			} else {
+				//cannot locate the correct go.mod
+				for _, pkg := range pkgs {
+					p1 := pkg.Pkg.Path()
+					if strings.HasPrefix(p1, tmp) {
+						continue
+					}else{ //p1 has shorter path, use this
+						tmp = p1
+					}
 				}
+				//until find the shortest path among all pkgs
+				PTAscope = append(PTAscope, tmp)
 			}
-			//until find the shortest path among all pkgs
-			PTAscope = append(PTAscope, tmp)
 		}
 	}
 
@@ -292,11 +303,34 @@ func determineScope(main *ssa.Package, pkgs []*ssa.Package) {
 }
 
 //bz:
-func getScopeFromGOMod() string {
-	path, err := os.Getwd() //current working directory == project path
+func recursiveGetScopeFromGoMod(tmpScope string) string {
+	curPath, err := os.Getwd() //current
 	if err != nil {
 		panic("Error while os.Getwd: " + err.Error())
 	}
+	idx := strings.LastIndex(curPath, "/")
+	for idx > 0 {
+		checkPath := curPath[:idx]
+		modScope := getScopeFromGOMod(checkPath)
+		if modScope != "" && strings.HasPrefix(tmpScope, modScope){
+			return modScope
+		}else{
+			idx = strings.LastIndex(checkPath, "/")
+		}
+	}
+	return ""
+}
+
+//bz:
+func getScopeFromGOMod(path string) string {
+	if path == "" {
+		var err error
+		path, err = os.Getwd() //current working directory == project path
+		if err != nil {
+			panic("Error while os.Getwd: " + err.Error())
+		}
+	}
+
 	gomodFile, err := os.Open(path + "/go.mod") // For read access.
 	if err != nil {
 		return "" //no such file

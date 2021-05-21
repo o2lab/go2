@@ -187,9 +187,7 @@ func (a *analysis) runChecker() raceReport {
 
 	if len(a.RWIns) == 1 { //bz: only main thread, no races.
 		log.Info("Only has the main goroutine, no need to continue. Return. ")
-		return raceReport{
-			entryInfo: a.main.Pkg.Path(),
-		}
+		return a.getRaceReport()
 	}
 
 	if useDefaultPTA {
@@ -224,15 +222,21 @@ func (a *analysis) runChecker() raceReport {
 	doEndLog("Done  -- Happens-Before graph built ")
 	log.Info("Checking for data races... ") //bz: no spinner -> we need to print out ...
 	//}
+	rr := a.getRaceReport()
+	rr.racePairs = a.checkRacyPairs()
+
+	return rr
+}
+
+//bz:
+func (a *analysis) getRaceReport() raceReport {
 	entryStr := a.main.Pkg.Path()
 	if a.testEntry != nil {
-		entryStr = entryStr + a.testEntry.Name() //duplicate name in summary
+		entryStr = a.testEntry.String() //duplicate name in summary
 	}
 	rr := raceReport{
 		entryInfo: entryStr,
 	}
-	rr.racePairs = a.checkRacyPairs()
-
 	return rr
 }
 
