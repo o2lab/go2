@@ -229,7 +229,7 @@ func (a *analysis) runChecker() raceReport {
 		entryStr = entryStr + a.testEntry.Name() //duplicate name in summary
 	}
 	rr := raceReport{
-		entryInfo: a.main.Pkg.Path(),
+		entryInfo: entryStr,
 	}
 	rr.racePairs = a.checkRacyPairs()
 
