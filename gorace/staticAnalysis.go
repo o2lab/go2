@@ -416,7 +416,8 @@ func (runner *AnalysisRunner) Run2() error {
 	var initial []*packages.Package
 	initial, _ = packages.Load(cfg, userInputFile ... )
 	if len(initial) == 0 {
-		log.Panic("No Go files detected. ")
+		doEndLog("No Go files detected. Return. ")
+		return nil
 	}
 	doEndLog("Done  -- " + strconv.Itoa(len(initial)) + " packages detected.")
 
