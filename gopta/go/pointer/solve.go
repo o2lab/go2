@@ -22,8 +22,9 @@ type solverState struct {
 
 //bz: to limit the size of pts
 var (
-	ptsLimit int
-	skipIDs  map[int]int //these pts reach the ptsLimit, skip their solving if added to worklist
+	ptsLimit  int
+	skipIDs   map[int]int //these pts reach the ptsLimit, skip their solving if added to worklist
+	skipNewFn bool        //bz: do we skip create new fn/cgn/constraints on the fly in invokeConstraint.solve
 )
 
 func (a *analysis) solve() {
@@ -124,6 +125,9 @@ func (a *analysis) solveDefault() {
 func (a *analysis) solveLimit() {
 	//setting
 	ptsLimit = flags.PTSLimit
+	if len(a.constraints) > 5000000 {
+		skipNewFn = true //bz: too much ... cannot finish
+	}
 	skipIDs = make(map[int]int)
 	if flags.DoPrintInfo {
 		fmt.Println(" *** PTS Limit:", ptsLimit, "*** ")
@@ -472,6 +476,10 @@ func (c *invokeConstraint) solve(a *analysis, delta *nodeset) {
 		fnObj := a.globalobj[fn] // dynamic calls use shared contour  ---> bz: fnObj is nodeid
 
 		if fnObj == 0 { //bz: because a.objectNode(fn) was not called during gen phase or fn is stored at other fields
+			if skipNewFn {
+				//bz: already too many cgn/fn ... skip creating on the fly TODO: this needs to be fixed
+				return
+			}
 			//bz: this should not create new constraints anymore; just retrieve the existing nodeid for fn
 			fnObj = a.genMissingFn(fn, c.caller, c.site, "online") // should not create any new things if using DoCallback && preSolve()
 			if fnObj == 0 {                                        //return 0 for out of scope functions

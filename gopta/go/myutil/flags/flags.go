@@ -23,9 +23,9 @@ var TimeLimit time.Duration //bz: time limit set by users, unit: ?h?m?s
 
 //my use
 var PrintCGNodes = false  //bz: print #cgnodes (before solve())
-var DoPerformance = false //bz: print out all statistics (time, number)
 var DoDetail = false      //bz: print out all data from countReachUnreachXXX
 var DoCommonPart = false  //bz: do compute common path
+var DoPerformance = false //bz: print out all statistics (time, number)
 var DoPrintInfo = false   //bz: whether we print out the details of config and other process info
 
 //different run scenario
