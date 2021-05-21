@@ -258,7 +258,8 @@ func (a *analysis) checkRacyPairs() []*raceInfo {
 						//}
 
 						if a.sameAddress(addressPair[0], addressPair[1], i, j) &&
-							!sliceContains(a, races, addressPair, i, j) &&
+							//!strictSliceContains(races, addressPair) && //bz: this has no duplciate race locations
+							!sliceContains(a, races, addressPair, i, j) && //bz: this reports the same race locations with different traces/goids
 							!a.reachable(goI.ins, i, goJ.ins, j) &&
 							!a.reachable(goJ.ins, j, goI.ins, i) &&
 							!a.bothAtomic(insSlice[0].ins, insSlice[1].ins) &&
