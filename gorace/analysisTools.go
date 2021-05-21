@@ -224,6 +224,10 @@ func (a *analysis) runChecker() raceReport {
 	doEndLog("Done  -- Happens-Before graph built ")
 	log.Info("Checking for data races... ") //bz: no spinner -> we need to print out ...
 	//}
+	entryStr := a.main.Pkg.Path()
+	if a.testEntry != nil {
+		entryStr = entryStr + a.testEntry.Name() //duplicate name in summary
+	}
 	rr := raceReport{
 		entryInfo: a.main.Pkg.Path(),
 	}
