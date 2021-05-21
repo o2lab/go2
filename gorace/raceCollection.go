@@ -265,8 +265,8 @@ func (a *analysis) checkRacyPairs() []*raceInfo {
 							!a.bothAtomic(insSlice[0].ins, insSlice[1].ins) &&
 							!a.lockSetsIntersect(goI.ins, goJ.ins, i, j) &&
 							!a.selectMutEx(insSlice[0].ins, insSlice[1].ins) &&
-							!a.mutuallyExcluded(goI, i, goJ, j) &&
-							!a.fromLibrary(addressPair) {
+							!a.mutuallyExcluded(goI, i, goJ, j) {
+						//&& !a.fromLibrary(addressPair)
 							ri = &raceInfo{
 								insPair:  insSlice,
 								addrPair: addressPair,

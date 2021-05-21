@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	pta0 "github.com/april1989/origin-go-tools/go/pointer_default"
 	"github.com/april1989/origin-go-tools/go/ssa"
 	log "github.com/sirupsen/logrus"
@@ -41,6 +42,9 @@ func (a *analysis) runChecker() raceReport {
 	for fn, _ := range a.trieMap { //bz: remove diff context for the same fn
 		traversed[fn.fnName] = fn.fnName
 	}
+	//if len(traversed) == 0 {
+	//	fmt.Print()
+	//}
 	doEndLog("Done  -- " + strconv.Itoa(len(a.RWIns)) + " goroutines analyzed! " + strconv.Itoa(len(traversed)) + " function traversed! " + strconv.Itoa(totalIns) + " instructions of interest detected! ")
 
 	if len(a.RWIns) == 1 { //bz: only main thread, no races.

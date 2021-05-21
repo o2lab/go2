@@ -278,8 +278,8 @@ func determineScope(pkgs []*ssa.Package) []string {
 		scope[0] = pkgs[1].Pkg.Path()
 	} else if len(pkgs) > 1 {
 		scope[0] = strings.Split(pkgs[1].Pkg.Path(), "/")[0] + "/" + strings.Split(pkgs[1].Pkg.Path(), "/")[1]
-		if strings.Contains(pkgs[1].Pkg.Path(), "checker") {
-			scope[0] += "/race-checker"
+		if strings.Contains(pkgs[1].Pkg.Path(), "gorace") {
+			scope[0] += "/gorace"
 		}
 		if strings.Contains(pkgs[1].Pkg.Path(), "ethereum") {
 			scope[0] += "/go-ethereum"
