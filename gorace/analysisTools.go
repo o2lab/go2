@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	pta0 "github.com/april1989/origin-go-tools/go/pointer_default"
 	"github.com/april1989/origin-go-tools/go/ssa"
 	log "github.com/sirupsen/logrus"
