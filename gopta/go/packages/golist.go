@@ -288,7 +288,8 @@ func handleDriverUnderDir(restPatterns []string, patterns []string, response *re
 				return nil
 			})
 			if err != nil {
-				panic(fmt.Sprintf("!!! Windows: path walker failed with err: %s\n", err))
+				fmt.Println("Cannot list all directories under path " + cfg.Dir + "; failed with:" + err.Error())
+				return
 			}
 
 			if len(subdirs) > 0 {
@@ -303,7 +304,8 @@ func handleDriverUnderDir(restPatterns []string, patterns []string, response *re
 			cmd.Stderr = &stderr
 			cmderr := cmd.Run()
 			if cmderr != nil { //bz: change to panic
-				panic(fmt.Sprintf("!!! cmd.Run() failed with %s\n", cmderr))
+				fmt.Println("Cannot list all directories under path " + cmd.Dir + "; failed with:" + cmderr.Error())
+				return
 			}
 			outStr, _ := string(stdout.Bytes()), string(stderr.Bytes())
 			//fmt.Printf("run ls cmd. out:\n%s\nerr:\n%s\n", outStr, errStr) //bz: for me to debug
