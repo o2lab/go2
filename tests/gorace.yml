@@ -10,5 +10,4 @@ goracecfgs:
 
   # provide scope on which to perform race checking analysis
     analysisScope:
-      - command-line-arguments # if analyzing only one .go file
-      - github.com/o2lab/gorace # if analyzing a package, use the go module name here
+#      - github.com/o2lab/gorace # if analyzing a package, use the go module name here

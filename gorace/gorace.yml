@@ -10,5 +10,5 @@ goracecfgs:
 
   # provide scope on which to perform race checking analysis
     analysisScope:
-      - github.com/o2lab/gorace
+#      - github.com/o2lab/gorace
 #      - github.com/april1989/origin-go-tools

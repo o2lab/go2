@@ -30,16 +30,17 @@ var (
 	goTest        bool   // running test script
 	excludedFns   []string
 	testMode      = false // Used by race_test.go for collecting output.
+	PTAscope      []string
 
-	//for our debug use: default value here
+	//for our debug use: default value here: false false true
 	DEBUG          = false //bz: replace the usage for old allEntries -> print out verbose debug info
 	DEBUGHBGraph   = false //bz: print out verbose debug info in buildHB()
-	turnOnSpinning = true  //bz: if we run this in goland, turn this off... this only works for terminal
+	turnOnSpinning = false //bz: if we run this in goland, turn this off... this only works for terminal
 
 	//from users yml or flags
 	allEntries    = false  //user flag
 	excludedPkgs  []string // ******** FOR ISSUE 14 *************
-	PTAscope      []string // ******** FOR ISSUE 14 *************
+	inputScope      []string //bz: this can be nil -> default is to analyze the current folder
 	userDir       string   //bz: user specify dir -> we run gorace here
 	userInputFile []string //bz: used when input is a .go file, not a path
 
@@ -60,12 +61,12 @@ type GoRace struct {
 type GoRaceCfg struct {
 	ExPkgs []string `yaml:"excludePkgs"`
 	PTS    int      `yaml:"PTSlimit"`
-	Scope  []string   `yaml:"analysisScope"`
+	Scope  []string `yaml:"analysisScope"`
 }
 
 //bz: move the config in main.go here
 func ParseFlagsAndInput() { //default: -useNewPTA
-	newPTA := flag.Bool("useNewPTA", false, "Use the new pointer analysis in go_tools.")
+	newPTA := flag.Bool("useNewPTA", true, "Use the new pointer analysis in go_tools.")
 	builtinPTA := flag.Bool("useDefaultPTA", false, "Use the built-in pointer analysis.")
 	debug := flag.Bool("debug", false, "Prints log.Debug messages.")
 	lockOps := flag.Bool("lockOps", false, "Prints lock and unlock operations. ")
@@ -119,7 +120,6 @@ func ParseFlagsAndInput() { //default: -useNewPTA
 		allEntries = true
 	}
 
-	// from Dr. H : input a dir or .go file
 	input := flag.Args()
 	if len(input) != 1 {
 		fmt.Fprintf(os.Stderr, "Must provide one analysis directory: %v\n", input)
@@ -141,7 +141,7 @@ func ParseFlagsAndInput() { //default: -useNewPTA
 			tmp := userDir
 			idx := strings.LastIndex(tmp, "/")
 			userDir = tmp[0:idx]
-			userInputFile = append(userInputFile, tmp[idx + 1:])
+			userInputFile = append(userInputFile, tmp[idx+1:])
 		}
 	}
 
@@ -172,7 +172,12 @@ func ParseFlagsAndInput() { //default: -useNewPTA
 func DecodeYmlFile(absPath string) {
 	grfile, err := ioutil.ReadFile(absPath)
 	if err != nil {
-		log.Fatal("No gorace.yml file found in current directory:", absPath, ". Please provide gorace.yml file with config info. ")
+		log.Info("No gorace.yml file found in current directory:", absPath, ". Use default values.") //Please provide gorace.yml file with config info.
+		//use default
+		excludedPkgs = append(excludedPkgs, "fmt")
+		excludedPkgs = append(excludedPkgs, "logrus")
+		flags.PTSLimit = 10
+		return
 	}
 	grs := GoRace{}
 	err = yaml.Unmarshal(grfile, &grs)
@@ -183,6 +188,6 @@ func DecodeYmlFile(absPath string) {
 	for _, eachCfg := range grs.GoRaceCfgs {
 		excludedPkgs = eachCfg.ExPkgs
 		flags.PTSLimit = eachCfg.PTS //bz: limit the size of pts
-		PTAscope = eachCfg.Scope
+		inputScope = eachCfg.Scope
 	}
 }

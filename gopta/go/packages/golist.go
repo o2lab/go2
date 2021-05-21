@@ -198,10 +198,12 @@ extractQueries:
 	//        hence we are going to make this recursively traverse the subdir under the initial cfg.Dir
 	if len(restPatterns) > 0 || len(patterns) == 0 {
 		dr, err := state.createDriverResponse(restPatterns...) //bz: run go list cmd
-		if err != nil {
+		if err != nil && !strings.Contains(err.Error(), "cannot find main module") { //bz: we might have different .go files, each has a main, but not as a pkg
 			return nil, err
 		}
-		response.addAll(dr)
+		if dr != nil {
+			response.addAll(dr)
+		}
 
 		//bz: when run under proj dir, find all mains
 		handleDriverUnderDir(restPatterns, patterns, response, cfg, ctx)
@@ -259,6 +261,42 @@ extractQueries:
 	return response.dr, nil
 }
 
+//bz: as name
+func findRecursiveDirs(cfg *Config,) []string {
+	cmd := exec.Command("find", ".", "-type", "d")
+	cmd.Dir = cfg.Dir   //set cmd dir
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	cmderr := cmd.Run()
+	if cmderr != nil { //bz: change to panic
+		fmt.Println("Cannot list all directories under path " + cmd.Dir + "; failed with:" + cmderr.Error())
+		return nil
+	}
+	outStr, _ := string(stdout.Bytes()), string(stderr.Bytes())
+	//fmt.Printf("run ls cmd. out:\n%s\nerr:\n%s\n", outStr, errStr) //bz: for me to debug
+	subdirs := strings.Split(outStr, "\n") //bz: record the future dir we need to traverse
+	return subdirs
+}
+
+//bz: as name
+func findRecursiveFiles(dir string) []string {
+	cmd := exec.Command("find", ".", "-type", "f")
+	cmd.Dir = dir   //set cmd dir
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	cmderr := cmd.Run()
+	if cmderr != nil { //bz: change to panic
+		fmt.Println("Cannot list all files under path " + cmd.Dir + "; failed with:" + cmderr.Error())
+		return nil
+	}
+	outStr, _ := string(stdout.Bytes()), string(stderr.Bytes())
+	//fmt.Printf("run ls cmd. out:\n%s\nerr:\n%s\n", outStr, errStr) //bz: for me to debug
+	files := strings.Split(outStr, "\n") //bz: record the future dir we need to traverse
+	return files
+}
+
 //bz: when run under proj dir, find all mains
 func handleDriverUnderDir(restPatterns []string, patterns []string, response *responseDeduper, cfg *Config, ctx context.Context) {
 	skip := false
@@ -297,21 +335,8 @@ func handleDriverUnderDir(restPatterns []string, patterns []string, response *re
 				goListDriverRecursiveSeq(subdirs, response, cfg, ctx, restPatterns)
 			}
 		} else { //default: Unix (MacOS + Ubuntu)
-			cmd := exec.Command("find", ".", "-type", "d")
-			cmd.Dir = cfg.Dir   //set cmd dir
-			var stdout, stderr bytes.Buffer
-			cmd.Stdout = &stdout
-			cmd.Stderr = &stderr
-			cmderr := cmd.Run()
-			if cmderr != nil { //bz: change to panic
-				fmt.Println("Cannot list all directories under path " + cmd.Dir + "; failed with:" + cmderr.Error())
-				return
-			}
-			outStr, _ := string(stdout.Bytes()), string(stderr.Bytes())
-			//fmt.Printf("run ls cmd. out:\n%s\nerr:\n%s\n", outStr, errStr) //bz: for me to debug
-			subdirs = strings.Split(outStr, "\n") //bz: record the future dir we need to traverse
-
-			if len(subdirs) - 2 > 0 {
+			subdirs = findRecursiveDirs(cfg)
+			if subdirs != nil && len(subdirs) - 2 > 0 {
 				//goListDriverRecursive(subdirs, size, response, cfg, ctx, restPatterns)
 				goListDriverRecursiveSeq(subdirs, response, cfg, ctx, restPatterns)
 			}
@@ -346,11 +371,56 @@ func goListDriverRecursiveSeq(subdirs []string, response *responseDeduper, cfg *
 			vendorDirs: map[string]bool{},
 		}
 		_dr, _err := _state.createDriverResponse(restPatterns...)
-		if _err != nil {
+		if _err != nil && !strings.Contains(_err.Error(), "cannot find main module") {
 			fmt.Println("ERROR from _state.createDriverResponse: %s", _err)
 		}
 		if _dr != nil {
 			response.addAll(_dr)
+		}
+	}
+
+	if response.dr.Packages == nil && response.dr.Roots == nil {
+		//bz: all subdir has no go.mod, we need to check the inside files, they may be .go with main function
+		for i := 1; i < len(subdirs)-1; i++ { //bz: 1st element is ".", the last element is "", skip them
+			subdir := subdirs[i]
+			var realDir string //os dependent var
+			if runtime.GOOS == "windows" {
+				realDir = subdir //bz: windows path
+			} else {
+				realDir = cfg.Dir + subdir[1:] // bz: we update this. remove the "." in subdir
+			}
+			_cfg := &Config{
+				Mode:    LoadAllSyntax,
+				Context: cfg.Context,
+				Logf:    cfg.Logf,
+				Dir:     realDir,
+				Env:     cfg.Env,
+				Tests:   cfg.Tests,
+			}
+			_state := &golistState{
+				cfg:        _cfg,
+				ctx:        ctx,
+				vendorDirs: map[string]bool{},
+			}
+
+			files := findRecursiveFiles(subdir)
+			for j := 0; j < (len(files) - 1); j++ {
+				file := files[j]
+				if !strings.HasSuffix(file, ".go") {
+					continue
+				}
+				var _restPatterns []string
+				_restPatterns = append(_restPatterns, file[2:])
+				_dr, err := _state.createDriverResponse(_restPatterns...) //bz: run go list cmd
+				if err != nil && !strings.Contains(err.Error(), "cannot find main module") { //bz: we might have different .go files, each has a main, but not as a pkg
+					fmt.Println("ERROR from _state.createDriverResponse: %s", err)
+					continue
+				}
+				if _dr != nil {
+					//TODO: bz: all go2/tests/* have pkg name "command-line-arguments" -> distinguish them ...
+					response.addAll(_dr)
+				}
+			}
 		}
 	}
 }

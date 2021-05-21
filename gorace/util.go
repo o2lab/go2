@@ -16,7 +16,6 @@ import (
 	"time"
 )
 
-
 //bz: global -> all use the same one
 var spin *spinner.Spinner
 
@@ -26,11 +25,11 @@ func doStartLog(_log string) {
 			spin = spinner.New(spinner.CharSets[9], 100*time.Millisecond) // Build our new spinner
 			spin.Suffix = _log
 			spin.Start()
-		}else{
+		} else {
 			spin.Suffix = _log
 			spin.Restart()
 		}
-	}else{
+	} else {
 		log.Info(_log)
 	}
 }
@@ -39,8 +38,8 @@ func doEndLog(args ...interface{}) {
 	if turnOnSpinning {
 		spin.FinalMSG = fmt.Sprint(args[0]) + "\n"
 		spin.Stop()
-	}else{
-		log.Info(args ... )
+	} else {
+		log.Info(args...)
 	}
 }
 
@@ -141,35 +140,59 @@ func pkgSelection(initial []*packages.Package) ([]*ssa.Package, *ssa.Program, []
 			}
 			pkgMap[key] = exist
 		}
-		// Provide entry-point options and retrieve user selection
-		fmt.Println(len(mainPkgs), "main() entry-points identified: ")
-		for i, ep := range mainPkgs {
-			//bz: check if exist duplicate
-			pkgStr := ep.String()
-			if dup := pkgMap[pkgStr]; len(dup) > 1 {
-				isTest := false
-				for memName, _ := range ep.Members {
-					if isGoTestForm(memName) {
-						isTest = true
-						break
-					}
-				}
-				if isTest {
-					//bz: this is test cases for main pkg, but go ssa/pkg builder cannot identify the diff, so they use the same pkg name but different contents
-					ep.IsMainTest = true //bz: mark it -> change the code in pta is too complex, just mark it
-					fmt.Println("Option", i+1, ": ", ep.String()+".main.test")
-					continue
-				}
-			}
-			//all other
-			fmt.Println("Option", i+1, ": ", ep.String())
-		}
+		//// Provide entry-point options and retrieve user selection
+		//fmt.Println(len(mainPkgs), "main() entry-points identified: ")
+		//for i, ep := range mainPkgs {
+		//	//bz: check if exist duplicate
+		//	pkgStr := ep.String()
+		//	if dup := pkgMap[pkgStr]; len(dup) > 1 {
+		//		isTest := false
+		//		for memName, _ := range ep.Members {
+		//			if isGoTestForm(memName) {
+		//				isTest = true
+		//				break
+		//			}
+		//		}
+		//		if isTest {
+		//			//bz: this is test cases for main pkg, but go ssa/pkg builder cannot identify the diff, so they use the same pkg name but different contents
+		//			ep.IsMainTest = true //bz: mark it -> change the code in pta is too complex, just mark it
+		//			fmt.Println("Option", i+1, ": ", ep.String()+".main.test")
+		//			continue
+		//		}
+		//	}
+		//	//all other
+		//	fmt.Println("Option", i+1, ": ", ep.String())
+		//}
 		if allEntries { // no selection from user required
+			fmt.Println(len(mainPkgs), "main() entry-points identified. ")
 			for pInd := 0; pInd < len(mainPkgs); pInd++ {
 				mains = append(mains, mainPkgs[pInd])
 			}
 			log.Info("Iterating through all entry point options...")
 		} else {
+			// Provide entry-point options and retrieve user selection
+			fmt.Println(len(mainPkgs), "main() entry-points identified: ")
+			for i, ep := range mainPkgs {
+				//bz: check if exist duplicate
+				pkgStr := ep.String()
+				if dup := pkgMap[pkgStr]; len(dup) > 1 {
+					isTest := false
+					for memName, _ := range ep.Members {
+						if isGoTestForm(memName) {
+							isTest = true
+							break
+						}
+					}
+					if isTest {
+						//bz: this is test cases for main pkg, but go ssa/pkg builder cannot identify the diff, so they use the same pkg name but different contents
+						ep.IsMainTest = true //bz: mark it -> change the code in pta is too complex, just mark it
+						fmt.Println("Option", i+1, ": ", ep.String()+".main.test")
+						continue
+					}
+				}
+				//all other
+				fmt.Println("Option", i+1, ": ", ep.String())
+			}
 			fmt.Print("Enter option number of choice: \n")
 			fmt.Print("*** use space delimiter for multiple selections *** \n")
 			fmt.Print("*** use \"-\" for a range of selections *** \n")
@@ -214,71 +237,108 @@ func pkgSelection(initial []*packages.Package) ([]*ssa.Package, *ssa.Program, []
 	return mains, prog, pkgs
 }
 
-func determineScope(pkgs []*ssa.Package) []string {
-	if len(PTAscope) > 0 {
-		//bz: let's use the one from users
-		return PTAscope
+//bz: default behavior is like this:
+// use the user input dir/getwd as default scope; if scope in yml != nil, already add it to pta scope (when decode yml)
+func determineScope(main *ssa.Package, pkgs []*ssa.Package) {
+	if PTAscope != nil && len(PTAscope) > 0 {
+		//bz: already determined, return
+		return
 	}
-	var scope = make([]string, 1)
-	//if pkgs[0] != nil { // Note: only if main dir contains main.go.
-	//	scope[0] = pkgs[0].Pkg.Path() //bz: the 1st pkg has the scope info == the root pkg or default .go input
-	//} else
-	if pkgs[0] == nil && len(pkgs) == 1 {
-		log.Fatal("Error: No packages detected. Please verify directory provided contains Go Files. ")
-	} else if len(pkgs) > 1 && pkgs[1] != nil && !strings.Contains(pkgs[1].Pkg.Path(), "/") {
-		scope[0] = pkgs[1].Pkg.Path()
-	} else if len(pkgs) > 1 {
-		scope[0] = strings.Split(pkgs[1].Pkg.Path(), "/")[0] + "/" + strings.Split(pkgs[1].Pkg.Path(), "/")[1]
-		if strings.Contains(pkgs[1].Pkg.Path(), "gorace") {
-			scope[0] += "/gorace"
-		}
-		if strings.Contains(pkgs[1].Pkg.Path(), "ethereum") {
-			scope[0] += "/go-ethereum"
-		}
-		if strings.Contains(pkgs[1].Pkg.Path(), "grpc") {
-			scope[0] += "/go-grpc"
-		}
-	} else if len(pkgs) == 1 {
-		scope[0] = pkgs[0].Pkg.Path()
-	}
-	//scope[0] = "google.golang.org/grpc"
+	//bz: there are three cases:
+	// 1. user run under root dir of a project -> find the go.mod
+	// 2. user input is a .go file -> command-line-arguments
+	// 3. user run under a dir, but only one .go file (which must be the file with main function) -> command-line-arguments
+	// 4. user run under a dir, but has subdirs and/or .go files -> ??
 
-	//bz: update a bit to avoid duplicate scope addition, e.g., grpc
-	// return with error if error exist, skip panic
-	if len(scope) == 0 && len(pkgs) >= 1 && !goTest { // ** assuming more than one package detected in real programs
-		path, err := os.Getwd() //current working directory == project path
-		if err != nil {
-			panic("Error while os.Getwd: " + err.Error())
+	if len(pkgs) == 1 {
+		pkg := pkgs[0]
+		files := pkg.Files()
+		tmp := pkg.Pkg.Path()
+		if len(files) == 1 && tmp == "command-line-arguments" { //only 1 file -> no specific pkg
+			PTAscope = append(PTAscope, "command-line-arguments")
+		}else{ //one/multi files or sub dirs with pkg name
+			PTAscope = append(PTAscope, tmp)
 		}
-		gomodFile, err := os.Open(path + "/go.mod") // For read access.
-		if err != nil {
-			e0 := fmt.Errorf("Error while reading go.mod: " + err.Error())
-			fmt.Println(e0.Error())
-		}
-		defer gomodFile.Close()
-		scanner := bufio.NewScanner(gomodFile)
-		var mod string
-		for scanner.Scan() {
-			s := scanner.Text()
-			if strings.HasPrefix(s, "module ") {
-				mod = s
-				break //this is the line "module xxx.xxx.xx/xxx"
+	} else { //multiple pkg -> see if we can find go.mod
+		modScope := getScopeFromGOMod()
+		if modScope != "" {
+			PTAscope = append(PTAscope, modScope)
+		}else {// multiple pkgs: 1st pkg might be the root dir that user run gorace,
+			// need to check with other pkgs, since they all share the most left pkg path
+			tmp := pkgs[0].Pkg.Path()
+			for _, pkg := range pkgs {
+				p1 := pkg.Pkg.Path()
+				if strings.HasPrefix(p1, tmp) {
+					continue
+				}else{ //p1 has shorter path, use this
+					tmp = p1
+				}
 			}
+			//until find the shortest path among all pkgs
+			PTAscope = append(PTAscope, tmp)
 		}
-		if mod == "" {
-			e1 := fmt.Errorf("Cannot find go.mod in default location: " + gomodFile.Name())
-			fmt.Println(e1.Error())
-		}
-		if err2 := scanner.Err(); err2 != nil {
-			e2 := fmt.Errorf("Error while scanning go.mod: " + err2.Error())
-			fmt.Println(e2.Error())
-		}
-		parts := strings.Split(mod, " ")
-		scope = append(scope, parts[1])
 	}
-	return scope
+
+	if len(inputScope) > 0 { //user input
+		for _, s := range inputScope {
+			PTAscope = append(PTAscope, s)
+		}
+	}
 }
 
+//bz:
+func getScopeFromGOMod() string {
+	path, err := os.Getwd() //current working directory == project path
+	if err != nil {
+		panic("Error while os.Getwd: " + err.Error())
+	}
+	gomodFile, err := os.Open(path + "/go.mod") // For read access.
+	if err != nil {
+		return "" //no such file
+	}
+	defer gomodFile.Close()
+	scanner := bufio.NewScanner(gomodFile)
+	var mod string
+	for scanner.Scan() {
+		s := scanner.Text()
+		if strings.HasPrefix(s, "module ") {
+			mod = s
+			break //this is the line "module xxx.xxx.xx/xxx"
+		}
+	}
+	if mod == "" {
+		return "" //not format as expected
+	}
+	if err2 := scanner.Err(); err2 != nil {
+		return "" //scan error
+	}
+	parts := strings.Split(mod, " ")
+	return parts[1]
+}
+
+//var scope = make([]string, 1)
+////if pkgs[0] != nil { // Note: only if main dir contains main.go.
+////	scope[0] = pkgs[0].Pkg.Path() //bz: the 1st pkg has the scope info == the root pkg or default .go input
+////} else
+//if pkgs[0] == nil && len(pkgs) == 1 {
+//	log.Fatal("Error: No packages detected. Please verify directory provided contains Go Files. ")
+//} else if len(pkgs) > 1 && pkgs[1] != nil && !strings.Contains(pkgs[1].Pkg.Path(), "/") {
+//	scope[0] = pkgs[1].Pkg.Path()
+//} else if len(pkgs) > 1 {
+//	scope[0] = strings.Split(pkgs[1].Pkg.Path(), "/")[0] + "/" + strings.Split(pkgs[1].Pkg.Path(), "/")[1]
+//	if strings.Contains(pkgs[1].Pkg.Path(), "gorace") {
+//		scope[0] += "/gorace"
+//	}
+//	if strings.Contains(pkgs[1].Pkg.Path(), "ethereum") {
+//		scope[0] += "/go-ethereum"
+//	}
+//	if strings.Contains(pkgs[1].Pkg.Path(), "grpc") {
+//		scope[0] += "/go-grpc"
+//	}
+//} else if len(pkgs) == 1 {
+//	scope[0] = pkgs[0].Pkg.Path()
+//}
+////scope[0] = "google.golang.org/grpc"
 
 func getSrcPos(address ssa.Value) token.Pos {
 	var position token.Pos
@@ -294,7 +354,6 @@ func getSrcPos(address ssa.Value) token.Pos {
 	}
 	return position
 }
-
 
 func checkTokenName(varName string, theIns ssa.Instruction) string {
 	if strings.HasPrefix(varName, "t") { // function name begins with letter t

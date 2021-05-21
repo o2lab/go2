@@ -112,7 +112,7 @@ func (runner *AnalysisRunner) Run2() error {
 	var initial []*packages.Package
 	initial, _ = packages.Load(cfg, userInputFile ... )
 	if len(initial) == 0 {
-		doEndLog("No Go files detected. Return. ")
+		doEndLog("No Go package detected. Return. ")
 		return nil
 	}
 	doEndLog("Done  -- " + strconv.Itoa(len(initial)) + " packages detected.")
@@ -135,7 +135,7 @@ func (runner *AnalysisRunner) Run2() error {
 		// Configure pointer analysis...
 		doStartLog("Running Pointer Analysis... ")
 		if useNewPTA {
-			scope := determineScope(pkgs)
+			determineScope(main, pkgs)
 
 			var mains []*ssa.Package
 			mains = append(mains, main) //TODO: bz: optimize
@@ -153,7 +153,7 @@ func (runner *AnalysisRunner) Run2() error {
 				//shared config
 				K:          1,
 				LimitScope: true,         //bz: only consider app methods with origin
-				Scope:      scope,        //bz: analyze scope
+				Scope:      PTAscope,        //bz: analyze scope
 				Exclusion:  excludedPkgs, //bz: copied from gorace if any
 				TrackMore:  true,         //bz: track pointers with all types
 				Level:      0,            //bz: see pointer.Config
@@ -289,7 +289,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 	startExec := time.Now() // measure total duration of running entire code base
 	// Configure pointer analysis...
 	if useNewPTA {
-		scope := determineScope(pkgs)
+		determineScope(nil, pkgs)
 
 		//logfile, _ := os.Create("/Users/bozhen/Documents/GO2/pta_replaced/go2/gorace/pta_log_0") //bz: debug
 		flags.DoTests = true //bz: set to true if your folder has tests and you want to analyze them
@@ -303,7 +303,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 			//shared config
 			K:          1,
 			LimitScope: true,         //bz: only consider app methods with origin
-			Scope:      scope,        //bz: analyze scope
+			Scope:      PTAscope,        //bz: analyze scope
 			Exclusion:  excludedPkgs, //bz: copied from gorace if any
 			TrackMore:  true,         //bz: track pointers with all types
 			Level:      0,            //bz: see pointer.Config

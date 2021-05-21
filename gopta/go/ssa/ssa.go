@@ -62,6 +62,12 @@ type Package struct {
 	IsMainTest  bool
 }
 
+//bz: added -> determine scope ...
+func (p *Package) Files() []*ast.File {
+	return p.files
+}
+
+
 // A Member is a member of a Go package, implemented by *NamedConst,
 // *Global, *Function, or *Type; they are created by package-level
 // const, var, func and type declarations respectively.
