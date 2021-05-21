@@ -39,8 +39,14 @@ func printVarName(rwPos token.Position) string {
 	var isStringAlphabetic = regexp.MustCompile(`^[a-zA-Z0-9_]`).MatchString
 	for i := spaces; i < len(lineRmTabs); i++ {
 		if !isStringAlphabetic(lineRmTabs[i:i+1]) {
+			if spaces < 1 {
+				spaces = 1
+			}
 			return lineRmTabs[spaces-1:i] // TODO: test result to make sure it looks correct
 		}
+	}
+	if spaces < 1 {
+		spaces = 1
 	}
 	return lineRmTabs[spaces-1:spaces]
 }
