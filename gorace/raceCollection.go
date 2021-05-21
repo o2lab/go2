@@ -5,29 +5,12 @@ import (
 	"github.com/april1989/origin-go-tools/go/ssa"
 	"github.com/logrusorgru/aurora"
 	log "github.com/sirupsen/logrus"
-	"github.com/twmb/algoimpl/go/graph"
 	"go/token"
 	"regexp"
 	"strings"
 )
 
-func isLocal(ins ssa.Instruction) bool {
-	switch rw := ins.(type) {
-	case *ssa.UnOp:
-		if faddr, ok := rw.X.(*ssa.FieldAddr); ok {
-			if _, local := faddr.X.(*ssa.Alloc); local {
-				return true
-			}
-		}
-	case *ssa.Store:
-		if faddr, ok := rw.Addr.(*ssa.FieldAddr); ok {
-			if _, local := faddr.X.(*ssa.Alloc); local {
-				return true
-			}
-		}
-	}
-	return false
-}
+//bz: this file needs more classification
 
 func (a *analysis) canRunInParallel(goID1 int, goID2 int) bool {
 	paths := [2][]int{}          // thread traversal
@@ -202,6 +185,7 @@ func (a *analysis) mutuallyExcluded(goI *insInfo, I int, goJ *insInfo, J int) bo
 	return false
 }
 
+//bz: jeff says no now ... maybe need this later
 func (a *analysis) fromLibrary(addrPair [2]ssa.Value) bool {
 	for i := 0; i < 2; i++ {
 		if addrPair[i].Parent() != nil {
@@ -380,44 +364,6 @@ func (a *analysis) sameAddress(addr1 ssa.Value, addr2 ssa.Value, go1 int, go2 in
 	return ptr1.MayAlias(ptr2)
 }
 
-// reachable determines if 2 input instructions are connected in the Happens-Before Graph
-func (a *analysis) reachable(fromIns ssa.Instruction, fromGo int, toIns ssa.Instruction, toGo int) bool {
-	fromInsKey := goIns{ins: fromIns, goID: fromGo}
-	toInsKey := goIns{ins: toIns, goID: toGo}
-	fromNode := a.RWinsMap[fromInsKey] // starting node
-	toNode := a.RWinsMap[toInsKey]     // target node
-
-	//use breadth-first-search to traverse the Happens-Before Graph
-	var visited []graph.Node
-	q := &queue{}
-	q.enQueue(fromNode)
-	for !q.isEmpty() {
-		for size := q.size(); size > 0; size-- {
-			node := q.deQueue()
-			if node == toNode {
-				return true
-			}
-			for _, neighbor := range a.HBgraph.Neighbors(node) {
-				if sliceContainsNode(visited, neighbor) {
-					continue
-				}
-				visited = append(visited, neighbor)
-				q.enQueue(neighbor)
-			}
-		}
-	}
-	return false
-}
-
-func sliceContainsNode(slice []graph.Node, node graph.Node) bool {
-	for _, n := range slice {
-		if n.Value == node.Value {
-			return true
-		}
-	}
-	return false
-}
-
 // lockSetsIntersect determines if two input instructions are trying to access a variable that is protected by the same set of locks
 func (a *analysis) lockSetsIntersect(insA ssa.Instruction, insB ssa.Instruction, goA int, goB int) bool {
 	locksA := make([]ssa.Value, len(a.lockMap[insA])) // lockset of instruction-A
@@ -470,21 +416,6 @@ func (a *analysis) selectMutEx(insA ssa.Instruction, insB ssa.Instruction) bool 
 		}
 	}
 	return false
-}
-
-func getSrcPos(address ssa.Value) token.Pos {
-	var position token.Pos
-	switch param := address.(type) {
-	case *ssa.Parameter:
-		position = param.Pos()
-	case *ssa.FieldAddr:
-		position = param.Pos()
-	case *ssa.Alloc:
-		position = param.Pos()
-	case *ssa.FreeVar:
-		position = param.Pos()
-	}
-	return position
 }
 
 // printRace will print the details of a data race such as the write/read of a variable and other helpful information

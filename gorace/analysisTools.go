@@ -1,13 +1,155 @@
 package main
 
 import (
+	"github.com/april1989/origin-go-tools/go/pointer"
 	pta0 "github.com/april1989/origin-go-tools/go/pointer_default"
 	"github.com/april1989/origin-go-tools/go/ssa"
 	log "github.com/sirupsen/logrus"
 	"github.com/twmb/algoimpl/go/graph"
 	"strconv"
 	"strings"
+	"sync"
 )
+
+
+type analysis struct {
+	mu      sync.RWMutex
+	ptaRes  *pointer.Result //now can reuse the ptaRes
+	ptaRes0 *pta0.Result
+	ptaCfg  *pointer.Config
+	ptaCfg0 *pta0.Config
+
+	efficiency   bool
+	trieLimit    int
+	//getGo        bool // flag
+	prog         *ssa.Program
+	main         *ssa.Package
+	analysisStat stat
+	HBgraph      *graph.Graph
+	RWinsMap     map[goIns]graph.Node
+	trieMap      map[fnInfo]*trie    // map each function to a trie node -> bz: now it includes all traversed fns
+	RWIns        [][]*insInfo // instructions grouped by goroutine
+	insMono      int                 // index of instruction (in main goroutine) before which the program is single-threaded
+	storeFns     []*fnCallInfo
+	workList     []goroutineInfo
+	levels       map[int]int
+	lockMap      map[ssa.Instruction][]ssa.Value // map each read/write access to a snapshot of actively maintained lockset
+	lockSet      map[int][]*lockInfo             // active lockset, to be maintained along instruction traversal
+	RlockMap     map[ssa.Instruction][]ssa.Value // map each read/write access to a snapshot of actively maintained lockset
+	RlockSet     map[int][]*lockInfo             // active lockset, to be maintained along instruction traversal
+	getParam     bool
+	paramFunc       *ssa.Function
+	goStack         [][]*fnCallInfo
+	goCaller        map[int]int
+	goCalls         map[int]*goCallInfo
+	chanToken       map[string]string      // map token number to channel name
+	chanBuf         map[string]int         // map each channel to its buffer length
+	chanRcvs        map[string][]*ssa.UnOp // map each channel to receive instructions
+	chanSnds        map[string][]*ssa.Send // map each channel to send instructions
+	chanName        string
+	selectBloc      map[int]*ssa.Select             // index of block where select statement was encountered
+	selReady        map[*ssa.Select][]string        // store name of ready channels for each select statement
+	selUnknown      map[*ssa.Select][]string        // channels are passed in as parameters
+	selectCaseBegin map[ssa.Instruction]string      // map first instruction in clause to channel name
+	selectCaseEnd   map[ssa.Instruction]string      // map last instruction in clause to channel name
+	selectCaseBody  map[ssa.Instruction]*ssa.Select // map instructions to select instruction
+	selectDone      map[ssa.Instruction]*ssa.Select // map first instruction after select is done to select statement
+	ifSuccBegin     map[ssa.Instruction]*ssa.If     // map beginning of succ block to if statement
+	ifFnReturn      map[*ssa.Function]*ssa.Return   // map "if-containing" function to its final return
+	ifSuccEnd       map[ssa.Instruction]*ssa.Return // map ending of successor block to final return statement
+	commIfSucc      []ssa.Instruction               // store first ins of succ block that contains channel communication
+	omitComm        []*ssa.BasicBlock               // omit these blocks as they are race-free due to channel communication
+	racyStackTops   []string
+	inLoop          bool // entered a loop
+	goInLoop        map[int]bool
+	loopIDs         map[int]int // map goID to loopID
+	allocLoop       map[*ssa.Function][]string
+	bindingFV       map[*ssa.Go][]*ssa.FreeVar
+	//pbr             *ssa.Alloc //bz: this is not used
+	commIDs         map[int][]int
+	deferToRet      map[*ssa.Defer]ssa.Instruction
+
+	entryFn         string         //bz: move from global to analysis field
+	testEntry       *ssa.Function  //bz: test entry point -> just one!
+	otherTests      []*ssa.Function //bz: all other tests that are in the same test pkg, TODO: bz: exclude myself
+
+	twinGoID        map[*ssa.Go][]int //bz: whether two goroutines are spawned by the same loop; this might not be useful now since !sliceContains(a.reportedAddr, addressPair) && already filtered out the duplicate race check
+	//mutualTargets   map[int]*mutualFns //bz: this mutual exclusion is for this specific go id (i.e., int)
+}
+
+// fromPkgsOfInterest determines if a function is from a package of interest
+func (a *analysis) fromPkgsOfInterest(fn *ssa.Function) bool {
+	if fn.Pkg == nil || fn.Pkg.Pkg == nil {
+		if fn.IsFromApp { //bz: do not remove this ... otherwise will miss racy functions
+			return true
+		}
+		return false
+	}
+	if fn.Pkg.Pkg.Name() == "main" || fn.Pkg.Pkg.Name() == "cli" || fn.Pkg.Pkg.Name() == "testing" {
+		return true
+	}
+	for _, excluded := range excludedPkgs {
+		if fn.Pkg.Pkg.Name() == excluded || fn.Pkg.Pkg.Path() == excluded { //bz: some lib's Pkg.Name() == "Package", not the used import xxx; if so, check Pkg.Path()
+			return false
+		}
+	}
+	if a.efficiency && a.main.Pkg.Path() != "command-line-arguments" && !strings.HasPrefix(fn.Pkg.Pkg.Path(), strings.Split(a.main.Pkg.Path(), "/")[0]) { // path is dependent on tested program
+		return false
+	}
+	return true
+}
+
+func (a *analysis) fromExcludedFns(fn *ssa.Function) bool {
+	strFn := fn.String()
+	for _, ex := range excludedFns {
+		if strings.HasPrefix(strFn, ex) {
+			return true
+		}
+	}
+	return false
+}
+
+//bz: do not want to see this big block ...
+func initialAnalysis() *analysis {
+	return &analysis{
+		efficiency:      efficiency,
+		trieLimit:       trieLimit,
+		RWinsMap:        make(map[goIns]graph.Node),
+		trieMap:         make(map[fnInfo]*trie),
+		insMono:         -1,
+		levels:          make(map[int]int),
+		lockMap:         make(map[ssa.Instruction][]ssa.Value),
+		lockSet:         make(map[int][]*lockInfo),
+		RlockMap:        make(map[ssa.Instruction][]ssa.Value),
+		RlockSet:        make(map[int][]*lockInfo),
+		goCaller:        make(map[int]int),
+		goCalls:         make(map[int]*goCallInfo),
+		chanToken:       make(map[string]string),
+		chanBuf:         make(map[string]int),
+		chanRcvs:        make(map[string][]*ssa.UnOp),
+		chanSnds:        make(map[string][]*ssa.Send),
+		selectBloc:      make(map[int]*ssa.Select),
+		selReady:        make(map[*ssa.Select][]string),
+		selUnknown:      make(map[*ssa.Select][]string),
+		selectCaseBegin: make(map[ssa.Instruction]string),
+		selectCaseEnd:   make(map[ssa.Instruction]string),
+		selectCaseBody:  make(map[ssa.Instruction]*ssa.Select),
+		selectDone:      make(map[ssa.Instruction]*ssa.Select),
+		ifSuccBegin:     make(map[ssa.Instruction]*ssa.If),
+		ifFnReturn:      make(map[*ssa.Function]*ssa.Return),
+		ifSuccEnd:       make(map[ssa.Instruction]*ssa.Return),
+		inLoop:          false,
+		goInLoop:        make(map[int]bool),
+		loopIDs:         make(map[int]int),
+		allocLoop:       make(map[*ssa.Function][]string),
+		bindingFV:       make(map[*ssa.Go][]*ssa.FreeVar),
+		commIDs:         make(map[int][]int),
+		deferToRet:      make(map[*ssa.Defer]ssa.Instruction),
+		twinGoID:        make(map[*ssa.Go][]int),
+		//mutualTargets:   make(map[int]*mutualFns),
+	}
+}
+
 
 //bz: abstract out
 func (a *analysis) runChecker() raceReport {
@@ -88,264 +230,6 @@ func (a *analysis) runChecker() raceReport {
 	rr.racePairs = a.checkRacyPairs()
 
 	return rr
-}
-
-func (a *analysis) buildHB() {
-	var prevN graph.Node
-	var selectN []graph.Node
-	var readyCh []string
-	var selCaseEndN []graph.Node
-	var ifN []graph.Node
-	var ifSuccEndN []graph.Node
-	goCaller := make(map[*ssa.Go]graph.Node)
-	waitingN := make(map[goIns]graph.Node)
-	chanRecvs := make(map[string]graph.Node) // map channel name to graph node
-	chanSends := make(map[string]graph.Node) // map channel name to graph node
-	for nGo, insSlice := range a.RWIns {
-		for i, eachIns := range insSlice {
-			anIns := eachIns.ins
-			disjoin := false // detach select case statement from subsequent instruction
-			insKey := goIns{ins: anIns, goID: nGo}
-			if nGo == 0 && i == 0 { // main goroutine, first instruction
-				prevN = a.HBgraph.MakeNode() // initiate for future nodes
-				*prevN.Value = insKey
-				if goInstr, ok := anIns.(*ssa.Go); ok {
-					goCaller[goInstr] = prevN // sequentially store go calls in the same goroutine
-				}
-			} else {
-				currN := a.HBgraph.MakeNode()
-				*currN.Value = insKey
-				if nGo != 0 && i == 0 { // worker goroutine, first instruction
-					prevN = goCaller[anIns.(*ssa.Go)] // first node in subroutine
-				} else if goInstr, ok := anIns.(*ssa.Go); ok { // spawning of subroutine
-					//if _, ok1 := goCaller[goInstr]; ok1 { // repeated spawning in loop
-					//	continue
-					//}
-					goCaller[goInstr] = currN // store go calls in the same goroutine
-				} else if selIns, ok1 := anIns.(*ssa.Select); ok1 {
-					selectN = append(selectN, currN) // select node
-					readyCh = a.selReady[selIns]
-					selCaseEndN = []graph.Node{} // reset slice of nodes when encountering multiple select statements
-					readys := 0
-					for ith, ch := range readyCh {
-						if ith < len(selIns.States) && ch != "" && selIns.States[ith].Dir == 1 { // TODO: readyCh may be longer than selIns.States?
-							readys++
-							if _, ok0 := a.selUnknown[selIns]; ok0 && readys == 1 {
-								chanSends[ch] = currN
-							}
-						}
-					}
-				} else if ins, chR := anIns.(*ssa.UnOp); chR {
-					if ch := a.getRcvChan(ins); ch != "" { // a channel receive Op
-						chanRecvs[a.getRcvChan(ins)] = currN
-						if a.isReadySel(ch) { // channel waited on by select
-							disjoin = true // no edge between current node and node of succeeding instruction
-						}
-					}
-				} else if insS, chS := anIns.(*ssa.Send); chS {
-					chanSends[a.getSndChan(insS)] = currN
-				} else if _, isIf := anIns.(*ssa.If); isIf {
-					ifN = append([]graph.Node{currN}, ifN...) // store if statements
-				}
-				if ch, ok0 := a.selectCaseEnd[anIns]; ok0 && sliceContainsStr(readyCh, ch) {
-					selCaseEndN = append(selCaseEndN, currN)
-				}
-				if _, isSuccEnd := a.ifSuccEnd[anIns]; isSuccEnd {
-					ifSuccEndN = append(ifSuccEndN, currN)
-				}
-				// edge manipulation:
-				if ch, ok := a.selectCaseBegin[anIns]; ok && channelComm && selectN != nil {
-					if ch == "defaultCase" || ch == "timeOut" {
-						err := a.HBgraph.MakeEdge(selectN[0], currN) // select node to default case
-						if err != nil {
-							log.Fatal(err)
-						}
-					} else {
-						if _, ok1 := chanRecvs[ch]; ok1 {
-							err := a.HBgraph.MakeEdge(chanRecvs[ch], currN) // receive Op to ready case
-							if err != nil {
-								log.Fatal(err)
-							}
-						} else if sliceContainsStr(readyCh, ch) {
-							err := a.HBgraph.MakeEdge(selectN[0], currN) // select node to assumed ready cases
-							if err != nil {
-								log.Fatal(err)
-							}
-						}
-					}
-				} else if _, ok1 := a.selectDone[anIns]; ok1 && channelComm && selectN != nil {
-					if len(selCaseEndN) > 1 { // more than one portal is ready
-						err := a.HBgraph.MakeEdge(selectN[0], currN) // select statement to select done
-						if err != nil {
-							log.Fatal(err)
-						}
-					} else if len(selCaseEndN) > 0 {
-						err := a.HBgraph.MakeEdge(selCaseEndN[0], currN) // ready case to select done
-						if err != nil {
-							log.Fatal(err)
-						}
-					}
-					if len(selectN) > 1 {
-						selectN = selectN[1:]
-					} // completed analysis of one select statement
-				} else if ifInstr, ok2 := a.ifSuccBegin[anIns]; ok2 {
-					skipSucc := false
-					for beginIns, ifIns := range a.ifSuccBegin {
-						if ifIns == ifInstr && beginIns != anIns && sliceContainsInsAt(a.commIfSucc, beginIns) != -1 && channelComm { // other succ contains channel communication
-							if (anIns.Block().Comment == "if.then" && beginIns.Block().Comment == "if.else") || (anIns.Block().Comment == "if.else" && beginIns.Block().Comment == "if.then") {
-								skipSucc = true
-								a.omitComm = append(a.omitComm, anIns.Block())
-							}
-						}
-					}
-					if !skipSucc && ifN != nil {
-						err := a.HBgraph.MakeEdge(ifN[0], currN)
-						if err != nil {
-							log.Fatal(err)
-						}
-					}
-				} else {
-					err := a.HBgraph.MakeEdge(prevN, currN)
-					if err != nil {
-						log.Fatal(err)
-					}
-				}
-				if !disjoin {
-					prevN = currN
-				}
-			}
-			// Create additional edges:
-			if a.isReadIns(anIns) || isWriteIns(anIns) {
-				a.RWinsMap[insKey] = prevN
-			} else if callIns, ok := anIns.(*ssa.Call); ok { // taking care of WG operations. TODO: identify different WG instances
-				if callIns.Call.Value.Name() == "Wait" {
-					waitingN[insKey] = prevN // store Wait node for later edge creation TO this node
-				} else if callIns.Call.Value.Name() == "Done" {
-					for wKey, wNode := range waitingN {
-						if a.sameAddress(callIns.Call.Args[0], wKey.ins.(*ssa.Call).Call.Args[0], nGo, wKey.goID) &&
-							(*(prevN.Value)).(goIns).goID != (*(wNode.Value)).(goIns).goID {
-							err := a.HBgraph.MakeEdge(prevN, wNode) // create edge from Done node to Wait node
-							var fromName string
-							var toName string
-							if nGo == 0 {
-								fromName = a.entryFn
-							} else {
-								fromName = a.goNames(a.RWIns[nGo][0].ins.(*ssa.Go))
-							}
-							if (*wNode.Value).(goIns).goID == 0 {
-								toName = a.entryFn
-							} else {
-								toName = a.goNames(a.RWIns[(*wNode.Value).(goIns).goID][0].ins.(*ssa.Go))
-							}
-							if DEBUGHBGraph {
-								log.Debug("WaitGroup edge from Goroutine ", fromName, " [", nGo, "] to Goroutine ", toName, " [", (*wNode.Value).(goIns).goID, "]")
-							}
-							if err != nil {
-								log.Fatal(err)
-							}
-						}
-					}
-				}
-			} else if dIns, ok1 := anIns.(*ssa.Defer); ok1 {
-				if dIns.Call.Value.Name() == "Done" {
-					for wKey, wNode := range waitingN {
-						if a.sameAddress(dIns.Call.Args[0], wKey.ins.(*ssa.Call).Call.Args[0], nGo, wKey.goID) &&
-							(*(prevN.Value)).(goIns).goID != (*(wNode.Value)).(goIns).goID {
-							err := a.HBgraph.MakeEdge(prevN, wNode) // create edge from Done node to Wait node
-							var fromName string
-							var toName string
-							if nGo == 0 {
-								fromName = a.entryFn
-							} else {
-								fromName = a.goNames(a.RWIns[nGo][0].ins.(*ssa.Go))
-							}
-							if (*wNode.Value).(goIns).goID == 0 {
-								toName = a.entryFn
-							} else {
-								toName = a.goNames(a.RWIns[(*wNode.Value).(goIns).goID][0].ins.(*ssa.Go))
-							}
-							if DEBUGHBGraph {
-								log.Debug("WaitGroup edge from Goroutine ", fromName, " [", nGo, "] to Goroutine ", toName, " [", (*wNode.Value).(goIns).goID, "]")
-							}
-							if err != nil {
-								log.Fatal(err)
-							}
-						}
-					}
-				}
-			}
-			if sendIns, ok := anIns.(*ssa.Send); ok && channelComm { // detect matching channel send operations
-				for ch, sIns := range a.chanSnds {
-					if rcvN, matching := chanRecvs[ch]; matching && sliceContainsSnd(sIns, sendIns) &&
-						(*(prevN.Value)).(goIns).goID != (*(rcvN.Value)).(goIns).goID {
-						err := a.HBgraph.MakeEdge(prevN, rcvN) // create edge from Send node to Receive node
-						var fromName, toName string
-						if nGo == 0 {
-							fromName = a.entryFn
-						} else {
-							fromName = a.goNames(a.RWIns[nGo][0].ins.(*ssa.Go))
-						}
-						if (*rcvN.Value).(goIns).goID == 0 {
-							toName = a.entryFn
-						} else {
-							toName = a.goNames(a.RWIns[(*rcvN.Value).(goIns).goID][0].ins.(*ssa.Go))
-						}
-						if DEBUGHBGraph {
-							log.Debug("Channel comm edge from Goroutine ", fromName, " [", nGo, "] to Goroutine ", toName, " [", (*rcvN.Value).(goIns).goID, "]")
-						}
-						if err != nil {
-							log.Fatal(err)
-						}
-						err1 := a.HBgraph.MakeEdge(rcvN, prevN) // create edge from Receive node to Send node
-						if err1 != nil {
-							log.Fatal(err1)
-						}
-					}
-				}
-			} else if rcvIns, chR := anIns.(*ssa.UnOp); chR && channelComm {
-				if ch := a.getRcvChan(rcvIns); ch != "" {
-					if sndN, matching := chanSends[ch]; matching &&
-						(*(sndN.Value)).(goIns).goID != (*(prevN.Value)).(goIns).goID {
-						err := a.HBgraph.MakeEdge(sndN, prevN) // create edge from Send node to Receive node
-						var fromName, toName string
-						if (*sndN.Value).(goIns).goID == 0 {
-							fromName = a.entryFn
-						} else {
-							fromName = a.goNames(a.RWIns[(*sndN.Value).(goIns).goID][0].ins.(*ssa.Go))
-						}
-						if nGo == 0 {
-							toName = a.entryFn
-						} else {
-							toName = a.goNames(a.RWIns[nGo][0].ins.(*ssa.Go))
-						}
-						if DEBUGHBGraph {
-							log.Debug("Channel comm edge from Goroutine ", fromName, " [", (*sndN.Value).(goIns).goID, "] to Goroutine ", toName, " [", nGo, "]")
-						}
-						if err != nil {
-							log.Fatal(err)
-						}
-						err1 := a.HBgraph.MakeEdge(prevN, sndN) // create edge from Receive node to Send node
-						if err1 != nil {
-							log.Fatal(err1)
-						}
-					}
-				}
-			}
-			if reIns, isReturn := anIns.(*ssa.Return); isReturn {
-				if a.ifFnReturn[reIns.Parent()] == reIns { // this is final return
-					for r, ifEndN := range ifSuccEndN {
-						if r != len(ifSuccEndN)-1 {
-							err := a.HBgraph.MakeEdge(ifEndN, prevN)
-							if err != nil {
-								log.Fatal(err)
-							}
-						}
-					}
-					ifSuccEndN = []graph.Node{} // reset slice containing last ins of each succ block preceeding final return
-				}
-			}
-		}
-	}
 }
 
 // visitAllInstructions visits each line and calls the corresponding helper function to drive the tool
@@ -875,14 +759,24 @@ func (a *analysis) exploredFunction(fn *ssa.Function, goID int, theIns ssa.Instr
 	return a.trieMap[fnKey].isBudgetExceeded()
 }
 
-// isBudgetExceeded determines if the budget has exceeded the limit
-func (t trie) isBudgetExceeded() bool {
-	if t.budget > trieLimit {
-		return true
+
+// updateRecords will print out the stack trace
+func (a *analysis) updateRecords(fnName string, goID int, pushPop string, theFn *ssa.Function, theIns ssa.Instruction) {
+	if pushPop == "POP  " {
+		a.storeFns = a.storeFns[:len(a.storeFns)-1]
+		a.levels[goID]--
 	}
-	return false
+	if DEBUG {
+		log.Debug(strings.Repeat(" ", a.levels[goID]), pushPop, theFn.String(), " at lvl ", a.levels[goID])
+	}
+	if pushPop == "PUSH " {
+		newFn := &fnCallInfo{ssaIns: theIns, fnIns: theFn}
+		a.storeFns = append(a.storeFns, newFn)
+		a.levels[goID]++
+	}
 }
 
+//bz: call this before any call to visitAllInstructions
 func (a *analysis) traverseFn(fn *ssa.Function, fnName string, goID int, theIns ssa.Instruction, lock bool) {
 	if !a.exploredFunction(fn, goID, theIns) {
 		a.updateRecords(fnName, goID, "PUSH ", fn, theIns)
@@ -895,4 +789,74 @@ func (a *analysis) traverseFn(fn *ssa.Function, fnName string, goID int, theIns 
 		a.updateLockMap(goID, theIns)
 		a.updateRLockMap(goID, theIns)
 	}
+}
+
+// getRcvChan returns channel name of receive Op
+func (a *analysis) getRcvChan(ins *ssa.UnOp) string {
+	for ch, rIns := range a.chanRcvs {
+		if sliceContainsRcv(rIns, ins) { // channel receive
+			return ch
+		}
+	}
+	return ""
+}
+
+func (a *analysis) getSndChan(ins *ssa.Send) string {
+	for ch, sIns := range a.chanSnds {
+		if sliceContainsSnd(sIns, ins) { // channel receive
+			return ch
+		}
+	}
+	return ""
+}
+
+// isReadySel returns whether or not the channel is awaited on (and ready) by a select statement
+func (a *analysis) isReadySel(ch string) bool {
+	for _, chStr := range a.selReady {
+		if sliceContainsStr(chStr, ch) {
+			return true
+		}
+	}
+	return false
+}
+
+
+
+//stackGo prints the callstack of a goroutine -> bz: not used now
+func (a *analysis) stackGo() {
+	//if a.getGo { // print call stack of each goroutine
+	for i := 0; i < len(a.RWIns); i++ {
+		name := "main"
+		if i > 0 {
+			name = a.goNames(a.goCalls[i].goIns)
+		}
+		if a.goInLoop[i] {
+			log.Debug("Goroutine ", i, "  --  ", name, strings.Repeat(" *", 10), " spawned by a loop", strings.Repeat(" *", 10))
+		} else {
+			log.Debug("Goroutine ", i, "  --  ", name)
+		}
+		if i > 0 {
+			log.Debug("call stack: ")
+		}
+		var pathGo []int
+		goID := i
+		for goID > 0 {
+			pathGo = append([]int{goID}, pathGo...)
+			temp := a.goCaller[goID]
+			goID = temp
+		}
+		if !allEntries {
+			for q, eachGo := range pathGo {
+				eachStack := a.goStack[eachGo]
+				for k, eachFn := range eachStack {
+					if k == 0 {
+						log.Debug("\t ", strings.Repeat(" ", q), "--> Goroutine: ", eachFn.fnIns.Name(), "[", a.goCaller[eachGo], "] ", a.prog.Fset.Position(eachFn.ssaIns.Pos()))
+					} else {
+						log.Debug("\t   ", strings.Repeat(" ", q), strings.Repeat(" ", k), eachFn.fnIns.Name(), " ", a.prog.Fset.Position(eachFn.ssaIns.Pos()))
+					}
+				}
+			}
+		}
+	}
+	//}
 }

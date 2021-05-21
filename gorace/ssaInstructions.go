@@ -6,82 +6,14 @@ import (
 	"go/constant"
 	"go/token"
 	"go/types"
-	"strconv"
 	"strings"
 )
 
-func checkTokenName(varName string, theIns ssa.Instruction) string {
-	if strings.HasPrefix(varName, "t") { // function name begins with letter t
-		if _, err := strconv.Atoi(string([]rune(varName)[1:])); err == nil { // function name after first character look like an integer
-			switch examIns := theIns.(type) {
-			case *ssa.Call:
-				switch callVal := examIns.Call.Value.(type) {
-				case *ssa.Function:
-					return callVal.Name()
-				case *ssa.MakeClosure:
-					return callVal.Fn.Name()
-				default:
-					return callVal.Type().String()
-				}
-			case *ssa.UnOp:
-				switch unOpX := examIns.X.(type) {
-				case *ssa.FieldAddr:
-					switch faX := unOpX.X.(type) {
-					case *ssa.Parameter:
-						return faX.Name()
-					case *ssa.Alloc:
-						return faX.Name()
-					default:
-						// debug
-					}
-				default:
-					// debug
-				}
-			case *ssa.Store:
-				switch addr := examIns.Addr.(type) {
-				case *ssa.FieldAddr:
-					switch faX := addr.X.(type) {
-					case *ssa.Parameter:
-						return faX.Name()
-					}
-				}
-			default:
-				// debug
-			}
-		}
-	}
-	return varName
-}
 
-//// checkTokenName will return original name of an input function rather than a token
-//func checkTokenName(fnName string, theIns *ssa.Call) string {
-//	if strings.HasPrefix(fnName, "t") { // function name begins with letter t
-//		if _, err := strconv.Atoi(string([]rune(fnName)[1:])); err == nil { // function name after first character look like an integer
-//			switch callVal := theIns.Call.Value.(type) {
-//			case *ssa.MakeClosure:
-//				fnName = callVal.Fn.Name()
-//			default:
-//				fnName = callVal.Type().String()
-//			}
-//		}
-//	}
-//	return fnName
-//}
+/*
+bz: this file contains functions to handle all ssa.Instruction
+ */
 
-// checkTokenNameDefer will return original name of an input defered function rather than a token
-func checkTokenNameDefer(fnName string, theIns *ssa.Defer) string {
-	if strings.HasPrefix(fnName, "t") { // function name begins with letter t
-		if _, err := strconv.Atoi(string([]rune(fnName)[1:])); err == nil { // function name after first character look like an integer
-			switch callVal := theIns.Call.Value.(type) {
-			case *ssa.MakeClosure:
-				fnName = callVal.Fn.Name()
-			default:
-				fnName = callVal.Type().String()
-			}
-		}
-	}
-	return fnName
-}
 
 // isReadIns determines if the instruction is a read access
 func (a *analysis) isReadIns(ins ssa.Instruction) bool {
@@ -134,21 +66,6 @@ func isWriteIns(ins ssa.Instruction) bool {
 	return false
 }
 
-// updateRecords will print out the stack trace
-func (a *analysis) updateRecords(fnName string, goID int, pushPop string, theFn *ssa.Function, theIns ssa.Instruction) {
-	if pushPop == "POP  " {
-		a.storeFns = a.storeFns[:len(a.storeFns)-1]
-		a.levels[goID]--
-	}
-	if DEBUG {
-		log.Debug(strings.Repeat(" ", a.levels[goID]), pushPop, theFn.String(), " at lvl ", a.levels[goID])
-	}
-	if pushPop == "PUSH " {
-		newFn := &fnCallInfo{ssaIns: theIns, fnIns: theFn}
-		a.storeFns = append(a.storeFns, newFn)
-		a.levels[goID]++
-	}
-}
 
 // insMakeChan takes make channel instructions and stores their name and buffer size
 func (a *analysis) insMakeChan(examIns *ssa.MakeChan, insInd int) {
@@ -702,4 +619,54 @@ func (a *analysis) updateRLockMap(goID int, theIns ssa.Instruction) {
 			a.RlockMap[theIns][i] = l.locAddr
 		}
 	}
+}
+
+
+// lockSetContainsAt returns the index of e in s
+func (a *analysis) lockSetContainsAt(s map[int][]*lockInfo, e ssa.Value, goID int) int {
+	var aPos, bPos token.Pos
+	for i, k := range s[goID] {
+		var locA, locB ssa.Value
+		switch aType := k.locAddr.(type) {
+		case *ssa.Global:
+			aPos = aType.Pos()
+		case *ssa.FieldAddr:
+			if aType1, ok1 := aType.X.(*ssa.UnOp); ok1 {
+				if aType2, ok2 := aType1.X.(*ssa.FieldAddr); ok2 {
+					aPos = aType2.X.Pos()
+					locA = aType2.X
+				} else {
+					aPos = aType1.X.Pos()
+					locA = aType1.X
+				}
+			} else {
+				aPos = aType.X.Pos()
+				locA = aType.X
+			}
+		}
+		switch eType := e.(type) {
+		case *ssa.Global:
+			bPos = eType.Pos()
+		case *ssa.FieldAddr:
+			if eType1, ok2 := eType.X.(*ssa.UnOp); ok2 {
+				if eType2, ok3 := eType1.X.(*ssa.FieldAddr); ok3 {
+					bPos = eType2.X.Pos()
+					locB = eType2.X
+				} else {
+					bPos = eType1.X.Pos()
+					locB = eType1.X
+				}
+			} else {
+				bPos = eType.X.Pos()
+				locB = eType.X
+			}
+		}
+		if aPos == bPos {
+			return i
+		}
+		if a.sameAddress(locA, locB, goID, goID) {
+			return i
+		}
+	}
+	return -1
 }

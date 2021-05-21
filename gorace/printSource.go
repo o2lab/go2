@@ -10,6 +10,8 @@ import (
 	"unicode"
 )
 
+//bz: maybe these can be moved to util.go
+
 func getLineNumber(filePath string, lineNum int) (string, error) {
 	sourceFile, err := os.Open(filePath)
 	if err != nil {

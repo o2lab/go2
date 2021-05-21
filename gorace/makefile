@@ -1,5 +1,5 @@
 build:
-	go build -o main main.go pointerAnalysis.go raceCollection.go sliceTools.go ssaInstructions.go staticAnalysis.go gorace.go printSource.go
+	go build -o main main.go pointerAnalysis.go raceCollection.go sliceTools.go ssaInstructions.go staticAnalysis.go gorace.go printSource.go util.go shbgraph.go
 runSelect:
 	./main tests/select.go
 runWaitgroup:

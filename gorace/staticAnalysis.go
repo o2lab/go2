@@ -1,207 +1,37 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
 	"github.com/april1989/origin-go-tools/go/myutil/flags"
 	"github.com/april1989/origin-go-tools/go/packages"
 	"github.com/april1989/origin-go-tools/go/pointer"
 	pta0 "github.com/april1989/origin-go-tools/go/pointer_default"
 	"github.com/april1989/origin-go-tools/go/ssa"
-	"github.com/april1989/origin-go-tools/go/ssa/ssautil"
-	"github.com/briandowns/spinner"
 	log "github.com/sirupsen/logrus"
 	"github.com/twmb/algoimpl/go/graph"
-	"go/token"
-	"go/types"
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
-// fromPkgsOfInterest determines if a function is from a package of interest
-func (a *analysis) fromPkgsOfInterest(fn *ssa.Function) bool {
-	if fn.Pkg == nil || fn.Pkg.Pkg == nil {
-		if fn.IsFromApp { //bz: do not remove this ... otherwise will miss racy functions
-			return true
-		}
-		return false
-	}
-	if fn.Pkg.Pkg.Name() == "main" || fn.Pkg.Pkg.Name() == "cli" || fn.Pkg.Pkg.Name() == "testing" {
-		return true
-	}
-	for _, excluded := range excludedPkgs {
-		if fn.Pkg.Pkg.Name() == excluded || fn.Pkg.Pkg.Path() == excluded { //bz: some lib's Pkg.Name() == "Package", not the used import xxx; if so, check Pkg.Path()
-			return false
-		}
-	}
-	if a.efficiency && a.main.Pkg.Path() != "command-line-arguments" && !strings.HasPrefix(fn.Pkg.Pkg.Path(), strings.Split(a.main.Pkg.Path(), "/")[0]) { // path is dependent on tested program
-		return false
-	}
-	return true
+
+type AnalysisRunner struct {
+	mu            sync.Mutex
+	prog          *ssa.Program
+	pkgs          []*ssa.Package
+	ptaConfig     *pointer.Config
+	ptaResult     *pointer.Result //bz: added for convenience
+	ptaResults    map[*ssa.Package]*pointer.Result //bz: original code, renamed here
+	ptaConfig0    *pta0.Config
+	ptaResult0    *pta0.Result
+	trieLimit     int  // set as user config option later, an integer that dictates how many times a function can be called under identical context
+	efficiency    bool // configuration setting to avoid recursion in tested program
+	racyStackTops []string
+	finalReport   []raceReport
 }
 
-func (a *analysis) fromExcludedFns(fn *ssa.Function) bool {
-	strFn := fn.String()
-	for _, ex := range excludedFns {
-		if strings.HasPrefix(strFn, ex) {
-			return true
-		}
-	}
-	return false
-}
-
-// isLocalAddr returns whether location is a local address or not
-func isLocalAddr(location ssa.Value) bool {
-	if location.Pos() == token.NoPos {
-		return true
-	}
-	switch loc := location.(type) {
-	case *ssa.Parameter:
-		_, ok := loc.Type().(*types.Pointer)
-		return !ok
-	case *ssa.FieldAddr:
-		isLocalAddr(loc.X)
-	case *ssa.IndexAddr:
-		isLocalAddr(loc.X)
-	case *ssa.UnOp:
-		isLocalAddr(loc.X)
-	case *ssa.Alloc:
-		if !loc.Heap {
-			return true
-		}
-	default:
-		return false
-	}
-	return false
-}
-
-// isSynthetic returns whether fn is synthetic or not
-func isSynthetic(fn *ssa.Function) bool { // ignore functions that are NOT true source functions
-	return fn.Synthetic != "" || fn.Pkg == nil
-}
-
-//bz: whether the function name follows the go test form: https://golang.org/pkg/testing/
-// copied from /gopta/go/pointer/gen.go -> remember to update
-func isGoTestForm(name string) bool {
-	if strings.Contains(name, "$") {
-		return false //closure
-	}
-	if strings.HasPrefix(name, "Test") || strings.HasPrefix(name, "Benchmark") || strings.HasPrefix(name, "Example") {
-		return true
-	}
-	return false
-}
-
-func pkgSelection(initial []*packages.Package) ([]*ssa.Package, *ssa.Program, []*ssa.Package) {
-	var prog *ssa.Program
-	var pkgs []*ssa.Package
-	var mainPkgs []*ssa.Package //bz: selected
-
-	doStartLog("Building SSA code for entire program...")
-	prog, pkgs = ssautil.AllPackages(initial, 0)
-	if len(pkgs) == 0 {
-		log.Errorf("SSA code could not be constructed due to type errors. ")
-	}
-	prog.Build()
-	noFunc := len(ssautil.AllFunctions(prog))
-	mainPkgs = ssautil.MainPackages(pkgs)
-	if len(mainPkgs) == 0 {
-		log.Errorf("No main function detected. ")
-	}
-	doEndLog("Done  -- SSA code built. " + strconv.Itoa(len(pkgs)) + " packages and " + strconv.Itoa(noFunc) + " functions detected. ")
-
-	var mainInd string
-	var enterAt string
-	var mains []*ssa.Package
-	userEP := false // user specified entry function
-	if len(mainPkgs) > 1 {
-		//bz: we need a check to mark duplicate pkg in a program, also tell user the diff
-		pkgMap := make(map[string][]*ssa.Package)
-		for _, pkg := range mainPkgs {
-			key := pkg.String()
-			exist := pkgMap[key]
-			if exist == nil {
-				exist = make([]*ssa.Package, 1)
-				exist[0] = pkg
-			} else {
-				exist = append(exist, pkg)
-			}
-			pkgMap[key] = exist
-		}
-		// Provide entry-point options and retrieve user selection
-		fmt.Println(len(mainPkgs), "main() entry-points identified: ")
-		for i, ep := range mainPkgs {
-			//bz: check if exist duplicate
-			pkgStr := ep.String()
-			if dup := pkgMap[pkgStr]; len(dup) > 1 {
-				isTest := false
-				for memName, _ := range ep.Members {
-					if isGoTestForm(memName) {
-						isTest = true
-						break
-					}
-				}
-				if isTest {
-					//bz: this is test cases for main pkg, but go ssa/pkg builder cannot identify the diff, so they use the same pkg name but different contents
-					ep.IsMainTest = true //bz: mark it -> change the code in pta is too complex, just mark it
-					fmt.Println("Option", i+1, ": ", ep.String()+".main.test")
-					continue
-				}
-			}
-			//all other
-			fmt.Println("Option", i+1, ": ", ep.String())
-		}
-		if allEntries { // no selection from user required
-			for pInd := 0; pInd < len(mainPkgs); pInd++ {
-				mains = append(mains, mainPkgs[pInd])
-			}
-			log.Info("Iterating through all entry point options...")
-		} else {
-			fmt.Print("Enter option number of choice: \n")
-			fmt.Print("*** use space delimiter for multiple selections *** \n")
-			fmt.Print("*** use \"-\" for a range of selections *** \n")
-			fmt.Print("*** if selecting a test folder (ie. ending in .test), please select ONE at a time *** \n")
-			fmt.Scan(&mainInd)
-			if mainInd == "-" {
-				fmt.Print("Enter function name to begin analysis from: ")
-				fmt.Scan(&enterAt)
-				for _, p := range pkgs {
-					if p != nil {
-						if fnMem, okf := p.Members[enterAt]; okf { // package contains function to enter at
-							userEP = true
-							mains = append(mainPkgs, p)
-							//entryFn = enterAt // start analysis at user specified function TODO: bz: what is the use of entryFn here?
-							_ = fnMem
-						}
-					}
-				}
-				if !userEP {
-					fmt.Print("Function not found. ") // TODO: request input again
-				}
-			} else if strings.Contains(mainInd, ",") { // multiple selections
-				selection := strings.Split(mainInd, ",")
-				for _, s := range selection {
-					i, _ := strconv.Atoi(s) // convert to integer
-					mains = append(mains, mainPkgs[i-1])
-				}
-			} else if strings.Contains(mainInd, "-") { // selected range
-				selection := strings.Split(mainInd, "-")
-				begin, _ := strconv.Atoi(selection[0])
-				end, _ := strconv.Atoi(selection[1])
-				for i := begin; i <= end; i++ {
-					mains = append(mains, mainPkgs[i-1])
-				}
-			} else if i, err0 := strconv.Atoi(mainInd); err0 == nil {
-				mains = append(mains, mainPkgs[i-1])
-			}
-		}
-	} else {
-		mains = mainPkgs
-	}
-	return mains, prog, pkgs
-}
 
 //bz: the string return is not necessary
 func (runner *AnalysisRunner) analyzeTestEntry(main *ssa.Package) ([]*ssa.Function, string) {
@@ -262,140 +92,6 @@ func (runner *AnalysisRunner) analyzeTestEntry(main *ssa.Package) ([]*ssa.Functi
 	//}
 	return selectedFns, entry
 }
-
-func determineScope(pkgs []*ssa.Package) []string {
-	if len(PTAscope) > 0 {
-		//bz: let's use the one from users
-		return PTAscope
-	}
-	var scope = make([]string, 1)
-	//if pkgs[0] != nil { // Note: only if main dir contains main.go.
-	//	scope[0] = pkgs[0].Pkg.Path() //bz: the 1st pkg has the scope info == the root pkg or default .go input
-	//} else
-	if pkgs[0] == nil && len(pkgs) == 1 {
-		log.Fatal("Error: No packages detected. Please verify directory provided contains Go Files. ")
-	} else if len(pkgs) > 1 && pkgs[1] != nil && !strings.Contains(pkgs[1].Pkg.Path(), "/") {
-		scope[0] = pkgs[1].Pkg.Path()
-	} else if len(pkgs) > 1 {
-		scope[0] = strings.Split(pkgs[1].Pkg.Path(), "/")[0] + "/" + strings.Split(pkgs[1].Pkg.Path(), "/")[1]
-		if strings.Contains(pkgs[1].Pkg.Path(), "gorace") {
-			scope[0] += "/gorace"
-		}
-		if strings.Contains(pkgs[1].Pkg.Path(), "ethereum") {
-			scope[0] += "/go-ethereum"
-		}
-		if strings.Contains(pkgs[1].Pkg.Path(), "grpc") {
-			scope[0] += "/go-grpc"
-		}
-	} else if len(pkgs) == 1 {
-		scope[0] = pkgs[0].Pkg.Path()
-	}
-	//scope[0] = "google.golang.org/grpc"
-
-	//bz: update a bit to avoid duplicate scope addition, e.g., grpc
-	// return with error if error exist, skip panic
-	if len(scope) == 0 && len(pkgs) >= 1 && !goTest { // ** assuming more than one package detected in real programs
-		path, err := os.Getwd() //current working directory == project path
-		if err != nil {
-			panic("Error while os.Getwd: " + err.Error())
-		}
-		gomodFile, err := os.Open(path + "/go.mod") // For read access.
-		if err != nil {
-			e0 := fmt.Errorf("Error while reading go.mod: " + err.Error())
-			fmt.Println(e0.Error())
-		}
-		defer gomodFile.Close()
-		scanner := bufio.NewScanner(gomodFile)
-		var mod string
-		for scanner.Scan() {
-			s := scanner.Text()
-			if strings.HasPrefix(s, "module ") {
-				mod = s
-				break //this is the line "module xxx.xxx.xx/xxx"
-			}
-		}
-		if mod == "" {
-			e1 := fmt.Errorf("Cannot find go.mod in default location: " + gomodFile.Name())
-			fmt.Println(e1.Error())
-		}
-		if err2 := scanner.Err(); err2 != nil {
-			e2 := fmt.Errorf("Error while scanning go.mod: " + err2.Error())
-			fmt.Println(e2.Error())
-		}
-		parts := strings.Split(mod, " ")
-		scope = append(scope, parts[1])
-	}
-	return scope
-}
-
-//bz: do not want to see this big block ...
-func initialAnalysis() *analysis {
-	return &analysis{
-		efficiency:      efficiency,
-		trieLimit:       trieLimit,
-		RWinsMap:        make(map[goIns]graph.Node),
-		trieMap:         make(map[fnInfo]*trie),
-		insMono:         -1,
-		levels:          make(map[int]int),
-		lockMap:         make(map[ssa.Instruction][]ssa.Value),
-		lockSet:         make(map[int][]*lockInfo),
-		RlockMap:        make(map[ssa.Instruction][]ssa.Value),
-		RlockSet:        make(map[int][]*lockInfo),
-		goCaller:        make(map[int]int),
-		goCalls:         make(map[int]*goCallInfo),
-		chanToken:       make(map[string]string),
-		chanBuf:         make(map[string]int),
-		chanRcvs:        make(map[string][]*ssa.UnOp),
-		chanSnds:        make(map[string][]*ssa.Send),
-		selectBloc:      make(map[int]*ssa.Select),
-		selReady:        make(map[*ssa.Select][]string),
-		selUnknown:      make(map[*ssa.Select][]string),
-		selectCaseBegin: make(map[ssa.Instruction]string),
-		selectCaseEnd:   make(map[ssa.Instruction]string),
-		selectCaseBody:  make(map[ssa.Instruction]*ssa.Select),
-		selectDone:      make(map[ssa.Instruction]*ssa.Select),
-		ifSuccBegin:     make(map[ssa.Instruction]*ssa.If),
-		ifFnReturn:      make(map[*ssa.Function]*ssa.Return),
-		ifSuccEnd:       make(map[ssa.Instruction]*ssa.Return),
-		inLoop:          false,
-		goInLoop:        make(map[int]bool),
-		loopIDs:         make(map[int]int),
-		allocLoop:       make(map[*ssa.Function][]string),
-		bindingFV:       make(map[*ssa.Go][]*ssa.FreeVar),
-		commIDs:         make(map[int][]int),
-		deferToRet:      make(map[*ssa.Defer]ssa.Instruction),
-		twinGoID:        make(map[*ssa.Go][]int),
-		//mutualTargets:   make(map[int]*mutualFns),
-	}
-}
-
-//bz: global -> all use the same one
-var spin *spinner.Spinner
-
-func doStartLog(_log string) {
-	if turnOnSpinning {
-		if spin == nil {
-			spin = spinner.New(spinner.CharSets[9], 100*time.Millisecond) // Build our new spinner
-			spin.Suffix = _log
-			spin.Start()
-		}else{
-			spin.Suffix = _log
-			spin.Restart()
-		}
-	}else{
-		log.Info(_log)
-	}
-}
-
-func doEndLog(args ...interface{}) {
-	if turnOnSpinning {
-		spin.FinalMSG = fmt.Sprint(args[0]) + "\n"
-		spin.Stop()
-	}else{
-		log.Info(args ... )
-	}
-}
-
 
 //bz: update the run order of pta and checker
 //  -> sequentially now; do not provide selection of test entry
@@ -778,41 +474,83 @@ func (runner *AnalysisRunner) Run(args []string) error {
 	return nil
 }
 
-//stackGo prints the callstack of a goroutine -> not used now
-func (a *analysis) stackGo() {
-	//if a.getGo { // print call stack of each goroutine
-	for i := 0; i < len(a.RWIns); i++ {
-		name := "main"
-		if i > 0 {
-			name = a.goNames(a.goCalls[i].goIns)
-		}
-		if a.goInLoop[i] {
-			log.Debug("Goroutine ", i, "  --  ", name, strings.Repeat(" *", 10), " spawned by a loop", strings.Repeat(" *", 10))
-		} else {
-			log.Debug("Goroutine ", i, "  --  ", name)
-		}
-		if i > 0 {
-			log.Debug("call stack: ")
-		}
-		var pathGo []int
-		goID := i
-		for goID > 0 {
-			pathGo = append([]int{goID}, pathGo...)
-			temp := a.goCaller[goID]
-			goID = temp
-		}
-		if !allEntries {
-			for q, eachGo := range pathGo {
-				eachStack := a.goStack[eachGo]
-				for k, eachFn := range eachStack {
-					if k == 0 {
-						log.Debug("\t ", strings.Repeat(" ", q), "--> Goroutine: ", eachFn.fnIns.Name(), "[", a.goCaller[eachGo], "] ", a.prog.Fset.Position(eachFn.ssaIns.Pos()))
-					} else {
-						log.Debug("\t   ", strings.Repeat(" ", q), strings.Repeat(" ", k), eachFn.fnIns.Name(), " ", a.prog.Fset.Position(eachFn.ssaIns.Pos()))
-					}
-				}
-			}
-		}
+//bz: below are all util structures used in analysis
+
+//type mutualFns struct {
+//	fns     map[*ssa.Function]*mutualGroup //bz: fn <-> all its mutual fns (now including itself)
+//}
+
+type mutualGroup struct {
+	group   map[*ssa.Function]*ssa.Function //bz: this is a group of mutual fns
+}
+
+type insInfo struct {
+	ins 	ssa.Instruction
+	stack 	[]*fnCallInfo
+}
+
+type fnCallInfo struct {
+	fnIns  *ssa.Function
+	ssaIns ssa.Instruction
+}
+
+
+type lockInfo struct {
+	locAddr    ssa.Value
+	locFreeze  bool
+	locBlocInd int
+	parentFn   *ssa.Function
+}
+
+type raceInfo struct {
+	insPair  []*insInfo
+	addrPair [2]ssa.Value
+	goIDs    []int
+	insInd   []int
+}
+
+type raceReport struct {
+	entryInfo string
+	racePairs []*raceInfo
+}
+
+type fnInfo struct { // all fields must be comparable for fnInfo to be used as key to trieMap
+	fnName     *ssa.Function
+	contextStr string
+}
+
+type goCallInfo struct {
+	ssaIns ssa.Instruction
+	goIns  *ssa.Go
+}
+
+type goIns struct { // an ssa.Instruction with goroutine info
+	ins  ssa.Instruction
+	goID int
+}
+
+type goroutineInfo struct {
+	ssaIns      ssa.Instruction
+	goIns       *ssa.Go
+	entryMethod *ssa.Function
+	goID        int
+}
+
+type stat struct {
+	nAccess    int
+	nGoroutine int
+}
+
+type trie struct {
+	fnName    string
+	budget    int
+	fnContext []*ssa.Function
+}
+
+// isBudgetExceeded determines if the budget has exceeded the limit
+func (t trie) isBudgetExceeded() bool {
+	if t.budget > trieLimit {
+		return true
 	}
-	//}
+	return false
 }

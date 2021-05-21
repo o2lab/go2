@@ -199,78 +199,9 @@ func sliceContainsInsInfoAt(s []*insInfo, e ssa.Instruction) int {
 	return -1
 }
 
-// lockSetContainsAt returns the index of e in s
-func (a *analysis) lockSetContainsAt(s map[int][]*lockInfo, e ssa.Value, goID int) int {
-	var aPos, bPos token.Pos
-	for i, k := range s[goID] {
-		var locA, locB ssa.Value
-		switch aType := k.locAddr.(type) {
-		case *ssa.Global:
-			aPos = aType.Pos()
-		case *ssa.FieldAddr:
-			if aType1, ok1 := aType.X.(*ssa.UnOp); ok1 {
-				if aType2, ok2 := aType1.X.(*ssa.FieldAddr); ok2 {
-					aPos = aType2.X.Pos()
-					locA = aType2.X
-				} else {
-					aPos = aType1.X.Pos()
-					locA = aType1.X
-				}
-			} else {
-				aPos = aType.X.Pos()
-				locA = aType.X
-			}
-		}
-		switch eType := e.(type) {
-		case *ssa.Global:
-			bPos = eType.Pos()
-		case *ssa.FieldAddr:
-			if eType1, ok2 := eType.X.(*ssa.UnOp); ok2 {
-				if eType2, ok3 := eType1.X.(*ssa.FieldAddr); ok3 {
-					bPos = eType2.X.Pos()
-					locB = eType2.X
-				} else {
-					bPos = eType1.X.Pos()
-					locB = eType1.X
-				}
-			} else {
-				bPos = eType.X.Pos()
-				locB = eType.X
-			}
-		}
-		if aPos == bPos {
-			return i
-		}
-		if a.sameAddress(locA, locB, goID, goID) {
-			return i
-		}
-	}
-	return -1
-}
-
-// getRcvChan returns channel name of receive Op
-func (a *analysis) getRcvChan(ins *ssa.UnOp) string {
-	for ch, rIns := range a.chanRcvs {
-		if sliceContainsRcv(rIns, ins) { // channel receive
-			return ch
-		}
-	}
-	return ""
-}
-
-func (a *analysis) getSndChan(ins *ssa.Send) string {
-	for ch, sIns := range a.chanSnds {
-		if sliceContainsSnd(sIns, ins) { // channel receive
-			return ch
-		}
-	}
-	return ""
-}
-
-// isReadySel returns whether or not the channel is awaited on (and ready) by a select statement
-func (a *analysis) isReadySel(ch string) bool {
-	for _, chStr := range a.selReady {
-		if sliceContainsStr(chStr, ch) {
+func sliceContainsNode(slice []graph.Node, node graph.Node) bool {
+	for _, n := range slice {
+		if n.Value == node.Value {
 			return true
 		}
 	}
@@ -283,24 +214,4 @@ func lockSetVal(s map[int][]*lockInfo, goID int) []token.Pos {
 		res = append(res, ls.locAddr.Pos())
 	}
 	return res
-}
-
-// self-defined queue for traversing Happens-Before Graph
-type queue struct {
-	data []graph.Node
-}
-
-func (q *queue) enQueue(v graph.Node) {
-	q.data = append(q.data, v)
-}
-func (q *queue) deQueue() graph.Node {
-	v := q.data[0]
-	q.data = q.data[1:]
-	return v
-}
-func (q *queue) isEmpty() bool {
-	return len(q.data) == 0
-}
-func (q *queue) size() int {
-	return len(q.data)
 }
