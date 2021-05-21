@@ -284,6 +284,11 @@ func determineScope(main *ssa.Package, pkgs []*ssa.Package) {
 			PTAscope = append(PTAscope, s)
 		}
 	}
+
+	//bz: debug use
+	for _, s := range PTAscope {
+		fmt.Println(" - ",s)
+	}
 }
 
 //bz:
