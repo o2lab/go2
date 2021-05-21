@@ -64,7 +64,13 @@ func (a *analysis) runChecker() raceReport {
 				if _, ready := a.chanSnds[ch]; !ready && ch != "" {
 					if _, ready0 := a.chanRcvs[ch]; !ready0 {
 						if _, ready1 := a.chanBuf[a.chanToken[ch]]; !ready1 {
-							a.selReady[sel][i] = ""
+							//bz: here has error:
+							//INFO[20:50:17] Traversing Statements for test entry point: github.com/ethereum/go-ethereum/contracts/checkpointoracle.TestCheckpointRegister...
+							//panic: runtime error: index out of range [2] with length 2
+							exist := a.selReady[sel]
+							if i < len(exist) {
+								a.selReady[sel][i] = ""
+							}
 						}
 					}
 				}
@@ -725,7 +731,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 		}
 	}
 	if len(a.lockSet[goID]) > lockSetSize {
-		for i := lockSetSize; i < len(a.lockSet[goID]) - 1; i++ {
+		for i := lockSetSize; i < len(a.lockSet[goID])-1; i++ {
 			log.Trace("Unlocking ", a.lockSet[goID][i].locAddr.String(), "  (", a.lockSet[goID][i].locAddr.Pos(), ") removing index ", i, " from: ", lockSetVal(a.lockSet, goID))
 			//bz: index out of bound bug ... bypass now ... TODO: fix it ..
 			id := a.goCaller[goID] //bz: what is this id ??
