@@ -74,14 +74,18 @@ func printSource(rwPos token.Position) {
 			spaces := rwPos.Column-tabs
 			if spaces > 0 && strings.TrimLeftFunc(theLine, unicode.IsSpace)[spaces-1:spaces] == "[" {
 				log.Info("\t>> ", strings.Repeat("\t", tabs), strings.Repeat(" ", spaces), "v")
-			} else {
+			} else if spaces > 0 {
 				log.Info("\t>> ", strings.Repeat("\t", tabs), strings.Repeat(" ", spaces-1), "v")
+			} else if spaces == 0 {
+				log.Info("\t>> ", strings.Repeat("\t", tabs), "v")
 			}
 			log.Info("\t>> ", theLine)
 			if spaces > 0 && strings.TrimLeftFunc(theLine, unicode.IsSpace)[spaces-1:spaces] == "[" {
 				log.Info("\t>> ", strings.Repeat("\t", tabs), strings.Repeat(" ", spaces), "^")
-			} else {
+			} else if spaces > 0 {
 				log.Info("\t>> ", strings.Repeat("\t", tabs), strings.Repeat(" ", spaces-1), "^")
+			} else if spaces == 0 {
+				log.Info("\t>> ", strings.Repeat("\t", tabs), "^")
 			}
 
 		} else {

@@ -472,9 +472,6 @@ func (a *analysis) printRace(counter int, race *raceInfo) {
 		} else {
 			log.Println("\tin goroutine  ***", a.goNames(a.goCalls[goIDs[i]].goIns), "[ GoID #", goIDs[i], "] *** ")
 		}
-		//if i == 0 {
-		//	log.Info("\n") //bz: why?? not consistent
-		//}
 
 		if printStack {
 			var pathGo []int
@@ -522,7 +519,5 @@ func (a *analysis) printRace(counter int, race *raceInfo) {
 	}
 	log.Debug("Locks acquired before 1st access: ", locks1)
 	log.Debug("Locks acquired before 2nd access: ", locks2)
-	//log.Debug("Locks acquired before Write access: ", writeLocks)
-	//log.Debug("Locks acquired before Read  access: ", readLocks)
 	log.Println(strings.Repeat("=", 100))
 }

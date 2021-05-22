@@ -1,10 +1,10 @@
 package main
 
 import (
+	"fmt"
 	"github.com/april1989/origin-go-tools/go/pointer"
 	pta0 "github.com/april1989/origin-go-tools/go/pointer_default"
 	"github.com/april1989/origin-go-tools/go/ssa"
-	"fmt"
 	log "github.com/sirupsen/logrus"
 	"github.com/twmb/algoimpl/go/graph"
 	"strconv"
@@ -678,7 +678,6 @@ func (a *analysis) newGoroutine(info goroutineInfo) {
 		a.RWIns = append(a.RWIns, []*insInfo{})
 	}
 	a.recordIns(info.goID, info.ssaIns)
-	//a.RWIns[info.goID] = append(a.RWIns[info.goID], info.ssaIns)
 	newGoInfo := &goCallInfo{goIns: info.goIns, ssaIns: info.ssaIns}
 	a.goCalls[info.goID] = newGoInfo
 	if DEBUG {
@@ -694,12 +693,10 @@ func (a *analysis) newGoroutine(info goroutineInfo) {
 	}
 	if DEBUG {
 		log.Debug(strings.Repeat(" ", a.levels[info.goID]), "PUSH ", info.entryMethod.Name(), " at lvl ", a.levels[info.goID])
-		//fnCall := fnCallIns{fnIns: info.entryMethod, goID: info.goID}
-		//stack := make([]fnCallInfo, len(a.storeFns))
-		//copy(stack, a.storeFns)
-		//a.stackMap[fnCall] = stackInfo{fnCalls: stack}
 	}
 	a.levels[info.goID]++
+
+
 	var target *ssa.Function
 	switch info.goIns.Call.Value.(type) {
 	case *ssa.MakeClosure:
@@ -710,7 +707,8 @@ func (a *analysis) newGoroutine(info goroutineInfo) {
 		target = info.goIns.Call.StaticCallee()
 	}
 	if target != nil {
-		a.traverseFn(target, target.Name(), info.goID, nil, false)
+		a.visitAllInstructions(target, info.goID)
+		//a.traverseFn(target, target.Name(), info.goID, nil, false)
 	}
 }
 
