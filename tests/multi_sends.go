@@ -11,7 +11,7 @@ func main() {
 		ch2 <- 2
 	}()
 	go func() {
-		x7 /* RACE Write */ = 4
+		x7 /* RACE Write */ /* RACE Write */ = 4
 		ch2 <- 1
 	}()
 	select {
@@ -20,7 +20,7 @@ func main() {
 	case a := <-ch2:
 		x7 = a + 1
 	default:
-		x7 /* RACE Write */ = 20
+		x7 /* RACE Write */ /* RACE Write */ = 20
 	}
 	fmt.Println(x7)
 }
