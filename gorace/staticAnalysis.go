@@ -236,6 +236,10 @@ func (runner *AnalysisRunner) Run2() error {
 	}
 	log.Info("****************************************************************************************************\n\n") //bz: final finish line
 
+	if goTest {//bz: skip the following printout for go test
+		return nil
+	}
+
 	//summary report
 	fmt.Println("Summary Report:")
 	raceCount := 0

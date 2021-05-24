@@ -14,6 +14,7 @@ import (
 	"go/types"
 	"golang.org/x/sync/semaphore"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 	"regexp"
 	"runtime"
@@ -245,9 +246,14 @@ func runChecker(t *testing.T, filenames []string) ([]*ast.File, []error) {
 	runner.trieLimit = 2
 	runner.efficiency = false
 	goTest = true
-	err := runner.Run(filenames)
-	if err != nil {
-		t.Fatal(err)
+	for _, file := range filenames {
+		userDir, _ = os.Getwd()
+		userInputFile = make([]string, 1)
+		userInputFile[0] = file
+		err := runner.Run2()
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 	var raceErrors []error
 	for _, msg := range runner.racyStackTops {

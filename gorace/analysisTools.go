@@ -263,7 +263,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 			}
 			return
 		}
-		if fn.Name() == a.entryFn {
+		if fn.Name() == a.entryFn { //bz: for main only
 			if goID == 0 && len(a.storeFns) == 1 {
 				//a.levels[goID] = 0 // initialize level count at main entry -> bz: already initialized
 				a.loopIDs[goID] = 0
@@ -641,10 +641,19 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 	if fnName == a.storeFns[len(a.storeFns)-1].fnIns.Name() {
 		a.updateRecords(fnName, goID, "POP  ", fn, nil)
 	}
-	if len(a.storeFns) == 0 && len(a.workList) != 0 { // finished reporting current goroutine and workList isn't empty
-		nextGoInfo := a.workList[0] // get the goroutine info at head of workList
-		a.workList = a.workList[1:] // pop goroutine info from head of workList
-		a.newGoroutine(nextGoInfo)
+	//bz: let's do other goroutines
+	if goID == 0 {
+		if len(a.storeFns) == 0 && len(a.workList) != 0 { // finished reporting current goroutine and workList isn't empty
+			nextGoInfo := a.workList[0] // get the goroutine info at head of workList
+			a.workList = a.workList[1:] // pop goroutine info from head of workList
+			a.newGoroutine(nextGoInfo)
+		}
+	}else{ //when goID > 0
+		for len(a.workList) != 0 { // finished reporting current goroutine and workList isn't empty
+			nextGoInfo := a.workList[0] // get the goroutine info at head of workList
+			a.workList = a.workList[1:] // pop goroutine info from head of workList
+			a.newGoroutine(nextGoInfo)
+		}
 	}
 }
 
@@ -672,8 +681,9 @@ func (a *analysis) newGoroutine(info goroutineInfo) {
 	if a.goCalls[a.goCaller[info.goID]] != nil && info.goIns == a.goCalls[a.goCaller[info.goID]].goIns {
 		return // recursive spawning of same goroutine
 	}
-	newFn := &fnCallInfo{fnIns: info.entryMethod, ssaIns: info.ssaIns}
-	a.storeFns = append(a.storeFns, newFn)
+	//// bz: this will be pushed again in traverseFn later -> but we need this as record
+	//newFn := &fnCallInfo{fnIns: info.entryMethod, ssaIns: info.ssaIns}
+	//a.storeFns = append(a.storeFns, newFn)
 	if info.goID >= len(a.RWIns) { // initialize interior slice for new goroutine
 		a.RWIns = append(a.RWIns, []*insInfo{})
 	}
@@ -691,11 +701,10 @@ func (a *analysis) newGoroutine(info goroutineInfo) {
 	if len(a.lockSet[a.goCaller[info.goID]]) > 0 { // carry over lockset from parent goroutine
 		a.lockSet[info.goID] = a.lockSet[a.goCaller[info.goID]]
 	}
-	if DEBUG {
-		log.Debug(strings.Repeat(" ", a.levels[info.goID]), "PUSH ", info.entryMethod.Name(), " at lvl ", a.levels[info.goID])
-	}
-	a.levels[info.goID]++
-
+	//if DEBUG {
+	//	log.Debug(strings.Repeat(" ", a.levels[info.goID]), "PUSH ", info.entryMethod.Name(), " at lvl ", a.levels[info.goID])
+	//}
+	//a.levels[info.goID]++
 
 	var target *ssa.Function
 	switch info.goIns.Call.Value.(type) {
@@ -707,8 +716,8 @@ func (a *analysis) newGoroutine(info goroutineInfo) {
 		target = info.goIns.Call.StaticCallee()
 	}
 	if target != nil {
-		a.visitAllInstructions(target, info.goID)
-		//a.traverseFn(target, target.Name(), info.goID, nil, false)
+		//a.visitAllInstructions(target, info.goID)
+		a.traverseFn(target, target.Name(), info.goID,  info.ssaIns, false)
 	}
 }
 
@@ -728,7 +737,7 @@ func (a *analysis) exploredFunction(fn *ssa.Function, goID int, theIns ssa.Instr
 	var csSlice []*ssa.Function
 	var csStr string
 
-	if theIns == nil { //bz: this happens when analyzing entry point, or from newGoroutine -> i only need a record
+	if _, ok := theIns.(*ssa.Go); ok || theIns == nil { //bz: this happens when analyzing entry point, or go routine -> i only need a record
 		csStr = ""
 	} else {
 		if a.fromExcludedFns(fn) {
@@ -768,6 +777,10 @@ func (a *analysis) exploredFunction(fn *ssa.Function, goID int, theIns ssa.Instr
 		}
 		a.trieMap[fnKey] = &newTrieNode
 	}
+
+	if _, ok := theIns.(*ssa.Go); ok || theIns == nil { //bz: for go call, skip the checking of budget
+		return false
+	}
 	return a.trieMap[fnKey].isBudgetExceeded()
 }
 
@@ -792,7 +805,7 @@ func (a *analysis) updateRecords(fnName string, goID int, pushPop string, theFn 
 func (a *analysis) traverseFn(fn *ssa.Function, fnName string, goID int, theIns ssa.Instruction, lock bool) {
 	if !a.exploredFunction(fn, goID, theIns) {
 		a.updateRecords(fnName, goID, "PUSH ", fn, theIns)
-		if theIns != nil { //bz: this happens when analyzing entry point, or from newGoroutine
+		if theIns != nil { //bz: this happens when analyzing entry point
 			a.recordIns(goID, theIns)
 		}
 		a.visitAllInstructions(fn, goID)
