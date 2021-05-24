@@ -223,23 +223,23 @@ func (a *analysis) checkRacyPairs() []*raceInfo {
 						if addressPair[0] == nil || addressPair[1] == nil {
 							continue
 						}
-						//////!!!! bz: for my debug, please comment off, do not delete
-						//var goIinstr string
-						//var goJinstr string
-						//if i == 0 {
-						//	goIinstr = "main"
-						//} else {
-						//	goIinstr = a.RWIns[i][0].ins.String()
+						////!!!! bz: for my debug, please comment off, do not delete
+						var goIinstr string
+						var goJinstr string
+						if i == 0 {
+							goIinstr = "main"
+						} else {
+							goIinstr = a.RWIns[i][0].ins.String()
+						}
+						if j == 0 {
+							goJinstr = "main"
+						} else {
+							goJinstr = a.RWIns[j][0].ins.String()
+						}
+						//if strings.Contains(addressPair[0].String(), "returnBuffers") && strings.Contains(addressPair[1].String(), "returnBuffers") &&
+						//	goI.ins.Parent().Name() == "commitAttemptLocked" && goJ.ins.Parent().Name() == "SendMsg" {
+						fmt.Println(addressPair[0], " Go: ", goIinstr, " loopid: ", a.loopIDs[i], ";  ", addressPair[1], " Go: ", goJinstr, " loopid: ", a.loopIDs[j])
 						//}
-						//if j == 0 {
-						//	goJinstr = "main"
-						//} else {
-						//	goJinstr = a.RWIns[j][0].ins.String()
-						//}
-						////if strings.Contains(addressPair[0].String(), "returnBuffers") && strings.Contains(addressPair[1].String(), "returnBuffers") &&
-						////	goI.ins.Parent().Name() == "commitAttemptLocked" && goJ.ins.Parent().Name() == "SendMsg" {
-						//	fmt.Println(addressPair[0], " Go: ", goIinstr, " loopid: ", a.loopIDs[i], ";  ", addressPair[1], " Go: ", goJinstr, " loopid: ", a.loopIDs[j])
-						////}
 
 						if a.sameAddress(addressPair[0], addressPair[1], i, j) &&
 							!strictSliceContains(races, addressPair) && //bz: this has no duplicated race locations
@@ -250,7 +250,7 @@ func (a *analysis) checkRacyPairs() []*raceInfo {
 							!a.lockSetsIntersect(goI.ins, goJ.ins, i, j) &&
 							!a.selectMutEx(insSlice[0].ins, insSlice[1].ins) &&
 							!a.mutuallyExcluded(goI, i, goJ, j) {
-						//&& !a.fromLibrary(addressPair)
+							//&& !a.fromLibrary(addressPair)
 							ri = &raceInfo{
 								insPair:  insSlice,
 								addrPair: addressPair,
@@ -388,6 +388,15 @@ func (a *analysis) lockSetsIntersect(insA ssa.Instruction, insB ssa.Instruction,
 		copy(RlocksB, a.RlockMap[insB])
 		locksB = append(locksB, RlocksB...)
 	}
+	//bz: debug
+	for _, addrA := range locksA {
+		fmt.Print(addrA.String() + "(", addrA.Parent(), "),")
+	}
+	fmt.Println()
+	for _, addrB := range locksB {
+		fmt.Print(addrB.String() + "(", addrB.Parent(), "),")
+	}
+	fmt.Println()
 	for _, addrA := range locksA {
 		for _, addrB := range locksB {
 			if a.sameAddress(addrA, addrB, goA, goB) {
