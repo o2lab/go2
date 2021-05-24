@@ -172,7 +172,7 @@ func (runner *AnalysisRunner) Run2() error {
 			//if strings.Contains(main.String(), "github.com/ethereum/go-ethereum/cmd/ethkey") && main.IsMainTest {
 			//	fmt.Println("Receive Result: ")
 			//	fmt.Println("Receive ptaRes (#Queries: ", len(runner.ptaResult.Queries), ", #IndirectQueries: ", len(runner.ptaResult.IndirectQueries), ") for main: ", main.String())
-				runner.ptaResult.DumpCG()
+			//	runner.ptaResult.DumpCG()
 			//}
 
 		} else {

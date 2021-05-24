@@ -361,6 +361,10 @@ func (a *analysis) sameAddress(addr1 ssa.Value, addr2 ssa.Value, go1 int, go2 in
 		goInstr2 = a.RWIns[go2][0].ins.(*ssa.Go)
 	}
 	ptr2 := a.ptaRes.PointsToByGoWithLoopID(addr2, goInstr2, a.loopIDs[go2])
+
+	//bz: debug
+	fmt.Println("pts1:,", ptr1.PointsTo().String(), "\t", "pts2:,", ptr2.PointsTo().String())
+
 	return ptr1.MayAlias(ptr2)
 }
 
