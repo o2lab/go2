@@ -213,6 +213,10 @@ type driverResponse struct {
 	// Imports will be connected and then type and syntax information added in a
 	// later pass (see refine).
 	Packages []*Package
+
+	//bz: see goListDriverRecursiveSeq
+	special bool
+	RootIdx map[int]int //bz: the index in Packages <-> the index in Roots
 }
 
 // Load loads and returns the Go packages named by the given patterns.
@@ -229,14 +233,14 @@ type driverResponse struct {
 // return an error. Clients may need to handle such errors before
 // proceeding with further analysis. The PrintErrors function is
 // provided for convenient display of all errors.
-func Load(cfg *Config, patterns ...string) ([]*Package, error) {
+func Load(cfg *Config, patterns ...string) ([]*Package, bool, error) {
 	l := newLoader(cfg)
 	response, err := defaultDriver(&l.Config, patterns...)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	l.sizes = response.Sizes
-	return l.refine(response.Roots, response.Packages...)
+	return l.refine(response)
 }
 
 // defaultDriver is a driver that implements go/packages' fallback behavior.
@@ -560,7 +564,12 @@ func newLoader(cfg *Config) *loader {
 
 // refine connects the supplied packages into a graph and then adds type and
 // and syntax information as requested by the LoadMode.
-func (ld *loader) refine(roots []string, list ...*Package) ([]*Package, error) {
+// bz: udpate: see goListDriverRecursiveSeq
+func (ld *loader) refine(response *driverResponse) ([]*Package, bool, error) {
+	roots := response.Roots
+	list := response.Packages
+	root2idx := response.RootIdx
+
 	rootMap := make(map[string]int, len(roots))
 	for i, root := range roots {
 		rootMap[root] = i
@@ -568,10 +577,15 @@ func (ld *loader) refine(roots []string, list ...*Package) ([]*Package, error) {
 	ld.pkgs = make(map[string]*loaderPackage)
 	// first pass, fixup and build the map and roots
 	var initial = make([]*loaderPackage, len(roots))
-	for _, pkg := range list {
+	for ii, pkg := range list {
 		rootIndex := -1
 		if i, found := rootMap[pkg.ID]; found {
 			rootIndex = i
+		}
+		if response.special {
+			if i, found := root2idx[ii]; found {
+				rootIndex = i
+			}
 		}
 
 		// Overlays can invalidate export data.
@@ -599,7 +613,7 @@ func (ld *loader) refine(roots []string, list ...*Package) ([]*Package, error) {
 	}
 	for i, root := range roots {
 		if initial[i] == nil {
-			return nil, fmt.Errorf("root package %v is missing", root)
+			return nil, response.special, fmt.Errorf("root package %v is missing", root)
 		}
 	}
 
@@ -750,7 +764,7 @@ func (ld *loader) refine(roots []string, list ...*Package) ([]*Package, error) {
 		}
 	}
 
-	return result, nil
+	return result, response.special, nil
 }
 
 // loadRecursive loads the specified package and its dependencies,

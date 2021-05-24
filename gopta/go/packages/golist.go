@@ -42,6 +42,9 @@ type responseDeduper struct {
 	seenRoots    map[string]bool
 	seenPackages map[string]*Package
 	dr           *driverResponse
+
+	//bz: see goListDriverRecursiveSeq
+	seenSourceFiles map[string]bool
 }
 
 func newDeduper() *responseDeduper {
@@ -54,11 +57,36 @@ func newDeduper() *responseDeduper {
 
 // addAll fills in r with a driverResponse.
 func (r *responseDeduper) addAll(dr *driverResponse) {
+	//bz: original code
 	for _, pkg := range dr.Packages {
-		r.addPackage(pkg)
+		if r.dr.special && pkg.ID == "command-line-arguments" {
+			r.addPackageSpecial(pkg)
+		}else{
+			r.addPackage(pkg)
+		}
 	}
 	for _, root := range dr.Roots {
 		r.addRoot(root)
+	}
+}
+
+//bz: special
+func (r *responseDeduper) addPackageSpecial(p *Package) {
+	if len(p.GoFiles) == 1 { //bz: should not have > 1 files
+		if r.seenPackages[p.ID] != nil && r.seenSourceFiles[p.GoFiles[0]] {
+			return
+		}
+		r.seenPackages[p.ID] = p
+		r.seenSourceFiles[p.GoFiles[0]] = true
+		r.dr.Packages = append(r.dr.Packages, p)
+
+		//bz: add root together ...
+		r.seenRoots[p.ID] = true
+		r.dr.Roots = append(r.dr.Roots, p.ID)
+		//bz: mark root idx in r.dr.Packages
+		rIdx := len(r.dr.Roots) - 1
+		pIdx := len(r.dr.Packages) - 1
+		r.dr.RootIdx[pIdx] = rIdx
 	}
 }
 
@@ -380,7 +408,15 @@ func goListDriverRecursiveSeq(subdirs []string, response *responseDeduper, cfg *
 	}
 
 	if response.dr.Packages == nil && response.dr.Roots == nil {
-		//bz: all subdir has no go.mod, we need to check the inside files, they may be .go with main function
+		//bz: all subdir files has no go.mod, we need to check the inside files, they may be .go with main function
+		response.dr.special = true
+		if response.dr.RootIdx == nil {
+			response.dr.RootIdx = make(map[int]int)
+		}
+		if response.seenSourceFiles == nil {
+			response.seenSourceFiles = make(map[string]bool)
+		}
+		//start
 		for i := 1; i < len(subdirs)-1; i++ { //bz: 1st element is ".", the last element is "", skip them
 			subdir := subdirs[i]
 			var realDir string //os dependent var
@@ -417,7 +453,7 @@ func goListDriverRecursiveSeq(subdirs []string, response *responseDeduper, cfg *
 					continue
 				}
 				if _dr != nil {
-					//TODO: bz: all go2/tests/* have pkg name "command-line-arguments" -> distinguish them ...
+					//bz: all go2/tests/* have pkg name "command-line-arguments" -> distinguish them
 					response.addAll(_dr)
 				}
 			}

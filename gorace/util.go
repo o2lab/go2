@@ -110,7 +110,7 @@ func isGoTestForm(name string) bool {
 	return false
 }
 
-func pkgSelection(initial []*packages.Package) ([]*ssa.Package, *ssa.Program, []*ssa.Package) {
+func pkgSelection(initial []*packages.Package, multiSamePkgs bool) ([]*ssa.Package, *ssa.Program, []*ssa.Package) {
 	var prog *ssa.Program
 	var pkgs []*ssa.Package
 	var mainPkgs []*ssa.Package //bz: selected
@@ -178,26 +178,35 @@ func pkgSelection(initial []*packages.Package) ([]*ssa.Package, *ssa.Program, []
 		} else {
 			// Provide entry-point options and retrieve user selection
 			fmt.Println(len(mainPkgs), "main() entry-points identified: ")
-			for i, ep := range mainPkgs {
-				//bz: check if exist duplicate
-				pkgStr := ep.String()
-				if dup := pkgMap[pkgStr]; len(dup) > 1 {
-					isTest := false
-					for memName, _ := range ep.Members {
-						if isGoTestForm(memName) {
-							isTest = true
-							break
+			if multiSamePkgs { //bz: all duplicate pkg name, identify by source file loc
+				for i, ep := range mainPkgs {
+					loc := ep.Pkg.Scope().Child(0).String() //bz: too much info, cannot modify lib func
+					idx := strings.Index(loc, ".go") //this is the source file loc
+					loc = loc[:idx + 3]
+					fmt.Println("Option", i+1, ": ", ep.String(), "(" + loc + ")")
+				}
+			}else {
+				for i, ep := range mainPkgs {
+					//bz: check if exist duplicate
+					pkgStr := ep.String()
+					if dup := pkgMap[pkgStr]; len(dup) > 1 {
+						isTest := false
+						for memName, _ := range ep.Members {
+							if isGoTestForm(memName) {
+								isTest = true
+								break
+							}
+						}
+						if isTest {
+							//bz: this is test cases for main pkg, but go ssa/pkg builder cannot identify the diff, so they use the same pkg name but different contents
+							ep.IsMainTest = true //bz: mark it -> change the code in pta is too complex, just mark it
+							fmt.Println("Option", i+1, ": ", ep.String()+".main.test")
+							continue
 						}
 					}
-					if isTest {
-						//bz: this is test cases for main pkg, but go ssa/pkg builder cannot identify the diff, so they use the same pkg name but different contents
-						ep.IsMainTest = true //bz: mark it -> change the code in pta is too complex, just mark it
-						fmt.Println("Option", i+1, ": ", ep.String()+".main.test")
-						continue
-					}
+					//all other
+					fmt.Println("Option", i+1, ": ", ep.String())
 				}
-				//all other
-				fmt.Println("Option", i+1, ": ", ep.String())
 			}
 			fmt.Print("Enter option number of choice: \n")
 			fmt.Print("*** use space delimiter for multiple selections *** \n")
@@ -245,7 +254,7 @@ func pkgSelection(initial []*packages.Package) ([]*ssa.Package, *ssa.Program, []
 
 //bz: default behavior is like this:
 // use the user input dir/getwd as default scope; if scope in yml != nil, already add it to pta scope (when decode yml)
-func determineScope(main *ssa.Package, pkgs []*ssa.Package) {
+func determineScope(main *ssa.Package, pkgs []*ssa.Package, multiSamePkgs bool) {
 	if PTAscope != nil && len(PTAscope) > 0 {
 		//bz: already determined, return
 		return
@@ -256,7 +265,9 @@ func determineScope(main *ssa.Package, pkgs []*ssa.Package) {
 	// 3. user run under a dir, but only one .go file (which must be the file with main function) -> command-line-arguments
 	// 4. user run under a dir, but has subdirs and/or .go files -> ??
 
-	if len(pkgs) == 1 {
+	if multiSamePkgs {
+		PTAscope = append(PTAscope, "command-line-arguments")
+	}else if len(pkgs) == 1 {
 		pkg := pkgs[0]
 		files := pkg.Files()
 		tmp := pkg.Pkg.Path()

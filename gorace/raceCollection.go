@@ -388,6 +388,7 @@ func (a *analysis) lockSetsIntersect(insA ssa.Instruction, insB ssa.Instruction,
 		copy(RlocksB, a.RlockMap[insB])
 		locksB = append(locksB, RlocksB...)
 	}
+
 	for _, addrA := range locksA {
 		for _, addrB := range locksB {
 			if a.sameAddress(addrA, addrB, goA, goB) {

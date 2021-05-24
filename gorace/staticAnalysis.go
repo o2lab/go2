@@ -109,16 +109,19 @@ func (runner *AnalysisRunner) Run2() error {
 
 
 	doStartLog("Loading input packages... ")
-	var initial []*packages.Package
-	initial, _ = packages.Load(cfg, userInputFile ... )
+	initial, multiSamePkgs, err := packages.Load(cfg, userInputFile ... ) //bz: see golist.go
 	if len(initial) == 0 {
+		if DEBUG {
+			fmt.Println("packages.Load error: " + err.Error())
+		}
+
 		doEndLog("No Go package detected. Return. ")
 		return nil
 	}
 	doEndLog("Done  -- " + strconv.Itoa(len(initial)) + " packages detected.")
 
 
-	mains, prog, pkgs := pkgSelection(initial)
+	mains, prog, pkgs := pkgSelection(initial, multiSamePkgs)
 	runner.prog = prog //TODO: bz: optimize, no need to do like this.
 
 	startExec := time.Now() // measure total duration of running entire code base
@@ -135,7 +138,7 @@ func (runner *AnalysisRunner) Run2() error {
 		// Configure pointer analysis...
 		doStartLog("Running Pointer Analysis... ")
 		if useNewPTA {
-			determineScope(main, pkgs)
+			determineScope(main, pkgs, multiSamePkgs)
 
 			var mains []*ssa.Package
 			mains = append(mains, main) //TODO: bz: optimize
@@ -281,19 +284,19 @@ func (runner *AnalysisRunner) Run(args []string) error {
 	log.Info("Loading input packages...")
 
 	os.Stderr = nil // No need to output package errors for now. Delete this line to view package errors
-	initial, _ := packages.Load(cfg, args...)
+	initial, multiSamePkgs, _ := packages.Load(cfg, args...)
 	if len(initial) == 0 {
 		return fmt.Errorf("No Go files detected. ")
 	}
 	log.Info("Done  -- ", len(initial), " packages detected. ")
 
-	mains, prog, pkgs := pkgSelection(initial)
+	mains, prog, pkgs := pkgSelection(initial, multiSamePkgs)
 	runner.prog = prog
 	runner.pkgs = pkgs
 	startExec := time.Now() // measure total duration of running entire code base
 	// Configure pointer analysis...
 	if useNewPTA {
-		determineScope(nil, pkgs)
+		determineScope(nil, pkgs, multiSamePkgs)
 
 		//logfile, _ := os.Create("/Users/bozhen/Documents/GO2/pta_replaced/go2/gorace/pta_log_0") //bz: debug
 		flags.DoTests = true //bz: set to true if your folder has tests and you want to analyze them
