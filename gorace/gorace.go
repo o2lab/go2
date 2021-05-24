@@ -172,11 +172,11 @@ func ParseFlagsAndInput() { //default: -useNewPTA
 func DecodeYmlFile(absPath string) {
 	grfile, err := ioutil.ReadFile(absPath)
 	if err != nil {
-		log.Info("No gorace.yml file found in current directory:", absPath, ". Use default values.") //Please provide gorace.yml file with config info.
 		//use default
 		excludedPkgs = append(excludedPkgs, "fmt")
 		excludedPkgs = append(excludedPkgs, "logrus")
-		flags.PTSLimit = 10
+		flags.PTSLimit = 0
+		log.Info("No gorace.yml file found in current directory:", absPath, ". Use default values (pts limit =", flags.PTSLimit,").") //Please provide gorace.yml file with config info.
 		return
 	}
 	grs := GoRace{}
