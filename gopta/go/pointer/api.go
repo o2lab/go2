@@ -1453,6 +1453,7 @@ func (s PointsToSet) String() string {
 			if i > 0 {
 				buf.WriteString(", ")
 			}
+			buf.WriteString(nodeid(l).String() + ":")
 			buf.WriteString(s.a.labelFor(nodeid(l)).String())
 		}
 	}
