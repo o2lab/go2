@@ -236,10 +236,10 @@ func (a *analysis) checkRacyPairs() []*raceInfo {
 						} else {
 							goJinstr = a.RWIns[j][0].ins.String()
 						}
-						if strings.Contains(addressPair[0].String(), "returnBuffers") && strings.Contains(addressPair[1].String(), "returnBuffers") &&
-							goI.ins.Parent().Name() == "commitAttemptLocked" && goJ.ins.Parent().Name() == "SendMsg" {
+						//if strings.Contains(addressPair[0].String(), "returnBuffers") && strings.Contains(addressPair[1].String(), "returnBuffers") &&
+						//	goI.ins.Parent().Name() == "commitAttemptLocked" && goJ.ins.Parent().Name() == "SendMsg" {
 							fmt.Println(addressPair[0], " Go: ", goIinstr, " loopid: ", a.loopIDs[i], ";  ", addressPair[1], " Go: ", goJinstr, " loopid: ", a.loopIDs[j])
-						}
+						//}
 
 						if a.sameAddress(addressPair[0], addressPair[1], i, j) &&
 							//!strictSliceContains(races, addressPair) && //bz: this has no duplciate race locations
