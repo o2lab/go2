@@ -223,27 +223,27 @@ func (a *analysis) checkRacyPairs() []*raceInfo {
 						if addressPair[0] == nil || addressPair[1] == nil {
 							continue
 						}
-						////!!!! bz: for my debug, please comment off, do not delete
-						var goIinstr string
-						var goJinstr string
-						if i == 0 {
-							goIinstr = "main"
-						} else {
-							goIinstr = a.RWIns[i][0].ins.String()
-						}
-						if j == 0 {
-							goJinstr = "main"
-						} else {
-							goJinstr = a.RWIns[j][0].ins.String()
-						}
-						//if strings.Contains(addressPair[0].String(), "returnBuffers") && strings.Contains(addressPair[1].String(), "returnBuffers") &&
-						//	goI.ins.Parent().Name() == "commitAttemptLocked" && goJ.ins.Parent().Name() == "SendMsg" {
-							fmt.Println(addressPair[0], " Go: ", goIinstr, " loopid: ", a.loopIDs[i], ";  ", addressPair[1], " Go: ", goJinstr, " loopid: ", a.loopIDs[j])
+						//////!!!! bz: for my debug, please comment off, do not delete
+						//var goIinstr string
+						//var goJinstr string
+						//if i == 0 {
+						//	goIinstr = "main"
+						//} else {
+						//	goIinstr = a.RWIns[i][0].ins.String()
 						//}
+						//if j == 0 {
+						//	goJinstr = "main"
+						//} else {
+						//	goJinstr = a.RWIns[j][0].ins.String()
+						//}
+						////if strings.Contains(addressPair[0].String(), "returnBuffers") && strings.Contains(addressPair[1].String(), "returnBuffers") &&
+						////	goI.ins.Parent().Name() == "commitAttemptLocked" && goJ.ins.Parent().Name() == "SendMsg" {
+						//	fmt.Println(addressPair[0], " Go: ", goIinstr, " loopid: ", a.loopIDs[i], ";  ", addressPair[1], " Go: ", goJinstr, " loopid: ", a.loopIDs[j])
+						////}
 
 						if a.sameAddress(addressPair[0], addressPair[1], i, j) &&
-							//!strictSliceContains(races, addressPair) && //bz: this has no duplciate race locations
-							!sliceContains(a, races, addressPair, i, j) && //bz: this reports the same race locations with different traces/goids
+							!strictSliceContains(races, addressPair) && //bz: this has no duplicated race locations
+							//!sliceContains(a, races, addressPair, i, j) && //bz: this reports the same race locations with different traces/goids
 							!a.reachable(goI.ins, i, goJ.ins, j) &&
 							!a.reachable(goJ.ins, j, goI.ins, i) &&
 							!a.bothAtomic(insSlice[0].ins, insSlice[1].ins) &&
@@ -362,8 +362,10 @@ func (a *analysis) sameAddress(addr1 ssa.Value, addr2 ssa.Value, go1 int, go2 in
 	}
 	ptr2 := a.ptaRes.PointsToByGoWithLoopID(addr2, goInstr2, a.loopIDs[go2])
 
-	//bz: debug
-	fmt.Println("pts1:,", ptr1.PointsTo().String(), "\t", "pts2:,", ptr2.PointsTo().String())
+	if DEBUG {
+		//bz: debug
+		fmt.Println("pts1:,", ptr1.PointsTo().String(), "\t", "pts2:,", ptr2.PointsTo().String())
+	}
 
 	return ptr1.MayAlias(ptr2)
 }

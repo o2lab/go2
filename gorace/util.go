@@ -20,6 +20,9 @@ import (
 var spin *spinner.Spinner
 
 func doStartLog(_log string) {
+	if goTest {
+		return
+	}
 	if turnOnSpinning {
 		if spin == nil {
 			spin = spinner.New(spinner.CharSets[9], 100*time.Millisecond) // Build our new spinner
@@ -35,6 +38,9 @@ func doStartLog(_log string) {
 }
 
 func doEndLog(args ...interface{}) {
+	if goTest {
+		return
+	}
 	if turnOnSpinning {
 		spin.FinalMSG = fmt.Sprint(args[0]) + "\n"
 		spin.Stop()
@@ -256,11 +262,11 @@ func determineScope(main *ssa.Package, pkgs []*ssa.Package) {
 		tmp := pkg.Pkg.Path()
 		if len(files) == 1 && tmp == "command-line-arguments" { //only 1 file -> no specific pkg
 			PTAscope = append(PTAscope, "command-line-arguments")
-		}else{ //one/multi files or sub dirs with pkg name
+		} else { //one/multi files or sub dirs with pkg name
 			modScope := recursiveGetScopeFromGoMod(tmp)
 			if modScope != "" {
 				PTAscope = append(PTAscope, modScope)
-			} else {//cannot locate the correct go.mod
+			} else { //cannot locate the correct go.mod
 				PTAscope = append(PTAscope, tmp)
 			}
 		}
@@ -268,7 +274,7 @@ func determineScope(main *ssa.Package, pkgs []*ssa.Package) {
 		modScope := getScopeFromGOMod("")
 		if modScope != "" {
 			PTAscope = append(PTAscope, modScope)
-		}else {// multiple pkgs: 1st pkg might be the root dir that user run gorace,
+		} else { // multiple pkgs: 1st pkg might be the root dir that user run gorace,
 			// need to check with other pkgs, since they all share the most left pkg path
 			tmp := pkgs[0].Pkg.Path()
 			modScope := recursiveGetScopeFromGoMod(tmp)
@@ -280,7 +286,7 @@ func determineScope(main *ssa.Package, pkgs []*ssa.Package) {
 					p1 := pkg.Pkg.Path()
 					if strings.HasPrefix(p1, tmp) {
 						continue
-					}else{ //p1 has shorter path, use this
+					} else { //p1 has shorter path, use this
 						tmp = p1
 					}
 				}
@@ -296,9 +302,10 @@ func determineScope(main *ssa.Package, pkgs []*ssa.Package) {
 		}
 	}
 
-	//bz: debug use
-	for _, s := range PTAscope {
-		fmt.Println(" - ",s)
+	if DEBUG { //bz: debug use
+		for _, s := range PTAscope {
+			fmt.Println(" - ",s)
+		}
 	}
 }
 

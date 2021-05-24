@@ -184,9 +184,10 @@ func (a *analysis) runChecker() raceReport {
 	for fn, _ := range a.trieMap { //bz: remove diff context for the same fn
 		traversed[fn.fnName] = fn.fnName
 	}
-	//bz: debug
-	for _, fn := range traversed {
-		fmt.Println(fn.String())
+	if DEBUG { //bz: debug
+		for _, fn := range traversed {
+			fmt.Println(fn.String())
+		}
 	}
 
 	doEndLog("Done  -- " + strconv.Itoa(len(a.RWIns)) + " goroutines analyzed! " + strconv.Itoa(len(traversed)) + " function traversed! " + strconv.Itoa(totalIns) + " instructions of interest detected! ")
@@ -256,11 +257,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 	if !isSynthetic(fn) { // if function is NOT synthetic
 		if !a.fromPkgsOfInterest(fn) {
 			a.updateRecords(fn.Name(), goID, "POP  ", fn, nil)
-			if len(a.storeFns) == 0 && len(a.workList) != 0 { // finished reporting current goroutine and workList isn't empty
-				nextGoInfo := a.workList[0] // get the goroutine info at head of workList
-				a.workList = a.workList[1:] // pop goroutine info from head of workList
-				a.newGoroutine(nextGoInfo)
-			}
+			a.visitGo()
 			return
 		}
 		if fn.Name() == a.entryFn { //bz: for main only
@@ -641,19 +638,15 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 	if fnName == a.storeFns[len(a.storeFns)-1].fnIns.Name() {
 		a.updateRecords(fnName, goID, "POP  ", fn, nil)
 	}
-	//bz: let's do other goroutines
-	if goID == 0 {
-		if len(a.storeFns) == 0 && len(a.workList) != 0 { // finished reporting current goroutine and workList isn't empty
-			nextGoInfo := a.workList[0] // get the goroutine info at head of workList
-			a.workList = a.workList[1:] // pop goroutine info from head of workList
-			a.newGoroutine(nextGoInfo)
-		}
-	}else{ //when goID > 0
-		for len(a.workList) != 0 { // finished reporting current goroutine and workList isn't empty
-			nextGoInfo := a.workList[0] // get the goroutine info at head of workList
-			a.workList = a.workList[1:] // pop goroutine info from head of workList
-			a.newGoroutine(nextGoInfo)
-		}
+	a.visitGo()
+}
+
+//bz: let's visit all goroutines except main
+func (a *analysis) visitGo() {
+	for len(a.storeFns) == 0 && len(a.workList) != 0 { // finished reporting current goroutine and workList isn't empty
+		nextGoInfo := a.workList[0] // get the goroutine info at head of workList
+		a.workList = a.workList[1:] // pop goroutine info from head of workList
+		a.newGoroutine(nextGoInfo)
 	}
 }
 

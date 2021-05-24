@@ -140,15 +140,15 @@ func (runner *AnalysisRunner) Run2() error {
 			var mains []*ssa.Package
 			mains = append(mains, main) //TODO: bz: optimize
 
-			//logfile, _ := os.Create("/Users/bozhen/Documents/GO2/pta_replaced/go2/gorace/pta_log_0") //bz: debug
+			//logfile, _ := os.Create("/Users/bozhen/Documents/GO2/go2/gorace/pta_log_0") //bz: debug
 			if allEntries || strings.HasSuffix(main.Pkg.Path(), ".test") || main.IsMainTest { //bz: set to default behavior
 				flags.DoTests = true //bz: set to true if your folder has tests and you want to analyze them
 			}
-			runner.ptaConfig = &pointer.Config{
+			runner.ptaConfig = &pointer.Config {
 				Mains:          mains, //bz: all mains/tests in a project
 				Reflection:     false,
 				BuildCallGraph: true,
-				Log:            nil,
+				Log:            nil, //logfile,
 				Origin:         true, //origin
 				//shared config
 				K:          1,

@@ -35,7 +35,7 @@ var (
 	//for our debug use: default value here: false false true
 	DEBUG          = false //bz: replace the usage for old allEntries -> print out verbose debug info
 	DEBUGHBGraph   = false //bz: print out verbose debug info in buildHB()
-	turnOnSpinning = false //bz: if we run this in goland, turn this off... this only works for terminal
+	turnOnSpinning = true //bz: if we run this in goland, turn this off... this only works for terminal
 
 	//from users yml or flags
 	allEntries    = false  //user flag
@@ -175,7 +175,7 @@ func DecodeYmlFile(absPath string) {
 		//use default
 		excludedPkgs = append(excludedPkgs, "fmt")
 		excludedPkgs = append(excludedPkgs, "logrus")
-		flags.PTSLimit = 0
+		flags.PTSLimit = 10
 		log.Info("No gorace.yml file found in current directory:", absPath, ". Use default values (pts limit =", flags.PTSLimit,").") //Please provide gorace.yml file with config info.
 		return
 	}

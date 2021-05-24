@@ -190,9 +190,19 @@ func sliceContainsInsAt(s []ssa.Instruction, e ssa.Instruction) int {
 	return -1
 }
 
+//bz: problem in insCall (@gorace/ssaInstructions.go:339)
+// for a call with parameters, the a.recordIns will add the call ir inst to a.RWIns for parameter reads first
+// later the exploredFunction will call sliceContainsInsInfoAt and return that the call has been traversed,
+// but actually not, because it is a record for parameter read, not call
+// -> if this is a parameter read, its stack should not include e as the last element (since e is pushed afterwards);
+//    otherwise, this is a duplicate call
 func sliceContainsInsInfoAt(s []*insInfo, e ssa.Instruction) int {
 	for i := 0; i < len(s); i++ {
-		if s[i].ins == e {
+		r := s[i]
+		if r.ins == e {
+			if r.stack[len(r.stack) - 1].ssaIns != e {
+				continue
+			}
 			return i
 		}
 	}
