@@ -377,6 +377,16 @@ func (a *analysis) lockSetsIntersect(insA ssa.Instruction, insB ssa.Instruction,
 	copy(locksA, a.lockMap[insA])
 	copy(locksB, a.lockMap[insB])
 
+	//bz: debug
+	for _, addrA := range locksA {
+		fmt.Print(addrA.String() + "(", addrA.Parent(), ");")
+	}
+	fmt.Println()
+	for _, addrB := range locksB {
+		fmt.Print(addrB.String() + "(", addrB.Parent(), ");")
+	}
+	fmt.Println()
+
 	if a.isReadIns(insA) {
 		RlocksA := make([]ssa.Value, len(a.RlockMap[insA]))
 		copy(RlocksA, a.RlockMap[insA])
@@ -388,6 +398,7 @@ func (a *analysis) lockSetsIntersect(insA ssa.Instruction, insB ssa.Instruction,
 		copy(RlocksB, a.RlockMap[insB])
 		locksB = append(locksB, RlocksB...)
 	}
+
 	//bz: debug
 	for _, addrA := range locksA {
 		fmt.Print(addrA.String() + "(", addrA.Parent(), "),")
