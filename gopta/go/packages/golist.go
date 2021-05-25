@@ -80,7 +80,6 @@ func (r *responseDeduper) addPackageSpecial(p *Package) {
 		if curOS == "linux" {
 			idx := strings.LastIndex(file, "/")
 			file = "_" + file[0:idx]
-			fmt.Println(file)
 			if r.seenPackages[file] != nil {
 				return
 			}
@@ -373,16 +372,16 @@ func handleDriverUnderDir(restPatterns []string, patterns []string, response *re
 				goListDriverRecursiveSeq(subdirs, response, cfg, ctx, restPatterns)
 			}
 		} else { //default: Unix (MacOS + Ubuntu)
-			subdirs = findRecursiveDirs(cfg)
-			if subdirs != nil && len(subdirs)-2 > 0 {
-				//goListDriverRecursive(subdirs, size, response, cfg, ctx, restPatterns)
-				goListDriverRecursiveSeq(subdirs, response, cfg, ctx, restPatterns)
-			}
-
 			if curOS == "linux" {
 				initialSpecialDriver(response)
 				goListDriverFile(cfg.Dir, response, state)
 				return
+			}
+
+			subdirs = findRecursiveDirs(cfg)
+			if subdirs != nil && len(subdirs)-2 > 0 {
+				//goListDriverRecursive(subdirs, size, response, cfg, ctx, restPatterns)
+				goListDriverRecursiveSeq(subdirs, response, cfg, ctx, restPatterns)
 			}
 		}
 	}
