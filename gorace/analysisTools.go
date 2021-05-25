@@ -153,7 +153,7 @@ func initialAnalysis() *analysis {
 
 
 //bz: abstract out
-func (a *analysis) runChecker() raceReport {
+func (a *analysis) runChecker(multiSamePkgs bool) raceReport {
 	if strings.Contains(a.main.Pkg.Path(), "GoBench") { // for testing purposes
 		a.efficiency = false
 		a.trieLimit = 2
@@ -194,7 +194,7 @@ func (a *analysis) runChecker() raceReport {
 
 	if len(a.RWIns) == 1 { //bz: only main thread, no races.
 		log.Info("Only has the main goroutine, no need to continue. Return. ")
-		return a.getRaceReport()
+		return a.getRaceReport(false)
 	}
 
 	if useDefaultPTA {
@@ -229,17 +229,24 @@ func (a *analysis) runChecker() raceReport {
 	doEndLog("Done  -- Happens-Before graph built ")
 	log.Info("Checking for data races... ") //bz: no spinner -> we need to print out ...
 	//}
-	rr := a.getRaceReport()
+	rr := a.getRaceReport(multiSamePkgs)
 	rr.racePairs = a.checkRacyPairs()
 
 	return rr
 }
 
 //bz:
-func (a *analysis) getRaceReport() raceReport {
+func (a *analysis) getRaceReport(multiSamePkgs bool) raceReport {
 	entryStr := a.main.Pkg.Path()
 	if a.testEntry != nil {
 		entryStr = a.testEntry.String() //duplicate name in summary
+	}
+	if multiSamePkgs {
+		pkg := a.main.Pkg
+		loc := pkg.Scope().Child(0).String() //bz: copied from util.go
+		idx := strings.Index(loc, ".go")
+		loc = loc[:idx+3]
+		entryStr = entryStr + "(" + loc + ")"
 	}
 	rr := raceReport{
 		entryInfo: entryStr,

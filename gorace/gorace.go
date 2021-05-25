@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"syscall"
 )
@@ -31,16 +32,17 @@ var (
 	excludedFns   []string
 	testMode      = false // Used by race_test.go for collecting output.
 	PTAscope      []string
+	OS            = runtime.GOOS //bz: runtime os ... separate different behaviors in mac and linux
 
 	//for our debug use: default value here: false false true
 	DEBUG          = false //bz: replace the usage for old allEntries -> print out verbose debug info
 	DEBUGHBGraph   = false //bz: print out verbose debug info in buildHB()
-	turnOnSpinning = false //bz: if we run this in goland, turn this off... this only works for terminal
+	turnOnSpinning = true  //bz: if we run this in goland, turn this off... this only works for terminal
 
 	//from users yml or flags
 	allEntries    = false  //user flag
 	excludedPkgs  []string // ******** FOR ISSUE 14 *************
-	inputScope      []string //bz: this can be nil -> default is to analyze the current folder
+	inputScope    []string //bz: this can be nil -> default is to analyze the current folder
 	userDir       string   //bz: user specify dir -> we run gorace here
 	userInputFile []string //bz: used when input is a .go file, not a path
 

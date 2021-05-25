@@ -94,10 +94,12 @@ func (runner *AnalysisRunner) Run2() error {
 	}
 	doEndLog("Done  -- " + strconv.Itoa(len(initial)) + " packages detected.")
 
-
 	mains, prog, pkgs := pkgSelection(initial, multiSamePkgs)
-	runner.prog = prog //TODO: bz: optimize, no need to do like this.
+	if mains == nil {
+		return nil
+	}
 
+	runner.prog = prog //TODO: bz: optimize, no need to do like this.
 	startExec := time.Now() // measure total duration of running entire code base
 
 	//run one by one: Iterate each entry point...
@@ -183,7 +185,7 @@ func (runner *AnalysisRunner) Run2() error {
 			a.prog = runner.prog
 			a.entryFn = "main"
 
-			rr := a.runChecker()
+			rr := a.runChecker(multiSamePkgs)
 			runner.racyStackTops = a.racyStackTops
 			runner.finalReport = append(runner.finalReport, rr)
 		} else { //bz: is a test
@@ -201,7 +203,7 @@ func (runner *AnalysisRunner) Run2() error {
 				a.entryFn = test.Name()
 				a.otherTests = selectTests
 
-				rr := a.runChecker()
+				rr := a.runChecker(false)
 				runner.racyStackTops = a.racyStackTops
 				runner.finalReport = append(runner.finalReport, rr)
 
