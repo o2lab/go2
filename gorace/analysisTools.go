@@ -12,7 +12,6 @@ import (
 	"sync"
 )
 
-
 type analysis struct {
 	mu      sync.RWMutex
 	ptaRes  *pointer.Result //now can reuse the ptaRes
@@ -20,25 +19,25 @@ type analysis struct {
 	ptaCfg  *pointer.Config
 	ptaCfg0 *pta0.Config
 
-	efficiency   bool
-	trieLimit    int
+	efficiency bool
+	trieLimit  int
 	//getGo        bool // flag
-	prog         *ssa.Program
-	main         *ssa.Package
-	analysisStat stat
-	HBgraph      *graph.Graph
-	RWinsMap     map[goIns]graph.Node
-	trieMap      map[fnInfo]*trie    // map each function to a trie node -> bz: now it includes all traversed fns
-	RWIns        [][]*insInfo // instructions grouped by goroutine
-	insMono      int                 // index of instruction (in main goroutine) before which the program is single-threaded
-	storeFns     []*fnCallInfo
-	workList     []goroutineInfo
-	levels       map[int]int
-	lockMap      map[ssa.Instruction][]ssa.Value // map each read/write access to a snapshot of actively maintained lockset
-	lockSet      map[int][]*lockInfo             // active lockset, to be maintained along instruction traversal
-	RlockMap     map[ssa.Instruction][]ssa.Value // map each read/write access to a snapshot of actively maintained lockset
-	RlockSet     map[int][]*lockInfo             // active lockset, to be maintained along instruction traversal
-	getParam     bool
+	prog            *ssa.Program
+	main            *ssa.Package
+	analysisStat    stat
+	HBgraph         *graph.Graph
+	RWinsMap        map[goIns]graph.Node
+	trieMap         map[fnInfo]*trie // map each function to a trie node -> bz: now it includes all traversed fns
+	RWIns           [][]*insInfo     // instructions grouped by goroutine
+	insMono         int              // index of instruction (in main goroutine) before which the program is single-threaded
+	storeFns        []*fnCallInfo
+	workList        []goroutineInfo
+	levels          map[int]int
+	lockMap         map[ssa.Instruction][]ssa.Value // map each read/write access to a snapshot of actively maintained lockset
+	lockSet         map[int][]*lockInfo             // active lockset, to be maintained along instruction traversal
+	RlockMap        map[ssa.Instruction][]ssa.Value // map each read/write access to a snapshot of actively maintained lockset
+	RlockSet        map[int][]*lockInfo             // active lockset, to be maintained along instruction traversal
+	getParam        bool
 	paramFunc       *ssa.Function
 	goStack         [][]*fnCallInfo
 	goCaller        map[int]int
@@ -67,14 +66,14 @@ type analysis struct {
 	allocLoop       map[*ssa.Function][]string
 	bindingFV       map[*ssa.Go][]*ssa.FreeVar
 	//pbr             *ssa.Alloc //bz: this is not used
-	commIDs         map[int][]int
-	deferToRet      map[*ssa.Defer]ssa.Instruction
+	commIDs    map[int][]int
+	deferToRet map[*ssa.Defer]ssa.Instruction
 
-	entryFn         string         //bz: move from global to analysis field
-	testEntry       *ssa.Function  //bz: test entry point -> just one!
-	otherTests      []*ssa.Function //bz: all other tests that are in the same test pkg, TODO: bz: exclude myself
+	entryFn    string          //bz: move from global to analysis field
+	testEntry  *ssa.Function   //bz: test entry point -> just one!
+	otherTests []*ssa.Function //bz: all other tests that are in the same test pkg, TODO: bz: exclude myself
 
-	twinGoID        map[*ssa.Go][]int //bz: whether two goroutines are spawned by the same loop; this might not be useful now since !sliceContains(a.reportedAddr, addressPair) && already filtered out the duplicate race check
+	twinGoID map[*ssa.Go][]int //bz: whether two goroutines are spawned by the same loop; this might not be useful now since !sliceContains(a.reportedAddr, addressPair) && already filtered out the duplicate race check
 	//mutualTargets   map[int]*mutualFns //bz: this mutual exclusion is for this specific go id (i.e., int)
 }
 
@@ -150,7 +149,6 @@ func initialAnalysis() *analysis {
 		//mutualTargets:   make(map[int]*mutualFns),
 	}
 }
-
 
 //bz: abstract out
 func (a *analysis) runChecker(multiSamePkgs bool) raceReport {
@@ -243,10 +241,14 @@ func (a *analysis) getRaceReport(multiSamePkgs bool) raceReport {
 	}
 	if multiSamePkgs {
 		pkg := a.main.Pkg
-		loc := pkg.Scope().Child(0).String() //bz: copied from util.go
-		idx := strings.Index(loc, ".go")
-		loc = loc[:idx+3]
-		entryStr = entryStr + "(" + loc + ")"
+		if pkg.Path() != "command-line-arguments" {
+			entryStr = pkg.String()
+		}else{
+			loc := pkg.Scope().Child(0).String() //bz: copied from util.go
+			idx := strings.Index(loc, ".go")
+			loc = loc[:idx+3]
+			entryStr = entryStr + "(" + loc + ")"
+		}
 	}
 	rr := raceReport{
 		entryInfo: entryStr,
@@ -704,7 +706,7 @@ func (a *analysis) newGoroutine(info goroutineInfo) {
 	}
 	if target != nil {
 		//a.visitAllInstructions(target, info.goID)
-		a.traverseFn(target, target.Name(), info.goID,  info.ssaIns, false)
+		a.traverseFn(target, target.Name(), info.goID, info.ssaIns, false)
 	}
 }
 
@@ -724,7 +726,7 @@ func (a *analysis) exploredFunction(fn *ssa.Function, goID int, theIns ssa.Instr
 	var csSlice []*ssa.Function
 	var csStr string
 
-	if _, ok := theIns.(*ssa.Go); ok || theIns == nil { //bz: this happens when analyzing entry point, or go routine -> i only need a record
+	if theIns == nil { //bz: this happens when analyzing entry point, or go routine -> i only need a record
 		csStr = ""
 	} else {
 		if a.fromExcludedFns(fn) {
@@ -765,12 +767,11 @@ func (a *analysis) exploredFunction(fn *ssa.Function, goID int, theIns ssa.Instr
 		a.trieMap[fnKey] = &newTrieNode
 	}
 
-	if _, ok := theIns.(*ssa.Go); ok || theIns == nil { //bz: for go call, skip the checking of budget
+	if theIns == nil { //bz: for go call, skip the checking of budget
 		return false
 	}
 	return a.trieMap[fnKey].isBudgetExceeded()
 }
-
 
 // updateRecords will print out the stack trace
 func (a *analysis) updateRecords(fnName string, goID int, pushPop string, theFn *ssa.Function, theIns ssa.Instruction) {
@@ -831,8 +832,6 @@ func (a *analysis) isReadySel(ch string) bool {
 	}
 	return false
 }
-
-
 
 //stackGo prints the callstack of a goroutine -> bz: not used now
 func (a *analysis) stackGo() {

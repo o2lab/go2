@@ -200,7 +200,11 @@ func sliceContainsInsInfoAt(s []*insInfo, e ssa.Instruction) int {
 	for i := 0; i < len(s); i++ {
 		r := s[i]
 		if r.ins == e {
-			if r.stack[len(r.stack) - 1].ssaIns != e {
+			idx := len(r.stack) - 1
+			if idx < 0 {
+				continue
+			}
+			if r.stack[idx].ssaIns != e {
 				continue
 			}
 			return i

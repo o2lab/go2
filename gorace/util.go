@@ -1,16 +1,15 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
 	"github.com/april1989/origin-go-tools/go/packages"
 	"github.com/april1989/origin-go-tools/go/ssa"
 	"github.com/april1989/origin-go-tools/go/ssa/ssautil"
+	"github.com/april1989/origin-go-tools/go/util"
 	"github.com/briandowns/spinner"
 	log "github.com/sirupsen/logrus"
 	"go/token"
 	"go/types"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -144,6 +143,12 @@ func pkgSelection(initial []*packages.Package, multiSamePkgs bool) ([]*ssa.Packa
 	fmt.Println(len(mainPkgs), "main() entry-points identified: ")
 	if multiSamePkgs { //bz: all duplicate pkg name, identify by source file loc
 		for i, ep := range mainPkgs {
+			if ep.Pkg.Path() != "command-line-arguments" {
+				//bz: normal pkg
+				fmt.Println("Option", i+1, ": ", ep.String())
+				continue
+			}
+			//bz: duplicate mains
 			loc := ep.Pkg.Scope().Child(0).String() //bz: too much info, cannot modify lib func
 			idx := strings.Index(loc, ".go")        //this is the source file loc
 			loc = loc[:idx+3]
@@ -324,7 +329,7 @@ func determineScope(main *ssa.Package, pkgs []*ssa.Package, multiSamePkgs bool) 
 		if len(files) == 1 && tmp == "command-line-arguments" { //only 1 file -> no specific pkg
 			PTAscope = append(PTAscope, "command-line-arguments")
 		} else { //one/multi files or sub dirs with pkg name
-			modScope := recursiveGetScopeFromGoMod(tmp)
+			modScope := util.GetScopeFromGOModRecursive(tmp, userDir)
 			if modScope != "" {
 				PTAscope = append(PTAscope, modScope)
 			} else { //cannot locate the correct go.mod
@@ -332,13 +337,13 @@ func determineScope(main *ssa.Package, pkgs []*ssa.Package, multiSamePkgs bool) 
 			}
 		}
 	} else { //multiple pkg -> see if we can find go.mod
-		modScope := getScopeFromGOMod("")
+		modScope := util.GetScopeFromGOMod(userDir)
 		if modScope != "" {
 			PTAscope = append(PTAscope, modScope)
 		} else { // multiple pkgs: 1st pkg might be the root dir that user run gorace,
 			// need to check with other pkgs, since they all share the most left pkg path
 			tmp := pkgs[0].Pkg.Path()
-			modScope := recursiveGetScopeFromGoMod(tmp)
+			modScope := util.GetScopeFromGOModRecursive(tmp, userDir)
 			if modScope != "" {
 				PTAscope = append(PTAscope, modScope)
 			} else {
@@ -370,58 +375,6 @@ func determineScope(main *ssa.Package, pkgs []*ssa.Package, multiSamePkgs bool) 
 	}
 }
 
-//bz:
-func recursiveGetScopeFromGoMod(tmpScope string) string {
-	curPath, err := os.Getwd() //current
-	if err != nil {
-		panic("Error while os.Getwd: " + err.Error())
-	}
-	idx := strings.LastIndex(curPath, "/")
-	for idx > 0 {
-		checkPath := curPath[:idx]
-		modScope := getScopeFromGOMod(checkPath)
-		if modScope != "" && strings.HasPrefix(tmpScope, modScope) {
-			return modScope
-		} else {
-			idx = strings.LastIndex(checkPath, "/")
-		}
-	}
-	return ""
-}
-
-//bz:
-func getScopeFromGOMod(path string) string {
-	if path == "" {
-		var err error
-		path, err = os.Getwd() //current working directory == project path
-		if err != nil {
-			panic("Error while os.Getwd: " + err.Error())
-		}
-	}
-
-	gomodFile, err := os.Open(path + "/go.mod") // For read access.
-	if err != nil {
-		return "" //no such file
-	}
-	defer gomodFile.Close()
-	scanner := bufio.NewScanner(gomodFile)
-	var mod string
-	for scanner.Scan() {
-		s := scanner.Text()
-		if strings.HasPrefix(s, "module ") {
-			mod = s
-			break //this is the line "module xxx.xxx.xx/xxx"
-		}
-	}
-	if mod == "" {
-		return "" //not format as expected
-	}
-	if err2 := scanner.Err(); err2 != nil {
-		return "" //scan error
-	}
-	parts := strings.Split(mod, " ")
-	return parts[1]
-}
 
 //var scope = make([]string, 1)
 ////if pkgs[0] != nil { // Note: only if main dir contains main.go.
