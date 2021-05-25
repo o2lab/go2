@@ -73,9 +73,19 @@ func (r *responseDeduper) addAll(dr *driverResponse) {
 //bz: special
 func (r *responseDeduper) addPackageSpecial(p *Package) {
 	if len(p.GoFiles) == 1 { //bz: should not have > 1 files
-		if r.seenPackages[p.ID] != nil && r.seenSourceFiles[p.GoFiles[0]] {
+		file := p.GoFiles[0]
+		if r.seenPackages[p.ID] != nil && r.seenSourceFiles[file] {
 			return
 		}
+		if curOS == "linux" {
+			idx := strings.LastIndex(file, "/")
+			file = "_" + file[0:idx]
+			fmt.Println(file)
+			if r.seenPackages[file] != nil {
+				return
+			}
+		}
+
 		r.seenPackages[p.ID] = p
 		r.seenSourceFiles[p.GoFiles[0]] = true
 		r.dr.Packages = append(r.dr.Packages, p)
@@ -363,15 +373,16 @@ func handleDriverUnderDir(restPatterns []string, patterns []string, response *re
 				goListDriverRecursiveSeq(subdirs, response, cfg, ctx, restPatterns)
 			}
 		} else { //default: Unix (MacOS + Ubuntu)
-			if curOS == "linux" {
-				initialSpecialDriver(response)
-				goListDriverFile(cfg.Dir, response, state)
-			}
-
 			subdirs = findRecursiveDirs(cfg)
 			if subdirs != nil && len(subdirs)-2 > 0 {
 				//goListDriverRecursive(subdirs, size, response, cfg, ctx, restPatterns)
 				goListDriverRecursiveSeq(subdirs, response, cfg, ctx, restPatterns)
+			}
+
+			if curOS == "linux" {
+				initialSpecialDriver(response)
+				goListDriverFile(cfg.Dir, response, state)
+				return
 			}
 		}
 	}
