@@ -372,12 +372,6 @@ func handleDriverUnderDir(restPatterns []string, patterns []string, response *re
 				goListDriverRecursiveSeq(subdirs, response, cfg, ctx, restPatterns)
 			}
 		} else { //default: Unix (MacOS + Ubuntu)
-			if curOS == "linux" {
-				initialSpecialDriver(response)
-				goListDriverFile(cfg.Dir, response, state)
-				return
-			}
-
 			subdirs = findRecursiveDirs(cfg)
 			if subdirs != nil && len(subdirs)-2 > 0 {
 				//goListDriverRecursive(subdirs, size, response, cfg, ctx, restPatterns)
@@ -428,12 +422,13 @@ func goListDriverRecursiveSeq(subdirs []string, response *responseDeduper, cfg *
 		}
 	}
 
-	if response.dr.Packages == nil && response.dr.Roots == nil { //bz: mac os
+	if (response.dr.Packages == nil && response.dr.Roots == nil) || curOS == "linux" { //bz: mac os vs linux
 		goListDriverRecursiveFilesSeq(subdirs, response, cfg, ctx)
 	}
 }
 
-func initialSpecialDriver(response *responseDeduper) {
+//bz: all subdir files has no go.mod, we need to check the inside files, they may be .go with main function
+func goListDriverRecursiveFilesSeq(subdirs []string, response *responseDeduper, cfg *Config, ctx context.Context) {
 	response.dr.special = true
 	if response.dr.RootIdx == nil {
 		response.dr.RootIdx = make(map[int]int)
@@ -441,12 +436,16 @@ func initialSpecialDriver(response *responseDeduper) {
 	if response.seenSourceFiles == nil {
 		response.seenSourceFiles = make(map[string]bool)
 	}
-}
 
-//bz: all subdir files has no go.mod, we need to check the inside files, they may be .go with main function
-func goListDriverRecursiveFilesSeq(subdirs []string, response *responseDeduper, cfg *Config, ctx context.Context) {
-	initialSpecialDriver(response)
-	//start
+	//root folder
+	_state := &golistState{
+		cfg:        cfg, //root dir
+		ctx:        ctx,
+		vendorDirs: map[string]bool{},
+	}
+	goListDriverFile(cfg.Dir, response, _state)
+
+	//sub folders
 	for i := 1; i < len(subdirs)-1; i++ { //bz: 1st element is ".", the last element is "", skip them
 		subdir := subdirs[i]
 		var realDir string //os dependent var
@@ -472,6 +471,7 @@ func goListDriverRecursiveFilesSeq(subdirs []string, response *responseDeduper, 
 	}
 }
 
+//bz: sub routine ...
 func goListDriverFile(subdir string, response *responseDeduper, _state *golistState) {
 	files := findRecursiveFiles(subdir)
 	for j := 0; j < (len(files) - 1); j++ {
