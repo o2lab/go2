@@ -97,7 +97,7 @@ func doCallback(filepath string) {
 //do preparation job: common job
 func initial(args []string, cfg *packages.Config) []*ssa.Package {
 	fmt.Println("Loading input packages...")
-	initial, err := packages.Load(cfg, args...)
+	initial, _, err := packages.Load(cfg, args...)
 	if err != nil {
 		panic(fmt.Sprintln(err))
 	}

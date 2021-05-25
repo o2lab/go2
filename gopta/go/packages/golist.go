@@ -9,6 +9,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/april1989/origin-go-tools/go/util"
 	"go/types"
 	"log"
 	"os"
@@ -412,13 +413,16 @@ func goListDriverRecursiveSeq(subdirs []string, response *responseDeduper, cfg *
 		}
 	}
 
-	if response.dr.Packages == nil && response.dr.Roots == nil {
-		goListDriverRecursiveFilesSeq(subdirs, response, cfg, ctx)
+	//bz: different behaviors in mac vs linux when a set of .go files with main function are under the same dir
+	if (response.dr.Packages == nil && response.dr.Roots == nil) ||
+		(runtime.GOOS == "linux" && util.GetScopeFromGOModRecursive("", cfg.Dir) == "") {
+ 		goListDriverRecursiveFilesSeq(subdirs, response, cfg, ctx)
 	}
 }
 
 //bz: all subdir files has no go.mod, we need to check the inside files, they may be .go with main function
 func goListDriverRecursiveFilesSeq(subdirs []string, response *responseDeduper, cfg *Config, ctx context.Context) {
+	//special initial
 	response.dr.special = true
 	if response.dr.RootIdx == nil {
 		response.dr.RootIdx = make(map[int]int)
@@ -469,6 +473,16 @@ func goListDriverFile(subdir string, response *responseDeduper, _state *golistSt
 		if !strings.HasSuffix(file, ".go") {
 			continue
 		}
+		//check if already add the pkg in response.dr -> linux only
+		if runtime.GOOS == "linux" {
+			id := "_" + _state.cfg.Dir + file[1:]
+			idx := strings.LastIndex(id, "/") // remove go file name, keep the sub dir
+			id = id[0:idx]
+			if id[1:] != subdir && response.seenPackages[id] != nil { // exclude the pkg with the same string as subdir ...
+				continue
+			}
+		}
+
 		var _restPatterns []string
 		_restPatterns = append(_restPatterns, file[2:])
 		_dr, err := _state.createDriverResponse(_restPatterns...)                    //bz: run go list cmd
@@ -479,6 +493,8 @@ func goListDriverFile(subdir string, response *responseDeduper, _state *golistSt
 		if _dr != nil {
 			//bz: all go2/tests/* have pkg name "command-line-arguments" -> distinguish them
 			response.addAll(_dr)
+		}else{
+			fmt.Println("nil dr")
 		}
 	}
 }
