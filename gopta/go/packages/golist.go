@@ -390,10 +390,16 @@ func goListDriverRecursiveSeq(subdirs []string, response *responseDeduper, cfg *
 	for i := 1; i < len(subdirs)-1; i++ { //bz: 1st element is ".", the last element is "", skip them
 		subdir := subdirs[i]
 		var realDir string //os dependent var
-		if runtime.GOOS == "windows" {
+		switch curOS {
+		case "windows":
 			realDir = subdir //bz: windows path
-		} else {
+		case "linux":
+			fmt.Println(subdir)
+			realDir = cfg.Dir + subdir[2:]
+		case "darwin":
 			realDir = cfg.Dir + subdir[1:] // bz: we update this. remove the "." in subdir
+		default:
+			panic("No option for this os: " + curOS)
 		}
 
 		_cfg := &Config{
@@ -449,10 +455,16 @@ func goListDriverRecursiveFilesSeq(subdirs []string, response *responseDeduper, 
 	for i := 1; i < len(subdirs)-1; i++ { //bz: 1st element is ".", the last element is "", skip them
 		subdir := subdirs[i]
 		var realDir string //os dependent var
-		if curOS == "windows" {
+		switch curOS {
+		case "windows":
 			realDir = subdir //bz: windows path
-		} else {
+		case "linux":
+			fmt.Println(subdir)
+			realDir = cfg.Dir + subdir[2:]
+		case "darwin":
 			realDir = cfg.Dir + subdir[1:] // bz: we update this. remove the "." in subdir
+		default:
+			panic("No option for this os: " + curOS)
 		}
 		_cfg := &Config{
 			Mode:    LoadAllSyntax,
