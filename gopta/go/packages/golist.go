@@ -364,6 +364,7 @@ func handleDriverUnderDir(restPatterns []string, patterns []string, response *re
 			}
 		} else { //default: Unix (MacOS + Ubuntu)
 			if curOS == "linux" {
+				initialSpecialDriver(response)
 				goListDriverFile(cfg.Dir, response, state)
 			}
 
@@ -422,8 +423,7 @@ func goListDriverRecursiveSeq(subdirs []string, response *responseDeduper, cfg *
 	}
 }
 
-//bz: all subdir files has no go.mod, we need to check the inside files, they may be .go with main function
-func goListDriverRecursiveFilesSeq(subdirs []string, response *responseDeduper, cfg *Config, ctx context.Context) {
+func initialSpecialDriver(response *responseDeduper) {
 	response.dr.special = true
 	if response.dr.RootIdx == nil {
 		response.dr.RootIdx = make(map[int]int)
@@ -431,6 +431,11 @@ func goListDriverRecursiveFilesSeq(subdirs []string, response *responseDeduper, 
 	if response.seenSourceFiles == nil {
 		response.seenSourceFiles = make(map[string]bool)
 	}
+}
+
+//bz: all subdir files has no go.mod, we need to check the inside files, they may be .go with main function
+func goListDriverRecursiveFilesSeq(subdirs []string, response *responseDeduper, cfg *Config, ctx context.Context) {
+	initialSpecialDriver(response)
 	//start
 	for i := 1; i < len(subdirs)-1; i++ { //bz: 1st element is ".", the last element is "", skip them
 		subdir := subdirs[i]
