@@ -262,9 +262,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 		}
 		if fn.Name() == a.entryFn { //bz: for main only
 			if goID == 0 && len(a.storeFns) == 1 {
-				//a.levels[goID] = 0 // initialize level count at main entry -> bz: already initialized
 				a.loopIDs[goID] = 0
-				//a.updateRecords(fn.Name(), goID, "PUSH ", fn, nil) //bz: already pushed..
 				a.goStack = append(a.goStack, []*fnCallInfo{}) // initialize first interior slice for main goroutine
 			} else { //revisiting entry-point
 				return
@@ -345,7 +343,6 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 		for ii, theIns := range aBlock.Instrs { // examine each instruction
 			if theIns.String() == "rundefers" { // execute deferred calls at this index
 				a.recordIns(goID, theIns)
-				//a.RWIns[goID] = append(a.RWIns[goID], theIns)
 				for _, dIns := range toDefer { // ----> !!! SEE HERE: bz: the same as above, from line 307 to 347 can be separated out
 					deferIns := dIns.(*ssa.Defer)
 					a.deferToRet[deferIns] = theIns
@@ -376,7 +373,6 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 						toRUnlock = append(toRUnlock, RlockLoc)
 					} else if deferIns.Call.Value.Name() == "Done" {
 						a.recordIns(goID, dIns)
-						//a.RWIns[goID] = append(a.RWIns[goID], dIns)
 						if !useNewPTA {
 							a.mu.Lock()
 							a.ptaCfg0.AddQuery(deferIns.Call.Args[0])
@@ -448,7 +444,6 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				toRUnlock = append(toRUnlock, runlockOps...)
 			case *ssa.Alloc:
 				a.recordIns(goID, theIns)
-				//a.RWIns[goID] = append(a.RWIns[goID], theIns)
 				if a.inLoop {
 					a.allocLoop[examIns.Parent()] = append(a.allocLoop[examIns.Parent()], examIns.Comment)
 				}
@@ -481,7 +476,6 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				}
 			case *ssa.Return:
 				a.recordIns(goID, theIns)
-				//a.RWIns[goID] = append(a.RWIns[goID], theIns)
 				if examIns.Block().Comment == "if.then" || examIns.Block().Comment == "if.else" || examIns.Block().Comment == "if.done" {
 					a.ifFnReturn[fn] = examIns // will be revised iteratively to eventually contain final return instruction
 				}
@@ -494,38 +488,36 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				a.selectBloc[aBlock.Index] = examIns
 			case *ssa.If:
 				a.recordIns(goID, theIns)
-				//a.RWIns[goID] = append(a.RWIns[goID], theIns)
 				ifIns = examIns
 			default:
 				a.recordIns(goID, theIns)
-				//a.RWIns[goID] = append(a.RWIns[goID], theIns) // TODO: consolidate
 			}
-			if ii == len(aBlock.Instrs)-1 && len(toUnlock) > 0 { // TODO: this can happen too early
+			if ii == len(aBlock.Instrs)-1 && len(toUnlock) > 0 {
 				for _, l := range toUnlock {
 					if a.lockSetContainsAt(a.lockSet, l, goID) != -1 {
 						a.lockSet[goID][a.lockSetContainsAt(a.lockSet, l, goID)].locFreeze = false
 					}
 				}
-			} else if ii == len(aBlock.Instrs)-1 && len(toRUnlock) > 0 { // TODO: modify for unlock in diff thread
+				toUnlock = []ssa.Value{}
+			} else if ii == len(aBlock.Instrs)-1 && len(toRUnlock) > 0 {
 				for _, l := range toRUnlock {
 					if a.lockSetContainsAt(a.RlockSet, l, goID) != -1 {
 						a.RlockSet[goID][a.lockSetContainsAt(a.RlockSet, l, goID)].locFreeze = false
 					}
 				}
+				toRUnlock = []ssa.Value{}
 			}
 			if activeCase && readyChans[selCount] != "defaultCase" && readyChans[selCount] != "timeOut" {
 				if ii == 0 {
 					a.selectCaseBegin[theIns] = readyChans[selCount] // map first instruction in case to channel name
 					if a.RWIns[goID][len(a.RWIns[goID])-1].ins != theIns {
 						a.recordIns(goID, theIns)
-						//a.RWIns[goID] = append(a.RWIns[goID], theIns)
 					}
 					a.selectCaseBody[theIns] = selIns
 				} else if ii == len(aBlock.Instrs)-1 {
 					a.selectCaseEnd[theIns] = readyChans[selCount] // map last instruction in case to channel name
 					if a.RWIns[goID][len(a.RWIns[goID])-1].ins != theIns {
 						a.recordIns(goID, theIns)
-						//a.RWIns[goID] = append(a.RWIns[goID], theIns)
 					}
 					a.selectCaseBody[theIns] = selIns
 				} else {
@@ -538,7 +530,6 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 			if selDone && ii == 0 {
 				if sliceContainsInsInfoAt(a.RWIns[goID], theIns) == -1 {
 					a.recordIns(goID, theIns)
-					//a.RWIns[goID] = append(a.RWIns[goID], theIns)
 				}
 			}
 		}
@@ -623,14 +614,10 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 			} //TODO : modify for unlock in diff thread
 		}
 	}
-	if len(a.lockSet[goID]) > lockSetSize {
-		for i := lockSetSize; i < len(a.lockSet[goID])-1; i++ {
+	if len(a.lockSet[goID]) > lockSetSize { // lock(s) acquired in this function that have not been released ...
+		for i := lockSetSize; i < len(a.lockSet[goID]); i++ { // iterate UNreleased locks
 			log.Trace("Unlocking ", a.lockSet[goID][i].locAddr.String(), "  (", a.lockSet[goID][i].locAddr.Pos(), ") removing index ", i, " from: ", lockSetVal(a.lockSet, goID))
-			//bz: index out of bound bug ... bypass now ... TODO: fix it ..
-			id := a.goCaller[goID] //bz: what is this id ??
-			if i < len(a.lockSet[id]) {
-				a.lockSet[goID] = append(a.lockSet[id][:i], a.lockSet[goID][i+1:]...)
-			}
+			a.lockSet[goID] = append(a.lockSet[goID][:i], a.lockSet[goID][i+1:]...) // remove from lockset
 		}
 	}
 	// done with all instructions in function body, now pop the function

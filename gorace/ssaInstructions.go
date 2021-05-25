@@ -174,7 +174,6 @@ func (a *analysis) insUnOp(examIns *ssa.UnOp, goID int, theIns ssa.Instruction) 
 		//	}
 		//}
 		a.recordIns(goID, theIns)
-		//a.RWIns[goID] = append(a.RWIns[goID], theIns)
 	} else if examIns.Op == token.ARROW { // channel receive op (not waited on by select)
 		ch := examIns.X.Name()
 		if _, ok := a.chanBuf[ch]; !ok {
@@ -203,7 +202,6 @@ func (a *analysis) insUnOp(examIns *ssa.UnOp, goID int, theIns ssa.Instruction) 
 			a.chanRcvs[ch] = append(a.chanRcvs[ch], examIns)
 		}
 		a.recordIns(goID, theIns)
-		//a.RWIns[goID] = append(a.RWIns[goID], theIns)
 	}
 }
 
@@ -396,7 +394,7 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 				a.ptaCfg0.AddQuery(lockLoc)
 				a.mu.Unlock()
 			}
-			lock := &lockInfo{locAddr: lockLoc, locFreeze: false, parentFn: theIns.Parent(), locBlocInd: theIns.Block().Index}
+			lock := &lockInfo{locAddr: lockLoc, locFreeze: false, parentFn: theIns.Parent(), locBloc: theIns.Block()}
 			a.lockSet[goID] = append(a.lockSet[goID], lock)
 			log.Trace("Locking   ", lockLoc.String(), "  (", lockLoc.Pos(), ")  lockset now contains: ", lockSetVal(a.lockSet, goID))
 
@@ -409,12 +407,19 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 			}
 			lockOp := a.lockSetContainsAt(a.lockSet, lockLoc, goID) // index of locking operation
 			if lockOp != -1 {
-				if a.lockSet[goID][lockOp].parentFn == theIns.Parent() && a.lockSet[goID][lockOp].locBlocInd == theIns.Block().Index { // common block
-					log.Trace("Unlocking   ", lockLoc.String(), "  (", a.lockSet[goID][lockOp].locAddr.Pos(), ") removing index ", lockOp, " from: ", lockSetVal(a.lockSet, goID))
-					a.lockSet[goID] = append(a.lockSet[goID][:lockOp], a.lockSet[goID][lockOp+1:]...) // remove from lockset
-				} else {
+				//if a.lockSet[goID][lockOp].parentFn == theIns.Parent() && a.lockSet[goID][lockOp].locBlocInd == theIns.Block().Index { // common block
+				//	log.Trace("Unlocking   ", lockLoc.String(), "  (", a.lockSet[goID][lockOp].locAddr.Pos(), ") removing index ", lockOp, " from: ", lockSetVal(a.lockSet, goID))
+				//	a.lockSet[goID] = append(a.lockSet[goID][:lockOp], a.lockSet[goID][lockOp+1:]...) // remove from lockset
+				//} else {
+				//	unlockOps = append(unlockOps, lockLoc)
+				//	a.lockSet[goID][lockOp].locFreeze = true
+				//}
+				if strings.Contains(theIns.Block().Comment, "if") { // unlock located in if statement
 					unlockOps = append(unlockOps, lockLoc)
 					a.lockSet[goID][lockOp].locFreeze = true
+				} else {
+					log.Trace("Unlocking   ", lockLoc.String(), "  (", a.lockSet[goID][lockOp].locAddr.Pos(), ") removing index ", lockOp, " from: ", lockSetVal(a.lockSet, goID))
+					a.lockSet[goID] = append(a.lockSet[goID][:lockOp], a.lockSet[goID][lockOp+1:]...) // remove from lockset
 				}
 			}
 		case "RLock":
@@ -605,6 +610,8 @@ func (a *analysis) insSelect(examIns *ssa.Select, goID int, theIns ssa.Instructi
 
 func (a *analysis) updateLockMap(goID int, theIns ssa.Instruction) {
 	a.lockMap[theIns] = make([]ssa.Value, len(a.lockSet[goID]))
+
+
 	for i, l := range a.lockSet[goID] {
 		if !l.locFreeze {
 			a.lockMap[theIns][i] = l.locAddr

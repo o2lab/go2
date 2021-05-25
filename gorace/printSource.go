@@ -72,20 +72,25 @@ func printSource(rwPos token.Position) {
 		if lineNum == rwPos.Line {
 			tabs := len(theLine)-len(strings.TrimLeftFunc(theLine, unicode.IsSpace))
 			spaces := rwPos.Column-tabs
+
+			// top pointer
 			if spaces > 0 && strings.TrimLeftFunc(theLine, unicode.IsSpace)[spaces-1:spaces] == "[" {
-				log.Info("\t>> ", strings.Repeat("\t", tabs), strings.Repeat(" ", spaces), "v")
+				log.Info("\t   ", strings.Repeat("\t", tabs), strings.Repeat(" ", spaces), "v")
 			} else if spaces > 0 {
-				log.Info("\t>> ", strings.Repeat("\t", tabs), strings.Repeat(" ", spaces-1), "v")
+				log.Info("\t   ", strings.Repeat("\t", tabs), strings.Repeat(" ", spaces-1), "v")
 			} else if spaces == 0 {
-				log.Info("\t>> ", strings.Repeat("\t", tabs), "v")
+				log.Info("\t   ", strings.Repeat("\t", tabs), "v")
 			}
+
 			log.Info("\t>> ", theLine)
+
+			// bottom pointer
 			if spaces > 0 && strings.TrimLeftFunc(theLine, unicode.IsSpace)[spaces-1:spaces] == "[" {
-				log.Info("\t>> ", strings.Repeat("\t", tabs), strings.Repeat(" ", spaces), "^")
+				log.Info("\t   ", strings.Repeat("\t", tabs), strings.Repeat(" ", spaces), "^")
 			} else if spaces > 0 {
-				log.Info("\t>> ", strings.Repeat("\t", tabs), strings.Repeat(" ", spaces-1), "^")
+				log.Info("\t   ", strings.Repeat("\t", tabs), strings.Repeat(" ", spaces-1), "^")
 			} else if spaces == 0 {
-				log.Info("\t>> ", strings.Repeat("\t", tabs), "^")
+				log.Info("\t   ", strings.Repeat("\t", tabs), "^")
 			}
 
 		} else {

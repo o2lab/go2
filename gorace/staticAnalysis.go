@@ -505,7 +505,7 @@ type fnCallInfo struct {
 type lockInfo struct {
 	locAddr    ssa.Value
 	locFreeze  bool
-	locBlocInd int
+	locBloc		*ssa.BasicBlock
 	parentFn   *ssa.Function
 }
 
