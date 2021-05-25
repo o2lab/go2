@@ -77,13 +77,6 @@ func (r *responseDeduper) addPackageSpecial(p *Package) {
 		if r.seenPackages[p.ID] != nil && r.seenSourceFiles[file] {
 			return
 		}
-		if curOS == "linux" {
-			idx := strings.LastIndex(file, "/")
-			file = "_" + file[0:idx]
-			if r.seenPackages[file] != nil {
-				return
-			}
-		}
 
 		r.seenPackages[p.ID] = p
 		r.seenSourceFiles[p.GoFiles[0]] = true
@@ -316,7 +309,7 @@ func findRecursiveDirs(cfg *Config, ) []string {
 	return subdirs
 }
 
-//bz: as name
+//bz: as name -> recursively list all files under dir
 func findRecursiveFiles(dir string) []string {
 	cmd := exec.Command("find", ".", "-type", "f")
 	cmd.Dir = dir //set cmd dir
@@ -381,9 +374,6 @@ func handleDriverUnderDir(restPatterns []string, patterns []string, response *re
 	}
 }
 
-//bz: separate different behaviors in mac and linux
-var curOS = runtime.GOOS
-
 //bz: let's do this sequentially ....
 func goListDriverRecursiveSeq(subdirs []string, response *responseDeduper, cfg *Config, ctx context.Context, restPatterns []string) {
 	subdirs = removeDuplicateValues(subdirs)
@@ -422,7 +412,7 @@ func goListDriverRecursiveSeq(subdirs []string, response *responseDeduper, cfg *
 		}
 	}
 
-	if (response.dr.Packages == nil && response.dr.Roots == nil) || curOS == "linux" { //bz: mac os vs linux
+	if response.dr.Packages == nil && response.dr.Roots == nil {
 		goListDriverRecursiveFilesSeq(subdirs, response, cfg, ctx)
 	}
 }
@@ -445,30 +435,30 @@ func goListDriverRecursiveFilesSeq(subdirs []string, response *responseDeduper, 
 	}
 	goListDriverFile(cfg.Dir, response, _state)
 
-	//sub folders
-	for i := 1; i < len(subdirs)-1; i++ { //bz: 1st element is ".", the last element is "", skip them
-		subdir := subdirs[i]
-		var realDir string //os dependent var
-		if runtime.GOOS == "windows" {
-			realDir = subdir //bz: windows path
-		} else {
-			realDir = cfg.Dir + subdir[1:] // bz: we update this. remove the "." in subdir
-		}
-		_cfg := &Config{
-			Mode:    LoadAllSyntax,
-			Context: cfg.Context,
-			Logf:    cfg.Logf,
-			Dir:     realDir,
-			Env:     cfg.Env,
-			Tests:   cfg.Tests,
-		}
-		_state := &golistState{
-			cfg:        _cfg,
-			ctx:        ctx,
-			vendorDirs: map[string]bool{},
-		}
-		goListDriverFile(realDir, response, _state)
-	}
+	////sub folders
+	//for i := 1; i < len(subdirs)-1; i++ { //bz: 1st element is ".", the last element is "", skip them
+	//	subdir := subdirs[i]
+	//	var realDir string //os dependent var
+	//	if runtime.GOOS == "windows" {
+	//		realDir = subdir //bz: windows path
+	//	} else {
+	//		realDir = cfg.Dir + subdir[1:] // bz: we update this. remove the "." in subdir
+	//	}
+	//	_cfg := &Config{
+	//		Mode:    LoadAllSyntax,
+	//		Context: cfg.Context,
+	//		Logf:    cfg.Logf,
+	//		Dir:     realDir,
+	//		Env:     cfg.Env,
+	//		Tests:   cfg.Tests,
+	//	}
+	//	_state := &golistState{
+	//		cfg:        _cfg,
+	//		ctx:        ctx,
+	//		vendorDirs: map[string]bool{},
+	//	}
+	//	goListDriverFile(realDir, response, _state)
+	//}
 }
 
 //bz: sub routine ...
