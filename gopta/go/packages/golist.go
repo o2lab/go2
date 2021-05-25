@@ -414,8 +414,9 @@ func goListDriverRecursiveSeq(subdirs []string, response *responseDeduper, cfg *
 	}
 
 	//bz: different behaviors in mac vs linux when a set of .go files with main function are under the same dir
-	if (response.dr.Packages == nil && response.dr.Roots == nil) ||
-		(runtime.GOOS == "linux" && util.GetScopeFromGOModRecursive("", cfg.Dir) == "") {
+	if util.GetScopeFromGOModRecursive("", cfg.Dir) == "" &&
+		((response.dr.Packages == nil && response.dr.Roots == nil) || //mac
+			(runtime.GOOS == "linux" )) { // linux
  		goListDriverRecursiveFilesSeq(subdirs, response, cfg, ctx)
 	}
 }
