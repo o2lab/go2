@@ -71,7 +71,6 @@ func (a *analysis) mutuallyExcluded(goI *insInfo, I int, goJ *insInfo, J int) bo
 		for _, eachGo := range paths[i] { // concatenate call chain from each thread
 			stacks[i] = append(stacks[i], a.goStack[eachGo][:len(a.goStack[eachGo])-1]...)
 		}
-		//fnCall := fnCallIns{insPair[i].Parent(), goIDs[i]}
 		stacks[i] = append(stacks[i], insPair[i].stack...)
 	}
 	var divFnAt int
