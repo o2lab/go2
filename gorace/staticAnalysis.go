@@ -33,65 +33,39 @@ type AnalysisRunner struct {
 }
 
 
-//bz: the string return is not necessary
-func (runner *AnalysisRunner) analyzeTestEntry(main *ssa.Package) ([]*ssa.Function, string) {
-	var selectedFns []*ssa.Function
-	//bz: for analyzing tests
-	entry := "main"                                                     //bz: default value, will update later
+//bz: for analyzing tests, the string return is not necessary
+func (runner *AnalysisRunner) analyzeTestEntry(main *ssa.Package) []*ssa.Function {
 	if strings.HasSuffix(main.Pkg.Path(), ".test") || main.IsMainTest { //bz: strict end with .test or the pkg that i set
 		log.Info("Extracting test functions from PTA/CG...")
-		//for mainEntry, ptaRes := range runner.ptaResults { //bz: do not need this ...
-		tests := runner.ptaResult.GetTests()
-		if tests == nil {
-			return nil, "" //this is a main entry
+		testFns := runner.ptaResult.GetTests()// all test functions in this entry
+		if testFns == nil {
+			return nil  //this is a main entry
 		}
 		fmt.Println("The following are functions found within: ", main.String())
-		var testSelect string
-		var testFns []*ssa.Function // all test functions in this entry
 		counter := 1
-		for _, fn := range tests {
+		for _, fn := range testFns {
 			fmt.Println("Option", counter, ": ", fn.Name())
-			testFns = append(testFns, fn)
 			counter++
 		}
 		//if allEntries { // analyze all test functions -> bz: if allEntries, will not hit this code
 		//	return testFns, ""
 		//}
+
 		fmt.Print("Enter option number of choice or test name: \n")
-		fmt.Scan(&testSelect)
-		if strings.Contains(testSelect, ",") && testFns != nil { // multiple selections
-			selection := strings.Split(testSelect, ",")
-			for _, s := range selection {
-				i, _ := strconv.Atoi(s)                         // convert to integer
-				selectedFns = append(selectedFns, testFns[i-1]) // TODO: analyze multiple tests concurrently
-			}
-			entry = ""
-		} else if strings.Contains(testSelect, "-") && testFns != nil { // selected range
-			selection := strings.Split(testSelect, "-")
-			begin, _ := strconv.Atoi(selection[0])
-			end, _ := strconv.Atoi(selection[1])
-			for i := begin; i <= end; i++ {
-				selectedFns = append(selectedFns, testFns[i-1]) // TODO: analyze multiple tests concurrently
-			}
-			entry = ""
-		} else if i, err0 := strconv.Atoi(testSelect); err0 == nil && testFns != nil { // single selection
-			selectedFns = append(selectedFns, testFns[i-1]) // TODO: analyze multiple tests concurrently
-			entry = testFns[i-1].Name()
-		} else if strings.Contains(testSelect, "Test") { // user input name of test function
-			for _, fn := range testFns {
-				if fn.Name() == testSelect {
-					selectedFns = append(selectedFns, fn)
-					entry = fn.Name()
-				}
-			}
-		} else {
-			log.Error("Unrecognized input, try again.")
+		selectedFns, err := getUserSelectionFn(testFns)
+		for selectedFns == nil {
+			fmt.Println(err)
+			fmt.Print("Enter option number of choice or test name: \n")
+			selectedFns, err = getUserSelectionFn(testFns)
 		}
-		log.Info("Done  -- CG node of test function ", entry, " extracted...")
+
+		return selectedFns
+		//log.Info("Done  -- CG node of test function ", entry, " extracted.")
 	}
-	//}
-	return selectedFns, entry
+	return nil
 }
+
+
 
 //bz: update the run order of pta and checker
 //  -> sequentially now; do not provide selection of test entry
@@ -194,7 +168,7 @@ func (runner *AnalysisRunner) Run2() error {
 			selectTests = runner.ptaResult.GetTests()
 		} else {
 			//bz: select tests by users, can be nil if is main
-			selectTests, _ = runner.analyzeTestEntry(main)
+			selectTests = runner.analyzeTestEntry(main)
 		}
 
 		if selectTests == nil { //bz: is a main TODO: or main.IsMainTest == true but we cannot find/link the test func now
@@ -343,7 +317,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 	if len(mains) > 1 {
 		allEntries = true
 	}
-	_, entry := runner.analyzeTestEntry(mains[0]) //bz: unexpected behavior ...
+	selectFn := runner.analyzeTestEntry(mains[0]) //bz: unexpected behavior ...
 
 	// Iterate each entry point...
 	//var wg sync.WaitGroup
@@ -391,7 +365,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 			bindingFV:       make(map[*ssa.Go][]*ssa.FreeVar),
 			commIDs:         make(map[int][]int),
 			deferToRet:      make(map[*ssa.Defer]ssa.Instruction),
-			entryFn:         entry,
+			entryFn:         selectFn[0].Name(),
 			twinGoID:        make(map[*ssa.Go][]int),
 			//mutualTargets:   make(map[int]*mutualFns),
 		}

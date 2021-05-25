@@ -35,7 +35,7 @@ var (
 	//for our debug use: default value here: false false true
 	DEBUG          = false //bz: replace the usage for old allEntries -> print out verbose debug info
 	DEBUGHBGraph   = false //bz: print out verbose debug info in buildHB()
-	turnOnSpinning = true //bz: if we run this in goland, turn this off... this only works for terminal
+	turnOnSpinning = false //bz: if we run this in goland, turn this off... this only works for terminal
 
 	//from users yml or flags
 	allEntries    = false  //user flag

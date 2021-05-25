@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 )
 
 //bz: global -> all use the same one
@@ -125,132 +126,181 @@ func pkgSelection(initial []*packages.Package, multiSamePkgs bool) ([]*ssa.Packa
 	mainPkgs = ssautil.MainPackages(pkgs)
 	if len(mainPkgs) == 0 {
 		log.Errorf("No main function detected. ")
+		return nil, prog, pkgs
 	}
 	doEndLog("Done  -- SSA code built. " + strconv.Itoa(len(pkgs)) + " packages and " + strconv.Itoa(noFunc) + " functions detected. ")
 
+	if len(mainPkgs) == 1 {
+		return mainPkgs, prog, pkgs
+	}
+
+	if allEntries { // no selection from user required
+		fmt.Println(len(mainPkgs), "main() entry-points identified. ")
+		log.Info("Iterating through all entry point options...")
+		return mainPkgs, prog, pkgs
+	}
+
+	// Provide entry-point options and retrieve user selection
+	fmt.Println(len(mainPkgs), "main() entry-points identified: ")
+	if multiSamePkgs { //bz: all duplicate pkg name, identify by source file loc
+		for i, ep := range mainPkgs {
+			loc := ep.Pkg.Scope().Child(0).String() //bz: too much info, cannot modify lib func
+			idx := strings.Index(loc, ".go")        //this is the source file loc
+			loc = loc[:idx+3]
+			fmt.Println("Option", i+1, ": ", ep.String(), "("+loc+")")
+		}
+	} else { //bz: normal case
+		//bz: we need a check to mark duplicate pkg in a program, also tell user the diff
+		pkgMap := make(map[string][]*ssa.Package)
+		if !multiSamePkgs { //bz: must be duplicate pkg ... skip
+			for _, pkg := range mainPkgs {
+				key := pkg.String()
+				exist := pkgMap[key]
+				if exist == nil {
+					exist = make([]*ssa.Package, 1)
+					exist[0] = pkg
+				} else {
+					exist = append(exist, pkg)
+				}
+				pkgMap[key] = exist
+			}
+		}
+
+		for i, ep := range mainPkgs {
+			//bz: check if exist duplicates
+			pkgStr := ep.String()
+			if dup := pkgMap[pkgStr]; len(dup) > 1 {
+				isTest := false
+				for memName, _ := range ep.Members {
+					if isGoTestForm(memName) {
+						isTest = true
+						break
+					}
+				}
+				if isTest {
+					//bz: this is test cases for main pkg, but go ssa/pkg builder cannot identify the diff, so they use the same pkg name but different contents
+					ep.IsMainTest = true //bz: mark it -> change the code in pta is too complex, just mark it
+					fmt.Println("Option", i+1, ": ", ep.String()+".main.test")
+					continue
+				}
+			}
+			//all other
+			fmt.Println("Option", i+1, ": ", ep.String())
+		}
+	}
+	fmt.Print("Enter option number of choice: \n")
+	fmt.Print("*** use space delimiter for multiple selections *** \n")
+	fmt.Print("*** use \"-\" for a range of selections *** \n")
+	fmt.Print("*** if selecting a test pkg (i.e., ending in .test), please select ONE at a time *** \n")
+	mains, err := getUserSelectionPkg(mainPkgs, pkgs)
+	for mains == nil {
+		fmt.Println(err)
+		fmt.Println("Enter option number of choice: ")
+		mains, err = getUserSelectionPkg(mainPkgs, pkgs)
+	}
+
+	return mains, prog, pkgs
+}
+
+//bz: handle wrong input
+func getUserSelectionPkg(mainPkgs []*ssa.Package, pkgs []*ssa.Package) ([]*ssa.Package, string) {
 	var mainInd string
 	var enterAt string
 	var mains []*ssa.Package
 	userEP := false // user specified entry function
-	if len(mainPkgs) > 1 {
-		//bz: we need a check to mark duplicate pkg in a program, also tell user the diff
-		pkgMap := make(map[string][]*ssa.Package)
-		for _, pkg := range mainPkgs {
-			key := pkg.String()
-			exist := pkgMap[key]
-			if exist == nil {
-				exist = make([]*ssa.Package, 1)
-				exist[0] = pkg
-			} else {
-				exist = append(exist, pkg)
+	max := len(mainPkgs) //max length
+	fmt.Scan(&mainInd)
+	if mainInd == "-" { //bz: entry point is a random function, not test or main
+		fmt.Print("Enter function name to begin analysis from: ")
+		fmt.Scan(&enterAt)
+		for _, p := range pkgs {
+			if p != nil {
+				if fnMem, okf := p.Members[enterAt]; okf { // package contains function to enter at
+					userEP = true
+					mains = append(mainPkgs, p)
+					//entryFn = enterAt // start analysis at user specified function TODO: bz: what is the use of entryFn here?
+					_ = fnMem
+				}
 			}
-			pkgMap[key] = exist
 		}
-		//// Provide entry-point options and retrieve user selection
-		//fmt.Println(len(mainPkgs), "main() entry-points identified: ")
-		//for i, ep := range mainPkgs {
-		//	//bz: check if exist duplicate
-		//	pkgStr := ep.String()
-		//	if dup := pkgMap[pkgStr]; len(dup) > 1 {
-		//		isTest := false
-		//		for memName, _ := range ep.Members {
-		//			if isGoTestForm(memName) {
-		//				isTest = true
-		//				break
-		//			}
-		//		}
-		//		if isTest {
-		//			//bz: this is test cases for main pkg, but go ssa/pkg builder cannot identify the diff, so they use the same pkg name but different contents
-		//			ep.IsMainTest = true //bz: mark it -> change the code in pta is too complex, just mark it
-		//			fmt.Println("Option", i+1, ": ", ep.String()+".main.test")
-		//			continue
-		//		}
-		//	}
-		//	//all other
-		//	fmt.Println("Option", i+1, ": ", ep.String())
-		//}
-		if allEntries { // no selection from user required
-			fmt.Println(len(mainPkgs), "main() entry-points identified. ")
-			for pInd := 0; pInd < len(mainPkgs); pInd++ {
-				mains = append(mains, mainPkgs[pInd])
+		if !userEP { // TODO: request input again
+			return nil, "Function not found. "
+		}
+	} else if strings.Contains(mainInd, ",") { // multiple selections
+		selection := strings.Split(mainInd, ",")
+		for _, s := range selection {
+			i, _ := strconv.Atoi(s) // convert to integer
+			if i - 1 >= max {
+				return nil, "Selection out of scope: " + s
 			}
-			log.Info("Iterating through all entry point options...")
-		} else {
-			// Provide entry-point options and retrieve user selection
-			fmt.Println(len(mainPkgs), "main() entry-points identified: ")
-			if multiSamePkgs { //bz: all duplicate pkg name, identify by source file loc
-				for i, ep := range mainPkgs {
-					loc := ep.Pkg.Scope().Child(0).String() //bz: too much info, cannot modify lib func
-					idx := strings.Index(loc, ".go") //this is the source file loc
-					loc = loc[:idx + 3]
-					fmt.Println("Option", i+1, ": ", ep.String(), "(" + loc + ")")
-				}
-			}else {
-				for i, ep := range mainPkgs {
-					//bz: check if exist duplicate
-					pkgStr := ep.String()
-					if dup := pkgMap[pkgStr]; len(dup) > 1 {
-						isTest := false
-						for memName, _ := range ep.Members {
-							if isGoTestForm(memName) {
-								isTest = true
-								break
-							}
-						}
-						if isTest {
-							//bz: this is test cases for main pkg, but go ssa/pkg builder cannot identify the diff, so they use the same pkg name but different contents
-							ep.IsMainTest = true //bz: mark it -> change the code in pta is too complex, just mark it
-							fmt.Println("Option", i+1, ": ", ep.String()+".main.test")
-							continue
-						}
-					}
-					//all other
-					fmt.Println("Option", i+1, ": ", ep.String())
-				}
+			mains = append(mains, mainPkgs[i-1])
+		}
+	} else if strings.Contains(mainInd, "-") { // selected range
+		selection := strings.Split(mainInd, "-")
+		begin, _ := strconv.Atoi(selection[0])
+		end, _ := strconv.Atoi(selection[1])
+		if begin - 1 >= max || end - 1 >= max {
+			return nil, "Selection out of scope: " + mainInd
+		}
+		for i := begin; i <= end; i++ {
+			mains = append(mains, mainPkgs[i-1])
+		}
+	} else if i, err0 := strconv.Atoi(mainInd); err0 == nil {
+		if i - 1 >= max {
+			return nil, "Selection out of scope: " + strconv.Itoa(i)
+		}
+		mains = append(mains, mainPkgs[i-1])
+	} else {
+		return nil, "Unrecognized input, try again."
+	}
+	return mains, ""
+}
+
+//bz:
+func getUserSelectionFn(testFns []*ssa.Function) ([]*ssa.Function, string) {
+	var testSelect string
+	var selectedFns []*ssa.Function
+	max := len(testFns)
+	fmt.Scan(&testSelect)
+	if strings.Contains(testSelect, ",") { // multiple selections
+		selection := strings.Split(testSelect, ",")
+		for _, s := range selection {
+			i, _ := strconv.Atoi(s)                         // convert to integer
+			if i - 1 >= max {
+				return nil, "Selection out of scope: " + strconv.Itoa(i)
 			}
-			fmt.Print("Enter option number of choice: \n")
-			fmt.Print("*** use space delimiter for multiple selections *** \n")
-			fmt.Print("*** use \"-\" for a range of selections *** \n")
-			fmt.Print("*** if selecting a test folder (ie. ending in .test), please select ONE at a time *** \n")
-			fmt.Scan(&mainInd)
-			if mainInd == "-" {
-				fmt.Print("Enter function name to begin analysis from: ")
-				fmt.Scan(&enterAt)
-				for _, p := range pkgs {
-					if p != nil {
-						if fnMem, okf := p.Members[enterAt]; okf { // package contains function to enter at
-							userEP = true
-							mains = append(mainPkgs, p)
-							//entryFn = enterAt // start analysis at user specified function TODO: bz: what is the use of entryFn here?
-							_ = fnMem
-						}
-					}
-				}
-				if !userEP {
-					fmt.Print("Function not found. ") // TODO: request input again
-				}
-			} else if strings.Contains(mainInd, ",") { // multiple selections
-				selection := strings.Split(mainInd, ",")
-				for _, s := range selection {
-					i, _ := strconv.Atoi(s) // convert to integer
-					mains = append(mains, mainPkgs[i-1])
-				}
-			} else if strings.Contains(mainInd, "-") { // selected range
-				selection := strings.Split(mainInd, "-")
-				begin, _ := strconv.Atoi(selection[0])
-				end, _ := strconv.Atoi(selection[1])
-				for i := begin; i <= end; i++ {
-					mains = append(mains, mainPkgs[i-1])
-				}
-			} else if i, err0 := strconv.Atoi(mainInd); err0 == nil {
-				mains = append(mains, mainPkgs[i-1])
+			selectedFns = append(selectedFns, testFns[i-1]) // TODO: analyze multiple tests concurrently
+		}
+	} else if strings.Contains(testSelect, "-") { // selected range
+		selection := strings.Split(testSelect, "-")
+		begin, _ := strconv.Atoi(selection[0])
+		end, _ := strconv.Atoi(selection[1])
+		if begin - 1 >= max || end - 1 >= max {
+			return nil, "Selection out of scope: " + testSelect
+		}
+		for i := begin; i <= end; i++ {
+			selectedFns = append(selectedFns, testFns[i-1]) // TODO: analyze multiple tests concurrently
+		}
+	} else if i, err0 := strconv.Atoi(testSelect); err0 == nil { // single selection
+		if i - 1 >= max {
+			return nil, "Selection out of scope: " + strconv.Itoa(i)
+		}
+		selectedFns = append(selectedFns, testFns[i-1]) // TODO: analyze multiple tests concurrently
+	} else if unicode.IsLetter(rune(testSelect[0])) { // user input name of test function TODO:bz: only 1 allowed?
+		for _, fn := range testFns {
+			if fn.Name() == testSelect {
+				selectedFns = append(selectedFns, fn)
 			}
+		}
+		if len(selectedFns) == 0 {
+			return nil, "Function not found."
 		}
 	} else {
-		mains = mainPkgs
+		return nil, "Unrecognized input, try again."
 	}
-	return mains, prog, pkgs
+	return selectedFns, ""
 }
+
 
 //bz: default behavior is like this:
 // use the user input dir/getwd as default scope; if scope in yml != nil, already add it to pta scope (when decode yml)
@@ -267,7 +317,7 @@ func determineScope(main *ssa.Package, pkgs []*ssa.Package, multiSamePkgs bool) 
 
 	if multiSamePkgs {
 		PTAscope = append(PTAscope, "command-line-arguments")
-	}else if len(pkgs) == 1 {
+	} else if len(pkgs) == 1 {
 		pkg := pkgs[0]
 		files := pkg.Files()
 		tmp := pkg.Pkg.Path()
@@ -315,7 +365,7 @@ func determineScope(main *ssa.Package, pkgs []*ssa.Package, multiSamePkgs bool) 
 
 	if DEBUG { //bz: debug use
 		for _, s := range PTAscope {
-			fmt.Println(" - ",s)
+			fmt.Println(" - ", s)
 		}
 	}
 }
@@ -330,9 +380,9 @@ func recursiveGetScopeFromGoMod(tmpScope string) string {
 	for idx > 0 {
 		checkPath := curPath[:idx]
 		modScope := getScopeFromGOMod(checkPath)
-		if modScope != "" && strings.HasPrefix(tmpScope, modScope){
+		if modScope != "" && strings.HasPrefix(tmpScope, modScope) {
 			return modScope
-		}else{
+		} else {
 			idx = strings.LastIndex(checkPath, "/")
 		}
 	}
