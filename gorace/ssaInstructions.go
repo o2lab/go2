@@ -93,7 +93,6 @@ func (a *analysis) insMakeChan(examIns *ssa.MakeChan, insInd int) {
 // insSend ???
 func (a *analysis) insSend(examIns *ssa.Send, goID int, theIns ssa.Instruction) string {
 	a.recordIns(goID, theIns)
-	//a.RWIns[goID] = append(a.RWIns[goID], theIns)
 	ch := examIns.Chan.Name()
 	if _, ok := a.chanBuf[ch]; !ok {
 		switch chN := examIns.Chan.(type) {
@@ -228,15 +227,12 @@ func (a *analysis) insLookUp(examIns *ssa.Lookup, goID int, theIns ssa.Instructi
 	case *ssa.UnOp:
 		if readIns.Op == token.MUL && !isLocalAddr(readIns.X) {
 			a.recordIns(goID, theIns)
-			//a.RWIns[goID] = append(a.RWIns[goID], theIns)
 			a.updateLockMap(goID, theIns)
 			a.updateRLockMap(goID, theIns)
-			//a.ptaConfig0.AddQuery(readIns.X)
 		}
 	case *ssa.Parameter:
 		if !isLocalAddr(readIns) {
 			a.recordIns(goID, theIns)
-			//a.RWIns[goID] = append(a.RWIns[goID], theIns)
 			a.updateLockMap(goID, theIns)
 			a.updateRLockMap(goID, theIns)
 			if !useNewPTA {
@@ -345,7 +341,6 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 			case *ssa.FieldAddr:
 				if !isLocalAddr(access.X) && strings.HasPrefix(examIns.Call.Value.Name(), "Add") {
 					a.recordIns(goID, theIns)
-					//a.RWIns[goID] = append(a.RWIns[goID], theIns)
 					a.updateLockMap(goID, theIns)
 					a.updateRLockMap(goID, theIns)
 					if !useNewPTA {
@@ -509,7 +504,6 @@ func (a *analysis) insGo(examIns *ssa.Go, goID int, theIns ssa.Instruction, loop
 		a.loopIDs[newGoID] = 0
 	}
 	a.recordIns(goID, theIns)
-	//a.RWIns[goID] = append(a.RWIns[goID], theIns)
 	if goID == 0 && a.insMono == -1 { // this is first *ssa.Go instruction in main goroutine
 		a.insMono = len(a.RWIns[goID]) // race analysis will begin at this instruction
 	}
@@ -548,7 +542,6 @@ func (a *analysis) insMapUpdate(examIns *ssa.MapUpdate, goID int, theIns ssa.Ins
 
 func (a *analysis) insSelect(examIns *ssa.Select, goID int, theIns ssa.Instruction) []string {
 	a.recordIns(goID, theIns)
-	//a.RWIns[goID] = append(a.RWIns[goID], theIns)
 	defaultCase := 0
 	if !examIns.Blocking {
 		defaultCase++

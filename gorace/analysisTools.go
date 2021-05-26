@@ -65,7 +65,6 @@ type analysis struct {
 	loopIDs         map[int]int // map goID to loopID
 	allocLoop       map[*ssa.Function][]string
 	bindingFV       map[*ssa.Go][]*ssa.FreeVar
-	//pbr             *ssa.Alloc //bz: this is not used
 	commIDs    map[int][]int
 	deferToRet map[*ssa.Defer]ssa.Instruction
 
@@ -93,7 +92,14 @@ func (a *analysis) fromPkgsOfInterest(fn *ssa.Function) bool {
 			return false
 		}
 	}
-	if a.efficiency && a.main.Pkg.Path() != "command-line-arguments" && !strings.HasPrefix(fn.Pkg.Pkg.Path(), strings.Split(a.main.Pkg.Path(), "/")[0]) { // path is dependent on tested program
+
+	if a.efficiency && a.main.Pkg.Path() != "command-line-arguments" {
+		fnPath := fn.Pkg.Pkg.Path()
+		for _, eachScope := range PTAscope {
+			if strings.HasPrefix(fnPath, eachScope) {
+				return true
+			}
+		}
 		return false
 	}
 	return true
