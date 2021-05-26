@@ -62,6 +62,8 @@ func isWriteIns(ins ssa.Instruction) bool {
 		}
 	case *ssa.MapUpdate:
 		return true
+	case *ssa.ChangeType:
+		return true
 	}
 	return false
 }
@@ -139,7 +141,7 @@ func (a *analysis) insStore(examIns *ssa.Store, goID int, theIns ssa.Instruction
 		}
 	}
 	if theFunc, storeFn := examIns.Val.(*ssa.Function); storeFn {
-		a.traverseFn(theFunc, theFunc.Name(), goID, theIns, false)
+		a.traverseFn(theFunc, theFunc.Name(), goID, theIns)
 	}
 }
 
@@ -253,7 +255,7 @@ func (a *analysis) insChangeType(examIns *ssa.ChangeType, goID int, theIns ssa.I
 		theFn := mc.Fn.(*ssa.Function)
 		if a.fromPkgsOfInterest(theFn) {
 			fnName := mc.Fn.Name()
-			a.traverseFn(theFn, fnName, goID, theIns, true)
+			a.traverseFn(theFn, fnName, goID, theIns)
 			if !useNewPTA {
 				a.mu.Lock()
 				a.ptaCfg0.AddQuery(examIns.X)
@@ -381,12 +383,12 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 		}
 		fnName := examIns.Call.Value.Name()
 		fnName = checkTokenName(fnName, theIns)
-		a.traverseFn(examIns.Call.StaticCallee(), fnName, goID, theIns, false)
+		a.traverseFn(examIns.Call.StaticCallee(), fnName, goID, theIns)
 	} else if examIns.Call.StaticCallee().Pkg != nil && examIns.Call.StaticCallee().Pkg.Pkg.Name() == "sync" {
 		switch examIns.Call.Value.Name() {
 		case "Range":
 			fnName := examIns.Call.Value.Name()
-			a.traverseFn(examIns.Call.StaticCallee(), fnName, goID, theIns, false)
+			a.traverseFn(examIns.Call.StaticCallee(), fnName, goID, theIns)
 		case "Lock":
 			lockLoc := examIns.Call.Args[0] // identifier for address of lock
 			if !useNewPTA {

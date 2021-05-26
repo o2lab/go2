@@ -165,10 +165,10 @@ func (a *analysis) runChecker(multiSamePkgs bool) raceReport {
 	if a.testEntry != nil {
 		//bz: a test now uses itself as main context, tell pta which test will be analyzed for this analysis
 		a.ptaRes.AnalyzeTest(a.testEntry)
-		a.traverseFn(a.testEntry, a.testEntry.Name(), 0, nil, false)
+		a.traverseFn(a.testEntry, a.testEntry.Name(), 0, nil)
 	} else {
 		mainFn := a.main.Func(a.entryFn)
-		a.traverseFn(mainFn, mainFn.Name(), 0, nil, false)
+		a.traverseFn(mainFn, mainFn.Name(), 0, nil)
 	}
 
 	if DEBUG {
@@ -259,7 +259,7 @@ func (a *analysis) getRaceReport(multiSamePkgs bool) raceReport {
 // visitAllInstructions visits each line and calls the corresponding helper function to drive the tool
 func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 	lockSetSize := len(a.lockSet[goID])
-	a.analysisStat.nGoroutine = goID + 1 // keep count of goroutine quantity
+	//a.analysisStat.nGoroutine = goID + 1 // keep count of goroutine quantity
 	if fn == nil {
 		return
 	}
@@ -363,7 +363,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 					} else if a.fromPkgsOfInterest(deferIns.Call.StaticCallee()) && deferIns.Call.StaticCallee().Pkg.Pkg.Name() != "sync" {
 						fnName := deferIns.Call.Value.Name()
 						fnName = checkTokenNameDefer(fnName, deferIns)
-						a.traverseFn(deferIns.Call.StaticCallee(), fnName, goID, dIns, false)
+						a.traverseFn(deferIns.Call.StaticCallee(), fnName, goID, dIns)
 					} else if deferIns.Call.StaticCallee().Name() == "Unlock" {
 						lockLoc := deferIns.Call.Args[0]
 						if !useNewPTA {
@@ -565,7 +565,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 			} else if a.fromPkgsOfInterest(deferIns.Call.StaticCallee()) && deferIns.Call.StaticCallee().Pkg.Pkg.Name() != "sync" {
 				fnName := deferIns.Call.Value.Name()
 				fnName = checkTokenNameDefer(fnName, deferIns)
-				a.traverseFn(deferIns.Call.StaticCallee(), fnName, goID, dIns, false)
+				a.traverseFn(deferIns.Call.StaticCallee(), fnName, goID, dIns)
 			} else if deferIns.Call.StaticCallee().Name() == "Unlock" {
 				lockLoc := deferIns.Call.Args[0]
 				if !useNewPTA {
@@ -706,18 +706,16 @@ func (a *analysis) newGoroutine(info goroutineInfo) {
 	}
 	if target != nil {
 		//a.visitAllInstructions(target, info.goID)
-		a.traverseFn(target, target.Name(), info.goID, info.ssaIns, false)
+		a.traverseFn(target, target.Name(), info.goID, info.ssaIns)
 	}
 }
 
 // recordIns places newly encountered instructions into data structure for analyzing later
 func (a *analysis) recordIns(goID int, newIns ssa.Instruction) {
 	newInsInfo := &insInfo{ins: newIns}
-	//if !allEntries { //bz: we want this now
 	stack := make([]*fnCallInfo, len(a.storeFns))
 	copy(stack, a.storeFns)
 	newInsInfo.stack = stack
-	//}
 	a.RWIns[goID] = append(a.RWIns[goID], newInsInfo)
 }
 
@@ -790,7 +788,7 @@ func (a *analysis) updateRecords(fnName string, goID int, pushPop string, theFn 
 }
 
 //bz: call this before any call to visitAllInstructions
-func (a *analysis) traverseFn(fn *ssa.Function, fnName string, goID int, theIns ssa.Instruction, lock bool) {
+func (a *analysis) traverseFn(fn *ssa.Function, fnName string, goID int, theIns ssa.Instruction) {
 	if !a.exploredFunction(fn, goID, theIns) {
 		a.updateRecords(fnName, goID, "PUSH ", fn, theIns)
 		if theIns != nil { //bz: this happens when analyzing entry point
@@ -798,7 +796,7 @@ func (a *analysis) traverseFn(fn *ssa.Function, fnName string, goID int, theIns 
 		}
 		a.visitAllInstructions(fn, goID)
 	}
-	if lock { //bz: this happens when analyzing entry point, or from newGoroutine -> will always be false
+	if isWriteIns(theIns) || a.isReadIns(theIns) { //bz: this happens when analyzing entry point, or from newGoroutine -> will always be false
 		a.updateLockMap(goID, theIns)
 		a.updateRLockMap(goID, theIns)
 	}
