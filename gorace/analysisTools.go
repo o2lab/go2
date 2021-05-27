@@ -262,6 +262,29 @@ func (a *analysis) getRaceReport(multiSamePkgs bool) raceReport {
 	return rr
 }
 
+// visitLibFnInstructions
+func (a *analysis) visitLibFnInstructions(fn *ssa.Function, goID int) {
+	if fn == nil {
+		return
+	}
+	bVisit0 := fn.DomPreorder()
+	for _, aBlock := range bVisit0 {
+		if aBlock.Comment == "recover" {
+			continue
+		}
+		for _, theIns := range aBlock.Instrs {
+			switch examIns := theIns.(type) {
+			case *ssa.Call:
+				if examIns.Call.StaticCallee() != nil && a.fromPkgsOfInterest(examIns.Call.StaticCallee()) {
+					a.visitAllInstructions(fn, goID)
+				}
+			default:
+				continue
+			}
+		}
+	}
+}
+
 // visitAllInstructions visits each line and calls the corresponding helper function to drive the tool
 func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 	lockSetSize := len(a.lockSet[goID])
@@ -270,11 +293,12 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 		return
 	}
 	if !isSynthetic(fn) { // if function is NOT synthetic
-		if !a.fromPkgsOfInterest(fn) {
-			a.updateRecords(fn.Name(), goID, "POP  ", fn, nil)
-			a.visitGo()
-			return
-		}
+		// *** library functions are still visited if it contains fn calls of interest
+		//if !a.fromPkgsOfInterest(fn) {
+		//	a.updateRecords(fn.Name(), goID, "POP  ", fn, nil)
+		//	a.visitGo()
+		//	return
+		//}
 		if fn.Name() == a.entryFn { //bz: for main only
 			if goID == 0 && len(a.storeFns) == 1 {
 				a.loopIDs[goID] = 0
@@ -366,7 +390,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 					}
 					if deferIns.Call.StaticCallee() == nil {
 						continue
-					} else if a.fromPkgsOfInterest(deferIns.Call.StaticCallee()) && deferIns.Call.StaticCallee().Pkg.Pkg.Name() != "sync" {
+					} else if deferIns.Call.StaticCallee().Pkg.Pkg.Name() != "sync" {
 						fnName := deferIns.Call.Value.Name()
 						fnName = checkTokenNameDefer(fnName, deferIns)
 						a.traverseFn(deferIns.Call.StaticCallee(), fnName, goID, dIns)
@@ -568,7 +592,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 			}
 			if deferIns.Call.StaticCallee() == nil {
 				continue
-			} else if a.fromPkgsOfInterest(deferIns.Call.StaticCallee()) && deferIns.Call.StaticCallee().Pkg.Pkg.Name() != "sync" {
+			} else if deferIns.Call.StaticCallee().Pkg.Pkg.Name() != "sync" {
 				fnName := deferIns.Call.Value.Name()
 				fnName = checkTokenNameDefer(fnName, deferIns)
 				a.traverseFn(deferIns.Call.StaticCallee(), fnName, goID, dIns)
@@ -736,9 +760,9 @@ func (a *analysis) exploredFunction(fn *ssa.Function, goID int, theIns ssa.Instr
 		if a.fromExcludedFns(fn) {
 			return true
 		}
-		if a.efficiency && !a.fromPkgsOfInterest(fn) { // for temporary debugging purposes only
-			return true
-		}
+		//if a.efficiency && !a.fromPkgsOfInterest(fn) {
+		//	a.visitLibFnInstructions(fn, goID)
+		//}
 		if sliceContainsInsInfoAt(a.RWIns[goID], theIns) >= 0 {
 			return true
 		}
@@ -796,11 +820,15 @@ func (a *analysis) updateRecords(fnName string, goID int, pushPop string, theFn 
 //bz: call this before any call to visitAllInstructions
 func (a *analysis) traverseFn(fn *ssa.Function, fnName string, goID int, theIns ssa.Instruction) {
 	if !a.exploredFunction(fn, goID, theIns) {
-		a.updateRecords(fnName, goID, "PUSH ", fn, theIns)
-		if theIns != nil { //bz: this happens when analyzing entry point
-			a.recordIns(goID, theIns)
+		if !a.fromPkgsOfInterest(fn) {
+			a.visitLibFnInstructions(fn, goID)
+		} else {
+			a.updateRecords(fnName, goID, "PUSH ", fn, theIns)
+			if theIns != nil { //bz: this happens when analyzing entry point
+				a.recordIns(goID, theIns)
+			}
+			a.visitAllInstructions(fn, goID)
 		}
-		a.visitAllInstructions(fn, goID)
 	}
 	if isWriteIns(theIns) || a.isReadIns(theIns) { //bz: this happens when analyzing entry point, or from newGoroutine -> will always be false
 		a.updateLockMap(goID, theIns)
