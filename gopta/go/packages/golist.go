@@ -292,7 +292,7 @@ extractQueries:
 	return response.dr, nil
 }
 
-//bz: as name
+//bz: as name -> recursively list all dir under dir
 func findRecursiveDirs(cfg *Config, ) []string {
 	cmd := exec.Command("find", ".", "-type", "d")
 	cmd.Dir = cfg.Dir //set cmd dir
@@ -413,16 +413,16 @@ func goListDriverRecursiveSeq(subdirs []string, response *responseDeduper, cfg *
 		}
 	}
 
-	//bz: different behaviors in mac vs linux when a set of .go files with main function are under the same dir
+	//bz: different behaviors in mac vs linux when a set of .go files with main function are under the same dir, which has no go.mod
 	if util.GetScopeFromGOModRecursive("", cfg.Dir) == "" &&
 		((response.dr.Packages == nil && response.dr.Roots == nil) || //mac
-			(runtime.GOOS == "linux" )) { // linux
- 		goListDriverRecursiveFilesSeq(subdirs, response, cfg, ctx)
+			(runtime.GOOS == "linux")) { // linux
+		goListDriverRecursiveFilesSeq(response, cfg, ctx)
 	}
 }
 
 //bz: all subdir files has no go.mod, we need to check the inside files, they may be .go with main function
-func goListDriverRecursiveFilesSeq(subdirs []string, response *responseDeduper, cfg *Config, ctx context.Context) {
+func goListDriverRecursiveFilesSeq(response *responseDeduper, cfg *Config, ctx context.Context) {
 	//special initial
 	response.dr.special = true
 	if response.dr.RootIdx == nil {
@@ -439,31 +439,6 @@ func goListDriverRecursiveFilesSeq(subdirs []string, response *responseDeduper, 
 		vendorDirs: map[string]bool{},
 	}
 	goListDriverFile(cfg.Dir, response, _state)
-
-	////sub folders
-	//for i := 1; i < len(subdirs)-1; i++ { //bz: 1st element is ".", the last element is "", skip them
-	//	subdir := subdirs[i]
-	//	var realDir string //os dependent var
-	//	if runtime.GOOS == "windows" {
-	//		realDir = subdir //bz: windows path
-	//	} else {
-	//		realDir = cfg.Dir + subdir[1:] // bz: we update this. remove the "." in subdir
-	//	}
-	//	_cfg := &Config{
-	//		Mode:    LoadAllSyntax,
-	//		Context: cfg.Context,
-	//		Logf:    cfg.Logf,
-	//		Dir:     realDir,
-	//		Env:     cfg.Env,
-	//		Tests:   cfg.Tests,
-	//	}
-	//	_state := &golistState{
-	//		cfg:        _cfg,
-	//		ctx:        ctx,
-	//		vendorDirs: map[string]bool{},
-	//	}
-	//	goListDriverFile(realDir, response, _state)
-	//}
 }
 
 //bz: sub routine ...
