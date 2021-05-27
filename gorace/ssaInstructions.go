@@ -62,6 +62,8 @@ func isWriteIns(ins ssa.Instruction) bool {
 		}
 	case *ssa.MapUpdate:
 		return true
+	case *ssa.ChangeType:
+		return true
 	}
 	return false
 }
@@ -91,7 +93,6 @@ func (a *analysis) insMakeChan(examIns *ssa.MakeChan, insInd int) {
 // insSend ???
 func (a *analysis) insSend(examIns *ssa.Send, goID int, theIns ssa.Instruction) string {
 	a.recordIns(goID, theIns)
-	//a.RWIns[goID] = append(a.RWIns[goID], theIns)
 	ch := examIns.Chan.Name()
 	if _, ok := a.chanBuf[ch]; !ok {
 		switch chN := examIns.Chan.(type) {
@@ -139,7 +140,7 @@ func (a *analysis) insStore(examIns *ssa.Store, goID int, theIns ssa.Instruction
 		}
 	}
 	if theFunc, storeFn := examIns.Val.(*ssa.Function); storeFn {
-		a.traverseFn(theFunc, theFunc.Name(), goID, theIns, false)
+		a.traverseFn(theFunc, theFunc.Name(), goID, theIns)
 	}
 }
 
@@ -226,15 +227,12 @@ func (a *analysis) insLookUp(examIns *ssa.Lookup, goID int, theIns ssa.Instructi
 	case *ssa.UnOp:
 		if readIns.Op == token.MUL && !isLocalAddr(readIns.X) {
 			a.recordIns(goID, theIns)
-			//a.RWIns[goID] = append(a.RWIns[goID], theIns)
 			a.updateLockMap(goID, theIns)
 			a.updateRLockMap(goID, theIns)
-			//a.ptaConfig0.AddQuery(readIns.X)
 		}
 	case *ssa.Parameter:
 		if !isLocalAddr(readIns) {
 			a.recordIns(goID, theIns)
-			//a.RWIns[goID] = append(a.RWIns[goID], theIns)
 			a.updateLockMap(goID, theIns)
 			a.updateRLockMap(goID, theIns)
 			if !useNewPTA {
@@ -251,14 +249,12 @@ func (a *analysis) insChangeType(examIns *ssa.ChangeType, goID int, theIns ssa.I
 	switch mc := examIns.X.(type) {
 	case *ssa.MakeClosure: // yield closure value for *Function and free variable values supplied by Bindings
 		theFn := mc.Fn.(*ssa.Function)
-		if a.fromPkgsOfInterest(theFn) {
-			fnName := mc.Fn.Name()
-			a.traverseFn(theFn, fnName, goID, theIns, true)
-			if !useNewPTA {
-				a.mu.Lock()
-				a.ptaCfg0.AddQuery(examIns.X)
-				a.mu.Unlock()
-			}
+		fnName := mc.Fn.Name()
+		a.traverseFn(theFn, fnName, goID, theIns)
+		if !useNewPTA {
+			a.mu.Lock()
+			a.ptaCfg0.AddQuery(examIns.X)
+			a.mu.Unlock()
 		}
 	default:
 		return
@@ -334,7 +330,7 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 	} else if examIns.Call.StaticCallee() == nil {
 		//log.Debug("***********************special case*****************************************")
 		return
-	} else if a.fromPkgsOfInterest(examIns.Call.StaticCallee()) && examIns.Call.StaticCallee().Pkg.Pkg.Name() != "sync" { // calling a function
+	} else if examIns.Call.StaticCallee().Pkg.Pkg.Name() != "sync" { // calling a function
 		//if examIns.Call.Value.Name() == "AfterFunc" && examIns.Call.StaticCallee().Pkg.Pkg.Name() == "time" { // calling time.AfterFunc()
 		//	a.paramFunc = examIns.Call.Args[1]
 		//}
@@ -343,7 +339,6 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 			case *ssa.FieldAddr:
 				if !isLocalAddr(access.X) && strings.HasPrefix(examIns.Call.Value.Name(), "Add") {
 					a.recordIns(goID, theIns)
-					//a.RWIns[goID] = append(a.RWIns[goID], theIns)
 					a.updateLockMap(goID, theIns)
 					a.updateRLockMap(goID, theIns)
 					if !useNewPTA {
@@ -381,12 +376,12 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 		}
 		fnName := examIns.Call.Value.Name()
 		fnName = checkTokenName(fnName, theIns)
-		a.traverseFn(examIns.Call.StaticCallee(), fnName, goID, theIns, false)
+		a.traverseFn(examIns.Call.StaticCallee(), fnName, goID, theIns)
 	} else if examIns.Call.StaticCallee().Pkg != nil && examIns.Call.StaticCallee().Pkg.Pkg.Name() == "sync" {
 		switch examIns.Call.Value.Name() {
 		case "Range":
 			fnName := examIns.Call.Value.Name()
-			a.traverseFn(examIns.Call.StaticCallee(), fnName, goID, theIns, false)
+			a.traverseFn(examIns.Call.StaticCallee(), fnName, goID, theIns)
 		case "Lock":
 			lockLoc := examIns.Call.Args[0] // identifier for address of lock
 			if !useNewPTA {
@@ -507,7 +502,6 @@ func (a *analysis) insGo(examIns *ssa.Go, goID int, theIns ssa.Instruction, loop
 		a.loopIDs[newGoID] = 0
 	}
 	a.recordIns(goID, theIns)
-	//a.RWIns[goID] = append(a.RWIns[goID], theIns)
 	if goID == 0 && a.insMono == -1 { // this is first *ssa.Go instruction in main goroutine
 		a.insMono = len(a.RWIns[goID]) // race analysis will begin at this instruction
 	}
@@ -546,7 +540,6 @@ func (a *analysis) insMapUpdate(examIns *ssa.MapUpdate, goID int, theIns ssa.Ins
 
 func (a *analysis) insSelect(examIns *ssa.Select, goID int, theIns ssa.Instruction) []string {
 	a.recordIns(goID, theIns)
-	//a.RWIns[goID] = append(a.RWIns[goID], theIns)
 	defaultCase := 0
 	if !examIns.Blocking {
 		defaultCase++

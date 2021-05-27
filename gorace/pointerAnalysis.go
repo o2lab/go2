@@ -62,7 +62,7 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 		switch theFunc := PT0Set[rightLoc].Value().(type) {
 		case *ssa.Function:
 			fnName = theFunc.Name()
-			a.traverseFn(theFunc, fnName, goID, theIns, false)
+			a.traverseFn(theFunc, fnName, goID, theIns)
 		case *ssa.MakeInterface:
 			methodName := theIns.(*ssa.Call).Call.Method.Name()
 			if a.prog.MethodSets.MethodSet(pta0Set[location].PointsTo().DynamicTypes().Keys()[0]).Lookup(a.main.Pkg, methodName) == nil { // ignore abstract methods
@@ -70,7 +70,7 @@ func (a *analysis) pointerAnalysis(location ssa.Value, goID int, theIns ssa.Inst
 			}
 			check := a.prog.LookupMethod(pta0Set[location].PointsTo().DynamicTypes().Keys()[0], a.main.Pkg, methodName)
 			fnName = check.Name()
-			a.traverseFn(check, fnName, goID, theIns, false)
+			a.traverseFn(check, fnName, goID, theIns)
 		case *ssa.MakeChan:
 			a.chanName = theFunc.Name()
 		default:
@@ -146,7 +146,7 @@ func (a *analysis) pointerNewAnalysisHandleFunc(ptr pointer.PointerWCtx, labels 
 				a.getParam = !a.getParam
 			} else {
 				fnName = theFunc.Name()
-				a.traverseFn(theFunc, fnName, goID, theIns, false)
+				a.traverseFn(theFunc, fnName, goID, theIns)
 			}
 		case *ssa.MakeInterface:
 			switch theIns.(type) {
@@ -157,7 +157,7 @@ func (a *analysis) pointerNewAnalysisHandleFunc(ptr pointer.PointerWCtx, labels 
 				}
 				check := a.prog.LookupMethod(ptr.PointsTo().DynamicTypes().Keys()[0], a.main.Pkg, methodName)
 				fnName = check.Name()
-				a.traverseFn(check, fnName, goID, theIns, false)
+				a.traverseFn(check, fnName, goID, theIns)
 			case *ssa.Go:
 				switch theFunc.X.(type) {
 				case *ssa.Parameter:
@@ -176,7 +176,7 @@ func (a *analysis) pointerNewAnalysisHandleFunc(ptr pointer.PointerWCtx, labels 
 					break //bz: pta cannot find the target. how?
 				}
 				fnName = invokeFunc.Name()
-				a.traverseFn(invokeFunc, fnName, goID, theIns, false)
+				a.traverseFn(invokeFunc, fnName, goID, theIns)
 			}
 		default: //bz: this label is a pointer/named/interface, why not consider ...
 			isInvoke = true
@@ -190,7 +190,7 @@ func (a *analysis) pointerNewAnalysisHandleFunc(ptr pointer.PointerWCtx, labels 
 		if call, ok := theIns.(*ssa.Call); ok {
 			targets := a.ptaRes.GetInvokeFuncs(call, ptr, goInstr)
 			for _, target := range targets {
-				a.traverseFn(target, target.Name(), goID, theIns, false)
+				a.traverseFn(target, target.Name(), goID, theIns)
 			}
 		} else {
 			//bz: here will have weired behavior if running in debug mode

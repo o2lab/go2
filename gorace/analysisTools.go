@@ -65,7 +65,6 @@ type analysis struct {
 	loopIDs         map[int]int // map goID to loopID
 	allocLoop       map[*ssa.Function][]string
 	bindingFV       map[*ssa.Go][]*ssa.FreeVar
-	//pbr             *ssa.Alloc //bz: this is not used
 	commIDs    map[int][]int
 	deferToRet map[*ssa.Defer]ssa.Instruction
 
@@ -93,7 +92,14 @@ func (a *analysis) fromPkgsOfInterest(fn *ssa.Function) bool {
 			return false
 		}
 	}
-	if a.efficiency && a.main.Pkg.Path() != "command-line-arguments" && !strings.HasPrefix(fn.Pkg.Pkg.Path(), strings.Split(a.main.Pkg.Path(), "/")[0]) { // path is dependent on tested program
+
+	if a.efficiency && a.main.Pkg.Path() != "command-line-arguments" {
+		fnPath := fn.Pkg.Pkg.Path()
+		for _, eachScope := range PTAscope {
+			if strings.HasPrefix(fnPath, eachScope) {
+				return true
+			}
+		}
 		return false
 	}
 	return true
@@ -165,10 +171,10 @@ func (a *analysis) runChecker(multiSamePkgs bool) raceReport {
 	if a.testEntry != nil {
 		//bz: a test now uses itself as main context, tell pta which test will be analyzed for this analysis
 		a.ptaRes.AnalyzeTest(a.testEntry)
-		a.traverseFn(a.testEntry, a.testEntry.Name(), 0, nil, false)
+		a.traverseFn(a.testEntry, a.testEntry.Name(), 0, nil)
 	} else {
 		mainFn := a.main.Func(a.entryFn)
-		a.traverseFn(mainFn, mainFn.Name(), 0, nil, false)
+		a.traverseFn(mainFn, mainFn.Name(), 0, nil)
 	}
 
 	if DEBUG {
@@ -256,19 +262,43 @@ func (a *analysis) getRaceReport(multiSamePkgs bool) raceReport {
 	return rr
 }
 
+// visitLibFnInstructions
+func (a *analysis) visitLibFnInstructions(fn *ssa.Function, goID int) {
+	if fn == nil {
+		return
+	}
+	bVisit0 := fn.DomPreorder()
+	for _, aBlock := range bVisit0 {
+		if aBlock.Comment == "recover" {
+			continue
+		}
+		for _, theIns := range aBlock.Instrs {
+			switch examIns := theIns.(type) {
+			case *ssa.Call:
+				if examIns.Call.StaticCallee() != nil && a.fromPkgsOfInterest(examIns.Call.StaticCallee()) {
+					a.visitAllInstructions(fn, goID)
+				}
+			default:
+				continue
+			}
+		}
+	}
+}
+
 // visitAllInstructions visits each line and calls the corresponding helper function to drive the tool
 func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 	lockSetSize := len(a.lockSet[goID])
-	a.analysisStat.nGoroutine = goID + 1 // keep count of goroutine quantity
+	//a.analysisStat.nGoroutine = goID + 1 // keep count of goroutine quantity
 	if fn == nil {
 		return
 	}
 	if !isSynthetic(fn) { // if function is NOT synthetic
-		if !a.fromPkgsOfInterest(fn) {
-			a.updateRecords(fn.Name(), goID, "POP  ", fn, nil)
-			a.visitGo()
-			return
-		}
+		// *** library functions are still visited if it contains fn calls of interest
+		//if !a.fromPkgsOfInterest(fn) {
+		//	a.updateRecords(fn.Name(), goID, "POP  ", fn, nil)
+		//	a.visitGo()
+		//	return
+		//}
 		if fn.Name() == a.entryFn { //bz: for main only
 			if goID == 0 && len(a.storeFns) == 1 {
 				a.loopIDs[goID] = 0
@@ -360,10 +390,10 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 					}
 					if deferIns.Call.StaticCallee() == nil {
 						continue
-					} else if a.fromPkgsOfInterest(deferIns.Call.StaticCallee()) && deferIns.Call.StaticCallee().Pkg.Pkg.Name() != "sync" {
+					} else if deferIns.Call.StaticCallee().Pkg.Pkg.Name() != "sync" {
 						fnName := deferIns.Call.Value.Name()
 						fnName = checkTokenNameDefer(fnName, deferIns)
-						a.traverseFn(deferIns.Call.StaticCallee(), fnName, goID, dIns, false)
+						a.traverseFn(deferIns.Call.StaticCallee(), fnName, goID, dIns)
 					} else if deferIns.Call.StaticCallee().Name() == "Unlock" {
 						lockLoc := deferIns.Call.Args[0]
 						if !useNewPTA {
@@ -562,10 +592,10 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 			}
 			if deferIns.Call.StaticCallee() == nil {
 				continue
-			} else if a.fromPkgsOfInterest(deferIns.Call.StaticCallee()) && deferIns.Call.StaticCallee().Pkg.Pkg.Name() != "sync" {
+			} else if deferIns.Call.StaticCallee().Pkg.Pkg.Name() != "sync" {
 				fnName := deferIns.Call.Value.Name()
 				fnName = checkTokenNameDefer(fnName, deferIns)
-				a.traverseFn(deferIns.Call.StaticCallee(), fnName, goID, dIns, false)
+				a.traverseFn(deferIns.Call.StaticCallee(), fnName, goID, dIns)
 			} else if deferIns.Call.StaticCallee().Name() == "Unlock" {
 				lockLoc := deferIns.Call.Args[0]
 				if !useNewPTA {
@@ -706,18 +736,16 @@ func (a *analysis) newGoroutine(info goroutineInfo) {
 	}
 	if target != nil {
 		//a.visitAllInstructions(target, info.goID)
-		a.traverseFn(target, target.Name(), info.goID, info.ssaIns, false)
+		a.traverseFn(target, target.Name(), info.goID, info.ssaIns)
 	}
 }
 
 // recordIns places newly encountered instructions into data structure for analyzing later
 func (a *analysis) recordIns(goID int, newIns ssa.Instruction) {
 	newInsInfo := &insInfo{ins: newIns}
-	//if !allEntries { //bz: we want this now
 	stack := make([]*fnCallInfo, len(a.storeFns))
 	copy(stack, a.storeFns)
 	newInsInfo.stack = stack
-	//}
 	a.RWIns[goID] = append(a.RWIns[goID], newInsInfo)
 }
 
@@ -732,9 +760,9 @@ func (a *analysis) exploredFunction(fn *ssa.Function, goID int, theIns ssa.Instr
 		if a.fromExcludedFns(fn) {
 			return true
 		}
-		if a.efficiency && !a.fromPkgsOfInterest(fn) { // for temporary debugging purposes only
-			return true
-		}
+		//if a.efficiency && !a.fromPkgsOfInterest(fn) {
+		//	a.visitLibFnInstructions(fn, goID)
+		//}
 		if sliceContainsInsInfoAt(a.RWIns[goID], theIns) >= 0 {
 			return true
 		}
@@ -790,15 +818,19 @@ func (a *analysis) updateRecords(fnName string, goID int, pushPop string, theFn 
 }
 
 //bz: call this before any call to visitAllInstructions
-func (a *analysis) traverseFn(fn *ssa.Function, fnName string, goID int, theIns ssa.Instruction, lock bool) {
+func (a *analysis) traverseFn(fn *ssa.Function, fnName string, goID int, theIns ssa.Instruction) {
 	if !a.exploredFunction(fn, goID, theIns) {
-		a.updateRecords(fnName, goID, "PUSH ", fn, theIns)
-		if theIns != nil { //bz: this happens when analyzing entry point
-			a.recordIns(goID, theIns)
+		if !a.fromPkgsOfInterest(fn) {
+			a.visitLibFnInstructions(fn, goID)
+		} else {
+			a.updateRecords(fnName, goID, "PUSH ", fn, theIns)
+			if theIns != nil { //bz: this happens when analyzing entry point
+				a.recordIns(goID, theIns)
+			}
+			a.visitAllInstructions(fn, goID)
 		}
-		a.visitAllInstructions(fn, goID)
 	}
-	if lock { //bz: this happens when analyzing entry point, or from newGoroutine -> will always be false
+	if isWriteIns(theIns) || a.isReadIns(theIns) { //bz: this happens when analyzing entry point, or from newGoroutine -> will always be false
 		a.updateLockMap(goID, theIns)
 		a.updateRLockMap(goID, theIns)
 	}
