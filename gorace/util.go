@@ -309,46 +309,48 @@ func getUserSelectionFn(testFns []*ssa.Function) ([]*ssa.Function, string) {
 
 //bz: default behavior is like this:
 // use the user input dir/getwd as default scope; if scope in yml != nil, already add it to pta scope (when decode yml)
-func determineScope(main *ssa.Package, pkgs []*ssa.Package, multiSamePkgs bool) {
-	if PTAscope != nil && len(PTAscope) > 0 {
-		//bz: already determined, return
-		return
-	}
-	//bz: there are three cases:
+//Update: if is multiSamePkgs, then main must be "command-line-arguments"
+func determineScope(main *ssa.Package, pkgs []*ssa.Package) []string {
+	//bz: there are these cases:
 	// 1. user run under root dir of a project -> find the go.mod
 	// 2. user input is a .go file -> command-line-arguments
 	// 3. user run under a dir, but only one .go file (which must be the file with main function) -> command-line-arguments
-	// 4. user run under a dir, but has subdirs and/or .go files -> ??
+	// 4. user run under a dir, but has subdirs and/or .go files; some dir has go.mod, some do not
+    //NOTE: multiSamePkgs may happen in a sub dir or the usr input dir
 
-	if multiSamePkgs {
-		PTAscope = append(PTAscope, "command-line-arguments")
+	var scope []string
+	tmp := ""
+	if main.Pkg != nil {
+		tmp = main.Pkg.Path() //tmp cannot be nil if is "command-line-arguments"
+	}
+    if tmp == "command-line-arguments" {
+		scope = append(scope, "command-line-arguments")
 	} else if len(pkgs) == 1 {
-		pkg := pkgs[0]
-		files := pkg.Files()
-		tmp := pkg.Pkg.Path()
-		if len(files) == 1 && tmp == "command-line-arguments" { //only 1 file -> no specific pkg
-			PTAscope = append(PTAscope, "command-line-arguments")
-		} else { //one/multi files or sub dirs with pkg name
-			modScope := util.GetScopeFromGOModRecursive(tmp, userDir)
-			if modScope != "" {
-				PTAscope = append(PTAscope, modScope)
-			} else { //cannot locate the correct go.mod
-				PTAscope = append(PTAscope, tmp)
-			}
+		//one/multi files or sub dirs with pkg name -> main == pkgs[0]
+		modScope := util.GetScopeFromGOModRecursive(tmp, userDir)
+		if modScope != "" {
+			scope = append(scope, modScope)
+		} else { //cannot locate the correct go.mod
+			scope = append(scope, tmp)
 		}
-	} else { //multiple pkg -> see if we can find go.mod
+	} else { //multiple pkg or multiple go.mod -> see if we can find go.mod
 		modScope := util.GetScopeFromGOMod(userDir)
 		if modScope != "" {
-			PTAscope = append(PTAscope, modScope)
+			scope = append(scope, modScope)
 		} else { // multiple pkgs: 1st pkg might be the root dir that user run gorace,
 			// need to check with other pkgs, since they all share the most left pkg path
-			tmp := pkgs[0].Pkg.Path()
+			if pkgs[0].Pkg != nil {
+				tmp = pkgs[0].Pkg.Path()
+			}
 			modScope := util.GetScopeFromGOModRecursive(tmp, userDir)
 			if modScope != "" {
-				PTAscope = append(PTAscope, modScope)
+				scope = append(scope, modScope)
 			} else {
 				//cannot locate the correct go.mod
 				for _, pkg := range pkgs {
+					if pkg.Pkg == nil {
+						continue
+					}
 					p1 := pkg.Pkg.Path()
 					if strings.HasPrefix(p1, tmp) {
 						continue
@@ -357,22 +359,24 @@ func determineScope(main *ssa.Package, pkgs []*ssa.Package, multiSamePkgs bool) 
 					}
 				}
 				//until find the shortest path among all pkgs
-				PTAscope = append(PTAscope, tmp)
+				scope = append(scope, tmp)
 			}
 		}
 	}
 
 	if len(inputScope) > 0 { //user input
 		for _, s := range inputScope {
-			PTAscope = append(PTAscope, s)
+			scope = append(scope, s)
 		}
 	}
 
 	if DEBUG { //bz: debug use
-		for _, s := range PTAscope {
+		for _, s := range scope {
 			fmt.Println(" - ", s)
 		}
 	}
+
+	return scope
 }
 
 

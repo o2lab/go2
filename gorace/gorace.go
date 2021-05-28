@@ -31,7 +31,6 @@ var (
 	goTest        bool   // running test script
 	excludedFns   []string
 	testMode      = false // Used by race_test.go for collecting output.
-	PTAscope      []string
 	OS            = runtime.GOOS //bz: runtime os ... separate different behaviors in mac and linux
 
 	//for our debug use: default value here: false false true

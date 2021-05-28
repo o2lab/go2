@@ -72,6 +72,7 @@ type analysis struct {
 	testEntry  *ssa.Function   //bz: test entry point -> just one!
 	otherTests []*ssa.Function //bz: all other tests that are in the same test pkg, TODO: bz: exclude myself
 
+	scope []string          // bz: this needs to be per analysis, for both pta and checker
 	twinGoID map[*ssa.Go][]int //bz: whether two goroutines are spawned by the same loop; this might not be useful now since !sliceContains(a.reportedAddr, addressPair) && already filtered out the duplicate race check
 	//mutualTargets   map[int]*mutualFns //bz: this mutual exclusion is for this specific go id (i.e., int)
 }
@@ -95,7 +96,7 @@ func (a *analysis) fromPkgsOfInterest(fn *ssa.Function) bool {
 
 	if a.efficiency && a.main.Pkg.Path() != "command-line-arguments" {
 		fnPath := fn.Pkg.Pkg.Path()
-		for _, eachScope := range PTAscope {
+		for _, eachScope := range a.scope {
 			if strings.HasPrefix(fnPath, eachScope) {
 				return true
 			}
