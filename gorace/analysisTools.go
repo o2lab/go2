@@ -312,7 +312,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 	if _, ok := a.levels[goID]; !ok && goID > 0 { // initialize level counter for new goroutine
 		a.levels[goID] = 1
 	}
-	if goID >= len(a.RWIns) { // initialize interior slice for new goroutine
+	if fn.Name() == a.entryFn { // initialize interior slice for main goroutine
 		a.RWIns = append(a.RWIns, []*insInfo{})
 	}
 
@@ -621,7 +621,6 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				toRUnlock = append(toRUnlock, RlockLoc)
 			} else if deferIns.Call.Value.Name() == "Done" {
 				a.recordIns(goID, dIns)
-				//a.RWIns[goID] = append(a.RWIns[goID], dIns)
 				if !useNewPTA {
 					a.mu.Lock()
 					a.ptaCfg0.AddQuery(deferIns.Call.Args[0])
@@ -698,15 +697,16 @@ func (a *analysis) goNames(goIns *ssa.Go) string {
 
 // newGoroutine goes through the goroutine, logs its info, and goes through the instructions within
 func (a *analysis) newGoroutine(info goroutineInfo) {
+	if info.goID >= len(a.RWIns) { // initialize interior slice for new goroutine
+		a.RWIns = append(a.RWIns, []*insInfo{})
+	}
 	if a.goCalls[a.goCaller[info.goID]] != nil && info.goIns == a.goCalls[a.goCaller[info.goID]].goIns {
 		return // recursive spawning of same goroutine
 	}
 	//// bz: this will be pushed again in traverseFn later -> but we need this as record
 	//newFn := &fnCallInfo{fnIns: info.entryMethod, ssaIns: info.ssaIns}
 	//a.storeFns = append(a.storeFns, newFn)
-	if info.goID >= len(a.RWIns) { // initialize interior slice for new goroutine
-		a.RWIns = append(a.RWIns, []*insInfo{})
-	}
+
 	a.recordIns(info.goID, info.ssaIns)
 	newGoInfo := &goCallInfo{goIns: info.goIns, ssaIns: info.ssaIns}
 	a.goCalls[info.goID] = newGoInfo
