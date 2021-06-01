@@ -339,16 +339,19 @@ func determineScope(main *ssa.Package, pkgs []*ssa.Package) []string {
 			scope = append(scope, modScope)
 		} else { // multiple pkgs: 1st pkg might be the root dir that user run gorace,
 			// need to check with other pkgs, since they all share the most left pkg path
-			if pkgs[0].Pkg != nil {
+			// UPDATE: pkgs[i] can be nil in linux
+			if pkgs[0] != nil && pkgs[0].Pkg != nil {
 				tmp = pkgs[0].Pkg.Path()
 			}
 			modScope := util.GetScopeFromGOModRecursive(tmp, userDir)
 			if modScope != "" {
 				scope = append(scope, modScope)
+			} else if len(main.Files()) == 1 { //even though it has a pkg name, but only one .go file inside
+				scope = append(scope, "command-line-arguments")
 			} else {
-				//cannot locate the correct go.mod
+				//multiple .go files or subdirs, and cannot locate the correct go.mod
 				for _, pkg := range pkgs {
-					if pkg.Pkg == nil {
+					if pkg == nil || pkg.Pkg == nil {
 						continue
 					}
 					p1 := pkg.Pkg.Path()
