@@ -330,7 +330,7 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 	} else if examIns.Call.StaticCallee() == nil {
 		//log.Debug("***********************special case*****************************************")
 		return
-	} else if examIns.Call.StaticCallee().Pkg.Pkg.Name() != "sync" { // calling a function
+	} else if examIns.Call.StaticCallee().Pkg != nil && examIns.Call.StaticCallee().Pkg.Pkg.Name() != "sync" { // calling a function
 		//if examIns.Call.Value.Name() == "AfterFunc" && examIns.Call.StaticCallee().Pkg.Pkg.Name() == "time" { // calling time.AfterFunc()
 		//	a.paramFunc = examIns.Call.Args[1]
 		//}
