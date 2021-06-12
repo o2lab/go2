@@ -7,6 +7,7 @@ import (
 	"github.com/april1989/origin-go-tools/go/ssa"
 	log "github.com/sirupsen/logrus"
 	"github.com/twmb/algoimpl/go/graph"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -21,7 +22,7 @@ type analysis struct {
 
 	efficiency bool
 	trieLimit  int
-	//getGo        bool // flag
+	file 			*os.File
 	prog            *ssa.Program
 	main            *ssa.Package
 	analysisStat    stat
@@ -234,6 +235,22 @@ func (a *analysis) runChecker(multiSamePkgs bool) raceReport {
 	doEndLog("Done  -- Happens-Before graph built ")
 	log.Info("Checking for data races... ") //bz: no spinner -> we need to print out ...
 	//}
+
+	if _, err1 := os.Stat("race_report"); err1 != nil {
+		if os.IsNotExist(err1) {
+			fo, err2 := os.Create("race_report")
+			if err2 != nil {
+				log.Fatal(err2)
+			}
+			fo.Close()
+		}
+	}
+	f, err2 := os.OpenFile("race_report", os.O_RDWR | os.O_CREATE  | os.O_APPEND, 0666)
+	if err2 != nil {
+		log.Fatalf("error opening file: %v", err2)
+	}
+	a.file = f
+	log.SetOutput(a.file)
 	rr := a.getRaceReport(multiSamePkgs)
 	rr.racePairs = a.checkRacyPairs()
 

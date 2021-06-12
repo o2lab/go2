@@ -218,12 +218,13 @@ func (runner *AnalysisRunner) Run2() error {
 	}
 	log.Info("****************************************************************************************************\n\n") //bz: final finish line
 
+	log.SetOutput(os.Stdout)
 	if goTest {//bz: skip the following printout for go test
 		return nil
 	}
 
 	//summary report
-	fmt.Println("Summary Report:")
+	log.Info("Summary Report:")
 	raceCount := 0
 	for _, e := range runner.finalReport {
 		s := len(e.racePairs)
