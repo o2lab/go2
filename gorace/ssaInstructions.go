@@ -131,7 +131,6 @@ func (a *analysis) insStore(examIns *ssa.Store, goID int, theIns ssa.Instruction
 			}
 		}
 		a.recordIns(goID, theIns)
-		//a.RWIns[goID] = append(a.RWIns[goID], theIns)
 		a.updateLockMap(goID, theIns)
 		if !useNewPTA {
 			a.mu.Lock()
@@ -210,7 +209,6 @@ func (a *analysis) insUnOp(examIns *ssa.UnOp, goID int, theIns ssa.Instruction) 
 func (a *analysis) insFieldAddr(examIns *ssa.FieldAddr, goID int, theIns ssa.Instruction) {
 	if !isLocalAddr(examIns.X) {
 		a.recordIns(goID, theIns)
-		//a.RWIns[goID] = append(a.RWIns[goID], theIns)
 		a.updateLockMap(goID, theIns)
 		a.updateRLockMap(goID, theIns)
 		if !useNewPTA {
@@ -291,7 +289,6 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 			if theVal, ok0 := examIns.Call.Args[0].(*ssa.UnOp); ok0 {
 				if theVal.Op == token.MUL && !isLocalAddr(theVal.X) {
 					a.recordIns(goID, theIns)
-					//a.RWIns[goID] = append(a.RWIns[goID], theIns)
 					a.updateLockMap(goID, theIns)
 					a.updateRLockMap(goID, theIns)
 					if !useNewPTA {
@@ -446,7 +443,6 @@ func (a *analysis) insCall(examIns *ssa.Call, goID int, theIns ssa.Instruction) 
 			}
 		case "Wait":
 			a.recordIns(goID, theIns)
-			//a.RWIns[goID] = append(a.RWIns[goID], theIns)
 			if !useNewPTA {
 				a.mu.Lock()
 				a.ptaCfg0.AddQuery(examIns.Call.Args[0])
@@ -525,7 +521,6 @@ func (a *analysis) insGo(examIns *ssa.Go, goID int, theIns ssa.Instruction, loop
 
 func (a *analysis) insMapUpdate(examIns *ssa.MapUpdate, goID int, theIns ssa.Instruction) {
 	a.recordIns(goID, theIns)
-	//a.RWIns[goID] = append(a.RWIns[goID], theIns)
 	a.updateLockMap(goID, theIns)
 	switch ptType := examIns.Map.(type) {
 	case *ssa.UnOp:

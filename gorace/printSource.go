@@ -4,6 +4,7 @@ import (
 	"bufio"
 	log "github.com/sirupsen/logrus"
 	"go/token"
+	"math"
 	"os"
 	"regexp"
 	"strings"
@@ -40,6 +41,16 @@ func printVarName(rwPos token.Position) string {
 	spaces := rwPos.Column-tabs // should be minimum 0
 	var isStringAlphanumeric = regexp.MustCompile(`^[a-zA-Z0-9_]`).MatchString
 	for i := spaces; i < len(lineRmTabs); i++ {
+		if i == spaces && lineRmTabs[i:i+1] == "[" {
+			for j := spaces - 1; j >= 0; j-- { // backtrack to find beginning
+				if j == 0 {
+					return lineRmTabs[:i+1]
+				}
+				if !isStringAlphanumeric(lineRmTabs[j-1:j]) {
+					return lineRmTabs[j:i+1]
+				}
+			}
+		}
 		if !isStringAlphanumeric(lineRmTabs[i:i+1]) { // character is not alphanumeric
 			if lineRmTabs[i:i+1] == "]" { // array/map element
 				for j := spaces - 1; j >= 0; j-- { // backtrack to find beginning
@@ -75,26 +86,26 @@ func printSource(rwPos token.Position) {
 
 			// top pointer
 			if spaces > 0 && strings.TrimLeftFunc(theLine, unicode.IsSpace)[spaces-1:spaces] == "[" {
-				log.Info("\t   ", strings.Repeat("\t", tabs), strings.Repeat(" ", spaces), "v")
+				log.Info("\t", strings.Repeat(" ", int(math.Log10(float64(rwPos.Line)))+1), strings.Repeat("\t", tabs), strings.Repeat(" ", spaces), "v")
 			} else if spaces > 0 {
-				log.Info("\t   ", strings.Repeat("\t", tabs), strings.Repeat(" ", spaces-1), "v")
+				log.Info("\t", strings.Repeat(" ", int(math.Log10(float64(rwPos.Line)))+1), strings.Repeat("\t", tabs), strings.Repeat(" ", spaces-1), "v")
 			} else if spaces == 0 {
-				log.Info("\t   ", strings.Repeat("\t", tabs), "v")
+				log.Info("\t", strings.Repeat(" ", int(math.Log10(float64(rwPos.Line)))+1), strings.Repeat("\t", tabs), "v")
 			}
 
-			log.Info("\t>> ", theLine)
+			log.Info("\t", rwPos.Line, "|", theLine)
 
 			// bottom pointer
 			if spaces > 0 && strings.TrimLeftFunc(theLine, unicode.IsSpace)[spaces-1:spaces] == "[" {
-				log.Info("\t   ", strings.Repeat("\t", tabs), strings.Repeat(" ", spaces), "^")
+				log.Info("\t", strings.Repeat(" ", int(math.Log10(float64(rwPos.Line)))+1),  strings.Repeat("\t", tabs), strings.Repeat(" ", spaces), "^")
 			} else if spaces > 0 {
-				log.Info("\t   ", strings.Repeat("\t", tabs), strings.Repeat(" ", spaces-1), "^")
+				log.Info("\t", strings.Repeat(" ", int(math.Log10(float64(rwPos.Line)))+1), strings.Repeat("\t", tabs), strings.Repeat(" ", spaces-1), "^")
 			} else if spaces == 0 {
-				log.Info("\t   ", strings.Repeat("\t", tabs), "^")
+				log.Info("\t", strings.Repeat(" ", int(math.Log10(float64(rwPos.Line)))+1), strings.Repeat("\t", tabs), "^")
 			}
 
 		} else {
-			log.Info("\t>> ", theLine)
+			log.Info("\t", lineNum, "|", theLine)
 		}
 	}
 }
