@@ -7,6 +7,7 @@ import (
 	"github.com/april1989/origin-go-tools/go/ssa"
 	log "github.com/sirupsen/logrus"
 	"github.com/twmb/algoimpl/go/graph"
+	"io"
 	"os"
 	"strconv"
 	"strings"
@@ -245,12 +246,13 @@ func (a *analysis) runChecker(multiSamePkgs bool) raceReport {
 			fo.Close()
 		}
 	}
-	f, err2 := os.OpenFile("race_report", os.O_RDWR | os.O_CREATE  | os.O_APPEND, 0666)
+	f, err2 := os.OpenFile("races.txt", os.O_RDWR | os.O_CREATE  | os.O_APPEND, 0666)
 	if err2 != nil {
 		log.Fatalf("error opening file: %v", err2)
 	}
 	a.file = f
-	log.SetOutput(a.file)
+	consoleAndFile := io.MultiWriter(a.file, os.Stdout)
+	log.SetOutput(consoleAndFile)
 	rr := a.getRaceReport(multiSamePkgs)
 	rr.racePairs = a.checkRacyPairs()
 
