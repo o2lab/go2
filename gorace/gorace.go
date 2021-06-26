@@ -78,11 +78,7 @@ func ParseFlagsAndInput() { //default: -useNewPTA
 	analyzeAll := flag.Bool("analyzeAll", false, "Analyze all main() entry-points. ")
 	runTest := flag.Bool("runTest", false, "For micro-benchmark debugging... ")
 	showStack := flag.Bool("show", true, "Show call stack of each racy access. ")
-	//setTrie := flag.Int("trieLimit", 1, "Set trie limit... ")
 	flag.Parse()
-	//if *setTrie > 1 {
-	//	trieLimit = *setTrie
-	//}
 	if *showStack {
 		printStack = true
 	}

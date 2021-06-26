@@ -344,7 +344,6 @@ func (a *analysis) sameAddress(addr1 ssa.Value, addr2 ssa.Value, go1 int, go2 in
 		ptsets := a.ptaRes0.Queries
 		return ptsets[addr1].PointsTo().Intersects(ptsets[addr2].PointsTo())
 	}
-	// new PTA
 
 	var goInstr1 *ssa.Go
 	if go1 == 0 {
@@ -432,8 +431,6 @@ func (a *analysis) printRace(counter int, race *raceInfo) {
 	log.Printf("Data race #%d", counter)
 	log.Println(strings.Repeat("=", 100))
 	////bz: this may have problem: what if two accesses are both write? the 2nd writelocks will overwrite the 1st writelocks
-	//var writeLocks []ssa.Value
-	//var readLocks []ssa.Value
 	////bz: updated code below
 	var locks1 []ssa.Value
 	var locks2 []ssa.Value
@@ -454,7 +451,6 @@ func (a *analysis) printRace(counter int, race *raceInfo) {
 			} else {
 				locks2 = a.lockMap[anIns.ins]
 			}
-			//writeLocks = a.lockMap[anIns.ins]
 		} else {
 			access = " Read of "
 			rwPos[i] = a.prog.Fset.Position(anIns.ins.Pos())
@@ -464,7 +460,6 @@ func (a *analysis) printRace(counter int, race *raceInfo) {
 			} else {
 				locks2 = append(a.lockMap[anIns.ins], a.RlockMap[anIns.ins]...)
 			}
-			//readLocks = append(a.lockMap[anIns.ins], a.RlockMap[anIns.ins]...)
 		}
 		if testMode {
 			colorOutput := regexp.MustCompile(`\x1b\[\d+m`)

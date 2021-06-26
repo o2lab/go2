@@ -308,7 +308,6 @@ func (a *analysis) visitLibFnInstructions(fn *ssa.Function, goID int) {
 // visitAllInstructions visits each line and calls the corresponding helper function to drive the tool
 func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 	lockSetSize := len(a.lockSet[goID])
-	//a.analysisStat.nGoroutine = goID + 1 // keep count of goroutine quantity
 	if fn == nil {
 		return
 	}
@@ -441,7 +440,7 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				}
 				toDefer = []ssa.Instruction{}
 			}
-			for _, ex := range excludedPkgs { // TODO: need revision
+			for _, ex := range excludedPkgs {
 				if !isSynthetic(fn) && ex == theIns.Parent().Pkg.Pkg.Name() {
 					return
 				}
@@ -626,7 +625,6 @@ func (a *analysis) visitAllInstructions(fn *ssa.Function, goID int) {
 				toUnlock = append(toUnlock, lockLoc)
 				lockOp := a.lockSetContainsAt(a.lockSet, lockLoc, goID) // index of locking operation
 				if lockOp != -1 {
-					//if a.lockSet[goID][lockOp].parentFn == theIns.Parent() && a.lockSet[goID][lockOp].locBlocInd == theIns.Block().Index { // common block
 					log.Trace("Unlocking   ", lockLoc.String(), "  (", a.lockSet[goID][lockOp].locAddr.Pos(), ") removing index ", lockOp, " from: ", lockSetVal(a.lockSet, goID))
 					a.lockSet[goID] = append(a.lockSet[goID][:lockOp], a.lockSet[goID][lockOp+1:]...) // remove from lockset
 				}
@@ -723,8 +721,6 @@ func (a *analysis) newGoroutine(info goroutineInfo) {
 		return // recursive spawning of same goroutine
 	}
 	//// bz: this will be pushed again in traverseFn later -> but we need this as record
-	//newFn := &fnCallInfo{fnIns: info.entryMethod, ssaIns: info.ssaIns}
-	//a.storeFns = append(a.storeFns, newFn)
 
 	a.recordIns(info.goID, info.ssaIns)
 	newGoInfo := &goCallInfo{goIns: info.goIns, ssaIns: info.ssaIns}
@@ -743,7 +739,6 @@ func (a *analysis) newGoroutine(info goroutineInfo) {
 	//if DEBUG {
 	//	log.Debug(strings.Repeat(" ", a.levels[info.goID]), "PUSH ", info.entryMethod.Name(), " at lvl ", a.levels[info.goID])
 	//}
-	//a.levels[info.goID]++
 
 	var target *ssa.Function
 	switch info.goIns.Call.Value.(type) {
@@ -755,7 +750,6 @@ func (a *analysis) newGoroutine(info goroutineInfo) {
 		target = info.goIns.Call.StaticCallee()
 	}
 	if target != nil {
-		//a.visitAllInstructions(target, info.goID)
 		a.traverseFn(target, target.Name(), info.goID, info.ssaIns)
 	}
 }
@@ -780,9 +774,6 @@ func (a *analysis) exploredFunction(fn *ssa.Function, goID int, theIns ssa.Instr
 		if a.fromExcludedFns(fn) {
 			return true
 		}
-		//if a.efficiency && !a.fromPkgsOfInterest(fn) {
-		//	a.visitLibFnInstructions(fn, goID)
-		//}
 		if sliceContainsInsInfoAt(a.RWIns[goID], theIns) >= 0 {
 			return true
 		}
@@ -887,7 +878,6 @@ func (a *analysis) isReadySel(ch string) bool {
 
 //stackGo prints the callstack of a goroutine -> bz: not used now
 func (a *analysis) stackGo() {
-	//if a.getGo { // print call stack of each goroutine
 	for i := 0; i < len(a.RWIns); i++ {
 		name := "main"
 		if i > 0 {
@@ -921,5 +911,4 @@ func (a *analysis) stackGo() {
 			}
 		}
 	}
-	//}
 }
