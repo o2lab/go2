@@ -1,6 +1,5 @@
 # GoRace Detector
 
- 
 ## Build and install the tool
 
 Make sure Go is installed in the system. 
