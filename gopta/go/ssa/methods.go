@@ -84,6 +84,9 @@ func (prog *Program) addMethod(mset *methodSet, sel *types.Selection) *Function 
 		} else {
 			fn = prog.declaredFunc(obj)
 		}
+		if fn == nil {
+			return nil // e.g. instantiated generic method
+		}
 		if fn.Signature.Recv() == nil {
 			panic(fn) // missing receiver
 		}
@@ -113,14 +116,13 @@ func (prog *Program) RuntimeTypes() []types.Type {
 	return res
 }
 
-// declaredFunc returns the concrete function/method denoted by obj.
-// Panic ensues if there is none.
-//
+// declaredFunc returns the concrete function/method denoted by obj,
+// or nil if there is none (e.g. for instantiated generic methods).
 func (prog *Program) declaredFunc(obj *types.Func) *Function {
 	if v := prog.packageLevelValue(obj); v != nil {
 		return v.(*Function)
 	}
-	panic("no concrete method: " + obj.String())
+	return nil
 }
 
 // needMethodsOf ensures that runtime type information (including the
@@ -141,8 +143,14 @@ func (prog *Program) declaredFunc(obj *types.Func) *Function {
 //
 func (prog *Program) needMethodsOf(T types.Type) {
 	prog.methodsMu.Lock()
+	defer prog.methodsMu.Unlock()
+	defer func() {
+		if r := recover(); r != nil {
+			// Silently skip types that cannot be processed
+			// (e.g. instantiated generic types).
+		}
+	}()
 	prog.needMethods(T, false)
-	prog.methodsMu.Unlock()
 }
 
 // Precondition: T is not a method signature (*Signature with Recv()!=nil).
@@ -230,6 +238,14 @@ func (prog *Program) needMethods(T types.Type, skip bool) { //bz: 'skip' is neve
 	case *types.Tuple:
 		for i, n := 0, t.Len(); i < n; i++ {
 			prog.needMethods(t.At(i).Type(), false)
+		}
+
+	case *types.TypeParam:
+		// Type parameters are handled via their constraint interface.
+
+	case *types.Union:
+		for i := 0; i < t.Len(); i++ {
+			prog.needMethods(t.Term(i).Type(), false)
 		}
 
 	default:

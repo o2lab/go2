@@ -136,7 +136,9 @@ func (a *analysis) flatten(t types.Type) []*fieldInfo {
 			*types.Map,
 			*types.Interface,
 			*types.Slice,
-			*types.Pointer:
+			*types.Pointer,
+			*types.TypeParam,
+			*types.Union:
 			fl = append(fl, &fieldInfo{typ: t})
 
 		case *types.Array:

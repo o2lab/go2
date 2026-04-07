@@ -1371,6 +1371,9 @@ func (c *CallCommon) Signature() *types.Signature {
 	if c.Method != nil {
 		return c.Method.Type().(*types.Signature)
 	}
+	if fn, ok := c.Value.(*Function); ok && fn == nil {
+		return nil
+	}
 	return c.Value.Type().Underlying().(*types.Signature)
 }
 

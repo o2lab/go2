@@ -50,11 +50,20 @@ func (visit *visitor) program() {
 }
 
 func (visit *visitor) function(fn *ssa.Function) {
+	if fn == nil {
+		return
+	}
 	if !visit.seen[fn] {
 		visit.seen[fn] = true
 		var buf [10]*ssa.Value // avoid alloc in common case
 		for _, b := range fn.Blocks {
+			if b == nil {
+				continue
+			}
 			for _, instr := range b.Instrs {
+				if instr == nil {
+					continue
+				}
 				for _, op := range instr.Operands(buf[:0]) {
 					if fn, ok := (*op).(*ssa.Function); ok {
 						visit.function(fn)

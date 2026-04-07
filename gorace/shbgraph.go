@@ -11,33 +11,38 @@ import (
 // self-defined queue for traversing Happens-Before Graph
 type queue struct {
 	data []graph.Node
+	head int
 }
 
 func (q *queue) enQueue(v graph.Node) {
 	q.data = append(q.data, v)
 }
 func (q *queue) deQueue() graph.Node {
-	v := q.data[0]
-	q.data = q.data[1:]
+	v := q.data[q.head]
+	q.head++
 	return v
 }
 func (q *queue) isEmpty() bool {
-	return len(q.data) == 0
+	return q.head >= len(q.data)
 }
 func (q *queue) size() int {
-	return len(q.data)
+	return len(q.data) - q.head
 }
 
 
-// reachable determines if 2 input instructions are connected in the Happens-Before Graph
-func (a *analysis) reachable(fromIns ssa.Instruction, fromGo int, toIns ssa.Instruction, toGo int) bool {
+// reachableBFS determines if 2 input instructions are connected in the Happens-Before Graph
+func (a *analysis) reachableBFS(fromIns ssa.Instruction, fromGo int, toIns ssa.Instruction, toGo int) bool {
 	fromInsKey := goIns{ins: fromIns, goID: fromGo}
 	toInsKey := goIns{ins: toIns, goID: toGo}
-	fromNode := a.RWinsMap[fromInsKey] // starting node
-	toNode := a.RWinsMap[toInsKey]     // target node
+	fromNode, ok1 := a.RWinsMap[fromInsKey] // starting node
+	toNode, ok2 := a.RWinsMap[toInsKey]     // target node
+	if !ok1 || !ok2 {
+		return false
+	}
 
 	//use breadth-first-search to traverse the Happens-Before Graph
-	var visited []graph.Node
+	visited := make(map[interface{}]bool)
+	visited[fromNode.Value] = true
 	q := &queue{}
 	q.enQueue(fromNode)
 	for !q.isEmpty() {
@@ -47,15 +52,26 @@ func (a *analysis) reachable(fromIns ssa.Instruction, fromGo int, toIns ssa.Inst
 				return true
 			}
 			for _, neighbor := range a.HBgraph.Neighbors(node) {
-				if sliceContainsNode(visited, neighbor) {
+				if visited[neighbor.Value] {
 					continue
 				}
-				visited = append(visited, neighbor)
+				visited[neighbor.Value] = true
 				q.enQueue(neighbor)
 			}
 		}
 	}
 	return false
+}
+
+// reachable wraps reachableBFS with caching to avoid redundant BFS calls
+func (a *analysis) reachable(fromIns ssa.Instruction, fromGo int, toIns ssa.Instruction, toGo int) bool {
+	key := [4]interface{}{fromIns, fromGo, toIns, toGo}
+	if cached, ok := a.reachCache[key]; ok {
+		return cached
+	}
+	result := a.reachableBFS(fromIns, fromGo, toIns, toGo)
+	a.reachCache[key] = result
+	return result
 }
 
 func (a *analysis) buildHB() {

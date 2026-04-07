@@ -69,6 +69,7 @@ type analysis struct {
 	bindingFV       map[*ssa.Go][]*ssa.FreeVar
 	commIDs    map[int][]int
 	deferToRet map[*ssa.Defer]ssa.Instruction
+	reachCache map[[4]interface{}]bool // cache for reachable() results
 
 	entryFn    string          //bz: move from global to analysis field
 	testEntry  *ssa.Function   //bz: test entry point -> just one!
@@ -154,6 +155,7 @@ func initialAnalysis() *analysis {
 		bindingFV:       make(map[*ssa.Go][]*ssa.FreeVar),
 		commIDs:         make(map[int][]int),
 		deferToRet:      make(map[*ssa.Defer]ssa.Instruction),
+		reachCache:      make(map[[4]interface{}]bool),
 		twinGoID:        make(map[*ssa.Go][]int),
 		//mutualTargets:   make(map[int]*mutualFns),
 	}

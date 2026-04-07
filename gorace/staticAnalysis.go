@@ -142,7 +142,7 @@ func (runner *AnalysisRunner) Run2() error {
 			var err error
 			runner.ptaResult, err = pointer.Analyze(runner.ptaConfig) // conduct pointer analysis for multiple mains
 			if err != nil {
-				panic("Pointer Analysis Error: " + err.Error())
+				return fmt.Errorf("Pointer Analysis Error: %w", err)
 			}
 
 			t := time.Now()
@@ -370,6 +370,7 @@ func (runner *AnalysisRunner) Run(args []string) error {
 			bindingFV:       make(map[*ssa.Go][]*ssa.FreeVar),
 			commIDs:         make(map[int][]int),
 			deferToRet:      make(map[*ssa.Defer]ssa.Instruction),
+			reachCache:      make(map[[4]interface{}]bool),
 			entryFn:         selectFn[0].Name(),
 			twinGoID:        make(map[*ssa.Go][]int),
 			//mutualTargets:   make(map[int]*mutualFns),

@@ -596,6 +596,11 @@ func (a *analysis) rtypeTaggedValue(obj nodeid) types.Type {
 // values containing no pointers.
 //
 func (a *analysis) valueNode(v ssa.Value) nodeid {
+	// Guard against nil concrete values wrapped in non-nil interfaces
+	// (e.g. nil *ssa.Function from unresolved generic methods).
+	if fn, ok := v.(*ssa.Function); ok && fn == nil {
+		return 0
+	}
 	// Value nodes for locals are created en masse (== in a group) by genFunc.
 	if id, ok := a.localval[v]; ok {
 		return id
@@ -2065,6 +2070,12 @@ func (a *analysis) genInvokeReflectType(caller *cgnode, site *callsite, call *ss
 func (a *analysis) genCall(caller *cgnode, instr ssa.CallInstruction) {
 	call := instr.Common()
 
+	// Skip calls with nil Value (e.g. from partially-built packages
+	// that encountered generics-related panics).
+	if fn, ok := call.Value.(*ssa.Function); ok && fn == nil {
+		return
+	}
+
 	// Intrinsic implementations of built-in functions.
 	if _, ok := call.Value.(*ssa.Builtin); ok {
 		a.genBuiltinCall(instr, caller)
@@ -2234,7 +2245,7 @@ func (a *analysis) objectNodeOthers(fn *ssa.Function) nodeid {
 //bz: tell if fn is from makeclosure
 func (a *analysis) isFromMakeClosure(fn *ssa.Function) bool {
 	referrers := fn.Referrers()
-	if referrers == nil {
+	if referrers == nil || len(*referrers) == 0 {
 		return false
 	}
 
@@ -2903,7 +2914,13 @@ func (a *analysis) genFunc(cgn *cgnode) {
 	// since SSA may contain forward references.
 	var space [10]*ssa.Value
 	for _, b := range fn.Blocks {
+		if b == nil {
+			continue
+		}
 		for _, instr := range b.Instrs {
+			if instr == nil {
+				continue
+			}
 			switch instr := instr.(type) {
 			case *ssa.Range:
 				// do nothing: it has a funky type,
@@ -2937,7 +2954,13 @@ func (a *analysis) genFunc(cgn *cgnode) {
 	a.isWithinScope = a.considerMyContext(fn.String()) //global bool
 	// Generate constraints for instructions.
 	for _, b := range fn.Blocks {
+		if b == nil {
+			continue
+		}
 		for _, instr := range b.Instrs {
+			if instr == nil {
+				continue
+			}
 			a.genInstr(cgn, instr)
 		}
 	}
