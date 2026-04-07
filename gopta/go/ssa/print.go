@@ -25,6 +25,9 @@ import (
 // references are package-qualified.
 //
 func relName(v Value, i Instruction) string {
+	if fn, ok := v.(*Function); ok && fn == nil {
+		return "<nil function>"
+	}
 	var from *types.Package
 	if i != nil {
 		from = i.Parent().pkg()
@@ -127,7 +130,7 @@ func printCall(v *CallCommon, prefix string, instr Instruction) string {
 		}
 		b.WriteString(relName(arg, instr))
 	}
-	if v.Signature().Variadic() {
+	if sig := v.Signature(); sig != nil && sig.Variadic() {
 		b.WriteString("...")
 	}
 	b.WriteString(")")

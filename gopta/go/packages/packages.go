@@ -19,6 +19,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -239,7 +240,11 @@ func Load(cfg *Config, patterns ...string) ([]*Package, bool, error) {
 	if err != nil {
 		return nil, false, err
 	}
-	l.sizes = response.Sizes
+	if response.Sizes != nil {
+		l.sizes = response.Sizes
+	} else {
+		l.sizes = types.SizesFor("gc", runtime.GOARCH)
+	}
 	return l.refine(response)
 }
 
@@ -936,6 +941,9 @@ func (ld *loader) loadPackage(lpkg *loaderPackage) {
 
 		Error: appendError,
 		Sizes: ld.sizes,
+	}
+	if ld.sizes == nil {
+		tc.Sizes = types.SizesFor("gc", runtime.GOARCH)
 	}
 	if (ld.Mode & typecheckCgo) != 0 {
 		if !typesinternal.SetUsesCgo(tc) {

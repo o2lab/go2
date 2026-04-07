@@ -288,6 +288,11 @@ func buildReferrers(f *Function) {
 			rands = instr.Operands(rands[:0]) // recycle storage
 			for _, rand := range rands {
 				if r := *rand; r != nil {
+					// Guard against nil concrete values wrapped in non-nil interfaces
+					// (e.g. nil *Function from unresolved generic methods).
+					if fn, ok := r.(*Function); ok && fn == nil {
+						continue
+					}
 					if ref := r.Referrers(); ref != nil {
 						*ref = append(*ref, instr)
 					}

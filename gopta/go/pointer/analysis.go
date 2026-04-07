@@ -19,6 +19,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/april1989/origin-go-tools/go/ssa"
@@ -60,6 +61,7 @@ var (
 	//bz: for user uses
 	main2Result     map[*ssa.Package]*Result     //bz: return value of AnalyzeMultiMains(), skip redo everytime calls Analyze()
 	main2ResultWCtx map[*ssa.Package]*ResultWCtx //bz: return value of AnalyzeMultiMains(), skip redo everytime calls Analyze()
+	main2Mu         sync.Mutex                   // protects main2Result and main2ResultWCtx
 
 	//bz: for my use: coverage
 	allFns          map[string]string //bz: when DoCoverage = true: store all funcs within the scope/app, use map instead of array for an easier existence check
@@ -206,6 +208,11 @@ type analysis struct {
 	  we ONLY record this skipTypes when optHVN is on and mark indirect in genStaticCall()
 	*/
 	skipTypes map[string]string //bz: a record of skipped methods in generate() off-line
+
+	// Per-analysis solver state (moved from package-level to avoid races).
+	ptsLimit  int
+	skipIDs   map[int]int
+	skipNewFn bool
 }
 
 //bz: for callback use only
@@ -291,6 +298,8 @@ var main2Analysis map[*ssa.Package]*Result //bz: skip redo everytime calls Analy
 
 //bz: expose to my test.go only
 func GetMain2ResultWCtx() map[*ssa.Package]*ResultWCtx {
+	main2Mu.Lock()
+	defer main2Mu.Unlock()
 	return main2ResultWCtx
 }
 
@@ -598,10 +607,13 @@ func Analyze(config *Config) (result *Result, err error) {
 	}()
 
 	main := config.Mains[0] //bz: currently only handle one main
+	main2Mu.Lock()
 	if result, ok := main2Result[main]; ok {
+		main2Mu.Unlock()
 		//we already done the analysis, now find and wrap the result
 		return result, nil
 	}
+	main2Mu.Unlock()
 
 	//setting
 	if flags.DoCallback { //bz: see comments of optHVN
@@ -947,6 +959,7 @@ func translateResult(_result *ResultWCtx, main *ssa.Package) *Result {
 	}
 
 	//upate
+	main2Mu.Lock()
 	if main2Result == nil {
 		main2Result = make(map[*ssa.Package]*Result)
 	}
@@ -958,6 +971,7 @@ func translateResult(_result *ResultWCtx, main *ssa.Package) *Result {
 		main2ResultWCtx = make(map[*ssa.Package]*ResultWCtx)
 	}
 	main2ResultWCtx[main] = _result
+	main2Mu.Unlock()
 
 	//also udpate _result for new api
 	_result.Queries = result.Queries
@@ -1265,7 +1279,10 @@ func computeTotalCoverage() {
 	closure := make(map[string]string)
 	other := make(map[string]string) //others can be lib, reflect, <root>
 
-	for _, result := range main2ResultWCtx {
+	main2Mu.Lock()
+	localMain2ResultWCtx := main2ResultWCtx
+	main2Mu.Unlock()
+	for _, result := range localMain2ResultWCtx {
 		for fn, _ := range result.CallGraph.Fn2CGNode {
 			s := fn.String()
 			if _, ok := allFns[s]; ok {

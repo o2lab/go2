@@ -677,7 +677,8 @@ func (b *builder) expr0(fn *Function, e ast.Expr, tv types.TypeAndValue) Value {
 		// Universal built-in or nil?
 		switch obj := obj.(type) {
 		case *types.Builtin:
-			return &Builtin{name: obj.Name(), sig: tv.Type.(*types.Signature)}
+			sig, _ := tv.Type.(*types.Signature)
+			return &Builtin{name: obj.Name(), sig: sig}
 		case *types.Nil:
 			return nilConst(tv.Type)
 		}
@@ -2241,16 +2242,27 @@ func (prog *Program) Build() {
 	var wg sync.WaitGroup
 	for _, p := range prog.packages {
 		if prog.mode&BuildSerially != 0 {
-			p.Build()
+			safeBuildPackage(p)
 		} else {
 			wg.Add(1)
 			go func(p *Package) {
-				p.Build()
-				wg.Done()
+				defer wg.Done()
+				safeBuildPackage(p)
 			}(p)
 		}
 	}
 	wg.Wait()
+}
+
+// safeBuildPackage builds a package, recovering from panics caused by
+// unhandled type constructs (e.g. Go generics in standard library internals).
+func safeBuildPackage(p *Package) {
+	defer func() {
+		if r := recover(); r != nil {
+			// Silently skip packages that cannot be built.
+		}
+	}()
+	p.Build()
 }
 
 // Build builds SSA code for all functions and vars in package p.

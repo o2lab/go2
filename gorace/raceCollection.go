@@ -19,9 +19,12 @@ func (a *analysis) canRunInParallel(goID1 int, goID2 int) bool {
 	divFn := &fnCallInfo{nil, nil} // fn where divergence happens
 	for i, ID := range goIDs {     // for each thread
 		for ID > 0 { // traverse up the call chain
-			paths[i] = append([]int{ID}, paths[i]...) // prepend
-			temp := a.goCaller[ID]
-			ID = temp
+			paths[i] = append(paths[i], ID)
+			ID = a.goCaller[ID]
+		}
+		// Reverse in-place to get root-first order
+		for l, r := 0, len(paths[i])-1; l < r; l, r = l+1, r-1 {
+			paths[i][l], paths[i][r] = paths[i][r], paths[i][l]
 		}
 		for _, eachGo := range paths[i] { // concatenate call chain from each thread
 			stacks[i] = append(stacks[i], a.goStack[eachGo]...)
@@ -64,9 +67,12 @@ func (a *analysis) mutuallyExcluded(goI *insInfo, I int, goJ *insInfo, J int) bo
 	divFn := &fnCallInfo{nil, nil} // fn where divergence happens
 	for i, ID := range goIDs {     // for each thread
 		for ID > 0 { // traverse up the call chain
-			paths[i] = append([]int{ID}, paths[i]...) // prepend
-			temp := a.goCaller[ID]
-			ID = temp
+			paths[i] = append(paths[i], ID)
+			ID = a.goCaller[ID]
+		}
+		// Reverse in-place to get root-first order
+		for l, r := 0, len(paths[i])-1; l < r; l, r = l+1, r-1 {
+			paths[i][l], paths[i][r] = paths[i][r], paths[i][l]
 		}
 		for _, eachGo := range paths[i] { // concatenate call chain from each thread
 			stacks[i] = append(stacks[i], a.goStack[eachGo][:len(a.goStack[eachGo])-1]...)
@@ -243,11 +249,11 @@ func (a *analysis) checkRacyPairs() []*raceInfo {
 						if a.sameAddress(addressPair[0], addressPair[1], i, j) &&
 							!strictSliceContains(races, addressPair) && //bz: this has no duplicated race locations
 							//!sliceContains(a, races, addressPair, i, j) && //bz: this reports the same race locations with different traces/goids
+							!a.bothAtomic(insSlice[0].ins, insSlice[1].ins) &&
+							!a.selectMutEx(insSlice[0].ins, insSlice[1].ins) &&
+							!a.lockSetsIntersect(goI.ins, goJ.ins, i, j) &&
 							!a.reachable(goI.ins, i, goJ.ins, j) &&
 							!a.reachable(goJ.ins, j, goI.ins, i) &&
-							!a.bothAtomic(insSlice[0].ins, insSlice[1].ins) &&
-							!a.lockSetsIntersect(goI.ins, goJ.ins, i, j) &&
-							!a.selectMutEx(insSlice[0].ins, insSlice[1].ins) &&
 							!a.mutuallyExcluded(goI, i, goJ, j) {
 						//&& !a.fromLibrary(addressPair)
 							ri = &raceInfo{

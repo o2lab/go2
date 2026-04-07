@@ -122,7 +122,12 @@ func makeWrapper(prog *Program, sel *types.Selection) *Function {
 		if !isPointer(r) {
 			v = emitLoad(fn, v)
 		}
-		c.Call.Value = prog.declaredFunc(obj)
+		callee := prog.declaredFunc(obj)
+		if callee == nil {
+			// Cannot resolve method (e.g. instantiated generic).
+			return nil
+		}
+		c.Call.Value = callee
 		c.Call.Args = append(c.Call.Args, v)
 	} else {
 		c.Call.Method = obj
@@ -268,6 +273,9 @@ func makeThunk(prog *Program, sel *types.Selection) *Function {
 	fn, ok := prog.thunks[key]
 	if !ok {
 		fn = makeWrapper(prog, sel)
+		if fn == nil {
+			return nil // e.g. instantiated generic method
+		}
 		if fn.Signature.Recv() != nil {
 			panic(fn) // unexpected receiver
 		}

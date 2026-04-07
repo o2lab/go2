@@ -298,6 +298,21 @@ func (h Hasher) hashFor(t types.Type) uint32 {
 
 	case *types.Tuple:
 		return h.hashTuple(t)
+
+	case *types.TypeParam:
+		return uint32(t.Index())
+
+	case *types.Union:
+		var hash uint32 = 9151
+		for i := 0; i < t.Len(); i++ {
+			term := t.Term(i)
+			elemHash := h.Hash(term.Type())
+			if term.Tilde() {
+				elemHash *= 9161
+			}
+			hash += elemHash
+		}
+		return hash
 	}
 	panic(t)
 }

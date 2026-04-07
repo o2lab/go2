@@ -20,12 +20,8 @@ type solverState struct {
 	prevPTS nodeset      // pts(n) in previous iteration (for difference propagation)
 }
 
-//bz: to limit the size of pts
-var (
-	ptsLimit  int
-	skipIDs   map[int]int //these pts reach the ptsLimit, skip their solving if added to worklist
-	skipNewFn bool        //bz: do we skip create new fn/cgn/constraints on the fly in invokeConstraint.solve
-)
+// NOTE: ptsLimit, skipIDs, and skipNewFn were moved to the analysis struct
+// to avoid concurrent map access when multiple analyses run in parallel.
 
 func (a *analysis) solve() {
 	if flags.DoPerformance { //bz: performance dump info
@@ -124,13 +120,13 @@ func (a *analysis) solveDefault() {
 //bz: solve(); use when flags.PTSLimit > 0
 func (a *analysis) solveLimit() {
 	//setting
-	ptsLimit = flags.PTSLimit
+	a.ptsLimit = flags.PTSLimit
 	if len(a.constraints) > 5000000 {
-		skipNewFn = true //bz: too much ... cannot finish
+		a.skipNewFn = true //bz: too much ... cannot finish
 	}
-	skipIDs = make(map[int]int)
+	a.skipIDs = make(map[int]int)
 	if flags.DoPrintInfo {
-		fmt.Println(" *** PTS Limit:", ptsLimit, "*** ")
+		fmt.Println(" *** PTS Limit:", a.ptsLimit, "*** ")
 	}
 
 	// Solver main loop.
@@ -146,7 +142,7 @@ func (a *analysis) solveLimit() {
 			break // empty worklist
 		}
 
-		if _, ok := skipIDs[x]; ok { //bz: skip its solving for those pts size reach limit
+		if _, ok := a.skipIDs[x]; ok { //bz: skip its solving for those pts size reach limit
 			continue
 		}
 
@@ -172,8 +168,8 @@ func (a *analysis) solveLimit() {
 		//	skipIDs[x] = x
 		//}
 
-		if n.solve.pts.Len() >= ptsLimit { //bz: check then copy
-			skipIDs[x] = x
+		if n.solve.pts.Len() >= a.ptsLimit { //bz: check then copy
+			a.skipIDs[x] = x
 			n.solve.prevPTS.Clear()
 			continue
 		}else {
@@ -476,7 +472,7 @@ func (c *invokeConstraint) solve(a *analysis, delta *nodeset) {
 		fnObj := a.globalobj[fn] // dynamic calls use shared contour  ---> bz: fnObj is nodeid
 
 		if fnObj == 0 { //bz: because a.objectNode(fn) was not called during gen phase or fn is stored at other fields
-			if skipNewFn {
+			if a.skipNewFn {
 				//bz: already too many cgn/fn ... skip creating on the fly TODO: this needs to be fixed
 				return
 			}
